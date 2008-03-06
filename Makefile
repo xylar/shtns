@@ -5,4 +5,4 @@
 cmd = gcc -O3
 
 sphere : sphere.c Makefile
-	$(cmd) sphere.c -lgsl -lgslcblas -lm -o sphere
+	$(cmd) sphere.c -lfftw3 -lgsl -lgslcblas -lm -o sphere

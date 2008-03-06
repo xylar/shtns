@@ -16,17 +16,29 @@
 #define MMAX 0
 #define LMMAX ( ((MMAX+1)*(2*LMAX+2-MMAX))/2 )
 #define NLAT (LMAX+1)
+#define NPHI (MMAX*2)
 
 #define LM(l,m) ((m*(2*LMAX +1-m))/2 + l)
 
 double pi = atan(1)*4;
-double *ylm;
-double *dylm;
+double *ylm, *dylm, *iylm;
 
 // ((MMAX+1)*(2*LMAX+2-MMAX))/2 -1
 
+fftw_plan ifft, fft;		// plans de FFTW.
+double fft_norm;			// normalisation required for the Direct Fourier Transform.
+
+complex double *Slm;
+complex double *ShF;
+double *Sh;
+	
+double xg[NLAT];
+double wg[NLAT];
+
 double spat[NLAT];
 double spec[LMMAX];
+
+unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
 
 // Generates the abscissa and weights for a Gauss-Legendre quadrature.
@@ -85,16 +97,76 @@ void write_vect(char *fn, double *vec, int N)
 	fclose(fp);
 }
 
+void runerr(const char * error_text)
+{
+	printf("*** Run-time error : %s\n",error_text);
+	exit(1);
+}
+
+void planFFT()	// les FFTs. STRIDE = 1 (m's ranges en contigus.)
+{
+	int nfft = NPHI;
+	int ncplx = NPHI/2 +1;
+	int nreal;
+	
+	nreal = 2*ncplx;
+	
+// Allocate Spatial Fields.
+	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	Sh = (double *) ShF;	// alias for inplace.
+
+	printf("[FFTW] Mmax=%d, Nphi=%d\n",MMAX,NPHI);
+
+	if (NPHI < 2*MMAX) runerr("[FFTW] the condition Nphi >= 2*Mmax is not met.");
+	if (NPHI < 3*MMAX) printf("       ! Warning : 2/3 rule for anti-aliasing not met !\n");
+
+// IFFT : unnormalized.
+	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, 1, ncplx, Sh, &nreal, 1, nreal, fftw_plan_mode);
+	if (ifft == NULL)
+		runerr("[FFTW] ifft planning failed !");
+
+// FFT : must be normalized.
+	fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, 1, nreal, ShF, &ncplx, 1, ncplx, fftw_plan_mode);
+	if (fft == NULL)
+		runerr("[FFTW] fft planning failed !");
+
+	fft_norm = 1.0/nfft;
+}
+
+void init_HS()
+{
+	int i,m;
+	
+	Gauss(xg,wg,NLAT);	// generate gauss nodes and weights
+
+// for synthesis (inverse transform)
+	ylm = (double *) malloc(sizeof(double)* LMMAX*NLAT);
+	dylm = (double *) malloc(sizeof(double)* LMMAX*NLAT);
+	
+	for (i=0;i<NLAT;i++) {
+		for (m=0; m<=MMAX; m++) {
+			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[i], &ylm[i*LMMAX + LM(m,m)], &dylm[i*LMMAX + LM(m,m)]);	// fixed m legendre functions lookup table.
+		}
+	}
+	
+// for analysis (decomposition, direct transform) : transpose and multiply by gauss weight.
+	iylm = (double *) malloc(sizeof(double)* LMMAX*NLAT);
+	
+	for (i=0;i<NLAT;i++) {
+		for (m=0; m<LMMAX; m++) {
+			iylm[m*NLAT + i] = ylm[i*LMMAX + m] * wg[i];
+		}
+	}
+}
+
 
 int main()
 {
-	double xg[NLAT];
-	double wg[NLAT];
 
 	double t,tmax;
 	int i,m;
 
-	Gauss(xg,wg,NLAT);
+	init_HS();
 
 	tmax = 0.0;
 	for (i = 0; i<NLAT; i++) {
@@ -104,13 +176,7 @@ int main()
 	}
 	printf("max zero : %g\n",tmax);
 
-	ylm = (double *) malloc(sizeof(double)* LMMAX*NLAT);
-	dylm = (double *) malloc(sizeof(double)* LMMAX*NLAT);
-
-	m = 0;
-	for (i=0;i<NLAT;i++) {
-	 	gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[i], &ylm[i*LMMAX], &dylm[i*LMMAX]);	// table des fonctions de legendre à m fixé.
-	}
+//	planFFT();
 
 // test case :
 	for (m=0;m<LMMAX;m++) spec[m] = 0.0;
@@ -142,6 +208,16 @@ int main()
 	}
 
 	write_vect("spec1",spec,LMMAX);
+
+// DECOMPOSITION (OPTIMIZED)
+	for (m=0;m<LMMAX;m++) {
+		spec[m] = 0.0;
+		for (i=0;i<NLAT;i++) {
+			spec[m] += iylm[m*NLAT + i] * spat[i];
+		}
+	}
+
+	write_vect("spec2",spec,LMMAX);
 
 }
 
