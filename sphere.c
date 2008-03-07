@@ -253,6 +253,11 @@ for (jj=0;jj<1000;jj++) {
 			}
 		}
 	}
+	for (m=MMAX+1;m<=NPHI/2;m++) {		// padding for high m's
+		for (i=0;i<NLAT;i++) {
+			ShF[m*NLAT +i] = 0.0;
+		}
+	}
 	fftw_execute(ifft);
 //	write_mx("sph",Sh,NPHI,NLAT);
 
