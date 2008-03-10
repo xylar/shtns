@@ -11,14 +11,24 @@
 #include <gsl/gsl_sf_legendre.h>
 
 
-
+// LMAX : maximum degree of Spherical Harmonic
 #define LMAX 79
+// MMAX : max number of fourrier decomposition (degree = MMAX * MRES)
 #define MMAX 32
-#define LMMAX ( ((MMAX+1)*(2*LMAX+2-MMAX))/2 )
+// MRES : azimutal symmetry
+#define MRES 2
+// LMMAX : total number of Spherical Harmonic coefficients.
+//#define LMMAX ( ((MMAX+1)*(2*LMAX+2-MMAX))/2 )
+#define LMMAX ( (MMAX+1)*(LMAX+1) - MRES* MMAX*(MMAX+1)/2 )
+// NLAT : number of latitudinal (theta) gauss points, at least LMAX+1, should be EVEN
 #define NLAT (LMAX+1)
+// NPHI : number of azimutal grid points, at least MMAX*2
 #define NPHI (MMAX*2)
 
-#define LM(l,m) ((m*(2*LMAX +1-m))/2 + l)
+// LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
+//#define LM(l,m) ((m*(2*LMAX +1-m))/2 + l)
+#define LM(l,m) ( (m/MRES)*(2*LMAX+3 -m)/2 + l-m )
+#define LiM(l,im) ( im*(2*LMAX+3 -(im+2)*MRES)/2 + l )
 
 double pi = atan(1)*4;
 
@@ -77,7 +87,7 @@ void Gauss(double *x, double *w, int n)
 		w[n-i] = w[i-1];
 	}
 
-// as we started with initial guesses, we should check if the gauss points are unique.
+// as we started with initial guesses, we should check if the gauss points are actually unique.
 	for (i=n; i>0; i--) {
 		if (x[i] == x[i-1]) {
 			printf("ERROR : bad gauss points !\n");
@@ -120,7 +130,7 @@ void runerr(const char * error_text)
 	exit(1);
 }
 
-void planFFT()	// les FFTs. STRIDE = NLAT (m's ranges en contigus.)
+void planFFT()	// les FFTs. STRIDE = NLAT (l ranges en contigus.)
 {
 	int nfft = NPHI;
 	int ncplx = NPHI/2 +1;
@@ -150,63 +160,71 @@ void planFFT()	// les FFTs. STRIDE = NLAT (m's ranges en contigus.)
 	fft_norm = 1.0/nfft;
 }
 
+int tm[MMAX+1];		// start theta value for spherical harmonics. (because at the pole the legendre polynoms go to zero for high m's
+
 void init_HS()
 {
-	int i,m,l;
+	int it,im,m,l;
+	double eps= 1.e-14;	// precision : polar coefficients below that threshold are neglected (for high ms)
+
+	if (MMAX*MRES > LMAX) runerr("[init_HS] resolution mismatch : MMAX*MRES should not exceed LMAX");
+	if (NLAT <= LMAX) runerr("[init_HS] resolution mismatch : NLAT should be at least LMAX+1");
 	
-	planFFT();
+	planFFT();		// initialize fftw
 	Gauss(xg,wg,NLAT);	// generate gauss nodes and weights
 
 // for synthesis (inverse transform)
-	for (m=0; m<=MMAX; m++) {
-		ylm[m] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT);
-		for (i=0;i<NLAT;i++) {
-//			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[i], ylm[m], &dylm[i*LMMAX + LM(m,m)]);	// fixed m legendre functions lookup table.
-			gsl_sf_legendre_sphPlm_array(LMAX, m, xg[i], ylm[m] + i*(LMAX-m+1));	// fixed m legendre functions lookup table.
+	for (im=0; im<=MMAX; im++) {
+		m = im*MRES;
+		ylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT);
+		for (it=0;it<NLAT;it++) {
+//			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[it], ylm[im], &dylm[it*LMMAX + LM(im,im)]);	// fixed im legendre functions lookup table.
+			gsl_sf_legendre_sphPlm_array(LMAX, m, xg[it], ylm[im] + it*(LMAX-m+1));	// fixed im legendre functions lookup table.
 		}
 	}
 	
 // for analysis (decomposition, direct transform) : transpose and multiply by gauss weight.
-	for (m=0; m<=MMAX; m++) {
-		iylm[m] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT);
-		for (i=0;i<NLAT;i++) {
+	for (im=0; im<=MMAX; im++) {
+		m = im*MRES;
+		iylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT);
+		for (it=0;it<NLAT;it++) {
 			for (l=m;l<=LMAX;l++) {
-				iylm[m][(l-m)*NLAT + i] = ylm[m][i*(LMAX-m+1) + (l-m)] * wg[i] *2.0*pi* fft_norm;
+				iylm[im][(l-m)*NLAT + it] = ylm[im][it*(LMAX-m+1) + (l-m)] * wg[it] *2.0*pi* fft_norm;
 			}
 		}
 	}
-}
 
-	int tm[MMAX+1];
-
-
-analyse_HS()
-{
-	int i,m,l;
-	double eps= 1.e-6;
-	
-	for (m=0;m<=MMAX;m++) {
-		tm[m] = 1.0*NLAT;
+// POLAR OPTIMIZATION : analysing coefficients, some can be neglected.
+	for (im=0;im<=MMAX;im++) {
+		m = im*MRES;
+		tm[im] = 1.0*NLAT;
 		for (l=m;l<=LMAX;l++) {
-			i=0;
-			while( ylm[m][i*(LMAX-m+1) + (l-m)] < eps ) { i++; }
-			if (tm[m] > i) tm[m] = i;
+			it=0;
+			while( ylm[im][it*(LMAX-m+1) + (l-m)] < eps ) { it++; }
+			if (tm[im] > it) tm[im] = it;
 		}
-//		tm[m] = 0;
+//		tm[im] = 0;	// this would cancel the optimisation.
 	}
 
 //	write_vect("tm",tm,MMAX+1);
+	for (im=0;im<=MMAX;im++)
+		printf("%d ",tm[im]);
+
 }
+
+
 
 int main()
 {
+	complex double fp[NLAT/2];	// partie symetrique
+	complex double fm[NLAT/2];	// partie anti-sym
 
 	double t,tmax;
-	int i,m,l,jj;
+	int i,im,m,l,jj;
 
 	init_HS();
-	analyse_HS();
 
+// TEST if gauss points are ok.
 	tmax = 0.0;
 	for (i = 0; i<NLAT; i++) {
 		t = gsl_sf_legendre_sphPlm(NLAT, 0, xg[i]);
@@ -235,46 +253,135 @@ int main()
 	}
 	
 	Slm[LM(0,0)] = 1.0;
-	Slm[LM(3,3)] = 2.0;
 	Slm[LM(3,1)] = 3.0;
+	Slm[LM(3,3)] = 2.0;
 	Slm[LM(10,5)] = 4.0;
-	Slm[LM(55,30)] = 5.0;
+	Slm[LM(55,12)] = 5.0;
 	
-for (jj=0;jj<1000;jj++) {
+for (jj=0;jj<3000;jj++) {
 
 // synthese (inverse legendre)
-	for (m=0;m<=MMAX;m++) {
+	for (im=0;im<=MMAX;im++) {
+		m = im*MRES;
+/*
+// Initial version without symmetric/antisymmetric optimization
 		for (i=0;i<NLAT;i++) {
-			ShF[m*NLAT +i] = 0.0;
+			ShF[im*NLAT +i] = 0.0;
 		}
-		for (i=tm[m];i<NLAT-tm[m];i++) {	// optimize
+		for (i=tm[im];i<NLAT-tm[im];i++) {	// ops : 2*(lmax-m+1)*NLAT
 			for(l=m;l<=LMAX;l++) {
-				ShF[m*NLAT +i] += ylm[m][i*(LMAX-m+1) + (l-m)] * Slm[LM(l,m)];
+				ShF[im*NLAT +i] += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LM(l,m)];
 			}
 		}
-	}
-	for (m=MMAX+1;m<=NPHI/2;m++) {		// padding for high m's
+*/
+
+/* EVEN - ODD optimized
 		for (i=0;i<NLAT;i++) {
-			ShF[m*NLAT +i] = 0.0;
+			ShF[im*NLAT +i] = 0.0;
+		}
+		for (i=tm[im];i<NLAT/2;i++) {		// ops : 3*(lmax-m+1)*NLAT/2	= 25% faster
+			for(l=m;l<=LMAX;l+=2) {		// EVEN
+				t = ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LM(l,m)];
+				ShF[im*NLAT +i] += t;
+				ShF[im*NLAT +NLAT-(i+1)] += t;
+			}
+			for(l=m+1;l<=LMAX;l+=2) {	// ODD
+				t = ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LM(l,m)];
+				ShF[im*NLAT +i] += t;
+				ShF[im*NLAT +NLAT-(i+1)] -= t;
+			}
+		}
+*/
+		i=0;
+		while (i<tm[im]) {	// polar optimization
+			ShF[im*NLAT + i] = 0.0;
+//			ShF[im*NLAT + NLAT-(i+1)] = 0.0;	// south pole zeroes
+			ShF[im*NLAT + NLAT-tm[im] + i] = 0.0;	// south pole zeroes
+			i++;
+		}
+		while (i<NLAT/2) {	// NLAT/2 * [ (lmax-m+1)*2 + 6]	: almost twice as fast.
+			fp[i] = 0.0;	fm[i] = 0.0;
+			l=m;
+			while (l<LMAX) {	// compute even and odd parts
+				fp[i] += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LM(l,m)];
+				fm[i] += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Slm[LM(l+1,m)];
+				l+=2;
+			}
+			if (l==LMAX) {
+				fp[i] += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LM(l,m)];
+			}
+			ShF[im*NLAT +i] = fp[i] + fm[i];
+			ShF[im*NLAT + NLAT-(i+1)] = fp[i] - fm[i];
+			i++;
+		}
+	}
+	for (im=MMAX+1;im<=NPHI/2;im++) {		// padding for high m's
+		for (i=0;i<NLAT;i++) {
+			ShF[im*NLAT +i] = 0.0;
 		}
 	}
 	fftw_execute(ifft);
 //	write_mx("sph",Sh,NPHI,NLAT);
 
+
 // analyse (direct legendre)
 	fftw_execute(fft);
-	for (m=0;m<=MMAX;m++) {
+	for (im=0;im<=MMAX;im++) {
+		m=im*MRES;
+
+/*		UNOPTIMIZED
 		for (l=m;l<=LMAX;l++) {
 			Slm[LM(l,m)] = 0.0;
 //			for (i=0;i<NLAT;i++) {
-			for (i=tm[m];i<NLAT-tm[m];i++) {
-				Slm[LM(l,m)] += iylm[m][(l-m)*NLAT + i] * ShF[m*NLAT + i];
+			for (i=tm[im];i<NLAT-tm[im];i++) {
+				Slm[LM(l,m)] += iylm[im][(l-m)*NLAT + i] * ShF[im*NLAT + i];
 			}
 		}
+*/
+
+		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
+			fp[i] = ShF[im*NLAT + i] + ShF[im*NLAT + NLAT-(i+1)];
+			fm[i] = ShF[im*NLAT + i] - ShF[im*NLAT + NLAT-(i+1)];
+		}
+
+		l=m;
+		while (l<LMAX) {
+			Slm[LM(l,m)] = 0.0;	Slm[LM(l+1,m)] = 0.0;
+			for (i=tm[im];i<NLAT/2;i++) {	// tm[im] : polar optimization
+				Slm[LM(l,m)] += iylm[im][(l-m)*NLAT + i] * fp[i];
+			}
+			for (i=tm[im];i<NLAT/2;i++) {	// tm[im] : polar optimization
+				Slm[LM(l+1,m)] += iylm[im][(l+1-m)*NLAT + i] * fm[i];
+			}
+			l+=2;
+		}
+		if (l==LMAX) {
+			Slm[LM(l,m)] = 0.0;
+			for (i=tm[im];i<NLAT/2;i++) {	// polar optimization
+				Slm[LM(l,m)] += iylm[im][(l-m)*NLAT + i] * fp[i];
+			}
+		}
+/*	alternative : on calcule d'abord les pairs puis les impairs, mais un peu moins bon au niveau du cache...
+		for (l=m;l<=LMAX;l+=2) {	// l-m pair (0, 2 ...)
+			Slm[LM(l,m)] = 0.0;
+//			for (i=0;i<NLAT;i++) {
+			for (i=tm[im];i<NLAT/2;i++) {	// polar optimization
+				Slm[LM(l,m)] += iylm[im][(l-m)*NLAT + i] * fp[i];
+			}
+		}
+		for (l=m+1;l<=LMAX;l+=2) {	// l-m impair (1, 3, ...)
+			Slm[LM(l,m)] = 0.0;
+//			for (i=0;i<NLAT;i++) {
+			for (i=tm[im];i<NLAT/2;i++) {	// polar optimization
+				Slm[LM(l,m)] += iylm[im][(l-m)*NLAT + i] * fm[i];
+			}
+		}
+*/
 	}
-//	write_vect("ylm",Slm,LMMAX*2);
 
 }
+
+	write_vect("ylm",Slm,LMMAX*2);
 
 }
 
