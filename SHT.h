@@ -3,10 +3,10 @@ Parmeter file for Spherical Harmonics Transform.
 LMAX, NLAT, MMAX, MRES, NPHI
 */
 
-// SIZES  //
+//  SIZES  //
 // LMAX : maximum degree of Spherical Harmonic
 #define LMAX 79
-// NLAT : number of latitudinal (theta) gauss points, at least (LMAX+1), should be EVEN
+// NLAT : number of latitudinal (theta) gauss points, at least (LMAX+1), must be EVEN
 #define NLAT (LMAX+1)
 
 // MMAX : max number of fourrier decomposition (degree = MMAX * MRES)
@@ -17,7 +17,7 @@ LMAX, NLAT, MMAX, MRES, NPHI
 // NPHI : number of azimutal grid points, at least 2*MMAX or 3*MMAX for antialiasing.
 #define NPHI (2*MMAX)
 
-// ADDITIONAL FINE TUNING
+//  ADDITIONAL FINE TUNING  //
 // POLAR_OPT_THRESHOLD : value under wich the polar values of the Legendre Polynomials Plm are neglected,
 // leading to increased performance (a few percent)
 // 0 = no polar optimization;  1.e-14 = very safe;  1.e-10 = safe;  1.e-6 = aggresive.

@@ -22,9 +22,10 @@
 #define LM(l,m) ( (m/MRES)*(2*LMAX+3 -m)/2 + l-m )
 #define LiM(l,im) ( im*(2*LMAX+3 -(im+2)*MRES)/2 + l )
 
-double pi = atan(1)*4;
+double pi = atan(1.0)*4.0;
 
 double* ylm[MMAX+1];	// matrix for direct transform
+double* dtylm[MMAX+1];	// matrix for direct transform
 double* iylm[MMAX+1];	// matrix for inverse transform
 int tm[MMAX+1];		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 
@@ -40,41 +41,40 @@ void spat_to_SH(complex double *ShF, complex double *Slm)
 {
 	complex double fp[NLAT/2];	// symmetric (even) part
 	complex double fm[NLAT/2];	// anti-symmetric (odd) part
+	complex double *Sl;		// virtual pointers for given im
+	double *iyl;
 	int i,im,m,l;
 
 	fftw_execute(fft);
-/*
-// UNOPTIMIZED
-	for (im=0;im<=MMAX;im++) {
-		m=im*MRES;
-		for (l=m;l<=LMAX;l++) {		// ops : 2*NLAT*(LMAX-m+1)
-			Slm[LM(l,m)] = 0.0;
-			for (i=tm[im];i<NLAT-tm[im];i++) {
-				Slm[LM(l,m)] += iylm[im][(l-m)*NLAT + i] * ShF[im*NLAT + i];
-			}
-		}
-	}
-*/
-// OPTIMIZED.
+
 	for (im=0;im<=MMAX;im++) {
 		m=im*MRES;
 		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
-			fp[i] = ShF[im*NLAT + i] + ShF[im*NLAT + NLAT-(i+1)];
-			fm[i] = ShF[im*NLAT + i] - ShF[im*NLAT + NLAT-(i+1)];
+			fp[i] = ShF[i] + ShF[NLAT-(i+1)];
+			fm[i] = ShF[i] - ShF[NLAT-(i+1)];
 		}
 		l=m;
+		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
+		iyl = iylm[im];
+		ShF += NLAT;
 		while (l<LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
-			Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
+//			Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
+			Sl[l] = 0.0;	Sl[l+1] = 0.0;
 			for (i=tm[im];i<NLAT/2;i++) {	// tm[im] : polar optimization
-				Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT + i] * fp[i];
-				Slm[LiM(l+1,im)] += iylm[im][(l+1-m)*NLAT + i] * fm[i];
+//				Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
+				Sl[l] += iyl[i] * fp[i];
+//				Slm[LiM(l+1,im)] += iylm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+				Sl[l+1] += iyl[NLAT/2 + i] * fm[i];
 			}
 			l+=2;
+			iyl += NLAT;
 		}
 		if (l==LMAX) {
-			Slm[LiM(l,im)] = 0.0;
+//			Slm[LiM(l,im)] = 0.0;
+			Sl[l] = 0.0;
 			for (i=tm[im];i<NLAT/2;i++) {	// polar optimization
-				Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT + i] * fp[i];
+//				Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
+				Sl[l] += iyl[i] * fp[i];
 			}
 		}
 	}
@@ -84,53 +84,46 @@ void SH_to_spat(complex double *Slm, complex double *ShF)
 {
 	complex double fp[NLAT/2];	// symmetric (even) part
 	complex double fm[NLAT/2];	// anti-symmetric (odd) part
+	complex double *Sl;
+	double *yl;
 	int i,im,m,l;
 
-/*
-// UNOPTIMIZED
-	for (im=0;im<=MMAX;im++) {
+	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-		for (i=0;i<NLAT;i++) {
-			ShF[im*NLAT +i] = 0.0;
-		}
-		for (i=tm[im];i<NLAT-tm[im];i++) {	// ops : 2*(lmax-m+1)*NLAT
-			for(l=m;l<=LMAX;l++) {
-				ShF[im*NLAT +i] += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LM(l,m)];
-			}
-		}
-	}
-*/
-// OPTIMIZED
-	for (im=0;im<=MMAX;im++) {
-		m = im*MRES;
+		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 		i=0;
 		while (i<tm[im]) {	// polar optimization
-			ShF[im*NLAT + i] = 0.0;
+			ShF[i] = 0.0;
 //			ShF[im*NLAT + NLAT-(i+1)] = 0.0;	// south pole zeroes
-			ShF[im*NLAT + NLAT-tm[im] + i] = 0.0;	// south pole zeroes
+			ShF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes
 			i++;
 		}
+		yl = ylm[im] + i*(LMAX-m+1) -m;
 		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			fp[i] = 0.0;	fm[i] = 0.0;
 			l=m;
 			while (l<LMAX) {	// compute even and odd parts
-				fp[i] += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
-				fm[i] += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Slm[LiM(l+1,im)];
+//				fp[i] += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
+				fp[i] += yl[l] * Sl[l];
+//				fm[i] += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Slm[LiM(l+1,im)];
+				fm[i] += yl[l+1] * Sl[l+1];
 				l+=2;
 			}
 			if (l==LMAX) {
-				fp[i] += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
+//				fp[i] += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
+				fp[i] += yl[l] * Sl[l];
 			}
-			ShF[im*NLAT +i] = fp[i] + fm[i];
-			ShF[im*NLAT + NLAT-(i+1)] = fp[i] - fm[i];
+			ShF[i] = fp[i] + fm[i];
+			ShF[NLAT-(i+1)] = fp[i] - fm[i];
 			i++;
+			yl += (LMAX-m+1);
 		}
+		ShF += NLAT;
 	}
-
-	for (im=MMAX+1;im<=NPHI/2;im++) {		// padding for high m's
-		for (i=0;i<NLAT;i++) {
-			ShF[im*NLAT +i] = 0.0;
-		}
+	for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
+		for (i=0;i<NLAT;i++)
+			ShF[i] = 0.0;
+		ShF += NLAT;
 	}
 
 	fftw_execute(ifft);
@@ -235,7 +228,7 @@ void init_SH()
 #ifdef _SH_DEBUG_
 // TEST if gauss points are ok.
 	tmax = 0.0;
-	for (it = 0; it<NLAT; it++) {
+	for (it = 0; it<NLAT/2; it++) {
 		t = gsl_sf_legendre_sphPlm(NLAT, 0, xg[it]);
 		if (t>tmax) tmax = t;
 //		printf("i=%d, x=%12.12g, p=%12.12g\n",i,xg[i],t);
@@ -243,23 +236,24 @@ void init_SH()
 	printf("          max zero at Gauss node for Plm[l=LMAX+1,m=0] : %g\n",tmax);
 #endif
 
+// Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT/2 points required.
 // for synthesis (inverse transform)
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
 		ylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT);
-		for (it=0;it<NLAT;it++) {
-//			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[it], ylm[im], &dylm[it*LMMAX + LM(im,im)]);	// fixed im legendre functions lookup table.
-			gsl_sf_legendre_sphPlm_array(LMAX, m, xg[it], ylm[im] + it*(LMAX-m+1));	// fixed im legendre functions lookup table.
+		dtylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT/2);
+		for (it=0;it<NLAT/2;it++) {
+			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[it], ylm[im] + it*(LMAX-m+1), dtylm[im] + it*(LMAX-m+1));	// fixed im legendre functions lookup table.
 		}
 	}
 	
 // for analysis (decomposition, direct transform) : transpose and multiply by gauss weight.
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-		iylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT);
-		for (it=0;it<NLAT;it++) {
+		iylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT/2);
+		for (it=0;it<NLAT/2;it++) {
 			for (l=m;l<=LMAX;l++) {
-				iylm[im][(l-m)*NLAT + it] = ylm[im][it*(LMAX-m+1) + (l-m)] * wg[it] *iylm_fft_norm;
+				iylm[im][(l-m)*NLAT/2 + it] = ylm[im][it*(LMAX-m+1) + (l-m)] * wg[it] *iylm_fft_norm;
 			}
 		}
 	}

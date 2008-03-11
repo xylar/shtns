@@ -64,6 +64,20 @@ int main()
 	fftw_execute(fft);
 	write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
 
+// test Ylm :
+	im = 0; l=0; m=im*MRES;
+	write_vect("y00",&iylm[im][(l-m)*NLAT/2],NLAT/2);
+	im = 0; l=1; m=im*MRES;
+	write_vect("y10",&iylm[im][(l-m)*NLAT/2],NLAT/2);
+	im = 0; l=LMAX; m=im*MRES;
+	write_vect("yLmax0",&iylm[im][(l-m)*NLAT/2],NLAT/2);
+	im = MMAX; m=im*MRES; l=m;
+	write_vect("ymmax-mmax",&iylm[im][(l-m)*NLAT/2],NLAT/2);
+	im = 3; l=8; m=im*MRES;
+	write_vect("y83",&iylm[im][(l-m)*NLAT/2],NLAT/2);
+	im = 30; l=65; m=im*MRES;
+	write_vect("y6530",&iylm[im][(l-m)*NLAT/2],NLAT/2);
+
 // test case...
 	Slm = (complex double *) malloc(sizeof(complex double)* LMMAX);
 	for (i=0;i<LMMAX;i++) {
