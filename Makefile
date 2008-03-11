@@ -4,5 +4,5 @@
 # le compilateur :
 cmd = gcc -O3
 
-sphere : sphere.c Makefile
+sphere : sphere.c SHT.c SHT.h Makefile
 	$(cmd) sphere.c -lfftw3 -lgsl -lgslcblas -lm -o sphere
