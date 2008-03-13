@@ -21,6 +21,6 @@ LMAX, NLAT, MMAX, MRES, NPHI
 // POLAR_OPT_THRESHOLD : value under wich the polar values of the Legendre Polynomials Plm are neglected,
 // leading to increased performance (a few percent)
 // 0 = no polar optimization;  1.e-14 = very safe;  1.e-10 = safe;  1.e-6 = aggresive.
-#define POLAR_OPT_THRESHOLD 1.e-10
+#define POLAR_OPT_THRESHOLD 1.e-6
 // compute and print some debugging information...
 #define _SH_DEBUG_

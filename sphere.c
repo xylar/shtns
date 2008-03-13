@@ -51,6 +51,9 @@ int main()
 
 	init_SH();
 
+	ShF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+	Sh = (double *) ShF;
+
 // test FFT :
 	for(i=0;i<NLAT*(NPHI/2+1);i++) {
 		ShF[i] = 0;
@@ -59,34 +62,34 @@ int main()
 	ShF[NLAT] = 2.0+I;
 	ShF[NLAT*2] = 3.0+I;
 	
-	fftw_execute(ifft);
+	fftw_execute_dft_c2r(ifft,ShF,Sh);
 	write_mx("sph",Sh,NPHI,NLAT);
-	fftw_execute(fft);
+	fftw_execute_dft_r2c(fft,Sh,ShF);
 	write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
 
 // test Ylm :
 	im = 0; l=0; m=im*MRES;
 	write_vect("y00",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dy00",&dtiylm[im][(l-m)*NLAT/2],NLAT/2);
+	write_vect("dy00",&idylm[im][(l-m)*NLAT/2].t,NLAT);
 	im = 0; l=1; m=im*MRES;
 	write_vect("y10",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dty10",&dtiylm[im][(l-m)*NLAT/2],NLAT/2);
+	write_vect("dty10",&idylm[im][(l-m)*NLAT/2].t,NLAT);
 	im = 0; l=LMAX; m=im*MRES;
 	write_vect("yLmax0",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dtyLmax0",&dtiylm[im][(l-m)*NLAT/2],NLAT/2);
+	write_vect("dtyLmax0",&idylm[im][(l-m)*NLAT/2].t,NLAT);
 	im = MMAX; m=im*MRES; l=m;
 	write_vect("ymmax-mmax",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dtymmax-mmax",&dtiylm[im][(l-m)*NLAT/2],NLAT/2);
+	write_vect("dtymmax-mmax",&idylm[im][(l-m)*NLAT/2].t,NLAT);
 	im = 3; l=8; m=im*MRES;
 	write_vect("y83",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dty83",&dtiylm[im][(l-m)*NLAT/2],NLAT/2);
+	write_vect("dty83",&idylm[im][(l-m)*NLAT/2].t,NLAT);
 	im = 30; l=65; m=im*MRES;
 	write_vect("y6530",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dty6530",&dtiylm[im][(l-m)*NLAT/2],NLAT/2);
+	write_vect("dty6530",&idylm[im][(l-m)*NLAT/2].t,NLAT);
 
 // test case...
-	Slm = (complex double *) malloc(sizeof(complex double)* LMMAX);
-	for (i=0;i<LMMAX;i++) {
+	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
+	for (i=0;i<NLM;i++) {
 		Slm[i] = 0.0;
 	}
 	
@@ -95,8 +98,8 @@ int main()
 	Slm[LM(3,3)] = 2.0;
 	Slm[LM(10,5)] = 4.0;
 	Slm[LM(55,12)] = 5.0;
-	
-	for (jj=0;jj<300;jj++) {
+
+	for (jj=0;jj<30000;jj++) {
 
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
@@ -106,6 +109,6 @@ int main()
 		spat_to_SH(ShF,Slm);
 	}
 
-	write_vect("ylm",Slm,LMMAX*2);
+	write_vect("ylm",Slm,NLM*2);
 }
 

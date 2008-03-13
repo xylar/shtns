@@ -22,14 +22,20 @@
 #define LM(l,m) ( (m/MRES)*(2*LMAX+3 -m)/2 + l-m )
 #define LiM(l,im) ( im*(2*LMAX+3 -(im+2)*MRES)/2 + l )
 
+struct DtDp {		// theta and phi derivatives stored together.
+	double t, p;
+};
+
 double pi = atan(1.0)*4.0;
 double l2[NLM], l_2[NLM];			// l(l+1) and 1/(l(l+1))
 double ct[NLAT/2], st[NLAT/2], st_1[NLAT/2];	// cos(theta), sin(theta), 1/sin(theta);
 
 long int tm[MMAX+1];	// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-double* ylm[MMAX+1];	// matrix for direct transform
-double* dtylm[MMAX+1];	// theta derivative matrix for direct transform
-double* iylm[MMAX+1];	// matrix for inverse transform
+
+double* ylm[MMAX+1];		// matrix for direct transform
+struct DtDp* dylm[MMAX+1];	// theta and phi derivative of Ylm matrix
+double* iylm[MMAX+1];		// matrix for inverse transform
+struct DtDp* idylm[MMAX+1];
 
 fftw_plan ifft, fft;	// plans for FFTW.
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
@@ -121,6 +127,8 @@ void SH_to_spat(complex double *Slm, complex double *ShF)
 			ShF[i] = 0.0;
 		ShF += NLAT;
 	}
+
+	ShF -= NLAT*(NPHI/2+1);		// restore original pointer
 	fftw_execute_dft_c2r(ifft, ShF, (double *) ShF);
 }
 
@@ -135,7 +143,7 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 	complex double se, so, dse, dso;	// spheroidal even and odd parts
 	complex double te, to, dte, dto;	// toroidal ...
 	complex double *Sl, *Tl;
-	double *yl, *dtyl;
+	struct DtDp *dyl;
 	long int i,im,m,l;
 
 	for (im=0; im<=MMAX; im++) {
@@ -150,39 +158,34 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 			BpF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes
 			i++;
 		}
-		yl = ylm[im] + i*(LMAX-m+1) -m;
-		dtyl = dtylm[im] + i*(LMAX-m+1) -m;
+		dyl = dylm[im] + i*(LMAX-m+1) -m;
 		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 			se = 0.0;	so = 0.0;	dse = 0.0;	dso = 0.0;
 			te = 0.0;	to = 0.0;	dte = 0.0;	dto = 0.0;
 			while (l<LMAX) {	// compute even and odd parts
-				se += yl[l] * Sl[l];
-				so += yl[l+1] * Sl[l+1];
-				dso += dtyl[l] * Sl[l];
-				dse += dtyl[l+1] * Sl[l+1];
-				te += yl[l] * Tl[l];
-				to += yl[l+1] * Tl[l+1];
-				dto += dtyl[l] * Tl[l];
-				dte += dtyl[l+1] * Tl[l+1];
+				te += dyl[l].p * Tl[l];
+				dto += dyl[l].t * Tl[l];
+				to += dyl[l+1].p * Tl[l+1];
+				dte += dyl[l+1].t * Tl[l+1];
+				se += dyl[l].p * Sl[l];
+				so += dyl[l+1].p * Sl[l+1];
+				dso += dyl[l].t * Sl[l];
+				dse += dyl[l+1].t * Sl[l+1];
 				l+=2;
 			}
 			if (l==LMAX) {
-				se += yl[l] * Sl[l];
-				dso += dtyl[l] * Sl[l];
-				te += yl[l] * Tl[l];
-				dto += dtyl[l] * Tl[l];
+				te += dyl[l].p * Tl[l];
+				dto += dyl[l].t * Tl[l];
+				se += dyl[l].p * Sl[l];
+				dso += dyl[l].t * Sl[l];
 			}
-			se *= I*st_1[i]*m;	so *= I*st_1[i]*m;
-			te *= I*st_1[i]*m;	to *= I*st_1[i]*m;
-
-			BtF[i] = (dse+dso) + (te+to);			// Bt = dS/dt       + Im/sint *T
-			BtF[NLAT-(i+1)] = (dse-dso) + (te-to);
-			BpF[i] = (se+so) - (dte+dto);			// Bp = Im/sint * S - dT/dt
-			BpF[NLAT-(i+1)] = (se-so) - (dte-dto);
-
+			BtF[i] = (dse+dso) + I*(te+to);			// Bt = dS/dt       + Im/sint *T
+			BtF[NLAT-(i+1)] = (dse-dso) + I*(te-to);
+			BpF[i] = I*(se+so) - (dte+dto);			// Bp = Im/sint * S - dT/dt
+			BpF[NLAT-(i+1)] = I*(se-so) - (dte-dto);
 			i++;
-			yl += (LMAX-m+1);	dtyl += (LMAX-m+1);
+			dyl += (LMAX-m+1);
 		}
 		BpF += NLAT;	BtF += NLAT;
 	}
@@ -193,9 +196,59 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 		BpF += NLAT;	BtF += NLAT;
 	}
 
+	BpF -= NLAT*(NPHI/2+1);		// restore original pointers
+	BtF -= NLAT*(NPHI/2+1);
 	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
 	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
 }
+
+void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
+{
+	complex double te[NLAT/2], to[NLAT/2];	// theta even and odd parts
+	complex double pe[NLAT/2], po[NLAT/2];	// phi even and odd parts.
+	complex double *Sl, *Tl;		// virtual pointers for given im
+	struct DtDp *idyl;
+	long int i,im,m,l;
+
+	fftw_execute_dft_r2c(fft,(double *) BtF, BtF);
+	fftw_execute_dft_r2c(fft,(double *) BpF, BpF);
+
+	for (im=0;im<=MMAX;im++) {
+		m=im*MRES;
+		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
+			te[i] = BtF[i] + BtF[NLAT-(i+1)];
+			to[i] = BtF[i] - BtF[NLAT-(i+1)];
+			pe[i] = BpF[i] + BpF[NLAT-(i+1)];
+			po[i] = BpF[i] - BpF[NLAT-(i+1)];
+		}
+		l=m;
+		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
+		Tl = &Tlm[LiM(0,im)];
+		idyl = idylm[im];
+		BtF += NLAT;	BpF += NLAT;
+		while (l<LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+			Sl[l] = 0.0;	Sl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
+			Tl[l] = 0.0;	Tl[l+1] = 0.0;
+			for (i=tm[im];i<NLAT/2;i++) {	// tm[im] : polar optimization
+				Sl[l] += -idyl[i].p *pe[i]*I + idyl[i].t *to[i];
+				Tl[l] +=  idyl[i].p *te[i]*I - idyl[i].t *po[i];
+				
+				Sl[l+1] += -idyl[NLAT/2 +i].p *po[i]*I + idyl[NLAT/2 +i].t *te[i];
+				Tl[l+1] +=  idyl[NLAT/2 +i].p *to[i]*I - idyl[NLAT/2 +i].t *pe[i];
+			}
+			l+=2;
+			idyl += NLAT;
+		}
+		if (l==LMAX) {
+			Sl[l] = 0.0;	Tl[l] = 0.0;
+			for (i=tm[im];i<NLAT/2;i++) {	// polar optimization
+				Sl[l] += -idyl[i].p *pe[i]*I + idyl[i].t *to[i];
+				Tl[l] += idyl[i].p *te[i]*I - idyl[i].t *po[i];
+			}
+		}
+	}
+}
+
 
 /*
 	INITIALIZATION FUNCTIONS
@@ -250,7 +303,8 @@ void Gauss(double *x, double *w, int n)
 // initialize FFTs using FFTW. stride = NLAT, (contiguous l)
 void planFFT()
 {
-	complex double * ShF;
+	complex double *ShF;
+	double *Sh;
 	int nfft = NPHI;
 	int ncplx = NPHI/2 +1;
 	int nreal;
@@ -259,6 +313,7 @@ void planFFT()
 	
 // Allocate dummy Spatial Fields.
 	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	Sh = (double *) ShF;
 
 	printf("[FFTW] Mmax=%d, Nphi=%d\n",MMAX,NPHI);
 
@@ -284,6 +339,7 @@ void planFFT()
 void init_SH()
 {
 	double xg[NLAT], wg[NLAT];	// gauss points and weights.
+	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
 	double eps = POLAR_OPT_THRESHOLD;	// eps : polar coefficients below that threshold are neglected (for high ms)
 	double iylm_fft_norm = 2.0*pi/NPHI;	// normation FFT pour iylm
 	double t,tmax;
@@ -311,32 +367,54 @@ void init_SH()
 	printf("          max zero at Gauss node for Plm[l=LMAX+1,m=0] : %g\n",tmax);
 #endif
 
+// Allocate legendre functions lookup tables.
+	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT/2);
+	dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT/2);
+	iylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT/2);
+	idylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT/2);
+	for (im=0; im<MMAX; im++) {
+		m = im*MRES;
+		ylm[im+1] = ylm[im] + NLAT/2*(LMAX+1 -m);
+		dylm[im+1] = dylm[im] + NLAT/2*(LMAX+1 -m);
+		iylm[im+1] = iylm[im] + NLAT/2*(LMAX+1 -m);
+		idylm[im+1] = idylm[im] + NLAT/2*(LMAX+1 -m);
+	}
+
 // Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT/2 points required.
 // for synthesis (inverse transform)
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-		ylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT);		// P_l^m(x)   |x| <= 1.0
-		dtylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT/2);	// d(P_l^m(x))/dx
+//		ylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT/2);
+//		dylm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT/2);
 		for (it=0;it<NLAT/2;it++) {
-			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[it], ylm[im] + it*(LMAX-m+1), dtylm[im] + it*(LMAX-m+1));	// fixed im legendre functions lookup table.
+			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
-				dtylm[im][it*(LMAX-m+1) + (l-m)] *= -st[it];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
+				dylm[im][it*(LMAX-m+1) + (l-m)].t = -st[it] * dtylm[l-m];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
+				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
 			}
 		}
 	}
 	
-// for analysis (decomposition, direct transform) : transpose and multiply by gauss weight.
+// for analysis (decomposition, direct transform) : transpose and multiply by gauss weight and other normalizations.
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-		iylm[im] = (double *) malloc(sizeof(double)* (LMAX-m+1)*NLAT/2);
+//		iylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT/2);
+//		idylm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT/2);
 		for (it=0;it<NLAT/2;it++) {
 			for (l=m;l<=LMAX;l++) {
 				iylm[im][(l-m)*NLAT/2 + it] = ylm[im][it*(LMAX-m+1) + (l-m)] * wg[it] *iylm_fft_norm;
+				if (l!=0) {
+					idylm[im][(l-m)*NLAT/2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wg[it] *iylm_fft_norm /(l*(l+1));
+					idylm[im][(l-m)*NLAT/2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wg[it] *iylm_fft_norm /(l*(l+1));
+				} else {
+					idylm[im][(l-m)*NLAT/2 + it].t = 0.0;
+					idylm[im][(l-m)*NLAT/2 + it].p = 0.0;
+				}
 			}
 		}
 	}
 
-// POLAR OPTIMIZATION : analysing coefficients, some can be safely neglected.
+// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
 	for (im=0;im<=MMAX;im++) {
 		m = im*MRES;
 		tm[im] = 1.0*NLAT;
@@ -362,8 +440,9 @@ void init_SH()
 	it = 0;
 	for (im=0;im<=MMAX;im++) {
 		for (l=m;l<=LMAX;l++) {
-			l2[it] = l*(l+1);
+			l2[it] = l*(l+1);	l_2[it] = 1.0/(l*(l+1));
 			it++;
 		}
 	}
+	l_2[0] = 0.0;	// undefined for l=0 => replace by 0.
 }

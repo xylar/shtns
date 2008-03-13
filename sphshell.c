@@ -30,17 +30,52 @@ void alloc_fields()
 
 void poltor_to_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp)
 {
-	complex double Slm[NLM];	// dP/dr + P/r
 	complex double Qlm[NLM];	// l(l+1) * P/r
+	complex double Slm[NLM];	// dP/dr + P/r
 	int ir,lm;
 
 	for (ir=0; ir<NR; ir++) {
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
 			Slm[lm] = Gr[ir].l*Plm[ir-1][lm] + Gr[ir].d*Plm[ir][lm] + Gr[ir].u*Plm[ir+1][lm];
-			Qlm[lm] = r_1[ir]*l2[i] * Plm[ir][lm];
+			Qlm[lm] = r_1[ir]*l2[lm] * Plm[ir][lm];
 		}
-		SH_to_spat(Qlm,(complex double *) Br);
-		SHsphertor_to_spat(Slm, Tlm[ir], (complex double *) Bt, (complex double *) Bp);
+		SH_to_spat(Qlm,(complex double *) Br[ir]);
+		SHsphertor_to_spat(Slm, Tlm[ir], (complex double *) Bt[ir], (complex double *) Bp[ir]);
+	}
+}
+
+void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Slm, complex double **Tlm)
+{
+	complex double Q[NLM];	// l(l+1) * P/r
+	complex double S[NLM];	// dP/dr + P/r
+	complex double T[NLM];
+	int ir,lm;
+
+	for (ir=0; ir<NR; ir++) {
+		spat_to_SHsphertor((complex double *) Bt[ir], (complex double *) Bp[ir], S[ir], T[ir]);
+		spat_to_SH((complex double *) Br[ir], Q);
+		for (lm=0; lm<NLM; lm++) {
+			Plm[ir][lm] = r[ir]*l_2[lm] * Q[lm];		// poloidal
+		}
+	}
+}
+
+
+void poltor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp)
+{
+	complex double Q[NLM];	// l(l+1) * T/r
+	complex double S[NLM];	// dT/dr + T/r
+	complex double T[NLM];	//  [ l(l+1)/r^2 - 1/r d2/dr2(r .) ] P
+	int ir,lm;
+
+	for (ir=0; ir<NR; ir++) {
+		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+			Q[lm] = r_1[ir]*l2[lm] * Tlm[ir][lm];
+			S[lm] = Gr[ir].l*Tlm[ir-1][lm] + Gr[ir].d*Tlm[ir][lm] + Gr[ir].u*Tlm[ir+1][lm];
+			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*Plm[ir][lm] - r_1[ir]*D2r[ir].l*Plm[ir-1][lm] - r_1[ir]*D2r[ir].u*Plm[ir+1][lm];
+		}
+		SH_to_spat(Q,(complex double *) Br[ir]);
+		SHsphertor_to_spat(S, T, (complex double *) Bt[ir], (complex double *) Bp[ir]);
 	}
 }
 
