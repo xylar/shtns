@@ -46,10 +46,19 @@ void write_mx(char *fn, double *mx, int N1, int N2)
 
 int main()
 {
+	complex double t1, t2;
 	double t,tmax;
 	int i,im,m,l,jj;
 
 	init_SH();
+
+	t1 = 1.0+2.0*I;
+	t2 = 1.0-I;
+	printf("test : %f, %f, %f, %f\n",creal(t1),cimag(t1), creal(t2),cimag(t2));
+
+	(double) t1 = 8.0 +I;
+	(double) t2 = 8.1;
+	printf("test : %f, %f, %f, %f\n",creal(t1),cimag(t1), creal(t2),cimag(t2));
 
 	write_vect("cost",ct,NLAT/2);
 	write_vect("sint",st,NLAT/2);
@@ -74,7 +83,7 @@ int main()
 		write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
 	}
 
-/*
+
 // test Ylm :
 	im = 0; l=0; m=im*MRES;
 	write_vect("y00",&iylm[im][(l-m)*NLAT/2],NLAT/2);
@@ -91,10 +100,10 @@ int main()
 	im = 3; l=8; m=im*MRES;
 	write_vect("y83",&iylm[im][(l-m)*NLAT/2],NLAT/2);
 	write_vect("dty83",&idylm[im][(l-m)*NLAT/2].t,NLAT);
-	im = 30; l=65; m=im*MRES;
-	write_vect("y6530",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dty6530",&idylm[im][(l-m)*NLAT/2].t,NLAT);
-*/
+	im = 10; l=35; m=im*MRES;
+	write_vect("y3510",&iylm[im][(l-m)*NLAT/2],NLAT/2);
+	write_vect("dty3510",&idylm[im][(l-m)*NLAT/2].t,NLAT);
+
 
 // test case...
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);

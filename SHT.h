@@ -11,7 +11,7 @@ LMAX, NLAT, MMAX, MRES, NPHI
 
 // MMAX : max number of fourrier decomposition (degree = MMAX * MRES)
 // power of two is better (but not mandatory), MMAX*MRES <= LMAX
-#define MMAX 32
+#define MMAX 16
 // MRES : azimutal symmetry
 #define MRES 1
 // NPHI : number of azimutal grid points, at least 2*MMAX or 3*MMAX for antialiasing.

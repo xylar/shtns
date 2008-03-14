@@ -139,7 +139,31 @@ void SH_to_grad_spat(complex double *Slm, complex double *GtF, complex double *G
 	struct DtDp *dyl;
 	long int i,im,m,l;
 
-	for (im=0; im<=MMAX; im++) {
+	im=0;		// zonal part : Gp = 0.0
+		m = im*MRES;
+		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
+		i=0;
+		dyl = dylm[im] + i*(LMAX-m+1) -m;
+		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			gte = 0.0;  gto = 0.0;
+			while (l<LMAX) {	// compute even and odd parts
+				(double) gto += dyl[l].t * Sl[l];	// m=0 : everything is REAL
+				(double) gte += dyl[l+1].t * Sl[l+1];
+				l+=2;
+			}
+			if (l==LMAX) {
+				(double) gto += dyl[l].t * Sl[l];
+			}
+			GtF[i] = (gte + gto);
+			GtF[NLAT-(i+1)] = (gte - gto);
+			GpF[i] = 0.0;
+			GpF[NLAT-(i+1)] = 0.0;
+			i++;
+			dyl += (LMAX-m+1);
+		}
+		GtF += NLAT;	GpF += NLAT;
+	for (im=1; im<=MMAX; im++) {
 		m = im*MRES;
 		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 		i=0;
@@ -202,7 +226,35 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 	struct DtDp *dyl;
 	long int i,im,m,l;
 
-	for (im=0; im<=MMAX; im++) {
+	im = 0;		// zonal part : d/dphi = 0;
+		m = im*MRES;
+		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
+		Tl = &Tlm[LiM(0,im)];
+		i=0;
+		dyl = dylm[im] + i*(LMAX-m+1) -m;
+		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			dse = 0.0;	dso = 0.0;	dte = 0.0;	dto = 0.0;
+			while (l<LMAX) {	// compute even and odd parts
+				(double) dto += dyl[l].t * Tl[l];	// m=0 : everything is real.
+				(double) dso += dyl[l].t * Sl[l];
+				(double) dte += dyl[l+1].t * Tl[l+1];
+				(double) dse += dyl[l+1].t * Sl[l+1];
+				l+=2;
+			}
+			if (l==LMAX) {
+				(double) dto += dyl[l].t * Tl[l];
+				(double) dso += dyl[l].t * Sl[l];
+			}
+			BtF[i] = (dse+dso);			// Bt = dS/dt
+			BtF[NLAT-(i+1)] = (dse-dso);
+			BpF[i] = - (dte+dto);			// Bp = - dT/dt
+			BpF[NLAT-(i+1)] = - (dte-dto);
+			i++;
+			dyl += (LMAX-m+1);
+		}
+		BpF += NLAT;	BtF += NLAT;
+	for (im=1; im<=MMAX; im++) {
 		m = im*MRES;
 		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 		Tl = &Tlm[LiM(0,im)];
@@ -217,8 +269,8 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 		dyl = dylm[im] + i*(LMAX-m+1) -m;
 		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
-			te = 0.0;	to = 0.0;	dte = 0.0;	dto = 0.0;
-			se = 0.0;	so = 0.0;	dse = 0.0;	dso = 0.0;
+			dse = 0.0;	dso = 0.0;	dte = 0.0;	dto = 0.0;
+			se = 0.0;	so = 0.0;	te = 0.0;	to = 0.0;
 			while (l<LMAX) {	// compute even and odd parts
 				dto += dyl[l].t * Tl[l];
 				te += dyl[l].p * Tl[l];
@@ -269,6 +321,39 @@ void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *
 	fftw_execute_dft_r2c(fft,(double *) BtF, BtF);
 	fftw_execute_dft_r2c(fft,(double *) BpF, BpF);
 
+	im = 0;		// idyl.p = 0.0
+		m=im*MRES;
+		for (i=0;i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
+			te[i] = BtF[i] + BtF[NLAT-(i+1)];
+			to[i] = BtF[i] - BtF[NLAT-(i+1)];
+			pe[i] = BpF[i] + BpF[NLAT-(i+1)];
+			po[i] = BpF[i] - BpF[NLAT-(i+1)];
+		}
+		l=m;
+		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
+		Tl = &Tlm[LiM(0,im)];
+		idyl = idylm[im];
+		BtF += NLAT;	BpF += NLAT;
+		while (l<LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+			Sl[l] = 0.0;	Sl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
+			Tl[l] = 0.0;	Tl[l+1] = 0.0;
+			for (i=0;i<NLAT/2;i++) {
+				Sl[l] += idyl[i].t *to[i];
+				Tl[l] -= idyl[i].t *po[i];
+				
+				Sl[l+1] += idyl[NLAT/2 +i].t *te[i];
+				Tl[l+1] -= idyl[NLAT/2 +i].t *pe[i];
+			}
+			l+=2;
+			idyl += NLAT;
+		}
+		if (l==LMAX) {
+			Sl[l] = 0.0;	Tl[l] = 0.0;
+			for (i=0;i<NLAT/2;i++) {
+				Sl[l] += idyl[i].t *to[i];
+				Tl[l] -= idyl[i].t *po[i];
+			}
+		}
 	for (im=0;im<=MMAX;im++) {
 		m=im*MRES;
 		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
