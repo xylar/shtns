@@ -12,8 +12,8 @@
 
 
 complex double *Slm;	// spherical harmonics l,m space
-complex double *ShF;	// Fourier space : theta,m
-double *Sh;		// real space : theta,phi (alias of ShF)
+complex double *ShF, *ThF;	// Fourier space : theta,m
+double *Sh, *Th;		// real space : theta,phi (alias of ShF)
 
 #include "SHT.c"
 	
@@ -51,22 +51,30 @@ int main()
 
 	init_SH();
 
+	write_vect("cost",ct,NLAT/2);
+	write_vect("sint",st,NLAT/2);
+
 	ShF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
 	Sh = (double *) ShF;
+	ThF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+	Th = (double *) ThF;
 
 // test FFT :
 	for(i=0;i<NLAT*(NPHI/2+1);i++) {
 		ShF[i] = 0;
 	}
-	ShF[0] = 1.0+I;
-	ShF[NLAT] = 2.0+I;
-	ShF[NLAT*2] = 3.0+I;
-	
-	fftw_execute_dft_c2r(ifft,ShF,Sh);
-	write_mx("sph",Sh,NPHI,NLAT);
-	fftw_execute_dft_r2c(fft,Sh,ShF);
-	write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
+	ShF[NLAT] = 1.0-I;
+//	ShF[NLAT+3] = 2.0+I;
+//	ShF[NLAT*2] = 3.0+I;
 
+	if (MMAX>0) {
+		fftw_execute_dft_c2r(ifft,ShF,Sh);
+		write_mx("sph",Sh,NPHI,NLAT);
+		fftw_execute_dft_r2c(fft,Sh,ShF);
+		write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
+	}
+
+/*
 // test Ylm :
 	im = 0; l=0; m=im*MRES;
 	write_vect("y00",&iylm[im][(l-m)*NLAT/2],NLAT/2);
@@ -86,6 +94,7 @@ int main()
 	im = 30; l=65; m=im*MRES;
 	write_vect("y6530",&iylm[im][(l-m)*NLAT/2],NLAT/2);
 	write_vect("dty6530",&idylm[im][(l-m)*NLAT/2].t,NLAT);
+*/
 
 // test case...
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
@@ -93,22 +102,26 @@ int main()
 		Slm[i] = 0.0;
 	}
 	
-	Slm[LM(0,0)] = 1.0;
-	Slm[LM(3,1)] = 3.0;
-	Slm[LM(3,3)] = 2.0;
-	Slm[LM(10,5)] = 4.0;
-	Slm[LM(55,12)] = 5.0;
+// 	Slm[LM(0,0)] = 1.0+I;
+ 	Slm[LM(3,0)] = -3.0+I;
+	Slm[LM(4,0)] = 2.0+I;
+// 	Slm[LM(10,4)] = -4.0-I;
+// 	Slm[LM(55,12)] = 5.0-2.0*I;
 
-	for (jj=0;jj<30000;jj++) {
+	for (jj=0;jj<300;jj++) {
 
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
-//		write_mx("sph",Sh,NPHI,NLAT);
+		write_mx("sph",Sh,NPHI,NLAT);
+		SH_to_grad_spat(Slm,ShF,ThF);
+		write_mx("Gt",Sh,NPHI,NLAT);
+		write_mx("Gp",Th,NPHI,NLAT);
 
 // analyse (direct legendre)
-		spat_to_SH(ShF,Slm);
+//		spat_to_SH(ShF,Slm);
 	}
 
 	write_vect("ylm",Slm,NLM*2);
+
 }
 

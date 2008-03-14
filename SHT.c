@@ -68,8 +68,8 @@ void spat_to_SH(complex double *ShF, complex double *Slm)
 		while (l<LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			Sl[l] = 0.0;	Sl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
 			for (i=tm[im];i<NLAT/2;i++) {	// tm[im] : polar optimization
-				Sl[l] += iyl[i] * fp[i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
-				Sl[l+1] += iyl[NLAT/2 + i] * fm[i];	// Slm[LiM(l+1,im)] += iylm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+				Sl[l] += fp[i] * iyl[i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
+				Sl[l+1] += fm[i] * iyl[NLAT/2 + i];	// Slm[LiM(l+1,im)] += iylm[im][(l+1-m)*NLAT/2 + i] * fm[i];
 			}
 			l+=2;
 			iyl += NLAT;
@@ -105,8 +105,8 @@ void SH_to_spat(complex double *Slm, complex double *ShF)
 		}
 		yl = ylm[im] + i*(LMAX-m+1) -m;
 		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
-			fe = 0.0;	fo = 0.0;
 			l=m;
+			fe = 0.0;	fo = 0.0;
 			while (l<LMAX) {	// compute even and odd parts
 				fe += yl[l] * Sl[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
 				fo += yl[l+1] * Sl[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Slm[LiM(l+1,im)];
@@ -131,6 +131,62 @@ void SH_to_spat(complex double *Slm, complex double *ShF)
 	ShF -= NLAT*(NPHI/2+1);		// restore original pointer
 	fftw_execute_dft_c2r(ifft, ShF, (double *) ShF);
 }
+
+void SH_to_grad_spat(complex double *Slm, complex double *GtF, complex double *GpF)
+{
+	complex double gte, gto, gpe, gpo;		// even and odd parts
+	complex double *Sl;
+	struct DtDp *dyl;
+	long int i,im,m,l;
+
+	for (im=0; im<=MMAX; im++) {
+		m = im*MRES;
+		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
+		i=0;
+		while (i<tm[im]) {	// polar optimization
+			GtF[i] = 0.0;
+			GtF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes <=> ShF[im*NLAT + NLAT-(i+1)] = 0.0;
+			GpF[i] = 0.0;
+			GpF[NLAT-tm[im] + i] = 0.0;
+			i++;
+		}
+		dyl = dylm[im] + i*(LMAX-m+1) -m;
+		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			gte = 0.0;  gto = 0.0;  gpe = 0.0;  gpo = 0.0;
+			while (l<LMAX) {	// compute even and odd parts
+				gto += dyl[l].t * Sl[l];
+				gpe += dyl[l].p * Sl[l];
+				gte += dyl[l+1].t * Sl[l+1];
+				gpo += dyl[l+1].p * Sl[l+1];
+				l+=2;
+			}
+			if (l==LMAX) {
+				gto += dyl[l].t * Sl[l];
+				gpe += dyl[l].p * Sl[l];
+			}
+			GtF[i] = gte + gto;
+			GtF[NLAT-(i+1)] = gte - gto;
+			GpF[i] = I*(gpe + gpo);
+			GpF[NLAT-(i+1)] = I*(gpe - gpo);
+			i++;
+			dyl += (LMAX-m+1);
+		}
+		GtF += NLAT;	GpF += NLAT;
+	}
+	for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
+		for (i=0;i<NLAT;i++) {
+			GtF[i] = 0.0;	GpF[i] = 0.0;
+		}
+		GtF += NLAT;	GpF[i] += NLAT;
+	}
+
+	GtF -= NLAT*(NPHI/2+1);		// restore original pointer
+	GpF -= NLAT*(NPHI/2+1);
+	fftw_execute_dft_c2r(ifft, GtF, (double *) GtF);
+	fftw_execute_dft_c2r(ifft, GpF, (double *) GpF);
+}
+
 
 /////////////////////////////////////////////////////
 //   Spheroidal/Toroidal to (theta,phi) components inverse Spherical Harmonics Transform
@@ -161,28 +217,28 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 		dyl = dylm[im] + i*(LMAX-m+1) -m;
 		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
-			se = 0.0;	so = 0.0;	dse = 0.0;	dso = 0.0;
 			te = 0.0;	to = 0.0;	dte = 0.0;	dto = 0.0;
+			se = 0.0;	so = 0.0;	dse = 0.0;	dso = 0.0;
 			while (l<LMAX) {	// compute even and odd parts
-				te += dyl[l].p * Tl[l];
 				dto += dyl[l].t * Tl[l];
-				to += dyl[l+1].p * Tl[l+1];
-				dte += dyl[l+1].t * Tl[l+1];
-				se += dyl[l].p * Sl[l];
-				so += dyl[l+1].p * Sl[l+1];
+				te += dyl[l].p * Tl[l];
 				dso += dyl[l].t * Sl[l];
+				se += dyl[l].p * Sl[l];
+				dte += dyl[l+1].t * Tl[l+1];
+				to += dyl[l+1].p * Tl[l+1];
 				dse += dyl[l+1].t * Sl[l+1];
+				so += dyl[l+1].p * Sl[l+1];
 				l+=2;
 			}
 			if (l==LMAX) {
-				te += dyl[l].p * Tl[l];
 				dto += dyl[l].t * Tl[l];
-				se += dyl[l].p * Sl[l];
+				te += dyl[l].p * Tl[l];
 				dso += dyl[l].t * Sl[l];
+				se += dyl[l].p * Sl[l];
 			}
-			BtF[i] = (dse+dso) + I*(te+to);			// Bt = dS/dt       + Im/sint *T
+			BtF[i] = (dse+dso) + I*(te+to);			// Bt = dS/dt       + I.m/sint *T
 			BtF[NLAT-(i+1)] = (dse-dso) + I*(te-to);
-			BpF[i] = I*(se+so) - (dte+dto);			// Bp = Im/sint * S - dT/dt
+			BpF[i] = I*(se+so) - (dte+dto);			// Bp = I.m/sint * S - dT/dt
 			BpF[NLAT-(i+1)] = I*(se-so) - (dte-dto);
 			i++;
 			dyl += (LMAX-m+1);
@@ -230,11 +286,11 @@ void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *
 			Sl[l] = 0.0;	Sl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
 			Tl[l] = 0.0;	Tl[l+1] = 0.0;
 			for (i=tm[im];i<NLAT/2;i++) {	// tm[im] : polar optimization
-				Sl[l] += -idyl[i].p *pe[i]*I + idyl[i].t *to[i];
-				Tl[l] +=  idyl[i].p *te[i]*I - idyl[i].t *po[i];
+				Sl[l] += idyl[i].t *to[i] - idyl[i].p *pe[i]*I;		// ref: these E. Dormy p 72.
+				Tl[l] -= idyl[i].t *po[i] + idyl[i].p *te[i]*I;
 				
-				Sl[l+1] += -idyl[NLAT/2 +i].p *po[i]*I + idyl[NLAT/2 +i].t *te[i];
-				Tl[l+1] +=  idyl[NLAT/2 +i].p *to[i]*I - idyl[NLAT/2 +i].t *pe[i];
+				Sl[l+1] += idyl[NLAT/2 +i].t *te[i] - idyl[NLAT/2 +i].p *po[i]*I;
+				Tl[l+1] -= idyl[NLAT/2 +i].t *pe[i] - idyl[NLAT/2 +i].p *to[i]*I;
 			}
 			l+=2;
 			idyl += NLAT;
@@ -242,8 +298,8 @@ void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *
 		if (l==LMAX) {
 			Sl[l] = 0.0;	Tl[l] = 0.0;
 			for (i=tm[im];i<NLAT/2;i++) {	// polar optimization
-				Sl[l] += -idyl[i].p *pe[i]*I + idyl[i].t *to[i];
-				Tl[l] += idyl[i].p *te[i]*I - idyl[i].t *po[i];
+				Sl[l] += idyl[i].t *to[i] - idyl[i].p *pe[i]*I;
+				Tl[l] -= idyl[i].t *po[i] + idyl[i].p *te[i]*I;
 			}
 		}
 	}
@@ -349,20 +405,20 @@ void init_SH()
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
 	
-	Gauss(xg,wg,NLAT);	// generate gauss nodes and weights [ x = cos(theta) ]
+	Gauss(xg,wg,NLAT);	// generate gauss nodes and weights : xg = ]-1,1[ = cos(theta) 
 	for (it=0; it<NLAT/2; it++) {
-		ct[it] = xg[it];
-		st[it] = sqrt(1.0 - xg[it]*xg[it]);
-		st_1[it] = 1.0/sqrt(1.0 - xg[it]*xg[it]);
+		ct[it] = xg[NLAT-1-it];			// on prend theta = ]0,pi/2[ => cos(theta) = ]1,0[
+		st[it] = sqrt(1.0 - ct[it]*ct[it]);
+		st_1[it] = 1.0/sqrt(1.0 - ct[it]*ct[it]);
 	}
 
 #ifdef _SH_DEBUG_
 // TEST if gauss points are ok.
 	tmax = 0.0;
 	for (it = 0; it<NLAT/2; it++) {
-		t = gsl_sf_legendre_sphPlm(NLAT, 0, xg[it]);
+		t = gsl_sf_legendre_sphPlm(NLAT, 0, ct[it]);
 		if (t>tmax) tmax = t;
-//		printf("i=%d, x=%12.12g, p=%12.12g\n",i,xg[i],t);
+//		printf("i=%d, x=%12.12g, p=%12.12g\n",i,ct[i],t);
 	}
 	printf("          max zero at Gauss node for Plm[l=LMAX+1,m=0] : %g\n",tmax);
 #endif
@@ -387,7 +443,7 @@ void init_SH()
 //		ylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT/2);
 //		dylm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT/2);
 		for (it=0;it<NLAT/2;it++) {
-			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, xg[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
+			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				dylm[im][it*(LMAX-m+1) + (l-m)].t = -st[it] * dtylm[l-m];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
 				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
