@@ -5,17 +5,17 @@ LMAX, NLAT, MMAX, MRES, NPHI
 
 //  SIZES  //
 // LMAX : maximum degree of Spherical Harmonic
-#define LMAX 39
-// NLAT : number of latitudinal (theta) gauss points, at least (LMAX+1), must be EVEN
-#define NLAT (LMAX+1)
+#define LMAX 79
+// NLAT : number of latitudinal (theta) gauss points, at least (LMAX+1), must be EVEN (and (LMAX+1)*2 for dealias)
+#define NLAT (LMAX+1)*2
 
 // MMAX : max number of fourrier decomposition (degree = MMAX * MRES)
 // power of two is better (but not mandatory), MMAX*MRES <= LMAX
-#define MMAX 16
+#define MMAX 8
 // MRES : azimutal symmetry
 #define MRES 1
-// NPHI : number of azimutal grid points, at least 2*MMAX or 3*MMAX for antialiasing.
-#define NPHI (2*MMAX)
+// NPHI : number of azimutal grid points, at least 2*MMAX, 3*MMAX for antialiasing and 4*MMAX for full dealias
+#define NPHI (4*MMAX)
 
 //  ADDITIONAL FINE TUNING  //
 // POLAR_OPT_THRESHOLD : value under wich the polar values of the Legendre Polynomials Plm are neglected,

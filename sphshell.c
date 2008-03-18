@@ -28,31 +28,29 @@ void alloc_fields()
 	}
 }
 
-void poltor_to_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp)
+void PolTor_to_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp)
 {
-	complex double Qlm[NLM];	// l(l+1) * P/r
-	complex double Slm[NLM];	// dP/dr + P/r
+	complex double Q[NLM];	// l(l+1) * P/r
+	complex double S[NLM];	// dP/dr + P/r
 	int ir,lm;
 
 	for (ir=0; ir<NR; ir++) {
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
-			Slm[lm] = Gr[ir].l*Plm[ir-1][lm] + Gr[ir].d*Plm[ir][lm] + Gr[ir].u*Plm[ir+1][lm];
-			Qlm[lm] = r_1[ir]*l2[lm] * Plm[ir][lm];
+			S[lm] = Gr[ir].l*Plm[ir-1][lm] + Gr[ir].d*Plm[ir][lm] + Gr[ir].u*Plm[ir+1][lm];
+			Q[lm] = r_1[ir]*l2[lm] * Plm[ir][lm];
 		}
-		SH_to_spat(Qlm,(complex double *) Br[ir]);
-		SHsphertor_to_spat(Slm, Tlm[ir], (complex double *) Bt[ir], (complex double *) Bp[ir]);
+		SH_to_spat(Q,(complex double *) Br[ir]);
+		SHsphertor_to_spat(S, Tlm[ir], (complex double *) Bt[ir], (complex double *) Bp[ir]);
 	}
 }
 
 void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Slm, complex double **Tlm)
 {
 	complex double Q[NLM];	// l(l+1) * P/r
-	complex double S[NLM];	// dP/dr + P/r
-	complex double T[NLM];
 	int ir,lm;
 
 	for (ir=0; ir<NR; ir++) {
-		spat_to_SHsphertor((complex double *) Bt[ir], (complex double *) Bp[ir], S[ir], T[ir]);
+		spat_to_SHsphertor((complex double *) Bt[ir], (complex double *) Bp[ir], Slm[ir], Tlm[ir]);
 		spat_to_SH((complex double *) Br[ir], Q);
 		for (lm=0; lm<NLM; lm++) {
 			Plm[ir][lm] = r[ir]*l_2[lm] * Q[lm];		// poloidal
@@ -61,7 +59,7 @@ void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **P
 }
 
 
-void poltor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp)
+void PolTor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp)
 {
 	complex double Q[NLM];	// l(l+1) * T/r
 	complex double S[NLM];	// dT/dr + T/r
@@ -76,6 +74,60 @@ void poltor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Br,
 		}
 		SH_to_spat(Q,(complex double *) Br[ir]);
 		SHsphertor_to_spat(S, T, (complex double *) Bt[ir], (complex double *) Bp[ir]);
+	}
+}
+
+void NLU(complex double **Plm, complex double **Tlm, double** NLr, double** NLt, double** NLp)
+{
+	complex double Su[NLM];
+	complex double Sw[NLM];
+	complex double Tw[NLM];
+	double NLtmp[2*(NPHI/2+1)*NLAT];
+
+	long int ir,lm;
+
+	ir = 0;
+
+	for (ir=0; ir<NR; ir++) {
+		for (lm=0; lm<NLM; lm++) {
+			Su[lm] = Gr[ir].l*Plm[ir-1][lm] + Gr[ir].d*Plm[ir][lm] + Gr[ir].u*Plm[ir+1][lm];
+			Tw[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*Plm[ir][lm] - r_1[ir]*D2r[ir].l*Plm[ir-1][lm] - r_1[ir]*D2r[ir].u*Plm[ir+1][lm];
+			Sw[lm] = Gr[ir].l*Tlm[ir-1][lm] + Gr[ir].d*Tlm[ir][lm] + Gr[ir].u*Tlm[ir+1][lm];
+		}
+		SHsphertor_to_spat(Su, Tlm[ir], (complex double *) Nlt[ir], (complex double *) Nlp[ir]);
+		SHsphertor_to_spat(Sw, Tw, (complex double *) NLr[ir], (complex double *) Nltmp);
+		for(lm = 0; lm < NPHI*NLAT; lm++) {
+			NLt[ir][lm] *= NLr[ir][lm];	NLp[ir][i] *= NLtmp[lm];
+		}
+		for (lm=0; lm<NLM; lm++) {
+			Su[lm] = r_1[ir]*l2[lm] * Plm[ir][lm];
+			Sw[lm] = r_1[ir]*l2[lm] * Tlm[ir][lm];
+		}
+		SH_to_spat(Su,(complex double *) NLr[ir]);
+		SH_to_spat(Sw,(complex double *) NLtmp);
+		for(lm = 0; lm < NPHI*NLAT; lm++)
+			NLr[ir][lm] *= NLtmp[lm];
+	}
+}
+
+// spatial to curl : only for ir = 1 .. NR-1
+void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Tlm)
+{
+	complex double Q[NLM];
+	complex double Sl[NLM], Sd[NLM], Su[NLM];
+	complex double* St;	// temp pointer.
+	int ir,lm;
+
+	ir = 0;
+		spat_to_SHsphertor((complex double *) Bt[ir], (complex double *) Bp[ir], Sd, Su);	// discard Plm[0]
+		spat_to_SHsphertor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
+	for (ir=1; ir<NR-1; ir++) {
+		St = Sl;   Sl = Sd;   Sd = Su;   Su = St;		// rotating buffers.
+		spat_to_SHsphertor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
+		spat_to_SH((complex double *) Br[ir], Q);
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Gr[ir].l * Sl[lm] + Gr[ir].d * Sd[lm] + Gr[ir].u * Su[lm]);
+		}
 	}
 }
 

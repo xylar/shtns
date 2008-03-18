@@ -26,10 +26,12 @@ struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };
 
+/*
 union cplx {		// to access easily the real part of a complex number.
 	complex double c;
 	double r;
 };
+*/
 
 double pi = atan(1.0)*4.0;
 double l2[NLM], l_2[NLM];			// l(l+1) and 1/(l(l+1))
@@ -45,6 +47,36 @@ struct DtDp* idylm[MMAX+1];
 fftw_plan ifft, fft;	// plans for FFTW.
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
+
+// compute non-linear terms in m-spectral space and l-physical space, with FFTW conventions, ie :
+// y = x0 + sum(m=1..MMAX) [ xm.exp(i.m.phi) + xm*.exp(-i.m.phi) ]
+// this should be faster for small m's, and requires a legendre transform before.
+// No aliasing problems.
+void NLspec(complex double *x, complex double *y, complex double *nl)
+{
+	long int m,i,l;
+
+	m=0;	// 2MMAX+1 terms
+		for (l=0;l<NLAT;l++)
+			nl[m*NLAT+l] = creal(x[0*NLAT+l]) * creal(y[0*NLAT+l]);	// 1 term
+		for (i=1; i<=MMAX; i++) {		// 2(MMAX)
+			for (l=0;l<NLAT;l++)
+//				(double) nl[m*NLAT+l] += 2* creal(x[i*NLAT+l]*conj(y[i*NLAT+l]));	//xi*conj(yi) + conj(xi)*yi
+				(double) nl[m*NLAT+l] += 2*( creal(x[i*NLAT+l])*creal(y[i*NLAT+l]) + cimag(x[i*NLAT+l])*cimag(y[i*NLAT+l]) );
+		}
+	for (m=1; m<=MMAX; m++) {	// total 2(MMAX)+1-m terms
+		for (l=0;l<NLAT;l++)
+			nl[m*NLAT+l] = creal(x[0*NLAT+l])*y[m*NLAT+l] + x[m*NLAT+l]*creal(y[0*NLAT+l]);	// 2 terms
+		for (i=1; i<m; i++) {		// 3(m-1) terms
+			for (l=0;l<NLAT;l++)
+				nl[m*NLAT+l] += conj(x[i*NLAT+l])*y[(i+m)*NLAT+l] + x[(i+m)*NLAT+l]*conj(y[i*NLAT+l]) + x[i*NLAT+l]*y[(m-i)*NLAT+l];
+		}
+		for (i=m; i<=MMAX-m; i++) {	// 2(MMAX-2m+1) terms
+			for (l=0;l<NLAT;l++)
+				nl[m*NLAT+l] += conj(x[i*NLAT+l])*y[(i+m)*NLAT+l] + x[(i+m)*NLAT+l]*conj(y[i*NLAT+l]);
+		}
+	}
+}
 
 /////////////////////////////////////////////////////
 //   Scalar Spherical Harmonics Transform
@@ -599,7 +631,7 @@ void init_SH()
 				if (l!=0) {
 					idylm[im][(l-m)*NLAT/2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wg[it] *iylm_fft_norm /(l*(l+1));
 					idylm[im][(l-m)*NLAT/2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wg[it] *iylm_fft_norm /(l*(l+1));
-				} else {
+				} else {	// les derivees sont nulles pour l=0 (=> m=0)
 					idylm[im][(l-m)*NLAT/2 + it].t = 0.0;
 					idylm[im][(l-m)*NLAT/2 + it].p = 0.0;
 				}

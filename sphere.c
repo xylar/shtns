@@ -10,10 +10,12 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_sf_legendre.h>
 
+#include <time.h>
+
 
 complex double *Slm;	// spherical harmonics l,m space
-complex double *ShF, *ThF;	// Fourier space : theta,m
-double *Sh, *Th;		// real space : theta,phi (alias of ShF)
+complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
+double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 #include "SHT.c"
 	
@@ -63,18 +65,27 @@ int main()
 	write_vect("cost",ct,NLAT/2);
 	write_vect("sint",st,NLAT/2);
 
-	ShF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Sh = (double *) ShF;
-	ThF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+	ThF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Th = (double *) ThF;
+	NLF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
+	NL = (double *) NLF;
 
 // test FFT :
 	for(i=0;i<NLAT*(NPHI/2+1);i++) {
-		ShF[i] = 0;
+		ShF[i] = 0;	ThF[i] = 0;
 	}
+	ShF[0] = 1.0-I;
 	ShF[NLAT] = 1.0-I;
-//	ShF[NLAT+3] = 2.0+I;
-//	ShF[NLAT*2] = 3.0+I;
+	ShF[2*NLAT] = 2.0+I;
+	ShF[5*NLAT] = 3.0+I;
+	ShF[8*NLAT] = 5.0-I;
+	ThF[0] = 1.0-I;
+	ThF[3*NLAT] = 2.0-I;
+	ThF[NLAT] = 3.0+I;
+	ThF[6*NLAT] = 8.0-I;
+	ThF[7*NLAT] = 1.0-3.*I;
 
 	if (MMAX>0) {
 		fftw_execute_dft_c2r(ifft,ShF,Sh);
@@ -83,7 +94,62 @@ int main()
 		write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
 	}
 
+// compare FFT NL terms to pure spectral ...
+	l = clock();
+	for(jj=0;jj<10000;jj++) {
+	for(i=0;i<NLAT*(NPHI/2+1);i++) {
+		ShF[i] = 0;	ThF[i] = 0;
+	}
+	ShF[0] = 1.0-I;
+	ShF[NLAT] = 1.0-I;
+	ShF[2*NLAT] = 2.0+I;
+	ShF[5*NLAT] = 3.0+I;
+	ShF[8*NLAT] = 5.0-I;
+	ThF[0] = 1.0-I;
+	ThF[3*NLAT] = 2.0-I;
+	ThF[NLAT] = 3.0+I;
+	ThF[6*NLAT] = 8.0-I;
+	ThF[7*NLAT] = 1.0-3.*I;
 
+		fftw_execute_dft_c2r(ifft,ShF,Sh);
+		fftw_execute_dft_c2r(ifft,ThF,Th);
+		for(i=0;i<NLAT*NPHI;i++) {
+			NL[i] = Sh[i] * Th[i];
+		}
+		fftw_execute_dft_r2c(fft,NL,NLF);
+	}
+	l = clock() - l;
+	printf("fft nl time : %d\n",l);
+		write_mx("NLfft",NL,NPHI/2+1,2*NLAT);
+
+	if (MMAX>0) {
+		fftw_execute_dft_c2r(ifft,ShF,Sh);
+		write_mx("sph",Sh,NPHI,NLAT);
+		fftw_execute_dft_r2c(fft,Sh,ShF);
+		write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
+	}
+	m = clock();
+	for(jj=0;jj<10000;jj++) {
+	for(i=0;i<NLAT*(NPHI/2+1);i++) {
+		ShF[i] = 0;	ThF[i] = 0;
+	}
+	ShF[0] = 1.0-I;
+	ShF[NLAT] = 1.0-I;
+	ShF[2*NLAT] = 2.0+I;
+	ShF[5*NLAT] = 3.0+I;
+	ShF[8*NLAT] = 5.0-I;
+	ThF[0] = 1.0-I;
+	ThF[3*NLAT] = 2.0-I;
+	ThF[NLAT] = 3.0+I;
+	ThF[6*NLAT] = 8.0-I;
+	ThF[7*NLAT] = 1.0-3.*I;
+		NLspec(ShF,ThF, NLF);
+	}
+	m = clock() - m;
+	printf("spectral nl time : %d\n",m);
+	printf("fft/spectral time : %f\n",(double) l / (double) m);
+		write_mx("NLspec",NL,NPHI/2+1,2*NLAT);
+/*
 // test Ylm :
 	im = 0; l=0; m=im*MRES;
 	write_vect("y00",&iylm[im][(l-m)*NLAT/2],NLAT/2);
@@ -131,6 +197,6 @@ int main()
 	}
 
 	write_vect("ylm",Slm,NLM*2);
-
+*/
 }
 
