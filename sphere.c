@@ -71,7 +71,7 @@ int main()
 	Th = (double *) ThF;
 	NLF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	NL = (double *) NLF;
-
+/*
 // test FFT :
 	for(i=0;i<NLAT*(NPHI/2+1);i++) {
 		ShF[i] = 0;	ThF[i] = 0;
@@ -170,7 +170,7 @@ int main()
 	write_vect("y3510",&iylm[im][(l-m)*NLAT/2],NLAT/2);
 	write_vect("dty3510",&idylm[im][(l-m)*NLAT/2].t,NLAT);
 
-
+*/
 // test case...
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
 	for (i=0;i<NLM;i++) {
@@ -183,20 +183,23 @@ int main()
 // 	Slm[LM(10,4)] = -4.0-I;
 // 	Slm[LM(55,12)] = 5.0-2.0*I;
 
-	for (jj=0;jj<300;jj++) {
+	m = clock();
+	for (jj=0;jj<1000;jj++) {
 
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
-		write_mx("sph",Sh,NPHI,NLAT);
-		SH_to_grad_spat(Slm,ShF,ThF);
-		write_mx("Gt",Sh,NPHI,NLAT);
-		write_mx("Gp",Th,NPHI,NLAT);
+//		write_mx("sph",Sh,NPHI,NLAT);
+//		SH_to_grad_spat(Slm,ShF,ThF);
+//		write_mx("Gt",Sh,NPHI,NLAT);
+//		write_mx("Gp",Th,NPHI,NLAT);
 
 // analyse (direct legendre)
-//		spat_to_SH(ShF,Slm);
+		spat_to_SH(ShF,Slm);
 	}
+	m = clock() - m;
+	printf("SHT + iSHT time : %d\n",m);
 
 	write_vect("ylm",Slm,NLM*2);
-*/
+
 }
 

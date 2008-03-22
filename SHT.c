@@ -50,7 +50,7 @@ unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mod
 
 // compute non-linear terms in m-spectral space and l-physical space, with FFTW conventions, ie :
 // y = x0 + sum(m=1..MMAX) [ xm.exp(i.m.phi) + xm*.exp(-i.m.phi) ]
-// this should be faster for small m's, and requires a legendre transform before.
+// this should be faster for small m's (MMAX <= 8), and requires a legendre transform before.
 // No aliasing problems.
 void NLspec(complex double *x, complex double *y, complex double *nl)
 {
@@ -489,7 +489,7 @@ void runerr(const char * error_text)
 // Newton method from initial Guess to find the zeros of the Legendre Polynome
 // x = abscissa, w = weights, n points.
 // Reference:  Numerical Recipes, Cornell press.
-void Gauss(double *x, double *w, int n)
+void GaussNodes(double *x, double *w, int n)
 {
 	double z, z1, p1, p2, p3, pp, eps;
 	long int i,j,m;
@@ -574,7 +574,7 @@ void init_SH()
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
 	
-	Gauss(xg,wg,NLAT);	// generate gauss nodes and weights : xg = ]-1,1[ = cos(theta) 
+	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : xg = ]-1,1[ = cos(theta) 
 	for (it=0; it<NLAT/2; it++) {
 		ct[it] = xg[NLAT-1-it];			// on prend theta = ]0,pi/2[ => cos(theta) = ]1,0[
 		st[it] = sqrt(1.0 - ct[it]*ct[it]);
@@ -590,6 +590,10 @@ void init_SH()
 //		printf("i=%d, x=%12.12g, p=%12.12g\n",i,ct[i],t);
 	}
 	printf("          max zero at Gauss node for Plm[l=LMAX+1,m=0] : %g\n",tmax);
+	printf("          Gauss nodes :");
+	for (it=0;it<NLAT/2; it++)
+		printf(" %g",ct[it]);
+	printf("\n");
 #endif
 
 // Allocate legendre functions lookup tables.
