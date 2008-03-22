@@ -93,11 +93,9 @@ int main()
 	Sh[3] = 3.0;
 	write_mx("DCTa",Sh,NPHI,NLAT);
 	fftw_execute_r2r(idct,Sh, Sh);		// DCT of weighted data
-	fftw_execute_r2r(idct2,Sh+1, Sh+1);		// DCT of weighted data
 	write_mx("DCTb",Sh,NPHI,NLAT);
 	
 	fftw_execute_r2r(dct,Sh, Sh);		// DCT of weighted data
-	fftw_execute_r2r(dct2,Sh+1, Sh+1);		// DCT of weighted data
 	write_mx("DCTc",Sh,NPHI,NLAT);
 	
 	
@@ -108,8 +106,8 @@ int main()
 		Slm[i] = 0.0;
 	
 	Slm[LM(0,0)] = 1.0;
-	Slm[LM(1,1)] = 3.0;
-//	Slm[LM(4,2)] = 2.0+I;
+//	Slm[LM(1,1)] = 3.0;
+	Slm[LM(4,2)] = 2.0+I;
 // 	Slm[LM(10,4)] = -4.0-I;
 // 	Slm[LM(55,12)] = 5.0-2.0*I;
 
@@ -119,11 +117,10 @@ int main()
 
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
-//		write_mx("sph",Sh,NPHI,NLAT);
-//		SH_to_grad_spat(Slm,ShF,ThF);
-//		write_mx("Gt",Sh,NPHI,NLAT);
-//		write_mx("Gp",Th,NPHI,NLAT);
-
+		SH_to_spat(Slm,ThF);
+		for (i=0; i< NLAT*NPHI; i++) {
+			ThF[i] *= ShF[i];
+		}
 // analyse (direct legendre)
 		spat_to_SH(ShF,Slm);
 	}

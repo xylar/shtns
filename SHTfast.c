@@ -17,15 +17,15 @@
 
 //  SIZES  //
 // LMAX : maximum degree of Spherical Harmonic
-#define LMAX 96
+#define LMAX 8
 // NLAT : number of latitudinal (theta) gauss points, at least (LMAX+1), must be EVEN (and (LMAX+1)*2 for dealias)
 #define NLAT (3*LMAX)
 
 // MMAX : max number of fourrier decomposition (degree = MMAX * MRES)
 // power of two is better (but not mandatory), MMAX*MRES <= LMAX
-#define MMAX 32
+#define MMAX 4
 // MRES : azimutal symmetry
-#define MRES 1
+#define MRES 2
 // NPHI : number of azimutal grid points, at least 2*MMAX, 3*MMAX for antialiasing and 4*MMAX for full dealias
 #define NPHI (3*MMAX)
 // compute and print some debugging information...
@@ -46,11 +46,12 @@ double l2[NLM], l_2[NLM];			// l(l+1) and 1/(l(l+1))
 double wc[2*NLAT];	// chebychev weights. for even and odd m's.
 double ct[NLAT],st[NLAT],st_1[NLAT];	// cos(theta), sin(theta), and 1/sin(theta) arrays.
 
-double* ylm[MMAX+1];		// matrix for direct transform
+double* ylm[MMAX+1];		// matrix for inverse transform (synthesis)
+//double* zlm[MMAX+1];		// matrix for direct transform (analysis)
 
 fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dct;
-fftw_plan idct2, dct2;
+//fftw_plan idct2, dct2;
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
 
@@ -65,16 +66,22 @@ void spat_to_SH(complex double *ShF, complex double *Slm)
 	long int it,im,m,l;
 
 	fftw_execute_dft_r2c(fft,(double *) ShF, ShF);
-	for (im=0; im<MMAX; im+=2) {
-		for (it=0; it<NLAT*2; it++)				// span two im's because
-			ShF[im*NLAT + it] *= wc[it];		// even and odd weights are different.
-	}
-	if (im == MMAX) {
-		for (it=0; it<NLAT; it++)
-			ShF[im*NLAT + it] *= wc[it];
+	if (MRES % 2) {		// odd m's are present
+		for (im=0; im<MMAX; im+=2) {
+			for (it=0; it<NLAT*2; it++)				// span two im's because
+				ShF[im*NLAT + it] *= wc[it];		// even and odd weights are different.
+		}
+		if (im == MMAX) {
+			for (it=0; it<NLAT; it++)
+				ShF[im*NLAT + it] *= wc[it];
+		}
+	} else {			// m is always even
+		for (im=0; im<=MMAX; im++) {
+			for (it=0; it<NLAT; it++)
+				ShF[im*NLAT + it] *= wc[it];
+		}
 	}
 	fftw_execute_r2r(dct,(double *) ShF, (double *) ShF);		// DCT of weighted data
-	fftw_execute_r2r(dct2,((double *) ShF)+1, ((double *) ShF)+1);		// DCT of weighted data
 
 	for (im=0; im<=MMAX; im++) {
 		m=im*MRES;
@@ -136,11 +143,12 @@ void SH_to_spat(complex double *Slm, complex double *ShF)
 
 	ShF -= NLAT*(NPHI/2+1);		// restore original pointer
 	fftw_execute_r2r(idct,(double *) ShF, (double *) ShF);		// iDCT
-	fftw_execute_r2r(idct2,((double *) ShF)+1, ((double *) ShF)+1);		// iDCT
 
-	for (im=1; im<=MMAX; im+=2) {	// odd m's must be multiplied by sin(theta) which was removed from ylm's
-		for (it=0; it<NLAT; it++)
-			ShF[im*NLAT + it] *= st[it];
+	if (MRES % 2) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
+		for (im=1; im<=MMAX; im+=2) {
+			for (it=0; it<NLAT; it++)
+				ShF[im*NLAT + it] *= st[it];
+		}
 	}
 	fftw_execute_dft_c2r(ifft, ShF, (double *) ShF);
 }
@@ -168,6 +176,7 @@ void planFFT()
 	int nreal;
 	int ndct = NLAT;
 	fftw_r2r_kind r2r_kind;
+	fftw_iodim dims, hdims[2];
 	
 	nreal = 2*ncplx;
 	
@@ -183,23 +192,30 @@ void planFFT()
 	
 // IFFT : unnormalized.
 	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
-	if (ifft == NULL)
-		runerr("[FFTW] ifft planning failed !");
-
 // FFT : must be normalized.
 	fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, NLAT, 1, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
-	if (fft == NULL)
+	if ((fft == NULL)||(ifft == NULL))
 		runerr("[FFTW] fft planning failed !");
 
 //	fft_norm = 1.0/nfft;
 
 /* LATITUDINAL DCT (THETA) */
-	r2r_kind = FFTW_REDFT10;
+/*	r2r_kind = FFTW_REDFT10;
 	dct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 	dct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 	r2r_kind = FFTW_REDFT01;
 	idct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 	idct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+*/
+	dims.n = NLAT;	dims.is = 2;	dims.os = 2;
+	hdims[0].n = MMAX+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
+	hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
+	r2r_kind = FFTW_REDFT10;
+	dct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
+	r2r_kind = FFTW_REDFT01;
+	idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
+	if ((dct == NULL)||(idct == NULL))
+		runerr("[FFTW] dct planning failed !");
 
 //	dct_norm = 1.0/(2*NLAT);
 
@@ -250,31 +266,80 @@ void ChebychevNodes( double *nodes, double *weights, int bw )
 	}
 }
 
+// Generates the abscissa and weights for a Gauss-Legendre quadrature.
+// Newton method from initial Guess to find the zeros of the Legendre Polynome
+// x = abscissa, w = weights, n points.
+// Reference:  Numerical Recipes, Cornell press.
+void GaussNodes(double *x, double *w, int n)
+{
+	double z, z1, p1, p2, p3, pp, eps;
+	long int i,j,m;
+
+	eps = 1.0e-15;	// desired precision, minimum = 2.2204e-16 (double)
+
+	m = (n+1)/2;
+	for (i=1;i<=m;i++) {
+		z = cos(pi*((double)i-0.25)/((double)n+0.5));
+		z1 = z+1;
+		while ( fabs(z-z1) > eps )
+		{
+			p1 = 1.0;
+			p2 = 0.0;
+			for(j=1;j<=n;j++) {
+				p3 = p2;
+				p2 = p1;
+				p1 = ((2*j-1)*z*p2-(j-1)*p3)/j;	// The Legendre polynomial...
+			}
+			pp = ((double)n)*(z*p1-p2)/(z*z-1.0);                       // ... and its derivative.
+			z1 = z;
+			z = z1-p1/pp;
+		}
+		x[i-1] = -z;		// Build up the abscissas.
+		x[n-i] = z;
+		w[i-1] = 2.0/((1-z*z)*(pp*pp));		// Build up the weights.
+		w[n-i] = w[i-1];
+	}
+
+// as we started with initial guesses, we should check if the gauss points are actually unique.
+	for (i=n; i>0; i--) {
+		if (x[i] == x[i-1]) runerr("bad gauss points\n");
+	}
+}
+
+
 // initialize SH transform.
 void init_SH()
 {
+	double tg[LMAX+1],xg[LMAX+1],wg[LMAX+1];	// Gauss quadrature weights.
+	double Zlm[LMAX+1];		// inverse matrix DCT
 	double *ft;					// for DCT.
 	double *ylmt;				// temp storage for Plm's
 	double *yl;			// virtual pointer.
 	fftw_plan dct;
 	double iylm_fft_norm = 2.0*pi/(NPHI);	// normation FFT +DCT pour iylm
 	double t,tmax;
-	long int it,im,m,l,c;
+	long int it,im,m,l,c,k;
 #ifdef _SH_DEBUG_
 	FILE *fp;
 	fp = fopen("ylm_dct","w");
 #endif
 
 	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, LMmax=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
+	printf("          => using regular theta grid and DCT\n");
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
 	
-	ChebychevNodes(ct,wc,NLAT);		// chebychev points and weights.
+	ChebychevNodes(ct,wc,NLAT);		// chebychev (equaly-spaced) points and weights.
 	for (it=0;it<NLAT; it++) {
 		st[it] = sqrt(1.0 - ct[it]*ct[it]);
 		st_1[it] = 1.0/st[it];
 		wc[it] *= iylm_fft_norm;		// include FFT normation in weigths
 		wc[NLAT+it] *= iylm_fft_norm;	// odd m's weight
+	}
+
+	GaussNodes(xg,wg,LMAX+1);	// for quadrature, gauss nodes and weights : xg = ]-1,1[ = cos(theta) 
+	for (it=0; it<=LMAX; it++) {
+		tg[it] = acos(xg[it]);		// theta at gauss points.
 	}
 
 // Allocate legendre functions lookup tables.
@@ -289,7 +354,6 @@ void init_SH()
 #endif
 
 	ylm[0] = (double *) fftw_malloc(sizeof(double)* c);
-	ylmt = (double *) fftw_malloc(sizeof(double)* (LMAX+1)*NLAT);
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
 		c = 0;
@@ -302,6 +366,7 @@ void init_SH()
 	dct = fftw_plan_r2r_1d( NLAT, ft, ft, FFTW_REDFT10, FFTW_ESTIMATE );	// quick and dirty dfts.
 	if (dct == NULL) runerr("FFTW : dct could not be created...");
 
+	ylmt = (double *) fftw_malloc(sizeof(double)* (LMAX+1)*NLAT);
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
 //		ylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT/2);
@@ -347,10 +412,33 @@ void init_SH()
 			}
 		}
 	}
+	fftw_free(ylmt);
 	
+	printf("     Gauss quadrature for equaly-spaced grid ...\n");
+/* GAUSS QUADRATURE TO COMPUTE DIRECT TRANSFORM MATRIX (analysis) */
+	ylmt = (double *) fftw_malloc(sizeof(double)* (LMAX+1)*(LMAX+1));
+	for (im=0; im<=MMAX; im++) {
+		m = im*MRES;
+		for (it=0;it<=LMAX;it++) {
+			gsl_sf_legendre_sphPlm_array(LMAX, m, xg[it], ylmt + it*(LMAX+1));	// fixed im legendre functions lookup table.
+		}
+		for (l=m;l<=LMAX;l++) {
+			printf("* m=%d, l=%d ::",m,l);
+			for (k=0;k<=LMAX;k++) {
+				Zlm[k] = 0.0;
+				for(it=0;it<=LMAX;it++) {
+					Zlm[k] += cos(k*tg[it])*wg[it]*ylmt[it*(LMAX+1) + (l-m)];		// Gauss Quadrature.
+				}
+				printf(" %.3f",Zlm[k]);
+			}
+			printf("\n");
+			// Zlm(theta) = iDCT( Zlm[k] )
+		}
+	}
+
+	fftw_free(ylmt);
 	fftw_destroy_plan(dct);
 	fftw_free(ft);
-	fftw_free(ylmt);
 	
 	planFFT();		// initialize fftw
 

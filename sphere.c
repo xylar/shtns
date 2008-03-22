@@ -177,22 +177,20 @@ int main()
 		Slm[i] = 0.0;
 	}
 	
-// 	Slm[LM(0,0)] = 1.0+I;
- 	Slm[LM(3,0)] = -3.0+I;
-	Slm[LM(4,0)] = 2.0+I;
+	Slm[LM(0,0)] = 1.0;
+	Slm[LM(1,1)] = 3.0;
+	Slm[LM(4,2)] = 2.0+I;
 // 	Slm[LM(10,4)] = -4.0-I;
 // 	Slm[LM(55,12)] = 5.0-2.0*I;
 
 	m = clock();
 	for (jj=0;jj<1000;jj++) {
-
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
-//		write_mx("sph",Sh,NPHI,NLAT);
-//		SH_to_grad_spat(Slm,ShF,ThF);
-//		write_mx("Gt",Sh,NPHI,NLAT);
-//		write_mx("Gp",Th,NPHI,NLAT);
-
+		SH_to_spat(Slm,ThF);
+		for (i=0; i< NLAT*NPHI; i++) {
+			ThF[i] *= ShF[i];
+		}
 // analyse (direct legendre)
 		spat_to_SH(ShF,Slm);
 	}

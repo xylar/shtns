@@ -39,9 +39,9 @@ double ct[NLAT/2], st[NLAT/2], st_1[NLAT/2];	// cos(theta), sin(theta), 1/sin(th
 
 long int tm[MMAX+1];	// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 
-double* ylm[MMAX+1];		// matrix for direct transform
+double* ylm[MMAX+1];		// matrix for inverse transform (synthesis)
 struct DtDp* dylm[MMAX+1];	// theta and phi derivative of Ylm matrix
-double* iylm[MMAX+1];		// matrix for inverse transform
+double* iylm[MMAX+1];		// matrix for direct transform (analysis)
 struct DtDp* idylm[MMAX+1];
 
 fftw_plan ifft, fft;	// plans for FFTW.
@@ -505,9 +505,9 @@ void GaussNodes(double *x, double *w, int n)
 			p1 = 1.0;
 			p2 = 0.0;
 			for(j=1;j<=n;j++) {
-        			p3 = p2;
-        			p2 = p1;
-        			p1 = ((2*j-1)*z*p2-(j-1)*p3)/j;	// The Legendre polynomial...
+				p3 = p2;
+				p2 = p1;
+				p1 = ((2*j-1)*z*p2-(j-1)*p3)/j;	// The Legendre polynomial...
 			}
 			pp = ((double)n)*(z*p1-p2)/(z*z-1.0);                       // ... and its derivative.
 			z1 = z;
@@ -571,6 +571,7 @@ void init_SH()
 	long int it,im,m,l;
 
 	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, LMmax=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
+	printf("          => using Gauss Nodes\n");
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
 	
