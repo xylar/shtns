@@ -307,15 +307,17 @@ void GaussNodes(double *x, double *w, int n)
 }
 
 
+//#define NG (LMAX+1)
+#define NG ((LMAX+1)*2)
 // initialize SH transform.
 void init_SH()
 {
-	double tg[LMAX+1],xg[LMAX+1],wg[LMAX+1];	// Gauss quadrature weights.
-	double Zlm[LMAX+1];		// inverse matrix DCT
+	double tg[NG],xg[NG],wg[NG];	// Gauss quadrature weights.
+	double Zlm[NLAT];		// inverse matrix DCT
 	double *ft;					// for DCT.
 	double *ylmt;				// temp storage for Plm's
 	double *yl;			// virtual pointer.
-	fftw_plan dct;
+	fftw_plan dct, idct;
 	double iylm_fft_norm = 2.0*pi/(NPHI);	// normation FFT +DCT pour iylm
 	double t,tmax;
 	long int it,im,m,l,c,k;
@@ -337,8 +339,8 @@ void init_SH()
 		wc[NLAT+it] *= iylm_fft_norm;	// odd m's weight
 	}
 
-	GaussNodes(xg,wg,LMAX+1);	// for quadrature, gauss nodes and weights : xg = ]-1,1[ = cos(theta) 
-	for (it=0; it<=LMAX; it++) {
+	GaussNodes(xg,wg,NG);	// for quadrature, gauss nodes and weights : xg = ]-1,1[ = cos(theta) 
+	for (it=0; it<=NG; it++) {
 		tg[it] = acos(xg[it]);		// theta at gauss points.
 	}
 
@@ -365,6 +367,7 @@ void init_SH()
 	ft = (double *) fftw_malloc(sizeof(double)* NLAT);
 	dct = fftw_plan_r2r_1d( NLAT, ft, ft, FFTW_REDFT10, FFTW_ESTIMATE );	// quick and dirty dfts.
 	if (dct == NULL) runerr("FFTW : dct could not be created...");
+	idct = fftw_plan_r2r_1d( NLAT, Zlm, Zlm, FFTW_REDFT01, FFTW_ESTIMATE );	// quick and dirty dfts.
 
 	ylmt = (double *) fftw_malloc(sizeof(double)* (LMAX+1)*NLAT);
 	for (im=0; im<=MMAX; im++) {
@@ -416,23 +419,29 @@ void init_SH()
 	
 	printf("     Gauss quadrature for equaly-spaced grid ...\n");
 /* GAUSS QUADRATURE TO COMPUTE DIRECT TRANSFORM MATRIX (analysis) */
-	ylmt = (double *) fftw_malloc(sizeof(double)* (LMAX+1)*(LMAX+1));
+	ylmt = (double *) fftw_malloc(sizeof(double)* NG*(LMAX+1));
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-		for (it=0;it<=LMAX;it++) {
+		for (it=0;it<NG;it++) {
 			gsl_sf_legendre_sphPlm_array(LMAX, m, xg[it], ylmt + it*(LMAX+1));	// fixed im legendre functions lookup table.
 		}
 		for (l=m;l<=LMAX;l++) {
 			printf("* m=%d, l=%d ::",m,l);
 			for (k=0;k<=LMAX;k++) {
 				Zlm[k] = 0.0;
-				for(it=0;it<=LMAX;it++) {
+				for(it=0;it<NG;it++) {
 					Zlm[k] += cos(k*tg[it])*wg[it]*ylmt[it*(LMAX+1) + (l-m)];		// Gauss Quadrature.
 				}
 				printf(" %.3f",Zlm[k]);
 			}
-			printf("\n");
+			for (k=LMAX+1;k<NLAT;k++)
+				Zlm[k] = 0.0;
+			printf("\n      idct ::");
+			fftw_execute(idct);
 			// Zlm(theta) = iDCT( Zlm[k] )
+			for (it=0;it<NLAT;it++)
+				printf(" %.3f",Zlm[it]);
+			printf("\n");
 		}
 	}
 

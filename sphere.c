@@ -184,7 +184,7 @@ int main()
 // 	Slm[LM(55,12)] = 5.0-2.0*I;
 
 	m = clock();
-	for (jj=0;jj<1000;jj++) {
+	for (jj=0;jj<100;jj++) {
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
 		SH_to_spat(Slm,ThF);
