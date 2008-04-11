@@ -171,8 +171,21 @@ int main()
 	write_vect("dty3510",&idylm[im][(l-m)*NLAT/2].t,NLAT);
 
 */
-// test case...
+
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
+
+// spat to SH
+	for (im=0;im<NPHI;im++) {
+	for (i=0;i<NLAT/2;i++) {
+		Sh[im*NLAT+i] = ct[i];
+		Sh[im*NLAT+ NLAT-1-i] = -ct[i];
+	}
+	}
+	spat_to_SH(ShF,Slm);
+	write_vect("ylm",Slm,NLM*2);
+	return(1);
+
+// test case...
 	for (i=0;i<NLM;i++) {
 		Slm[i] = 0.0;
 	}
@@ -184,7 +197,7 @@ int main()
 // 	Slm[LM(55,12)] = 5.0-2.0*I;
 
 	m = clock();
-	for (jj=0;jj<100;jj++) {
+	for (jj=0;jj<1000;jj++) {
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
 		SH_to_spat(Slm,ThF);

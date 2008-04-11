@@ -76,8 +76,9 @@ int main()
 	fp = fopen("cheby","w");
 	for (it=0;it<NLAT; it++)
 		fprintf(fp,"%d\t%f\t%f\t%f\n", it, ct[it], wc[it], wc[it+NLAT]);
+	fclose(fp);
 #endif
-	
+
 	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Sh = (double *) ShF;
 	ThF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
@@ -113,7 +114,7 @@ int main()
 
 	write_ylm("ylm0",Slm);
 	m = clock();
-	for (jj=0;jj<1000;jj++) {
+	for (jj=0;jj<1;jj++) {
 
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);

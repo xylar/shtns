@@ -19,7 +19,7 @@
 // LMAX : maximum degree of Spherical Harmonic
 #define LMAX 8
 // NLAT : number of latitudinal (theta) gauss points, at least (LMAX+1), must be EVEN (and (LMAX+1)*2 for dealias)
-#define NLAT (3*LMAX)
+#define NLAT (LMAX+2)
 
 // MMAX : max number of fourrier decomposition (degree = MMAX * MRES)
 // power of two is better (but not mandatory), MMAX*MRES <= LMAX
@@ -47,14 +47,14 @@ double wc[2*NLAT];	// chebychev weights. for even and odd m's.
 double ct[NLAT],st[NLAT],st_1[NLAT];	// cos(theta), sin(theta), and 1/sin(theta) arrays.
 
 double* ylm[MMAX+1];		// matrix for inverse transform (synthesis)
-//double* zlm[MMAX+1];		// matrix for direct transform (analysis)
+double* zlm[MMAX+1];		// matrix for direct transform (analysis)
 
 fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dct;
 //fftw_plan idct2, dct2;
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
-
+/*
 /////////////////////////////////////////////////////
 //   Scalar Spherical Harmonics Transform
 // input  : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
@@ -104,6 +104,36 @@ void spat_to_SH(complex double *ShF, complex double *Slm)
 		ShF += NLAT;
 	}
 }
+*/
+/////////////////////////////////////////////////////
+//   Scalar Spherical Harmonics Transform
+// input  : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+// output : Slm = spherical harmonics coefficients : complex double array of size NLM
+void spat_to_SH(complex double *ShF, complex double *Slm)
+{
+	complex double *Sl;		// virtual pointers for given im
+	double *zl;
+	long int k,im,m,l;
+
+	fftw_execute_dft_r2c(fft,(double *) ShF, ShF);
+	fftw_execute_r2r(dct,(double *) ShF, (double *) ShF);		// DCT
+
+	for (im=0; im<=MMAX; im++) {
+		m=im*MRES;
+		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
+		zl = zlm[im];
+		ShF[0] *= 1.0/sqrt(2.);
+		for (l=m; l<=LMAX; l++) {		// l has parity of m
+			Sl[l] = 0.0;
+			for (k=0; k<=l; k++) {
+				Sl[l]   += ShF[k]   * zl[k];
+			}
+			zl += LMAX+1;
+		}
+		ShF += NLAT;
+	}
+}
+
 
 /////////////////////////////////////////////////////
 //   Scalar inverse Spherical Harmonics Transform
@@ -313,8 +343,7 @@ void GaussNodes(double *x, double *w, int n)
 void init_SH()
 {
 	double tg[NG],xg[NG],wg[NG];	// Gauss quadrature weights.
-	double Zlm[NLAT];		// inverse matrix DCT
-	double *ft;					// for DCT.
+	double *ft,*Zlm;		// for DCT.
 	double *ylmt;				// temp storage for Plm's
 	double *yl;			// virtual pointer.
 	fftw_plan dct, idct;
@@ -337,11 +366,6 @@ void init_SH()
 		st_1[it] = 1.0/st[it];
 		wc[it] *= iylm_fft_norm;		// include FFT normation in weigths
 		wc[NLAT+it] *= iylm_fft_norm;	// odd m's weight
-	}
-
-	GaussNodes(xg,wg,NG);	// for quadrature, gauss nodes and weights : xg = ]-1,1[ = cos(theta) 
-	for (it=0; it<=NG; it++) {
-		tg[it] = acos(xg[it]);		// theta at gauss points.
 	}
 
 // Allocate legendre functions lookup tables.
@@ -367,7 +391,6 @@ void init_SH()
 	ft = (double *) fftw_malloc(sizeof(double)* NLAT);
 	dct = fftw_plan_r2r_1d( NLAT, ft, ft, FFTW_REDFT10, FFTW_ESTIMATE );	// quick and dirty dfts.
 	if (dct == NULL) runerr("FFTW : dct could not be created...");
-	idct = fftw_plan_r2r_1d( NLAT, Zlm, Zlm, FFTW_REDFT01, FFTW_ESTIMATE );	// quick and dirty dfts.
 
 	ylmt = (double *) fftw_malloc(sizeof(double)* (LMAX+1)*NLAT);
 	for (im=0; im<=MMAX; im++) {
@@ -394,7 +417,7 @@ void init_SH()
 				yl[0] = yl[0] / sqrt(2.0);
 			}
 #ifdef _SH_DEBUG_
-			fprintf(fp,"*** im=%d, l=%d ::",im,l);
+			fprintf(fp,"*** m=%d, l=%d ::",m,l);
 			c = 0;
 			for(it=0;it<NLAT;it++) {
 				if (fabs(ft[it]) > 1.e-10) {
@@ -405,7 +428,7 @@ void init_SH()
 			if (((l-m)%2)||(l==LMAX)) {
 				fprintf(fp,"  ylm ::");
 				for(it=0;it<=(l-m%2);it++) {
-					fprintf(fp," %.3f",yl[it]);
+					fprintf(fp," %g",yl[it]);
 				}
 				fprintf(fp,"\n");
 			}
@@ -416,9 +439,24 @@ void init_SH()
 		}
 	}
 	fftw_free(ylmt);
-	
+	fftw_destroy_plan(dct);
+	fftw_free(ft);
+#ifdef _SH_DEBUG_
+	fclose(fp);
+#endif
+
+	zlm[0] = (double *) fftw_malloc(sizeof(double)* NLM*(LMAX+1));
+	for (im=0; im<MMAX; im++) {
+		zlm[im+1] = zlm[im] + (LMAX+1-m)*(LMAX+1);
+	}
 	printf("     Gauss quadrature for equaly-spaced grid ...\n");
+	GaussNodes(xg,wg,NG);	// for quadrature, gauss nodes and weights : xg = ]-1,1[ = cos(theta) 
+	for (it=0; it<NG; it++) {
+		tg[it] = acos(xg[it]);		// theta at gauss points.
+	}
 /* GAUSS QUADRATURE TO COMPUTE DIRECT TRANSFORM MATRIX (analysis) */
+	Zlm = (double *) fftw_malloc(sizeof(double)* NLAT);
+	idct = fftw_plan_r2r_1d( NLAT, Zlm, Zlm, FFTW_REDFT01, FFTW_ESTIMATE );	// quick and dirty dfts.
 	ylmt = (double *) fftw_malloc(sizeof(double)* NG*(LMAX+1));
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
@@ -430,9 +468,13 @@ void init_SH()
 			for (k=0;k<=LMAX;k++) {
 				Zlm[k] = 0.0;
 				for(it=0;it<NG;it++) {
-					Zlm[k] += cos(k*tg[it])*wg[it]*ylmt[it*(LMAX+1) + (l-m)];		// Gauss Quadrature.
+					Zlm[k] += cos(tg[it]*k)*wg[it]*ylmt[it*(LMAX+1) + (l-m)];	// Gauss Quadrature of cos(k.theta)
 				}
 				printf(" %.3f",Zlm[k]);
+				zlm[im][(LMAX+1)*(l-m) +k] = Zlm[k] /(2.0*NLAT);
+				if (k==0) {
+					zlm[im][(LMAX+1)*(l-m) +k] = Zlm[k] /(sqrt(2.0)*NLAT);
+				}
 			}
 			for (k=LMAX+1;k<NLAT;k++)
 				Zlm[k] = 0.0;
@@ -444,11 +486,10 @@ void init_SH()
 			printf("\n");
 		}
 	}
-
 	fftw_free(ylmt);
-	fftw_destroy_plan(dct);
-	fftw_free(ft);
-	
+	fftw_destroy_plan(idct);
+	fftw_free(Zlm);
+
 	planFFT();		// initialize fftw
 
 // Additional arrays :

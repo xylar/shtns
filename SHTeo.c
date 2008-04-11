@@ -82,9 +82,8 @@ void NLspec(complex double *x, complex double *y, complex double *nl)
 //   Scalar Spherical Harmonics Transform
 // input  : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
 // output : Slm = spherical harmonics coefficients : complex double array of size NLM
-void spat_to_SH(complex double *ShF, complex double *Slm)
+void spateo_to_SH(long int eo, complex double *ShF, complex double *Slm)
 {
-	complex double fpm[NLAT];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 	complex double *Sl;		// virtual pointers for given im
 	double *iyl;
 	long int i,im,m,l;
@@ -97,49 +96,31 @@ void spat_to_SH(complex double *ShF, complex double *Slm)
 			(double) fpm[2*i] = (double) ShF[i] + (double) ShF[NLAT-(i+1)];
 			(double) fpm[2*i+1] = (double) ShF[i] - (double) ShF[NLAT-(i+1)];
 		}
-		l=m;
+		l=m+eo;
 		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
 		iyl = iylm[im];
 		ShF += NLAT;
-		while (l<LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
-			Sl[l] = 0.0;	Sl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
+		while (l<=LMAX) {
+			Sl[l] = 0.0;
 			for (i=0;i<NLAT;i+=2) {
-				(double) Sl[l] += (double) fpm[i] * iyl[i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
-				(double) Sl[l+1] += (double) fpm[i+1] * iyl[i+1];	// Slm[LiM(l+1,im)] += iylm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+				(double) Sl[l] += (double) ShF[i] * iyl[i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
 			}
 			l+=2;
 			iyl += NLAT;
-		}
-		if (l==LMAX) {
-			Sl[l] = 0.0;	// Slm[LiM(l,im)] = 0.0;
-			for (i=tm[im];i<NLAT/2;i++) {	// polar optimization
-				(double) Sl[l] += iyl[i] * (double) fpm[2*i];	// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
-			}
 		}
 	for (im=1;im<=MMAX;im++) {
 		m=im*MRES;
-		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
-			fpm[2*i] = ShF[i] + ShF[NLAT-(i+1)];
-			fpm[2*i+1] = ShF[i] - ShF[NLAT-(i+1)];
-		}
-		l=m;
+		l=m+eo;
 		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
 		iyl = iylm[im];
 		ShF += NLAT;
-		while (l<LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+		while (l<=LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			Sl[l] = 0.0;	Sl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
 			for (i=tm[im]*2;i<NLAT;i+=2) {	// tm[im] : polar optimization
-				Sl[l] += fpm[i] * iyl[i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
-				Sl[l+1] += fpm[i+1] * iyl[i+1];	// Slm[LiM(l+1,im)] += iylm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+				Sl[l] += ShF[i] * iyl[i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
 			}
 			l+=2;
 			iyl += NLAT;
-		}
-		if (l==LMAX) {
-			Sl[l] = 0.0;	// Slm[LiM(l,im)] = 0.0;
-			for (i=tm[im];i<NLAT/2;i++) {	// polar optimization
-				Sl[l] += iyl[i] * fpm[2*i];	// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
-			}
 		}
 	}
 }
@@ -148,9 +129,9 @@ void spat_to_SH(complex double *ShF, complex double *Slm)
 //   Scalar inverse Spherical Harmonics Transform
 // input  : Slm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
 // output : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
-void SH_to_spat(complex double *Slm, complex double *ShF)
+void SHeo_to_spat(long int eo, complex double *Slm, complex double *ShF)
 {
-	complex double fe, fo;		// even and odd parts
+	complex double feo;		// even and odd parts
 	complex double *Sl;
 	double *yl;
 	long int i,im,m,l;
@@ -161,18 +142,13 @@ void SH_to_spat(complex double *Slm, complex double *ShF)
 		i=0;
 		yl = ylm[im] + i*(LMAX-m+1) -m;
 		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
-			l=m;
-			fe = 0.0;	fo = 0.0;
-			while (l<LMAX) {	// compute even and odd parts
-				(double) fe += yl[l] * (double) Sl[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
-				(double) fo += yl[l+1] * (double) Sl[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Slm[LiM(l+1,im)];
+			l=m+eo;
+			feo = 0.0;
+			while (l<=LMAX) {	// compute even and odd parts
+				(double) feo += yl[l] * (double) Sl[l];
 				l+=2;
 			}
-			if (l==LMAX) {
-				(double) fe += yl[l] * (double) Sl[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
-			}
-			ShF[i] = fe + fo;
-			ShF[NLAT-(i+1)] = fe - fo;
+			ShF[i] = feo;
 			i++;
 			yl += (LMAX-m+1);
 		}
@@ -183,30 +159,24 @@ void SH_to_spat(complex double *Slm, complex double *ShF)
 		i=0;
 		while (i<tm[im]) {	// polar optimization
 			ShF[i] = 0.0;
-			ShF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes <=> ShF[im*NLAT + NLAT-(i+1)] = 0.0;
 			i++;
 		}
 		yl = ylm[im] + i*(LMAX-m+1) -m;
 		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
-			l=m;
-			fe = 0.0;	fo = 0.0;
-			while (l<LMAX) {	// compute even and odd parts
-				fe += yl[l] * Sl[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
-				fo += yl[l+1] * Sl[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Slm[LiM(l+1,im)];
+			l=m+eo;
+			feo = 0.0;
+			while (l<=LMAX) {	// compute even and odd parts
+				feo += yl[l] * Sl[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
 				l+=2;
 			}
-			if (l==LMAX) {
-				fe += yl[l] * Sl[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
-			}
-			ShF[i] = fe + fo;
-			ShF[NLAT-(i+1)] = fe - fo;
+			ShF[i] = feo;
 			i++;
 			yl += (LMAX-m+1);
 		}
 		ShF += NLAT;
 	}
 	for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
-		for (i=0;i<NLAT;i++)
+		for (i=0;i<NLAT/2;i++)
 			ShF[i] = 0.0;
 		ShF += NLAT;
 	}
