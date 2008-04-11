@@ -2,12 +2,7 @@
 // grid : Radial finite difference setup
 //////////////////////////////////////////////
 
-// discretisation spatiale
-double *r, *r_1, *r_2, *dr;		// r = rayon; r_1 = 1/r; r_2 = 1/(r*r); dr[i] = r[i+1]-r[i];
-struct TriDiag *Gr, *Wr, *D2r, *Lr;	// Gr = Gradient; Wr= 1/r Gr( r .); D2r = d2/dr2; Lr = Laplacien radial scalaire.
-
-
-/*	Inversion de matrices x-Bandes. (x = 3,5,7)
+/*	Inversion de matrices x-Bandes. (x = 3,5)
 	Les conditions aux limites sont prises en compte (ou pas !)
 	=> pour l'évolution temporelle semi-implicite des potentiels et champs.
         => Les Matrices ont une taille NR*(LMAX+1), la decomposition se fait sur NR.
@@ -16,32 +11,40 @@ struct TriDiag *Gr, *Wr, *D2r, *Lr;	// Gr = Gradient; Wr= 1/r Gr( r .); D2r = d2
 #define RL(i,l) ( i*(LMAX+1) + l )
 #define RLM(i,lm) ( i*NLM + lm )
 
-
-// LM_LOOP : loop over all (l,im) and perform "action"
+// LM_LOOP : loop over all (l,im) and perform "action"  : l,im,lm are defined. (but NOT m )
 #define LM_LOOP( action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=LMAX; l++, lm++) { action } }
 
 struct TriDiag {
-	double l, d ,u;		// lower, diagonal, upper
+	double l,d,u;		// lower, diagonal, upper.
+};
+
+struct TriDiagL {
+	double l;		// lower
+	double d[LMAX+1];	// diagonal (depends on l)
+	double u;		// upper
 };
 
 struct CinqDiag {
 	double l2,l1, d ,u1,u2;
 };
 
-struct SeptDiag {
-	double l3,l2,l1, d ,u1,u2,u3;
-};
 
 
+// discretisation spatiale
+double *r, *r_1, *r_2, *dr;		// r = rayon; r_1 = 1/r; r_2 = 1/(r*r); dr[i] = r[i+1]-r[i];
+struct TriDiag *Gr, *Wr, *D2r, *Lr;	// Gr = Gradient; Wr= 1/r Gr( r .); D2r = d2/dr2; Lr = Laplacien radial scalaire.
+
+/*
 void runerr(const char * error_text)
 {
 	printf("*** Run-time error : %s\n",error_text);
 	exit(1);
 }
+*/
 
-void TriDec(struct TriDiag *M, int istart, int iend)
-// decomposition d'une matrice tribande. Les divisions ont lieu dans cette etape.
-// les elements d et u sont écrasés !
+void TriDec(struct TriDiagL *M, int istart, int iend)
+// decomposition PARTIELLE d'une matrice tribande. Les divisions ont lieu dans cette etape.
+// seul l'element diagonal est ecrasé !!!
 {
 	double tmp;
 	int j,l;
@@ -49,120 +52,49 @@ void TriDec(struct TriDiag *M, int istart, int iend)
 	j = istart;
 		tmp = 1.0;
 		for (l=0;l<=LMAX;l++)
-			tmp *= M[RL(j,l)].d;
+			tmp *= M[j].d[l];
 		if (tmp == 0.0) runerr("[TriDec] first pivot is zero.");
 
 		for (l=0;l<=LMAX;l++)
-			M[RL(j,l)].d = 1.0/M[RL(j,l)].d;
+			M[j].d[l] = 1.0/M[j].d[l];
 	while(j < iend) {	//Decomposition.
 		j++;
 		for (l=0;l<=LMAX;l++) {
-			M[RL(j-1,l)].u = M[RL(j-1,l)].u * M[RL(j-1,l)].d;
-			tmp = M[RL(j,l)].d - M[RL(j,l)].l * M[RL(j-1,l)].u;
+			tmp = M[j].d[l] - M[j].l * M[j-1].u * M[j-1].d[l];
 			if (tmp == 0.0) runerr("[TriDec] zero pivot encountered.");	// Algorithm fails
-			M[RL(j,l)].d = 1.0/tmp;
+			M[j].d[l] = 1.0/tmp;
 		}
 	}
-/*	for (j=1; j<n; j++)
-	{
-		for (l=0;l<=LMAX;l++) {
-			M[RL(j-1,l)].u = M[RL(j-1,l)].u * M[RL(j-1,l)].d;
-			tmp = M[RL(j,l)].d - M[RL(j,l)].l * M[RL(j-1,l)].u;
-			if (tmp == 0.0) runerr("[TriDec] zero pivot encountered.");	// Algorithm fails
-			M[RL(j,l)].d = 1.0/tmp;
-		}
-	}	*/
 }
-
-// Solve a tridiag system, from is to ie.
-// uses j,l,im,lm  loop variables.
-#define TRI_SOLVE(M, b, x, is, ie) { \
-	j = is;	\
-		for (im=0, lm=0; im<=MMAX; im++) { \
-			for (l=im*MRES; l<=LMAX; l++, lm++) \
-				x[RLM(j,lm)] = b[RLM(j,lm)]*M[RL(j,l)].d; \
-		} \
-	while (j < ie) { j++; \
-		for (im=0, lm=0; im<=MMAX; im++) { \
-			for (l=im*MRES; l<=LMAX; l++, lm++) \
-				x[RLM(j,lm)] = (b[RLM(j,lm)] - M[RL(j,l)].l * x[RLM(j-1,l)]) * M[RL(j,l)].d; \
-		} \
-	} \
-	while (j > is) { j--; \
-		for (im=0, lm=0; im<=MMAX; im++) { \
-			for (l=im*MRES; l<=LMAX; l++, lm++) \
-				x[RLM(j,lm)] -= M[RL(j,l)].u *x[RLM(j+1,lm)]; \
-		} \
-	} }
 
 // Solve M x = b, where b and x can be the same array.
-//   M is a TriDiag Matrix, previously decomposed by TriDec. (NR * (LMAX+1))
-//   b and x are full Ylm : (NR*LMMAX)
-inline void TriSolve(struct TriDiag *M, double *b, double *x, int istart, int iend)
+//   M is a TriDiagL Matrix, previously decomposed by TriDec.
+//   b and x are full Ylm : (NR*LMMAX), [b and x can point to the same data].
+inline void cTriSolve(struct TriDiagL *M, complex double **b, complex double **x, int istart, int iend)
 {
 	long int j,l,im,lm;
 
 	j = istart;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] = b[RLM(j,lm)]*M[RL(j,l)].d;
-		}
-	while (j < iend) {	// Forward substitution.
+	if (x != b) {		// don't copy if b and x are the same vector.
+		for (lm=0; lm<NLM; lm++)  x[j][lm] = b[j][lm];
+	}
+	while (j < iend-1) {	// Forward substitution.
 		j++;
 		for (im=0, lm=0; im<=MMAX; im++) {
 			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] = (b[RLM(j,lm)] - M[RL(j,l)].l * x[RLM(j-1,l)]) * M[RL(j,l)].d;
+				x[j][lm] = b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm]);
 		}
-	}	// j=iend
-	while (j > istart) {	// Backsubstitution.
+	}	// j = iend-1;
+	j++;	// j = iend;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[j][lm] = (b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm])) * M[j].d[l];
+		}
+	while (j > istart) {	// Back-substitution.
 		j--;
 		for (im=0, lm=0; im<=MMAX; im++) {
 			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] -= M[RL(j,l)].u *x[RLM(j+1,lm)];
-		}
-	}	// j=istart
-/*
-	j=0;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] = b[RLM(j,lm)]*M[RL(j,l)].d;
-		}
-	for (j=1;j<n;j++) {		// Forward substitution.
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] = (b[RLM(j,lm)] - M[RL(j,l)].l * x[RLM(j-1,l)]) * M[RL(j,l)].d;
-		}
-	}
-	for (j=(n-2);j>=0;j--) {	// Backsubstitution.
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] -= M[RL(j,l)].u *x[RLM(j+1,lm)];
-		}
-	}
-*/
-}
-
-inline void cTriSolve(struct TriDiag *M, complex double *b, complex double *x, int istart, int iend)
-{
-	long int j,l,im,lm;
-
-	j = istart;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] = b[RLM(j,lm)]*M[RL(j,l)].d;
-		}
-	while (j < iend) {	// Forward substitution.
-		j++;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] = (b[RLM(j,lm)] - M[RL(j,l)].l * x[RLM(j-1,l)]) * M[RL(j,l)].d;
-		}
-	}	// j=iend
-	while (j > istart) {	// Backsubstitution.
-		j--;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[RLM(j,lm)] -= M[RL(j,l)].u *x[RLM(j+1,lm)];
+				x[j][lm] = ( x[j][lm] - M[j].u *x[j+1][lm] ) * M[j].d[l];
 		}
 	}	// j=istart
 }
@@ -230,76 +162,6 @@ void CinqSolve(struct CinqDiag *M, complex double *b, complex double *x, int n)
 		x[i] -= M[i].u1 * x[i+1] + M[i].u2 * x[i+2];
 }
 
-
-void SeptDec(struct SeptDiag *M, int n)
-{
-	double alp, bet, gam;
-	int i;
-	
-	if (M[0].d == 0.0) runerr("[SeptDec] first pivot is zero.");
-	
-	i=1;
-		gam = M[i].l1 / M[i-1].d;
-		M[i].d -= gam * M[i-1].u1;
-		M[i].u1 -= gam * M[i-1].u2;
-		M[i].u2 -= gam * M[i-1].u3;
-	i=2;
-		if (M[i-1].d == 0.0) runerr("[SeptDec] second pivot turned out to be zero.");
-		bet = M[i].l2 / M[i-2].d;
-		M[i].l1 -= bet * M[i-2].u1;
-		gam = M[i].l1 / M[i-1].d;
-		M[i].d -= gam * M[i-1].u1 + bet * M[i-2].u2;
-		M[i].u1 -= gam * M[i-1].u2 + bet * M[i-2].u3;
-		M[i].u2 -= gam * M[i-1].u3;
-	for(i=3;i<n;i++) {
-		if (M[i-1].d == 0.0) runerr("[SeptDec] zero pivot encountered.");
-		alp = M[i].l3 / M[i-3].d;
-		M[i].l2 -= alp * M[i-3].u1;
-		bet = M[i].l2 / M[i-2].d;
-		M[i].l1 -= bet * M[i-2].u1 + alp * M[i-3].u2;
-		gam = M[i].l1 / M[i-1].d;
-		M[i].d -= gam * M[i-1].u1 + bet * M[i-2].u2 + alp * M[i-3].u3;
-		M[i].u1 -= gam * M[i-1].u2 + bet * M[i-2].u3;
-		M[i].u2 -= gam * M[i-1].u3;
-	}
-
-	for(i=0;i<n;i++) {
-		M[i].d = 1.0 / M[i].d;
-		M[i].l3 *= M[i].d;
-		M[i].l2 *= M[i].d;
-		M[i].l1 *= M[i].d;
-		M[i].u1 *= M[i].d;
-		M[i].u2 *= M[i].d;
-		M[i].u3 *= M[i].d;
-	}
-}
-
-void SeptSolve(struct SeptDiag *M, complex double *b, complex double *x, int n)
-/* Solves M x = b, where b and x can be the same array.
-   M is a SeptDiag Matrix, previously decomposed by SeptDec.
-*/
-{
-	int i;
-
-// forward (suppose CL : x[-1] = 0)
-	i=0;
-		x[i] = M[i].d * b[i];
-	i=1;
-		x[i] = M[i].d * b[i] - M[i].l1 * x[i-1];
-	i=2;
-		x[i] = M[i].d * b[i] - M[i].l1 * x[i-1] - M[i].l2 * x[i-2];
-	for(i=3;i<n;i++)
-		x[i] = M[i].d * b[i] - M[i].l1 * x[i-1] - M[i].l2 * x[i-2] - M[i].l3 * x[i-3];
-
-// backward (suppose CL : x[n] = 0) ce qui est le cas pour les champs poloidaux consideres.
-	i = n-2;
-		x[i] -= M[i].u1 * x[i+1];
-	i = n-3;
-		x[i] -= M[i].u1 * x[i+1] + M[i].u2 * x[i+2];
-	for(i=n-4;i>=0;i--)
-		x[i] -= M[i].u1 * x[i+1] + M[i].u2 * x[i+2] + M[i].u3 * x[i+3];
-
-}
 
 
 

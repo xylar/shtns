@@ -13,9 +13,16 @@
 
 #include "SHT.c"
 
+#define NR 30
+
+#include "grid.c"
+
+
 complex double* BF[NR];
 double* B[NR];
 complex double* Blm[NR];
+
+TriDiagL* MB, MB_1;
 
 void alloc_fields()
 {
@@ -128,10 +135,10 @@ void NLU(complex double **Plm, complex double **Tlm, double** NLr, double** NLt,
 			Sw[lm] = Wr[ir].l*Tlm[ir-1][lm] + Wr[ir].d*Tlm[ir][lm] + Wr[ir].u*Tlm[ir+1][lm];
 		}
 //		(double) Sw[1] += Omega0 * 2.0*sqrt(pi/3.0);	// add Background Vorticity for Coriolis Force (l=1, m=0)
-		SHsphertor_to_spat(Su, Tlm[ir], (complex double *) Nlt[ir], (complex double *) Nlp[ir]);
-		SHsphertor_to_spat(Sw, Tw, (complex double *) NLr[ir], (complex double *) Nltmp);
+		SHsphertor_to_spat(Su, Tlm[ir], (complex double *) NLt[ir], (complex double *) NLp[ir]);
+		SHsphertor_to_spat(Sw, Tw, (complex double *) NLr[ir], (complex double *) NLtmp);
 		for(lm = 0; lm < NPHI*NLAT; lm++) {
-			NLt[ir][lm] *= NLr[ir][lm];	NLp[ir][i] *= NLtmp[lm];
+			NLt[ir][lm] *= NLr[ir][lm];	NLp[ir][lm] *= NLtmp[lm];
 		}
 		for (lm=0; lm<NLM; lm++) {
 			Su[lm] = r_1[ir]*l2[lm] * Plm[ir][lm];
@@ -188,36 +195,30 @@ void init_Bmatrix()
 	double dx_1,dx_2;
 	int i,l;
 
+	MB = (double *) malloc( NR* sizeof(struct TriDiagL));
+	MB_1 = (double *) malloc( NR* sizeof(struct TriDiagL));
+
 // Boundary conditions
 //	r=0 : T=0, P=0  => not computed at i=0.
 //	r=1 : T=0, dP/dr= -(l+1)/r P  (insulator) => only P is computed.
 
 	for(i=1; i<NR-1; i++) {
-		for (l=0; l<=LMAX; l++) {
-			MB[i*(LMAX+1) +l].l =           0.5*eta*Lr[i].l;
-			MB[i*(LMAX+1) +l].d = 1.0/dtB + 0.5*eta*(Lr[i].d - r_2[i]*l2[l]);
-			MB[i*(LMAX+1) +l].u =           0.5*eta*Lr[i].u;
-		}
+					MB[i].l =           0.5*eta*Lr[i].l;
+		for (l=0; l<=LMAX; l++)	MB[i].d[l] = 1.0/dtB + 0.5*eta*(Lr[i].d - r_2[i]*l2[l]);
+					MB[i].u =           0.5*eta*Lr[i].u;
 	}
 	i = NR-1;		// CL poloidale : dP/dr = -(l+1)/r P => permet d'approximer d2P/dr2 de maniere discrete avec 2 points.
 		dx_1 = 1.0/(r[i]-r[i-1]);	dx_2 = dx_1*dx_1;
-		for (l=0; l<=LMAX; l++) {
-			MB[i*(LMAX+1) +l].l =           eta * dx_2;
-			MB[i*(LMAX+1) +l].d = 1.0/dtB + eta*( -dx_2 - (l+1.0)*r_1[i]*dx_1 -(l+1.0 + 0.5*l2[l])*r_2[i] );
-			MB[i*(LMAX+1) +l].u = 0.0;
-		}
+					MB[i].l =           eta * dx_2;
+		for (l=0; l<=LMAX; l++) MB[i].d[l] = 1.0/dtB + eta*( -dx_2 - (l+1.0)*r_1[i]*dx_1 -(l+1.0 + 0.5*l2[l])*r_2[i] );
+					MB[i].u = 0.0;
 
 	for(i=1; i<NR; i++) {
-		for (l=0; l<=LMAX; l++) {
-			MBp_1[i*(LMAX+1) +l].l =         - MB[i*(LMAX+1) +l].l;
-			MBp_1[i*(LMAX+1) +l].d = 2.0/dtB - MB[i*(LMAX+1) +l].d;
-			MBp_1[i*(LMAX+1) +l].u =         - MB[i*(LMAX+1) +l].u;
-			MBt_1[i*(LMAX+1) +l].l = MBp_1[i*(LMAX+1) +l].l;
-			MBt_1[i*(LMAX+1) +l].d = MBp_1[i*(LMAX+1) +l].d;
-			MBt_1[i*(LMAX+1) +l].u = MBp_1[i*(LMAX+1) +l].u;
-		}
+					MB_1[i].l =            - MB[i*(LMAX+1) +l].l;
+		for (l=0; l<=LMAX; l++) MB_1[i].d[l] = 2.0/dtB - MB[i*(LMAX+1) +l].d;
+					MB_1[i].u =            - MB[i*(LMAX+1) +l].u;
 	}
-	TriDec(MBt_1, NR-2);
+	TriDec(MB_1, 1, NR-1);		// for Btor : 1 to NR-2, for Bpol : 1 to NR-1
 }
 
 
@@ -258,8 +259,8 @@ int main()
 	write_vect("y6530",&iylm[im][(l-m)*NLAT/2],NLAT/2);
 
 // test case...
-	Slm = (complex double *) malloc(sizeof(complex double)* LMMAX);
-	for (i=0;i<LMMAX;i++) {
+	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
+	for (i=0;i<NLM;i++) {
 		Slm[i] = 0.0;
 	}
 	
@@ -279,6 +280,6 @@ int main()
 		spat_to_SH(ShF,Slm);
 	}
 
-	write_vect("ylm",Slm,LMMAX*2);
+	write_vect("ylm",Slm,NLM*2);
 }
 
