@@ -684,8 +684,8 @@ void init_SH()
 // Additional arrays :
 	it = 0;
 	for (im=0;im<=MMAX;im++) {
-		for (l=m;l<=LMAX;l++) {
-			l2[it] = l*(l+1);	l_2[it] = 1.0/(l*(l+1));
+		for (l=im*MRES;l<=LMAX;l++) {
+			l2[it] = l*(l+1.0);	l_2[it] = 1.0/(l*(l+1.0));
 			it++;
 		}
 	}

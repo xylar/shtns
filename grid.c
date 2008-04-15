@@ -4,7 +4,7 @@
 
 /*	Inversion de matrices x-Bandes. (x = 3,5)
 	Les conditions aux limites sont prises en compte (ou pas !)
-	=> pour l'évolution temporelle semi-implicite des potentiels et champs.
+	=> pour l'ï¿½volution temporelle semi-implicite des potentiels et champs.
         => Les Matrices ont une taille NR*(LMAX+1), la decomposition se fait sur NR.
 */
 
@@ -44,7 +44,7 @@ void runerr(const char * error_text)
 
 // Multiplication d'un vecteur complexe par une matrice Tribande dependant de l
 // y = M.x    (y and x MUST be different)
-void cTriMul(struct TriDiagL *M, complex double **x, complex double **y, int istart, int iend)
+inline void cTriMul(struct TriDiagL *M, complex double **x, complex double **y, int istart, int iend)
 {
 	long int j,l,im,lm;
 
@@ -66,8 +66,32 @@ void cTriMul(struct TriDiagL *M, complex double **x, complex double **y, int ist
 		}
 }
 
+// Multiplication d'un vecteur complexe par une matrice Tribande dependant de l, ajoute au resultat.
+// y += M.x    (y and x MUST be different)
+inline void cTriMulAdd(struct TriDiagL *M, complex double **x, complex double **y, int istart, int iend)
+{
+	long int j,l,im,lm;
+
+	j=istart;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] += M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
+		}
+	for (j=istart+1; j<iend; j++) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] += M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
+		}
+	}
+	j = iend;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] += M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm];
+		}
+}
+
 // decomposition PARTIELLE d'une matrice tribande. Les divisions ont lieu dans cette etape.
-// seul l'element diagonal est ecrasé !!!
+// seul l'element diagonal est ecrasï¿½ !!!
 void TriDec(struct TriDiagL *M, int istart, int iend)
 {
 	double tmp;
@@ -179,7 +203,7 @@ void CinqSolve(struct CinqDiag *M, complex double *b, complex double *x, int n)
 	for(i=n-3;i>=0;i--)
 		x[i] -= M[i].u1 * x[i+1] + M[i].u2 * x[i+2];
 */
-// backward avec CL : x[n] != 0		(peut etre le cas pour le strain imposé m=2)
+// backward avec CL : x[n] != 0		(peut etre le cas pour le strain imposï¿½ m=2)
 	i = n-1;
 		x[i] -= M[i].u1 * x[i+1];
 	for(i=n-2;i>=0;i--)	// tient compte des conditions limites !!!
@@ -189,11 +213,11 @@ void CinqSolve(struct CinqDiag *M, complex double *b, complex double *x, int n)
 
 
 
-/*	Génération des Grilles et des opérateurs de dérivation spatiale.
+/*	Gï¿½nï¿½ration des Grilles et des opï¿½rateurs de dï¿½rivation spatiale.
 */
 
 
-void Reg_Grid(double rmin, double rmax)		// Grille régulière.
+void Reg_Grid(double rmin, double rmax)		// Grille rï¿½guliï¿½re.
 {
 	double dx;
 	int i;
@@ -222,13 +246,13 @@ void Exp_Grid(double dx0, double alpha)		// Grille exponentielle.
 	printf("[GRID:Exp] NR=%d alpha=%f rmax=%f, dxmin=%f dxmax=%f\n",NR,alpha,r[NR-1],dx0,dx);
 }
 
-void Mixed_Grid(int Nreg, double rreg_max, double dxmax_mul)	// Génère une grille réguliere au centre, puis exponentielle.
+void Mixed_Grid(int Nreg, double rreg_max, double dxmax_mul)	// Gï¿½nï¿½re une grille rï¿½guliere au centre, puis exponentielle.
 {
 	double dx, dxmax, alpha;
 	int i, Nirr;
 
 	if (Nreg > NR)	Nreg = NR;
-// Grille : réguilière dans le coeur ...
+// Grille : rï¿½guiliï¿½re dans le coeur ...
 	r[0] = 0.0;
 	dx = rreg_max/(Nreg-1);
 	for(i=1;i<Nreg;i++)
@@ -289,24 +313,24 @@ void init_Deriv_sph()
 		Gr[i].d = (dr[i]*dr[i] - dr[i-1]*dr[i-1])*t;	// =0 en grille reguliere.
 		Gr[i].u = dr[i-1]*dr[i-1]*t;
 
-		Wr[i].l = r_1[i]* Gr[i].l * r[i-1];	// Wr = 1/r * d/dr(r .), pour la vorticité m=0 !
+		Wr[i].l = r_1[i]* Gr[i].l * r[i-1];	// Wr = 1/r * d/dr(r .), pour la vorticitï¿½ m=0 !
 		Wr[i].d =         Gr[i].d;
 		Wr[i].u = r_1[i]* Gr[i].u * r[i+1];
 
 		D2r[i].l =  2.0*dr[i]*t;
 		D2r[i].d =  -2.0*(dr[i-1]+dr[i])*t;
 		D2r[i].u =  2.0*dr[i-1]*t;
-
+/*
 		Lr[i].l = r_1[i]* D2r[i].l * r[i-1];	// Laplacien radial : 1/r . d2/dr2(r .)
 		Lr[i].d =         D2r[i].d;
 		Lr[i].u = r_1[i]* D2r[i].u * r[i+1];
-/*
+*/
 		Lr[i].l = D2r[i].l + 2.0*r_1[i]*Gr[i].l;	// Laplacien radial : d2/dr2 + 2/r.d/r
 		Lr[i].d = D2r[i].d + 2.0*r_1[i]*Gr[i].d;
 		Lr[i].u = D2r[i].u + 2.0*r_1[i]*Gr[i].u;
-*/
+
 	}
-	// les extremites douvent etre déterminées par les CL au cas par cas.
+	// les extremites douvent etre dï¿½terminï¿½es par les CL au cas par cas.
 	i = 0;
 		Gr[i].l = 0.0; Gr[i].d = 0.0; Gr[i].u = 0.0;
 		Wr[i].l = 0.0;	Wr[i].d = 0.0;	Wr[i].u = 0.0;
@@ -357,7 +381,7 @@ void init_Deriv_cyl()
 		Gr[i].d = (dr[i]*dr[i] - dr[i-1]*dr[i-1])*t;	// =0 en grille reguliere.
 		Gr[i].u = dr[i-1]*dr[i-1]*t;
 
-		Wr[i].l = r_1[i]* Gr[i].l * r[i-1];	// Wr = 1/r * d/dr(r .), pour la vorticité m=0 !
+		Wr[i].l = r_1[i]* Gr[i].l * r[i-1];	// Wr = 1/r * d/dr(r .), pour la vorticitï¿½ m=0 !
 		Wr[i].d = Gr[i].d;
 		Wr[i].u = r_1[i]* Gr[i].u * r[i+1];
 
@@ -369,7 +393,7 @@ void init_Deriv_cyl()
 		Lr[i].d =  -2.0*(dr[i-1]+dr[i])*t + r_1[i]*Gr[i].d;
 		Lr[i].u =  2.0*dr[i-1]*t          + r_1[i]*Gr[i].u;
 	}
-	// les extremites douvent etre déterminées par les CL au cas par cas.
+	// les extremites douvent etre dï¿½terminï¿½es par les CL au cas par cas.
 	i = 0;
 		Gr[i].l = 0.0; Gr[i].d = 0.0; Gr[i].u = 0.0;
 		Wr[i].l = 0.0;	Wr[i].d = 0.0;	Wr[i].u = 0.0;
