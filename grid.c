@@ -42,9 +42,33 @@ void runerr(const char * error_text)
 }
 */
 
-void TriDec(struct TriDiagL *M, int istart, int iend)
+// Multiplication d'un vecteur complexe par une matrice Tribande dependant de l
+// y = M.x    (y and x MUST be different)
+void cTriMul(struct TriDiagL *M, complex double **x, complex double **y, int istart, int iend)
+{
+	long int j,l,im,lm;
+
+	j=istart;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
+		}
+	for (j=istart+1; j<iend; j++) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
+		}
+	}
+	j = iend;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm];
+		}
+}
+
 // decomposition PARTIELLE d'une matrice tribande. Les divisions ont lieu dans cette etape.
 // seul l'element diagonal est ecrasé !!!
+void TriDec(struct TriDiagL *M, int istart, int iend)
 {
 	double tmp;
 	int j,l;
@@ -85,7 +109,7 @@ inline void cTriSolve(struct TriDiagL *M, complex double **b, complex double **x
 				x[j][lm] = b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm]);
 		}
 	}	// j = iend-1;
-	j++;	// j = iend;
+	j = iend;
 		for (im=0, lm=0; im<=MMAX; im++) {
 			for (l=im*MRES; l<=LMAX; l++, lm++)
 				x[j][lm] = (b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm])) * M[j].d[l];
@@ -175,9 +199,8 @@ void Reg_Grid(double rmin, double rmax)		// Grille régulière.
 	int i;
 
 	dx = (rmax - rmin)/(NR-1);
-	r[0] = rmin;
-	for(i=1;i<NR;i++)
-		r[i] = r[i-1] + dx;
+	for(i=0;i<NR;i++)
+		r[i] = ((rmax-rmin)*i)/(NR-1);
 
 	printf("[GRID:Reg] NR=%d, r=[%f, %f], dr=%f\n",NR,r[0],r[NR-1],dx);
 }
@@ -277,6 +300,11 @@ void init_Deriv_sph()
 		Lr[i].l = r_1[i]* D2r[i].l * r[i-1];	// Laplacien radial : 1/r . d2/dr2(r .)
 		Lr[i].d =         D2r[i].d;
 		Lr[i].u = r_1[i]* D2r[i].u * r[i+1];
+/*
+		Lr[i].l = D2r[i].l + 2.0*r_1[i]*Gr[i].l;	// Laplacien radial : d2/dr2 + 2/r.d/r
+		Lr[i].d = D2r[i].d + 2.0*r_1[i]*Gr[i].d;
+		Lr[i].u = D2r[i].u + 2.0*r_1[i]*Gr[i].u;
+*/
 	}
 	// les extremites douvent etre déterminées par les CL au cas par cas.
 	i = 0;
@@ -289,7 +317,6 @@ void init_Deriv_sph()
 		Wr[i].l = 0.0;	Wr[i].d = 0.0;	Wr[i].u = 0.0;
 		D2r[i].l = 0.0; D2r[i].d = 0.0; D2r[i].u = 0.0;
 		Lr[i].l = 0.0;	Lr[i].d = 0.0;	Lr[i].u = 0.0;
-
 }
 
 /*
@@ -358,7 +385,7 @@ void init_Deriv_cyl()
 */
 
 // genere la grille radiale, et les matrices de derivees spatiales
-void init_Rad_sph(double rmin, double rmax)
+void init_rad_sph(double rmin, double rmax)
 {
 	r = (double *) malloc(NR * sizeof(double));	// allocation de la grille radiale
 	Reg_Grid(rmin, rmax);

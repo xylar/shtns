@@ -13,27 +13,24 @@
 
 #include "SHT.c"
 
-#define NR 30
+#define NR 100
 
 #include "grid.c"
 
+struct TriDiagL *MB, *MB_1;
 
 complex double* BF[NR];
 double* B[NR];
 complex double* Blm[NR];
+complex double* RHSlm[NR];
 
-TriDiagL* MB, MB_1;
+struct BaseField {
+	long int mmax,lmax;
+	complex double *ylm;
+};
 
-void alloc_fields()
-{
-	long int ir;
-// Allocate Spatial Fields.
-	for (ir = 0; ir < NR; ir++) {
-		BF[ir] = (complex double *) fftw_malloc( 3*NR*(NPHI/2+1)*NLAT * sizeof(complex double));	// 3 components
-		B[ir] = (double *) BF;	// alias for inplace.
-		Blm[ir] = (complex double *) malloc( 2*NLM * sizeof(complex double));	// Pol/Tor
-	}
-}
+double eta = 1.0;	// magnetic diffusivity.
+double dtB = 0.001;	// time step for magnetic field.
 
 void PolTor_to_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp)
 {
@@ -47,7 +44,7 @@ void PolTor_to_spat(complex double **Plm, complex double **Tlm, double** Br, dou
 			Q[lm] = r_1[ir]*l2[lm] * Plm[ir][lm];
 		}
 		SH_to_spat(Q,(complex double *) Br[ir]);
-		SHsphertor_to_spat(S, Tlm[ir], (complex double *) Bt[ir], (complex double *) Bp[ir]);
+		SHsphtor_to_spat(S, Tlm[ir], (complex double *) Bt[ir], (complex double *) Bp[ir]);
 	}
 }
 
@@ -57,7 +54,7 @@ void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **P
 	long int ir,lm;
 
 	for (ir=0; ir<NR; ir++) {
-		spat_to_SHsphertor((complex double *) Bt[ir], (complex double *) Bp[ir], Slm[ir], Tlm[ir]);
+		spat_to_SHsphtor((complex double *) Bt[ir], (complex double *) Bp[ir], Slm[ir], Tlm[ir]);
 		spat_to_SH((complex double *) Br[ir], Q);
 		for (lm=0; lm<NLM; lm++) {
 			Plm[ir][lm] = r[ir]*l_2[lm] * Q[lm];		// poloidal
@@ -73,7 +70,7 @@ void PolTor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Br,
 	complex double T[NLM];	//  [ l(l+1)/r^2 - 1/r d2/dr2(r .) ] P
 	long int ir,lm;
 
-	for (ir=0; ir<NR; ir++) {
+	for (ir=1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
 			Q[lm] = r_1[ir]*l2[lm] * Tlm[ir][lm];
 			S[lm] = Wr[ir].l*Tlm[ir-1][lm] + Wr[ir].d*Tlm[ir][lm] + Wr[ir].u*Tlm[ir+1][lm];
@@ -88,26 +85,28 @@ void PolTor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Br,
 		//	(double) Q[1] += Omega0 * 2.0*sqrt(pi/3.0);
 		//	(double) S[1] += Omega0 * 2.0*sqrt(pi/3.0);
 		SH_to_spat(Q,(complex double *) Br[ir]);
-		SHsphertor_to_spat(S, T, (complex double *) Bt[ir], (complex double *) Bp[ir]);
+		SHsphtor_to_spat(S, T, (complex double *) Bt[ir], (complex double *) Bp[ir]);
 	}
 }
 
-// spatial to curl : only for ir = 1 .. NR-1
+// spatial to curl : only for ir = 1 .. NR-2
 //	Pol <- Tor
 //	Tor <- Q/r - 1/r.d(rS)/dr
 void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Tlm)
 {
-	complex double Q[NLM];
-	complex double Sl[NLM], Sd[NLM], Su[NLM];
-	complex double* St;	// temp pointer.
+	complex double Q[NLM];		// Q
+	complex double S[NLM*3];	// buffers for S.
+	complex double *St, *Sl, *Sd, *Su;	// pointers to S (temp, lower, diag, upper)
 	long int ir,lm;
 
+	Sl = S;   Sd = S + NLM;   Su = S + 2*NLM;	// init pointers to buffer.
+
 	ir = 0;
-		spat_to_SHsphertor((complex double *) Bt[ir], (complex double *) Bp[ir], Sd, Su);	// discard Plm[0]
-		spat_to_SHsphertor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
-	for (ir=1; ir<NR-1; ir++) {
-		St = Sl;   Sl = Sd;   Sd = Su;   Su = St;		// rotating buffers.
-		spat_to_SHsphertor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
+		spat_to_SHsphtor((complex double *) Bt[ir], (complex double *) Bp[ir], Sd, Su);	// discard Plm[0]
+		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
+	for (ir=1; ir <= NR-2; ir++) {
+		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
+		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
 		spat_to_SH((complex double *) Br[ir], Q);
 		for (lm=0; lm<NLM; lm++) {
 			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
@@ -128,15 +127,15 @@ void NLU(complex double **Plm, complex double **Tlm, double** NLr, double** NLt,
 	cos theta = Y(m=0,l=1) * 2*sqrt(pi/3)		>> peut etre rajouté à Qlm. (=> Br)
 	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> peut etre rajouté à Slm  (=> Bt)
 */
-	for (ir=0; ir<NR; ir++) {
+	for (ir=1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
 			Su[lm] = Wr[ir].l*Plm[ir-1][lm] + Wr[ir].d*Plm[ir][lm] + Wr[ir].u*Plm[ir+1][lm];
 			Tw[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*Plm[ir][lm] - r_1[ir]*D2r[ir].l*Plm[ir-1][lm] - r_1[ir]*D2r[ir].u*Plm[ir+1][lm];
 			Sw[lm] = Wr[ir].l*Tlm[ir-1][lm] + Wr[ir].d*Tlm[ir][lm] + Wr[ir].u*Tlm[ir+1][lm];
 		}
 //		(double) Sw[1] += Omega0 * 2.0*sqrt(pi/3.0);	// add Background Vorticity for Coriolis Force (l=1, m=0)
-		SHsphertor_to_spat(Su, Tlm[ir], (complex double *) NLt[ir], (complex double *) NLp[ir]);
-		SHsphertor_to_spat(Sw, Tw, (complex double *) NLr[ir], (complex double *) NLtmp);
+		SHsphtor_to_spat(Su, Tlm[ir], (complex double *) NLt[ir], (complex double *) NLp[ir]);
+		SHsphtor_to_spat(Sw, Tw, (complex double *) NLr[ir], (complex double *) NLtmp);
 		for(lm = 0; lm < NPHI*NLAT; lm++) {
 			NLt[ir][lm] *= NLr[ir][lm];	NLp[ir][lm] *= NLtmp[lm];
 		}
@@ -195,91 +194,107 @@ void init_Bmatrix()
 	double dx_1,dx_2;
 	int i,l;
 
-	MB = (double *) malloc( NR* sizeof(struct TriDiagL));
-	MB_1 = (double *) malloc( NR* sizeof(struct TriDiagL));
+	MB = (struct TriDiagL *) malloc( NR* sizeof(struct TriDiagL));
+	MB_1 = (struct TriDiagL *) malloc( NR* sizeof(struct TriDiagL));
 
 // Boundary conditions
 //	r=0 : T=0, P=0  => not computed at i=0.
 //	r=1 : T=0, dP/dr= -(l+1)/r P  (insulator) => only P is computed.
 
 	for(i=1; i<NR-1; i++) {
-					MB[i].l =           0.5*eta*Lr[i].l;
-		for (l=0; l<=LMAX; l++)	MB[i].d[l] = 1.0/dtB + 0.5*eta*(Lr[i].d - r_2[i]*l2[l]);
-					MB[i].u =           0.5*eta*Lr[i].u;
+					MB[i].l =              0.5*eta*Lr[i].l;
+		for (l=0; l<=LMAX; l++)	MB[i].d[l] = 1.0/dtB + 0.5*eta*(Lr[i].d - r_2[i]*l*(l+1));
+					MB[i].u =              0.5*eta*Lr[i].u;
 	}
 	i = NR-1;		// CL poloidale : dP/dr = -(l+1)/r P => permet d'approximer d2P/dr2 de maniere discrete avec 2 points.
 		dx_1 = 1.0/(r[i]-r[i-1]);	dx_2 = dx_1*dx_1;
-					MB[i].l =           eta * dx_2;
-		for (l=0; l<=LMAX; l++) MB[i].d[l] = 1.0/dtB + eta*( -dx_2 - (l+1.0)*r_1[i]*dx_1 -(l+1.0 + 0.5*l2[l])*r_2[i] );
+					MB[i].l =              eta * dx_2;
+		for (l=0; l<=LMAX; l++) MB[i].d[l] = 1.0/dtB + eta*( -dx_2 - (l+1.0)*r_1[i]*dx_1 -(l+1.0 + 0.5*l*(l+1))*r_2[i] );
 					MB[i].u = 0.0;
 
 	for(i=1; i<NR; i++) {
-					MB_1[i].l =            - MB[i*(LMAX+1) +l].l;
-		for (l=0; l<=LMAX; l++) MB_1[i].d[l] = 2.0/dtB - MB[i*(LMAX+1) +l].d;
-					MB_1[i].u =            - MB[i*(LMAX+1) +l].u;
+					MB_1[i].l =            - MB[i].l;
+		for (l=0; l<=LMAX; l++) MB_1[i].d[l] = 2.0/dtB - MB[i].d[l];
+					MB_1[i].u =            - MB[i].u;
 	}
 	TriDec(MB_1, 1, NR-1);		// for Btor : 1 to NR-2, for Bpol : 1 to NR-1
+// for poloidal, use : cTriSolve(MB_1, RHS, Plm, 1, NR-1)
+// for toroidal, use : cTriSolve(MB_1, RHS, Tlm, 1, NR-2)
+
+/*
+	for(i=1; i<NR-1; i++) {
+					MB[i].l =              eta*Lr[i].l;
+		for (l=0; l<=LMAX; l++)	MB[i].d[l] =           eta*(Lr[i].d - r_2[i]*l2[l]);
+					MB[i].u =              eta*Lr[i].u;
+	}
+	i = NR-1;		// CL poloidale : dP/dr = -(l+1)/r P => permet d'approximer d2P/dr2 de maniere discrete avec 2 points.
+		dx_1 = 1.0/(r[i]-r[i-1]);	dx_2 = dx_1*dx_1;
+					MB[i].l =    eta * dx_2;
+		for (l=0; l<=LMAX; l++) MB[i].d[l] = eta*( -dx_2 - (l+1.0)*r_1[i]*dx_1 -(l+1.0 + 0.5*l2[l])*r_2[i] );
+					MB[i].u = 0.0;
+*/
 }
+
+
+void alloc_fields()
+{
+	long int ir;
+// Allocate Spatial Fields.
+	for (ir = 0; ir < NR; ir++) {
+		BF[ir] = (complex double *) fftw_malloc( 3*NR*(NPHI/2+1)*NLAT * sizeof(complex double));	// 3 components
+		B[ir] = (double *) BF;	// alias for inplace.
+		Blm[ir] = (complex double *) malloc( 2*NLM * sizeof(complex double));	// Pol/Tor
+		RHSlm[ir] = (complex double *) malloc( 2*NLM * sizeof(complex double));	// Pol/Tor
+	}
+}
+
 
 
 int main()
 {
-	double t,tmax;
-	int i,im,m,l,jj;
+	double t0,t1;
+	int i,im,m,l,jj, it;
+	FILE *fp; 
 
 	init_SH();
-	init_rad_sph(rmin, rmax);
+	init_rad_sph(0.0, 1.0);
 	init_Bmatrix();
 
-// test FFT :
-	for(i=0;i<NLAT*(NPHI/2+1);i++) {
-		ShF[i] = 0;
-	}
-	ShF[0] = 1.0+I;
-	ShF[NLAT] = 2.0+I;
-	ShF[NLAT*2] = 3.0+I;
-	
-	fftw_execute(ifft);
-	write_mx("sph",Sh,NPHI,NLAT);
-	fftw_execute(fft);
-	write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
+	alloc_fields();
 
-// test Ylm :
-	im = 0; l=0; m=im*MRES;
-	write_vect("y00",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	im = 0; l=1; m=im*MRES;
-	write_vect("y10",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	im = 0; l=LMAX; m=im*MRES;
-	write_vect("yLmax0",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	im = MMAX; m=im*MRES; l=m;
-	write_vect("ymmax-mmax",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	im = 3; l=8; m=im*MRES;
-	write_vect("y83",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	im = 30; l=65; m=im*MRES;
-	write_vect("y6530",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-
-// test case...
-	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
-	for (i=0;i<NLM;i++) {
-		Slm[i] = 0.0;
-	}
-	
-	Slm[LM(0,0)] = 1.0;
-	Slm[LM(3,1)] = 3.0;
-	Slm[LM(3,3)] = 2.0;
-	Slm[LM(10,5)] = 4.0;
-	Slm[LM(55,12)] = 5.0;
-	
-	for (jj=0;jj<3000;jj++) {
-
-// synthese (inverse legendre)
-		SH_to_spat(Slm,ShF);
-//		write_mx("sph",Sh,NPHI,NLAT);
-
-// analyse (direct legendre)
-		spat_to_SH(ShF,Slm);
+	for (i=0; i<NR; i++) {
+		for (l=0;l<NLM;l++) {
+			Blm[i][l] = 0.0;
+			RHSlm[i][l] = 0.0;
+		}
+		t0 = r[i]*pi;	t1 = r[i]*4.493409457909;
+//		Blm[i][1] = sin(t0)/(t0*t0) - cos(t0)/t0;
+		Blm[i][1] = r[i];
 	}
 
-	write_vect("ylm",Slm,NLM*2);
+
+
+	fp = fopen("prof0","w");
+	for (i=0; i<NR; i++) {
+		fprintf(fp,"%.6g ",Blm[i][1]);
+	}
+	fclose(fp);
+
+	for (it=0; it< 10000; it++) {
+		t0 = t1;
+		t1 = Blm[NR/2][1];
+		printf("%g :: tx=%g\n",t1,log(t1/t0)/dtB);
+
+		cTriMul(MB, Blm, RHSlm, 1, NR-1);
+//		cTriMul(MB, RHSlm, Blm, 1, NR-1);
+		cTriSolve(MB_1, RHSlm, Blm, 1, NR-1);
+	}
+
+	fp = fopen("prof1","w");
+	for (i=0; i<NR; i++) {
+		fprintf(fp,"%.6g ",Blm[i][1]);
+	}
+	fclose(fp);
+
 }
 
