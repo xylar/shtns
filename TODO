@@ -1,0 +1,16 @@
+*** Optimizations ***
+- SHT : use DCT space, keep low NLAT but regular grid and Gauss quadrature (??)
+        synthesis should be faster, analysis same speed.
+- SHT : implement even and odd sub-cases.
+- grid : try full NR*NLM matrices, loops are more efficient but what about cache ???
+
+=> time different implementations and chose the fastest...
+
+*** Features ***
++ velocity field computation
+- inner core differential rotation
+- conducting outer shell
+- insulating inner core
+
++ boundary conditions dependence
++ even/odd l dependance...

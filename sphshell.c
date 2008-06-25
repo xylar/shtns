@@ -14,17 +14,22 @@
 #include "SHT.c"
 
 // number of radial grid points.
-#define NR 100
+#define NR 200
 // radial points for inner core (NG = 0 : no inner core)
 #define NG 0
 #define NU (NR-NG)
 
 #include "grid.c"
 
+// boundary conditions.
+#define BC_NO_SLIP 0
+#define BC_FREE_SLIP 1
+#define BC_MAGNETIC 2
+
 struct TriDiagL *MB, *MB_1;
 
 double eta = 1.0;	// magnetic diffusivity.
-double dtB = 0.001;	// time step for magnetic field.
+double dtB = 0.0001;	// time step for magnetic field.
 
 double Omega = 0.0;		// rotation globale (force de Coriolis).
 double DeltaOmega = 0.0;	// rotation differentielle de la graine.
@@ -73,11 +78,42 @@ void alloc_Ufields()
 
 
 
-void PolTor_to_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp)
+void PolTor_to_spat(complex double **Plm, complex double **Tlm, double** Br, double** Bt, double** Bp, long int BC)
 {
 	complex double Q[NLM];	// l(l+1) * P/r
 	complex double S[NLM];	// dP/dr + P/r = 1/r.d(rP)/dr = Wr(P)
-	long int ir,lm;
+	double dr;
+	long int ir,lm,l;
+
+	ir = 0;
+	if (r[ir] == 0.0) {	// field at r=0 : S = 2.dP/dr (l=1 seulement) => store Bx, By, Bz (cartesian coordinates)
+		dr = 1.0/r[ir+1];
+		lm = LM(1,0);
+		S[lm] = 2.0* Plm[ir+1][lm]*dr * sqrt(3.0);
+		Br[ir][0] = creal( S[lm] );	// Bx
+		Bt[ir][0] = cimag( S[lm] );	// By
+		lm = LM(1,1);
+		S[lm] = 2.0* Plm[ir+1][lm]*dr * sqrt(3.0);
+		Bp[ir][0] = S[lm];	// Bz
+		for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
+			Br[ir][lm] = 0.0;	Bt[ir][lm] = 0.0;	Bp[ir][lm] = 0.0;
+		}
+	} else if (BC == BC_NO_SLIP) {
+		// Velocity field (no slip => U = 0)
+		for (lm=0; lm<NLAT*NPHI; lm++) {
+			Br[ir][lm] = 0.0;	Bt[ir][lm] = 0.0;	Bp[ir][lm] = 0.0;
+		}
+	} else if (BC == BC_FREE_SLIP) {
+		// Velocity field (free slip BC) : P = 0, d(T/r)/dr = 0   => Ur=0
+		dr = r[ir+1]/(r[ir]*(r[ir+1]-r[ir]));
+		for (lm=0; lm<NLM; lm++) {
+			S[lm] = dr * Plm[ir+1][lm];
+		}
+		SHsphtor_to_spat(S, Tlm[ir], (complex double *) Bt[ir], (complex double *) Bp[ir]);
+		for (lm=0; lm<NLAT*NPHI; lm++) {
+			Br[ir][lm] = 0.0;
+		}
+	}
 
 	for (ir=1; ir<NR-1; ir++) {
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
@@ -86,6 +122,35 @@ void PolTor_to_spat(complex double **Plm, complex double **Tlm, double** Br, dou
 		}
 		SH_to_spat(Q,(complex double *) Br[ir]);
 		SHsphtor_to_spat(S, Tlm[ir], (complex double *) Bt[ir], (complex double *) Bp[ir]);
+	}
+
+	ir = NR-1;
+	if (BC == BC_NO_SLIP) {
+		// Velocity field (no slip => U = 0)
+		for (lm=0; lm<NLAT*NPHI; lm++) {
+			Br[ir][lm] = 0.0;	Bt[ir][lm] = 0.0;	Bp[ir][lm] = 0.0;
+		}
+		return;
+	} else if (BC == BC_FREE_SLIP) {
+		// Velocity field (free slip BC) : P = 0, d(T/r)/dr = 0   => Ur=0
+		dr = r[ir-1]/(r[ir]*(r[ir-1]-r[ir]));
+		for (lm=0; lm<NLM; lm++) {
+			S[lm] = dr * Plm[ir-1][lm];
+		}
+		SHsphtor_to_spat(S, Tlm[ir], (complex double *) Bt[ir], (complex double *) Bp[ir]);
+		for (lm=0; lm<NLAT*NPHI; lm++) {
+			Br[ir][lm] = 0.0;
+		}
+		return;
+	} else if (BC == BC_MAGNETIC) {
+		// Magnetic field (insulator BC) : T=0, dP/dr = -(l+1)/r.P => S = -lP/r
+		for (lm=0, l=0; lm<NLM; lm++) {
+			S[lm] = -l*Plm[ir][lm]*r_1[ir];
+			if (l < LMAX) { l++; } else { l=0; }
+			Q[lm] = r_1[ir]*l2[lm] * Plm[ir][lm];
+		}
+		SH_to_spat(Q,(complex double *) Br[ir]);
+		SHsph_to_spat(S, (complex double *) Bt[ir], (complex double *) Bp[ir]);
 	}
 }
 
@@ -133,7 +198,7 @@ void PolTor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Br,
 // spatial to curl : only for ir = 1 .. NR-2
 //	Pol <- Tor
 //	Tor <- Q/r - 1/r.d(rS)/dr
-void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Tlm)
+void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Tlm, long int BC)
 {
 	complex double Q[NLM];		// Q
 	complex double S[NLM*3];	// buffers for S.
@@ -143,15 +208,63 @@ void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **
 	Sl = S;   Sd = S + NLM;   Su = S + 2*NLM;	// init pointers to buffer.
 
 	ir = 0;
-		spat_to_SHsphtor((complex double *) Bt[ir], (complex double *) Bp[ir], Sd, Plm[ir]);
+		for (lm=0; lm<NLM; lm++) {
+			Plm[ir][lm] = 0.0;	Tlm[ir][lm] = 0.0;	Sd[lm] = 0.0;
+		}
+		lm = LM(1,0);	Sd[lm] = Bp[ir][0] /sqrt(3.0);		// S(l=1,m=0) = Vz / sqrt(3)
+		lm = LM(1,1);	Sd[lm] = (Br[ir][0] + I*Bt[ir][0]) /sqrt(3.0);	// S(l=1,m=1) = (Vx+iVy)/sqrt(3)
+
 		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
-	for (ir=1; ir <= NR-2; ir++) {
+
+	for (ir=1; ir < NR-2; ir++) {
 		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
 		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
 		spat_to_SH((complex double *) Br[ir], Q);
 		for (lm=0; lm<NLM; lm++) {
 			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
 		}
+	}
+
+	ir = NR-2;
+	if (BC == BC_NO_SLIP) {		// NR-1 : all zero. => P = 0, T=0.
+		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
+		spat_to_SH((complex double *) Br[ir], Q);
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm]);		// Su=0
+		}
+		for (lm=0; lm<NLM; lm++) {
+			Plm[ir+1][lm] = 0.0;	Tlm[ir+1][lm] = 0.0;
+		}
+		return;
+	} else if (BC == BC_FREE_SLIP) {
+		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
+		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
+		spat_to_SH((complex double *) Br[ir], Q);
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
+		}
+		ir = NR-1;	// P = 0
+		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
+		spat_to_SH((complex double *) Br[ir], Q);
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm]);
+		}
+		for (lm=0; lm<NLM; lm++) {
+			Plm[ir][lm] = 0.0;
+		}
+		return;
+	} else if (BC == BC_MAGNETIC) {
+		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
+		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
+		spat_to_SH((complex double *) Br[ir], Q);
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
+		}
+		ir = NR-1;	// T=0, P already set.
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = 0.0;
+		}
+		return;
 	}
 }
 
@@ -207,7 +320,7 @@ void induction(complex double **NLP, complex double **NLT)
 			Br[ir][lm] = vr;	Bt[ir][lm] = vt;	Bp[ir][lm] = 0.0;
 		}
 	}
-	for (ir=NG; ir<=NR-2; ir++) {
+	for (ir=NG; ir<NR; ir++) {
 		for (lm=0; lm<NPHI*NLAT; lm++) {
 			vr = Ut[ir-NG][lm]*Bp[ir][lm] - Up[ir-NG][lm]*Bt[ir][lm];
 			vt = Up[ir-NG][lm]*Br[ir][lm] - Ur[ir-NG][lm]*Bp[ir][lm];
@@ -215,11 +328,28 @@ void induction(complex double **NLP, complex double **NLT)
 			Br[ir][lm] = vr;	Bt[ir][lm] = vt;	Bp[ir][lm] = vp;
 		}
 	}
-	ir = NR-1;	// U = 0
+/*	ir = NR-1;	// U = 0
 		for (lm=0; lm<NPHI*NLAT; lm++) {
 			Br[ir][lm] = 0.0;	Bt[ir][lm] = 0.0;	Bp[ir][lm] = 0.0;
-		}
-	spat_to_rot_PolTor(Br, Bt, Bp, NLP, NLT);
+		}*/
+	spat_to_rot_PolTor(Br, Bt, Bp, NLP, NLT, BC_MAGNETIC);
+}
+
+// compute total Energy
+double Energy(complex double **Plm, complex double **Tlm)
+{
+	double E,er;
+	long int ir,lm;
+
+	E = 0.0;
+	for (ir=0; ir<NR; ir++) {
+		er = 0.0;
+		for(lm=0; lm<NLM; lm++)
+			er += creal(Plm[ir][lm])*creal(Plm[ir][lm]) + cimag(Plm[ir][lm])*cimag(Plm[ir][lm]) +
+				creal(Tlm[ir][lm])*creal(Tlm[ir][lm]) + cimag(Tlm[ir][lm])*cimag(Tlm[ir][lm]);
+		E += er*dr[ir]*r[ir];
+	}
+	return E;
 }
 
 	
@@ -246,6 +376,43 @@ void write_mx(char *fn, double *mx, int N1, int N2)
 			fprintf(fp,"%.6g ",mx[i*N2+j]);
 		}
 		fprintf(fp,"\n");
+	}
+	fclose(fp);
+}
+
+void write_HS(char *fn, complex double **HS)
+{
+	FILE *fp;
+	int ir,lm;
+	
+	fp = fopen(fn,"w");
+	for (ir=0;ir<NR;ir++) {
+		for(lm=0;lm<NLM;lm++) {
+			fprintf(fp,"%.6g %.6g ",creal(HS[ir][lm]),cimag(HS[ir][lm]));
+		}
+		fprintf(fp,"\n");
+	}
+	fclose(fp);
+}
+
+void write_slice(char *fn, double **v, int im)
+{
+	FILE *fp;
+	int i,j;
+
+	fp = fopen(fn,"w");
+		fprintf(fp,"0 ");			// first row = radius
+		for(j=0;j<NLAT/2;j++) {
+			fprintf(fp,"%.6g ",ct[j]);	// first line = cos(theta)
+		}
+		for(j=1;j<=NLAT/2;j++) {
+			fprintf(fp,"-%.6g ",ct[NLAT/2-j]);	// first line = cos(theta)
+		}
+	for (i=0;i<NR;i++) {
+		fprintf(fp,"\n%.6g ",r[i]);		// first row = radius
+		for(j=0;j<NLAT;j++) {
+			fprintf(fp,"%.6g ",v[i][im*NLAT + j]);		// data
+		}
 	}
 	fclose(fp);
 }
@@ -296,19 +463,26 @@ void init_Bmatrix()
 
 
 
-int main()
+int main (int argc, char *argv[])
 {
-	double t0,t1,Rm;
-	int i,im,m,l,jj, it;
-	FILE *fp; 
+	double t0,t1,Rm,z;
+	int i,im,m,l,jj, it, lmtest;
+	FILE *fp;
+	complex double *Btmp[NR];
 
 	init_SH();
 	init_rad_sph(0.0, 1.0);
 	init_Bmatrix();
 
 	alloc_Bfields();	alloc_Ufields();
+	for (i=0;i<NR;i++)
+		Btmp[i] = (complex double *) malloc( NLM * sizeof(complex double));
 
-	Rm = 70.0;
+	sscanf(argv[1],"%lf",&Rm);
+	printf("=> Rm = %f\n",Rm);
+	// Dudley James : Rmcrit around 54 ... for m=1 // I find Rmcrit = 40 for m=2...
+	
+	lmtest = LM(1,1);
 	for (i=0; i<NR; i++) {
 		for (l=0;l<NLM;l++) {
 			BPlm[i][l] = 0.0;
@@ -316,47 +490,119 @@ int main()
 			UTlm[i][l] = 0.0;
 			UPlm[i][l] = 0.0;
 		}
-		BPlm[i][1] = r[i];	// dipole
-		BPlm[i][LM(2,1)] = r[i];
-		BPlm[i][LM(2,2)] = r[i];
-		BPlm[i][LM(1,1)] = r[i];
+//		BPlm[i][1] = r[i];	// dipole
+		BTlm[i][lmtest] = r[i]*(1-r[i]);
+//		BPlm[i][LM(2,2)] = r[i];
+		BPlm[i][lmtest] = r[i];
 
-		UTlm[i][LM(2,0)] = Rm* r[i]*r[i]*sin(pi*r[i]);
-		UPlm[i][LM(2,0)] = Rm* 0.14*r[i]*r[i]*sin(pi*r[i]);
+// WARNING : compared to the article of Dudley & James, the Pol and Tor functions must be divided by r.
+// simple roll flows (eq 24)
+		UTlm[i][LM(2,0)] = Rm*r[i]*sin(pi*r[i]);
+ 		UPlm[i][LM(2,0)] = 0.14*UTlm[i][LM(2,0)];
+
+// gubins (from Dudley-James)
+//		UTlm[i][LM(2,0)] = Rm*( -r[i]*sin(2*pi*r[i]) * tanh(2*pi*(1-r[i])) );
+//		UPlm[i][LM(2,0)] = 0.1* UTlm[i][LM(2,0)];
+/*// pekeris (") en j2  (eq 20-21)
+		if (r[i] != 0.0) {
+			z =  5.7634591968447*r[i];
+			UPlm[i][LM(2,2)] = Rm*5.7634591968447 * ((3.0/(z*z*z) -1.0/z)*sin(z) - 3./(z*z) * cos(z));
+			UTlm[i][LM(2,2)] = 5.7634591968447 * UPlm[i][LM(2,2)];
+		}	*/
+//		printf("%f ", UPlm[i][LM(2,2)]);
 	}
 
 // representation spatiale de U
-	PolTor_to_spat(UPlm, UTlm, Ur, Ut, Up);
-	write_mx("Ur",Ur[NR/2],NPHI,NLAT);
-	write_mx("Ut",Ut[NR/2],NPHI,NLAT);
-	write_mx("Up",Up[NR/2],NPHI,NLAT);
+	PolTor_to_spat(UPlm, UTlm, Ur, Ut, Up, BC_FREE_SLIP);
+	write_slice("Ur",Ur,0);
+	write_slice("Ut",Ut,0);
+	write_slice("Up",Up,0);
+// maximum de vitesse :
+	t0 = 0.0;
+	for(i=0;i<NR; i++) {
+		for(im=0;im<NPHI;im++) {
+			for(it=0;it<NLAT;it++) {
+				t1 = Ur[i][im*NLAT+it]*Ur[i][im*NLAT+it] + Ut[i][im*NLAT+it]*Ut[i][im*NLAT+it] + Up[i][im*NLAT+it]*Up[i][im*NLAT+it];
+				if (t1 > t0) t0 = t1;
+			}
+		}
+	}
+	t0 = sqrt(t0);
+	printf(":: max speed = %f\n",t0);
 
 	fp = fopen("prof0","w");
 	for (i=0; i<NR; i++) {
-		fprintf(fp,"%.6g ",BPlm[i][LM(2,1)]);
+		fprintf(fp,"%.6g ",BPlm[i][lmtest]);
 	}
 	fclose(fp);
 
-	for (it=0; it< 1000; it++) {
+	write_HS("Bpol0",BPlm);	write_HS("Btor0",BTlm);
+
+	PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
+	induction(NLbp2, NLbt2);
+
+	for (it=0; it< 2000; it++) {
 		t0 = t1;
-		t1 = BPlm[NR/2][LM(2,1)];
-		printf("%g :: tx=%g\n",t1,log(t1/t0)/dtB);
+//		t1 = Energy(BPlm, BTlm);
+		t1 = BPlm[NR/2][lmtest];
+		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
 
-		PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp);
+		PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
 		induction(NLbp1, NLbt1);
+		cTriMul(MB, BPlm, Btmp, 1, NR-1);
+		for (i=0; i<NR; i++) {
+			for (l=0;l<NLM;l++) {
+				Btmp[i][l] += 1.5*NLbp1[i][l] - 0.5*NLbp2[i][l];
+			}
+		}
+		cTriSolve(MB_1, Btmp, BPlm, 1, NR-1);
 
-		cTriMulAdd(MB, BPlm, NLbp1, 1, NR-1);
-		cTriSolve(MB_1, NLbp1, BPlm, 1, NR-1);
+		cTriMul(MB, BTlm, Btmp, 1, NR-2);
+		for (i=0; i<NR-1; i++) {
+			for (l=0;l<NLM;l++) {
+				Btmp[i][l] += 1.5*NLbt1[i][l] - 0.5*NLbt2[i][l];
+			}
+		}
+		cTriSolve(MB_1, Btmp, BTlm, 1, NR-2);
 
-		cTriMulAdd(MB, BTlm, NLbt1, 1, NR-2);
-		cTriSolve(MB_1, NLbt1, BTlm, 1, NR-2);
+		PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
+		induction(NLbp2, NLbt2);
+		cTriMul(MB, BPlm, Btmp, 1, NR-1);
+		for (i=0; i<NR; i++) {
+			for (l=0;l<NLM;l++) {
+				Btmp[i][l] += 1.5*NLbp2[i][l] - 0.5*NLbp1[i][l];
+			}
+		}
+		cTriSolve(MB_1, Btmp, BPlm, 1, NR-1);
+		cTriMul(MB, BTlm, Btmp, 1, NR-2);
+		for (i=0; i<NR-1; i++) {
+			for (l=0;l<NLM;l++) {
+				Btmp[i][l] += 1.5*NLbt2[i][l] - 0.5*NLbt1[i][l];
+			}
+		}
+		cTriSolve(MB_1, Btmp, BTlm, 1, NR-2);
 	}
 
-	fp = fopen("prof1","w");
+	write_HS("Bpol",BPlm);	write_HS("Btor",BTlm);
+	write_HS("Upol",UPlm);	write_HS("Utor",UTlm);
+
+	PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
+	write_slice("Br",Br,0);
+	write_slice("Bt",Bt,0);
+	write_slice("Bp",Bp,0);
+
+	fp = fopen("Pprof","w");
 	for (i=0; i<NR; i++) {
-		fprintf(fp,"%.6g ",BPlm[i][1]);
+		fprintf(fp,"%.6g ",BPlm[i][LM(1,1)]);
 	}
 	fclose(fp);
+	fp = fopen("Tprof","w");
+	for (i=0; i<NR; i++) {
+		fprintf(fp,"%.6g ",BTlm[i][LM(1,1)]);
+	}
+	fclose(fp);
+
+	printf("=> Rm = %f\n",Rm);
 
 }
 

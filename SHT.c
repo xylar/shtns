@@ -22,6 +22,10 @@
 #define LM(l,m) ( (m/MRES)*(2*LMAX+3 -m)/2 + l-m )
 #define LiM(l,im) ( im*(2*LMAX+3 -(im+2)*MRES)/2 + l )
 
+#ifndef MRES
+#define MRES 1
+#endif
+
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };
@@ -33,8 +37,8 @@ union cplx {		// to access easily the real part of a complex number.
 };
 */
 
-double pi = atan(1.0)*4.0;
-double l2[NLM], l_2[NLM];			// l(l+1) and 1/(l(l+1))
+double pi = 3.1415926535897932384626433832795;
+double el[NLM], l2[NLM], l_2[NLM];		// l, l(l+1) and 1/(l(l+1))
 double ct[NLAT/2], st[NLAT/2], st_1[NLAT/2];	// cos(theta), sin(theta), 1/sin(theta);
 
 long int tm[MMAX+1];	// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
@@ -393,6 +397,160 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
 }
 
+void SHsph_to_spat(complex double *Slm, complex double *BtF, complex double *BpF)
+{
+	complex double se, so, dse, dso;	// spheroidal even and odd parts
+	complex double *Sl;
+	struct DtDp *dyl;
+	long int i,im,m,l;
+
+	im = 0;		// zonal part : d/dphi = 0;
+		m = im*MRES;
+		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
+		i=0;
+		dyl = dylm[im] + i*(LMAX-m+1) -m;
+		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			dse = 0.0;	dso = 0.0;
+			while (l<LMAX) {	// compute even and odd parts
+				(double) dso += dyl[l].t * (double) Sl[l];
+				(double) dse += dyl[l+1].t * (double) Sl[l+1];
+				l+=2;
+			}
+			if (l==LMAX) {
+				(double) dso += dyl[l].t * Sl[l];
+			}
+			BtF[i] = (dse+dso);			// Bt = dS/dt
+			BtF[NLAT-(i+1)] = (dse-dso);
+			i++;
+			dyl += (LMAX-m+1);
+		}
+		BpF += NLAT;	BtF += NLAT;
+	for (im=1; im<=MMAX; im++) {
+		m = im*MRES;
+		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
+		i=0;
+		while (i<tm[im]) {	// polar optimization
+			BtF[i] = 0.0;
+			BtF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes
+			BpF[i] = 0.0;
+			BpF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes
+			i++;
+		}
+		dyl = dylm[im] + i*(LMAX-m+1) -m;
+		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			dse = 0.0;	dso = 0.0;	se = 0.0;	so = 0.0;
+			while (l<LMAX) {	// compute even and odd parts
+				dso += dyl[l].t * Sl[l];
+				se += dyl[l].p * Sl[l];
+				dse += dyl[l+1].t * Sl[l+1];
+				so += dyl[l+1].p * Sl[l+1];
+				l+=2;
+			}
+			if (l==LMAX) {
+				dso += dyl[l].t * Sl[l];
+				se += dyl[l].p * Sl[l];
+			}
+			BtF[i] = (dse+dso);			// Bt = dS/dt       + I.m/sint *T
+			BtF[NLAT-(i+1)] = (dse-dso);
+			BpF[i] = I*(se+so);			// Bp = I.m/sint * S - dT/dt
+			BpF[NLAT-(i+1)] = I*(se-so);
+			i++;
+			dyl += (LMAX-m+1);
+		}
+		BpF += NLAT;	BtF += NLAT;
+	}
+	for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
+		for (i=0;i<NLAT;i++) {
+			BpF[i] = 0.0;	BtF[i] = 0.0;
+		}
+		BpF += NLAT;	BtF += NLAT;
+	}
+
+	BpF -= NLAT*(NPHI/2+1);		// restore original pointers
+	BtF -= NLAT*(NPHI/2+1);
+	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
+	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
+}
+
+void SHtor_to_spat(complex double *Tlm, complex double *BtF, complex double *BpF)
+{
+	complex double te, to, dte, dto;	// toroidal ...
+	complex double *Tl;
+	struct DtDp *dyl;
+	long int i,im,m,l;
+
+	im = 0;		// zonal part : d/dphi = 0;
+		m = im*MRES;
+		Tl = &Tlm[LiM(0,im)];
+		i=0;
+		dyl = dylm[im] + i*(LMAX-m+1) -m;
+		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			dte = 0.0;	dto = 0.0;
+			while (l<LMAX) {	// compute even and odd parts
+				(double) dto += dyl[l].t * (double) Tl[l];	// m=0 : everything is real.
+				(double) dte += dyl[l+1].t * (double) Tl[l+1];
+				l+=2;
+			}
+			if (l==LMAX) {
+				(double) dto += dyl[l].t * Tl[l];
+			}
+			BpF[i] = - (dte+dto);			// Bp = - dT/dt
+			BpF[NLAT-(i+1)] = - (dte-dto);
+			i++;
+			dyl += (LMAX-m+1);
+		}
+		BpF += NLAT;	BtF += NLAT;
+	for (im=1; im<=MMAX; im++) {
+		m = im*MRES;
+		Tl = &Tlm[LiM(0,im)];
+		i=0;
+		while (i<tm[im]) {	// polar optimization
+			BtF[i] = 0.0;
+			BtF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes
+			BpF[i] = 0.0;
+			BpF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes
+			i++;
+		}
+		dyl = dylm[im] + i*(LMAX-m+1) -m;
+		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			dte = 0.0;	dto = 0.0;	te = 0.0;	to = 0.0;
+			while (l<LMAX) {	// compute even and odd parts
+				dto += dyl[l].t * Tl[l];
+				te += dyl[l].p * Tl[l];
+				dte += dyl[l+1].t * Tl[l+1];
+				to += dyl[l+1].p * Tl[l+1];
+				l+=2;
+			}
+			if (l==LMAX) {
+				dto += dyl[l].t * Tl[l];
+				te += dyl[l].p * Tl[l];
+			}
+			BtF[i] = I*(te+to);			// Bt = dS/dt       + I.m/sint *T
+			BtF[NLAT-(i+1)] = I*(te-to);
+			BpF[i] = - (dte+dto);			// Bp = I.m/sint * S - dT/dt
+			BpF[NLAT-(i+1)] = - (dte-dto);
+			i++;
+			dyl += (LMAX-m+1);
+		}
+		BpF += NLAT;	BtF += NLAT;
+	}
+	for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
+		for (i=0;i<NLAT;i++) {
+			BpF[i] = 0.0;	BtF[i] = 0.0;
+		}
+		BpF += NLAT;	BtF += NLAT;
+	}
+
+	BpF -= NLAT*(NPHI/2+1);		// restore original pointers
+	BtF -= NLAT*(NPHI/2+1);
+	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
+	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
+}
+
 void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
 {
 	complex double teo[NLAT], peo[NLAT];	// theta and phi even and odd parts
@@ -431,9 +589,9 @@ void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *
 		}
 		if (l==LMAX) {
 			Sl[l] = 0.0;	Tl[l] = 0.0;
-			for (i=0;i<NLAT;i+=2) {
-				(double) Sl[l] += idyl[i].t * (double) teo[i+1];
-				(double) Tl[l] -= idyl[i].t * (double) peo[i+1];
+			for (i=0;i<NLAT/2;i++) {
+				(double) Sl[l] += idyl[i].t * (double) teo[2*i+1];
+				(double) Tl[l] -= idyl[i].t * (double) peo[2*i+1];
 			}
 		}
 	for (im=1;im<=MMAX;im++) {
@@ -457,7 +615,7 @@ void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *
 				Tl[l] -= idyl[i].t *peo[i+1] + idyl[i].p *teo[i]*I;
 				
 				Sl[l+1] += idyl[i+1].t *teo[i] - idyl[i+1].p *peo[i+1]*I;
-				Tl[l+1] -= idyl[i+1].t *peo[i] - idyl[i+1].p *teo[i+1]*I;
+				Tl[l+1] -= idyl[i+1].t *peo[i] + idyl[i+1].p *teo[i+1]*I;
 			}
 			l+=2;
 			idyl += NLAT;
@@ -685,7 +843,7 @@ void init_SH()
 	it = 0;
 	for (im=0;im<=MMAX;im++) {
 		for (l=im*MRES;l<=LMAX;l++) {
-			l2[it] = l*(l+1.0);	l_2[it] = 1.0/(l*(l+1.0));
+			el[it] = l;	l2[it] = l*(l+1.0);	l_2[it] = 1.0/(l*(l+1.0));
 			it++;
 		}
 	}
