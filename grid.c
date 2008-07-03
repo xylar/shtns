@@ -179,6 +179,32 @@ inline void cPentaMul(struct PentaDiag **M, complex double **x, complex double *
 		}
 }
 
+// Multiply complex vector by a Penta-diagonal matrix (l-dependant)
+// y = M.x    (y and x MUST be different)
+// x has (non-zero) border elements istart-1 and iend+1
+inline void cPentaMulBC(struct PentaDiag **M, complex double **x, complex double **y, int istart, int iend)
+{
+	long int j,l,im,lm;
+
+	j=istart;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
+		}
+	for (j=istart+1; j<iend; j++) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
+		}
+	}
+	j = iend;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm];
+		}
+}
+
+
 void PentaDec(struct PentaDiag **M, long int istart, long int iend)
 {
 	double alp, bet;
@@ -243,6 +269,40 @@ inline void cPentaSolve(struct PentaDiag **M, complex double **b, complex double
 		}
 	}
 // backward
+	i = iend-1;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] -= M[i][l].u1 * x[i+1][lm];
+		}
+	for(i= iend-2; i>=istart; i--) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] -= M[i][l].u1 * x[i+1][lm] + M[i][l].u2 * x[i+2][lm];
+		}
+	}
+}
+
+inline void cPentaSolveBC(struct PentaDiag **M, complex double **b, complex double **x, long int istart, long int iend)
+/* Solves M x = b, where b and x can be the same array. (NR*NLM)
+   M is a CinqDiag Matrix, previously decomposed by CinqDec. (NR*LMAX)
+   x has (non-zero) border elements istart-1 and iend+1, which are untouched (read but not written)
+*/
+{
+	long int i,l,im,lm;
+
+// forward
+	i = istart;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm];
+		}
+	for(i=istart+1; i<=iend; i++) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm] - M[i][l].l2 * x[i-2][lm];
+		}
+	}
+// backward
 	i = iend;
 		for (im=0, lm=0; im<=MMAX; im++) {
 			for (l=im*MRES; l<=LMAX; l++, lm++)
@@ -255,8 +315,6 @@ inline void cPentaSolve(struct PentaDiag **M, complex double **b, complex double
 		}
 	}
 }
-
-
 
 
 /*	Grid Generation with radial derivation operators.

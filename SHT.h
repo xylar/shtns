@@ -12,11 +12,11 @@ LMAX, NLAT, MMAX, MRES, NPHI
 
 // MMAX : max number of fourrier decomposition (degree = MMAX * MRES)
 // power of two is better (but not mandatory), MMAX*MRES <= LMAX
-#define MMAX 10
+#define MMAX 8
 // MRES : azimutal symmetry
 #define MRES 1
 // NPHI : number of azimutal grid points, at least 2*MMAX, 3*MMAX for antialiasing and 4*MMAX for full dealias
-#define NPHI 32
+#define NPHI 16
 
 //  ADDITIONAL FINE TUNING  //
 // POLAR_OPT_THRESHOLD : value under wich the polar values of the Legendre Polynomials Plm are neglected,

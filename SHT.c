@@ -22,6 +22,12 @@
 #define LM(l,m) ( (m/MRES)*(2*LMAX+3 -m)/2 + l-m )
 #define LiM(l,im) ( im*(2*LMAX+3 -(im+2)*MRES)/2 + l )
 
+// useful values for some basic spherical harmonic representations
+// Y00_1 = 1/Y00 = spherical harmonic representation of 1 (l=0,m=0)
+#define Y00_1 = sqrt(4*pi)
+// Y10_ct = spherical harmonic representation of cos(theta) (l=1,m=0)
+#define Y10_ct = sqrt(4.0*pi/3.0)
+
 #ifndef MRES
 #define MRES 1
 #endif

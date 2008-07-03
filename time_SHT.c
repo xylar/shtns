@@ -51,6 +51,7 @@ int main()
 	complex double t1, t2;
 	double t,tmax,n2;
 	int i,im,m,l,jj;
+	clock_t tcpu;
 
 	srand( time(NULL) );	// initialise les nombres.
 	init_SH();
@@ -103,7 +104,7 @@ int main()
 // 	Slm[LM(55,12)] = 5.0-2.0*I;
 
 	printf(":: performing %d scalar SHT with NL evaluation\n", SHT_ITER);
-	m = clock();
+	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
@@ -114,8 +115,8 @@ int main()
 // analyse (direct legendre)
 		spat_to_SH(ShF,Slm);
 	}
-	m = clock() - m;
-	printf("2iSHT + NL + SHT time : %d\n", SHT_ITER, m);
+	tcpu = clock() - tcpu;
+	printf("2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
 
 // compute error :
 	tmax = 0;	n2 = 0;
@@ -138,15 +139,15 @@ int main()
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Slm0[i];
 	}
-	m = clock();
+	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
 		SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
 // analyse (direct legendre)
 		spat_to_SHsphtor(ShF,ThF,Slm,Tlm);
 	}
-	m = clock() - m;
-	printf("iSHT + SHT time : %d\n", SHT_ITER, m);
+	tcpu = clock() - tcpu;
+	printf("iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
 
 // compute error :
 	tmax = 0;	n2 = 0;

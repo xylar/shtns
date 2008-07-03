@@ -52,6 +52,7 @@ struct PolTor Ulm, Blm, NLb1, NLb2, NLu1, NLu2;
 
 // Magnetic field representation.
 double *Br[NR], *Bt[NR], *Bp[NR];	// Spatial representation
+double *B0r[NR], *B0t[NR], *B0p[NR];	// Spatial representation
 complex double *BPlm[NR], *BTlm[NR];	// Spherical Harmonics representation
 complex double *NLbp1[NR], *NLbp2[NR], *NLbt1[NR], *NLbt2[NR];	// Adams-Bashforth : 2 non-linear terms stored.
 // Velocity field representation.
@@ -60,16 +61,21 @@ complex double *UPlm[NR], *UTlm[NR];
 complex double *NLup1[NR], *NLup2[NR], *NLut1[NR], *NLut2[NR];
 // spare field J (for current density, or vorticity)
 double *Jr[NR], *Jt[NR], *Jp[NR];
+complex double *Alm[NR];	// temp scalar spectral (pol or tor) representation
 
+double *NLr, *NLt, *NLp;	// temporary vector shell for non-linear term calculations (fftw allocated)
 
 // Allocate memory for Magnetic field
 void alloc_Bfields()
 {
 	long int ir;
 	for (ir = 0; ir < NR; ir++) {		// shell by shell allocation.
-		Br[ir] = (double *) fftw_malloc( 3*(NPHI/2+1)*NLAT * sizeof(complex double));	// 3 components
+		Br[ir] = (double *) fftw_malloc( 6*(NPHI/2+1)*NLAT * sizeof(complex double));	// 3 components
 		Bt[ir] = Br[ir] + 2*(NPHI/2+1)*NLAT;
 		Bp[ir] = Bt[ir] + 2*(NPHI/2+1)*NLAT;
+		B0r[ir] = Bp[ir] + 2*(NPHI/2+1)*NLAT;	// for background magnetic field.
+		B0t[ir] = B0r[ir] + 2*(NPHI/2+1)*NLAT;
+		B0p[ir] = B0t[ir] + 2*(NPHI/2+1)*NLAT;
 
 		BPlm[ir] = (complex double *) malloc( 6*NLM * sizeof(complex double));	// Pol/Tor
 		BTlm[ir] = BPlm[ir] + NLM;
@@ -104,6 +110,11 @@ void alloc_Ufields()
 		NLup2[ir] = UPlm[ir] + 4*NLM;
 		NLut2[ir] = UPlm[ir] + 5*NLM;
 	}
+
+	// buffer for spatial non-linear terms (only one vector shell)
+	NLr = (double *) fftw_malloc( 3* 2*(NPHI/2+1)*NLAT * sizeof(double) );
+	NLt = NLr + 2*(NPHI/2+1)*NLAT;
+	NTp = NLt + 2*(NPHI/2+1)*NLAT;
 }
 
 // compute the cartesian coordinates of a vector field at r=0, from its Poloidal value component
@@ -112,7 +123,7 @@ inline void Pol_to_cart_spat0(complex double **Plm, double *Vx, double *Vy, doub
 	double dx;
 	long int lm;
 
-	dx = 2.0*sqrt(3.0) / r[1];
+	dx = 2.0 / (r[1] * Y10_ct);
 	lm = LM(1,1);	// l=1, m=1
 	*Vx = dx * creal( Plm[1][lm] );
 	*Vy = dx * cimag( Plm[1][lm] );
@@ -125,7 +136,7 @@ inline void cart_spat0_to_Sph(double Vx, double Vy, double Vz, complex double *S
 {
 	double dx;
 
-	dx = 1.0/sqrt(3.0);
+	dx = Y10_ct;
 	*S10 = Vz * dx;		// l=1, m=0
 	*S11 = (Vx + I*Vy) *dx;	// l=1, m=1
 }
@@ -207,54 +218,6 @@ void PolTor_to_spat(complex double **Plm, complex double **Tlm, double** Vr, dou
 	}
 }
 
-// compute vorticity field from poloidal/toroidal components of velocity [ie poltor_to_rot_spat applied to U]
-// IN: Plm, Tlm : pol/tor components of velocity
-//     Omega0 : background global rotation (solid body rotation rate) to include in vorticity
-//     BC : boundary condition (BC_NO_SLIP or BC_FREE_SLIP)
-// OUT: Vr,Vt,Vp : r,theta,phi components of vorticity field
-void calc_Vort(complex double **Plm, complex double **Tlm, double** Vr, double** Vt, double** Vp, double Omega0, long int BC)
-{
-	complex double Q[NLM];	// l(l+1) * T/r
-	complex double S[NLM];	// dT/dr + T/r
-	complex double T[NLM];	//  [ l(l+1)/r^2 - 1/r d2/dr2(r .) ] P
-	double dr;
-	long int ir,lm;
-
-	ir = NG;
-	if (r[ir] = 0.0) {	// field at r=0 : S = 2.dT/dr (l=1 seulement) => store Vx, Vy, Vz (cartesian coordinates)
-		Pol_to_cart_spat0(Tlm, Vr[ir],Vt[ir],Vp[ir]);
-		for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
-			Vr[ir][lm] = 0.0;	Vt[ir][lm] = 0.0;	Vp[ir][lm] = 0.0;
-		}
-	} else if (BC == BC_NO_SLIP) {
-		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Toroidal
-			Q[lm] = r_1[ir]*l2[lm] * Tlm[ir][lm];
-			S[lm] = Wr[ir].l*Tlm[ir-1][lm] + Wr[ir].d*Tlm[ir][lm] + Wr[ir].u*Tlm[ir+1][lm];
-			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*Plm[ir][lm] - r_1[ir]*D2r[ir].l*Plm[ir-1][lm] - r_1[ir]*D2r[ir].u*Plm[ir+1][lm];
-		}
-	}
-
-	for (ir=istart+1; ir < iend; ir++) {
-		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
-			Q[lm] = r_1[ir]*l2[lm] * Tlm[ir][lm];
-			S[lm] = Wr[ir].l*Tlm[ir-1][lm] + Wr[ir].d*Tlm[ir][lm] + Wr[ir].u*Tlm[ir+1][lm];
-			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*Plm[ir][lm] - r_1[ir]*D2r[ir].l*Plm[ir-1][lm] - r_1[ir]*D2r[ir].u*Plm[ir+1][lm];
-		}
-/* Pour Coriolis : ez ^ u
-	ez = cos(theta).er - sin(theta).etheta
-	cos theta = Y(m=0,l=1) * 2*sqrt(pi/3)		>> peut etre rajouté à Qlm. (=> Vr)
-	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> peut etre rajouté à Slm  (=> Vt)
-*/
-		// add Background Vorticity for Coriolis Force (l=1, m=0)
-		(double) Q[1] += Omega0 * 2.0*sqrt(pi/3.0);
-		(double) S[1] += Omega0 * 2.0*sqrt(pi/3.0);
-		SH_to_spat(Q,(complex double *) Vr[ir]);
-		SHsphtor_to_spat(S, T, (complex double *) Vt[ir], (complex double *) Vp[ir]);
-	}
-
-	ir = iend;
-}
-
 void PolTor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Vr, double** Vt, double** Vp, long int istart, long int iend, long int BC)
 // Pol = Tor;  Tor = Lap.Pol
 {
@@ -302,7 +265,7 @@ void PolTor_to_rot_spat(complex double **Plm, complex double **Tlm, double** Vr,
 // spatial to curl : only for ir = 1 .. NR-2
 //	Pol <- Tor
 //	Tor <- Q/r - 1/r.d(rS)/dr
-void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Tlm, long int BC)
+void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Tlm, long int istart, long int iend)
 {
 	complex double Q[NLM];		// Q
 	complex double S[NLM*3];	// buffers for S.
@@ -311,16 +274,14 @@ void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **
 
 	Sl = S;   Sd = S + NLM;   Su = S + 2*NLM;	// init pointers to buffer.
 
-	ir = 0;
-		for (lm=0; lm<NLM; lm++) {
-			Plm[ir][lm] = 0.0;	Tlm[ir][lm] = 0.0;	Sd[lm] = 0.0;
-		}
-		lm = LM(1,0);	Sd[lm] = Bp[ir][0] /sqrt(3.0);		// S(l=1,m=0) = Vz / sqrt(3)
-		lm = LM(1,1);	Sd[lm] = (Br[ir][0] + I*Bt[ir][0]) /sqrt(3.0);	// S(l=1,m=1) = (Vx+iVy)/sqrt(3)
-
+	ir = istart;
+		spat_to_SHsphtor((complex double *) Bt[ir], (complex double *) Bp[ir], Sd, Plm[ir]);
 		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
-
-	for (ir=1; ir < NR-2; ir++) {
+		spat_to_SH((complex double *) Br[ir], Q);
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);		// Sl = 0
+		}
+	for (ir=istart+1; ir < iend; ir++) {
 		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
 		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
 		spat_to_SH((complex double *) Br[ir], Q);
@@ -328,48 +289,12 @@ void spat_to_rot_PolTor(double** Br, double** Bt, double** Bp, complex double **
 			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
 		}
 	}
-
-	ir = NR-2;
-	if (BC == BC_NO_SLIP) {		// NR-1 : all zero. => P = 0, T=0.
+	ir = iend;
 		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
 		spat_to_SH((complex double *) Br[ir], Q);
 		for (lm=0; lm<NLM; lm++) {
 			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm]);		// Su=0
 		}
-		for (lm=0; lm<NLM; lm++) {
-			Plm[ir+1][lm] = 0.0;	Tlm[ir+1][lm] = 0.0;	// for paranoia
-		}
-		return;
-	} else if (BC == BC_FREE_SLIP) {
-		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
-		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
-		spat_to_SH((complex double *) Br[ir], Q);
-		for (lm=0; lm<NLM; lm++) {
-			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
-		}
-		ir = NR-1;	// P = 0
-		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
-		spat_to_SH((complex double *) Br[ir], Q);
-		for (lm=0; lm<NLM; lm++) {
-			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm]);
-		}
-		for (lm=0; lm<NLM; lm++) {
-			Plm[ir][lm] = 0.0;	// for paranoia
-		}
-		return;
-	} else if (BC == BC_MAGNETIC) {
-		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
-		spat_to_SHsphtor((complex double *) Bt[ir+1], (complex double *) Bp[ir+1], Su, Plm[ir+1]);
-		spat_to_SH((complex double *) Br[ir], Q);
-		for (lm=0; lm<NLM; lm++) {
-			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
-		}
-		ir = NR-1;	// T=0, P already set.
-		for (lm=0; lm<NLM; lm++) {
-			Tlm[ir][lm] = 0.0;	// for paranoia
-		}
-		return;
-	}
 }
 
 /*
@@ -388,46 +313,110 @@ void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **P
 }
 */
 
-void NLU(complex double **Plm, complex double **Tlm, double** NLr, double** NLt, double** NLp)
+// compute rot(u^omega) with spatial U and (Vr,Vt,Vp) = vorticity field + background already set
+// Vr,Vt,Vp overwritten with u^omega.
+// U is kept unchanged
+void calc_NLU(double** Vr, double** Vt, double** Vp, complex double **NLP, complex double **NLT)
 {
-	complex double Su[NLM];
-	complex double Sw[NLM];
-	complex double Tw[NLM];
-	double NLtmp[2*(NPHI/2+1)*NLAT];	// should be FFTW allocated
+	double vr,vt,vp;
+	long int ir,lm;
+
+	for (ir=0; ir<NU; ir++) {
+		for (lm=0; lm<NPHI*NLAT; lm++) {
+			vr = Ut[ir][lm]*Vp[ir][lm] - Up[ir][lm]*Vt[ir][lm];
+			vt = Up[ir][lm]*Vr[ir][lm] - Ur[ir][lm]*Vp[ir][lm];
+			vp = Ur[ir][lm]*Vt[ir][lm] - Ut[ir][lm]*Vr[ir][lm];
+			Vr[ir][lm] = vr;	Vt[ir][lm] = vt;	Vp[ir][lm] = vp;
+		}
+	}
+	spat_to_rot_PolTor(Vr-NG, Vt-NG, Vp-NG, NLT-NG, NLP-NG, NG+1, NR-1);
+}
+
+
+
+// compute vorticity field from poloidal/toroidal components of velocity [ie poltor_to_rot_spat applied to U]
+// IN: Plm, Tlm : pol/tor components of velocity
+//     Omega0 : background global rotation (solid body rotation rate) to include in vorticity
+// OUT: Vr,Vt,Vp : r,theta,phi components of vorticity field
+void calc_vort(complex double **Plm, complex double **Tlm, double Om0, double** Vr, double** Vt, double** Vp)
+{
+	complex double Q[NLM];
+	complex double S[NLM];
+	complex double T[NLM];
 	long int ir,lm;
 
 /* Pour Coriolis : ez ^ u
 	ez = cos(theta).er - sin(theta).etheta
-	cos theta = Y(m=0,l=1) * 2*sqrt(pi/3)		>> peut etre rajouté à Qlm. (=> Br)
-	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> peut etre rajouté à Slm  (=> Bt)
+	cos theta = Y(m=0,l=1) * 2*sqrt(pi/3)		>> peut etre rajouté à Qlm. (=> Vr)
+	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> peut etre rajouté à Slm  (=> Vt)
 */
+	Om0 = Om0 * Y10_ct;	// multiply by representation of cos(theta) in spherical harmonics (l=1,m=0)
+	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
-			Su[lm] = Wr[ir].l*Plm[ir-1][lm] + Wr[ir].d*Plm[ir][lm] + Wr[ir].u*Plm[ir+1][lm];
-			Tw[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*Plm[ir][lm] - r_1[ir]*D2r[ir].l*Plm[ir-1][lm] - r_1[ir]*D2r[ir].u*Plm[ir+1][lm];
-			Sw[lm] = Wr[ir].l*Tlm[ir-1][lm] + Wr[ir].d*Tlm[ir][lm] + Wr[ir].u*Tlm[ir+1][lm];
+			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*Plm[ir][lm] - r_1[ir]*D2r[ir].l*Plm[ir-1][lm] - r_1[ir]*D2r[ir].u*Plm[ir+1][lm];
+			Q[lm] = r_1[ir]*l2[lm] * Tlm[ir][lm];
+			S[lm] = Wr[ir].l*Tlm[ir-1][lm] + Wr[ir].d*Tlm[ir][lm] + Wr[ir].u*Tlm[ir+1][lm];
 		}
-		(double) Sw[1] += Omega0 * 2.0*sqrt(pi/3.0);	// add Background Vorticity for Coriolis Force (l=1, m=0)
-		SHsphtor_to_spat(Su, Tlm[ir], (complex double *) NLt[ir], (complex double *) NLp[ir]);
-		SHsphtor_to_spat(Sw, Tw, (complex double *) NLr[ir], (complex double *) NLtmp);
-		for(lm = 0; lm < NPHI*NLAT; lm++) {
-			NLt[ir][lm] *= NLr[ir][lm];	NLp[ir][lm] *= NLtmp[lm];
-		}
-		for (lm=0; lm<NLM; lm++) {
-			Su[lm] = r_1[ir]*l2[lm] * Plm[ir][lm];
-			Sw[lm] = r_1[ir]*l2[lm] * Tlm[ir][lm];
-		}
-		(double) Sw[1] += Omega0 * 2.0*sqrt(pi/3.0);	// add Background Vorticity for Coriolis Force (l=1, m=0)
-		SH_to_spat(Su,(complex double *) NLr[ir]);
-		SH_to_spat(Sw,(complex double *) NLtmp);
-		for(lm = 0; lm < NPHI*NLAT; lm++)
-			NLr[ir][lm] *= NLtmp[lm];
+		(double) Q[1] += Om0;		// add Background Vorticity for Coriolis Force (l=1, m=0)
+		(double) S[1] += Om0;		// add Background Vorticity for Coriolis Force (l=1, m=0)
+		SH_to_spat(Q,(complex double *) Vr[ir]);
+		SHsphtor_to_spat(S, T, (complex double *) Vt[ir], (complex double *) Vp[ir]);
 	}
 }
 
-// compute rot(u^B) : spatial B and U must be set.
+void step_NS(long int nstep)
+{
+	long int i,l;
+
+	while(nstep > 0) {
+		CALC_U(BC_NO_SLIP);
+		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp, );
+		calc_NLU(Jr, Jt, Jp, NLup1, NLut1);
+
+		cTriMul(MUt, UTlm, Alm, 1, NU-2);
+		for (i=1; i<NU-1; i++) {
+			for (l=0;l<NLM;l++) {
+				Alm[i][l] += 1.5*NLut1[i][l] - 0.5*NLut2[i][l];
+			}
+		}
+		cTriSolve(MUt_1, Alm, UTlm, 1, NU-2);
+
+		cPentaMul(MUp, UPlm, Alm, 1, NU-2);
+		for (i=1; i<NU-1; i++) {
+			for (l=0;l<NLM;l++) {
+				Alm[i][l] += 1.5*NLup1[i][l] - 0.5*NLup2[i][l];
+			}
+		}
+		cPentaSolve(MUp_1, Alm, UPlm, 1, NU-2);
+
+
+		CALC_U(BC_NO_SLIP);
+		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp, );
+		calc_NLU(Jr, Jt, Jp, NLup2, NLut2);
+
+		cTriMul(MUt, UTlm, Alm, 1, NU-2);
+		for (i=1; i<NU-1; i++) {
+			for (l=0;l<NLM;l++) {
+				Alm[i][l] += 1.5*NLut2[i][l] - 0.5*NLut1[i][l];
+			}
+		}
+		cTriSolve(MUt_1, Alm, UTlm, 1, NU-2);
+
+		cPentaMul(MUp, UPlm, Alm, 1, NU-2);
+		for (i=1; i<NU-1; i++) {
+			for (l=0;l<NLM;l++) {
+				Alm[i][l] += 1.5*NLup2[i][l] - 0.5*NLup1[i][l];
+			}
+		}
+		cPentaSolve(MUp_1, Alm, UPlm, 1, NU-2);
+	}
+}
+
+
+// compute rot(u^B) : spatial B0 and U must be set.
 // B is overwritten with u^B
-void induction(double **Br, double **Bt, double **Bp, complex double **NLP, complex double **NLT)
+void induction(complex double **NLP, complex double **NLT)
 {
 	double vr,vt,vp;
 	long int ir,lm;
@@ -435,16 +424,16 @@ void induction(double **Br, double **Bt, double **Bp, complex double **NLP, comp
 	for (ir=0; ir<NG; ir++) {		// for the inner core : solid body rotation  Up = r.DeltaOmega
 		vp = r[ir]*DeltaOmega;
 		for (lm=0; lm<NPHI*NLAT; lm++) {
-			vr = - vp*Bt[ir][lm];
-			vt =   vp*Br[ir][lm];
+			vr = - vp*B0t[ir][lm];
+			vt =   vp*B0r[ir][lm];
 			Br[ir][lm] = vr;	Bt[ir][lm] = vt;	Bp[ir][lm] = 0.0;
 		}
 	}
 	for (ir=NG; ir<NR; ir++) {
 		for (lm=0; lm<NPHI*NLAT; lm++) {
-			vr = Ut[ir][lm]*Bp[ir][lm] - Up[ir][lm]*Bt[ir][lm];
-			vt = Up[ir][lm]*Br[ir][lm] - Ur[ir][lm]*Bp[ir][lm];
-			vp = Ur[ir][lm]*Bt[ir][lm] - Ut[ir][lm]*Br[ir][lm];
+			vr = Ut[ir][lm]*B0p[ir][lm] - Up[ir][lm]*B0t[ir][lm];
+			vt = Up[ir][lm]*B0r[ir][lm] - Ur[ir][lm]*B0p[ir][lm];
+			vp = Ur[ir][lm]*B0t[ir][lm] - Ut[ir][lm]*B0r[ir][lm];
 			Br[ir][lm] = vr;	Bt[ir][lm] = vt;	Bp[ir][lm] = vp;
 		}
 	}
@@ -693,13 +682,13 @@ void init_Umatrix(long int BC)
 // for FREE-SLIP, use : cTriSolve(MUt_1, RHS, Tlm, 1, NU-1)
 }
 
-void step_dyncin(long int nstep)
+void step_MHD(long int nstep)
 {
 	long int i,l;
 
 	while(nstep > 0) {
 		nstep--;
-		PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
+//		PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
 		induction(NLbp1, NLbt1);
 		cTriMul(MB, BPlm, Btmp, 1, NR-1);
 		for (i=0; i<NR; i++) {
@@ -717,7 +706,7 @@ void step_dyncin(long int nstep)
 		}
 		cTriSolve(MB_1, Btmp, BTlm, 1, NR-2);
 
-		PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
+//		PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
 		induction(NLbp2, NLbt2);
 		cTriMul(MB, BPlm, Btmp, 1, NR-1);
 		for (i=0; i<NR; i++) {
@@ -736,105 +725,48 @@ void step_dyncin(long int nstep)
 	}
 }
 
-void step_NS(long int nstep)
-{
-	long int i,l;
 
-	while(nstep > 0) {
-		
-	}
-}
 
 int main (int argc, char *argv[])
 {
 	double t0,t1,Rm,Rm2,z;
 	int i,im,m,l,jj, it, lmtest;
 	FILE *fp;
-	complex double *Btmp[NR];
 
 	init_SH();
 	init_rad_sph(0.0, 1.0);
-	init_Bmatrix();
-
+	init_Bmatrix();		init_Umatrix(BC_NO_SLIP);
 	alloc_Bfields();	alloc_Ufields();
-	for (i=0;i<NR;i++)
-		Btmp[i] = (complex double *) malloc( NLM * sizeof(complex double));
 
-	sscanf(argv[1],"%lf",&Rm);
-	printf("=> Rm = %f\n",Rm);
-	// Dudley James : Rmcrit around 54 ... for m=1 // I find Rmcrit = 40 for m=2...
-	
-	lmtest = LM(1,1);
+	for (i=0;i<NR;i++)
+		Alm[i] = (complex double *) malloc( NLM * sizeof(complex double));
+
+	// init B fields.
 	for (i=0; i<NR; i++) {
 		for (l=0;l<NLM;l++) {
 			BPlm[i][l] = 0.0;
 			BTlm[i][l] = 0.0;
+		}
+		BPlm[i][1] = r[i];		// magnetic dipole
+	}
+	PolTor_to_spat(BPlm, BTlm, B0r, B0t, B0p, 0, NR-1, BC_MAGNETIC);	// background magnetic field.
+	for (i=0; i<NR; i++) {
+		BPlm[i][1] = 0.0;	// remove dipole.
+	}
+
+	// init U fields
+	for (i=NG; i<NR; i++) {
+		for (l=0;l<NLM;l++) {
 			UTlm[i][l] = 0.0;
 			UPlm[i][l] = 0.0;
 		}
-//		BPlm[i][1] = r[i];	// dipole
-		BTlm[i][lmtest] = r[i]*(1-r[i]);
-//		BPlm[i][LM(2,2)] = r[i];
-		BPlm[i][lmtest] = r[i];
-
-// WARNING : compared to the article of Dudley & James, the Pol and Tor functions must be divided by r.
-// simple roll flows (eq 24)
-//		UTlm[i][LM(2,0)] = Rm*r[i]*sin(pi*r[i]);
-// 		UPlm[i][LM(2,0)] = 0.14*UTlm[i][LM(2,0)];
-
-// gubins (from Dudley-James)
-		UTlm[i][LM(2,0)] = -r[i]*sin(2*pi*r[i]) * tanh(2*pi*(1-r[i]));
-		UPlm[i][LM(2,0)] = 0.1* UTlm[i][LM(2,0)];
-/*// pekeris (") en j2  (eq 20-21)
-		if (r[i] != 0.0) {
-			z =  5.7634591968447*r[i];
-			UPlm[i][LM(2,2)] = Rm*5.7634591968447 * ((3.0/(z*z*z) -1.0/z)*sin(z) - 3./(z*z) * cos(z));
-			UTlm[i][LM(2,2)] = 5.7634591968447 * UPlm[i][LM(2,2)];
-		}	*/
-//		printf("%f ", UPlm[i][LM(2,2)]);
 	}
 
-// representation spatiale de U
-// maximum de vitesse :
-	PolTor_to_spat(UPlm, UTlm, Ur, Ut, Up, BC_FREE_SLIP);
-	t0 = 0.0;
-	for(i=0;i<NR; i++) {
-		for(im=0;im<NPHI;im++) {
-			for(it=0;it<NLAT;it++) {
-				t1 = Ur[i][im*NLAT+it]*Ur[i][im*NLAT+it] + Ut[i][im*NLAT+it]*Ut[i][im*NLAT+it] + Up[i][im*NLAT+it]*Up[i][im*NLAT+it];
-				if (t1 > t0) t0 = t1;
-			}
-		}
-	}
-	Rm2 = sqrt(t0);
-	printf(":: max speed = %f, rescaled to Rm = %f\n",Rm2, Rm);
-	for (i=0; i<NR; i++) {
-		for (l=0;l<NLM;l++) {
-			UTlm[i][l] *= Rm/Rm2;
-			UPlm[i][l] *= Rm/Rm2;
-		}
-	}
-	PolTor_to_spat(UPlm, UTlm, Ur, Ut, Up, BC_FREE_SLIP);
-	write_slice("Ur",Ur,0);
-	write_slice("Ut",Ut,0);
-	write_slice("Up",Up,0);
-
-
-	fp = fopen("prof0","w");
-	for (i=0; i<NR; i++) {
-		fprintf(fp,"%.6g ",BPlm[i][lmtest]);
-	}
-	fclose(fp);
-
-	write_HS("Bpol0",BPlm);	write_HS("Btor0",BTlm);
-
-	PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
+	PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, 0, NR-1, BC_MAGNETIC);
 	induction(NLbp2, NLbt2);
 
 	for (it=0; it< 1000; it++) {
 		t0 = t1;
-//		t1 = Energy(BPlm, BTlm);
-		t1 = BPlm[NR/2][lmtest];
 		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
 
 		step_dyncin(1);
