@@ -72,106 +72,6 @@ int main()
 	Th = (double *) ThF;
 	NLF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	NL = (double *) NLF;
-/*
-// test FFT :
-	for(i=0;i<NLAT*(NPHI/2+1);i++) {
-		ShF[i] = 0;	ThF[i] = 0;
-	}
-	ShF[0] = 1.0-I;
-	ShF[NLAT] = 1.0-I;
-	ShF[2*NLAT] = 2.0+I;
-	ShF[5*NLAT] = 3.0+I;
-	ShF[8*NLAT] = 5.0-I;
-	ThF[0] = 1.0-I;
-	ThF[3*NLAT] = 2.0-I;
-	ThF[NLAT] = 3.0+I;
-	ThF[6*NLAT] = 8.0-I;
-	ThF[7*NLAT] = 1.0-3.*I;
-
-	if (MMAX>0) {
-		fftw_execute_dft_c2r(ifft,ShF,Sh);
-		write_mx("sph",Sh,NPHI,NLAT);
-		fftw_execute_dft_r2c(fft,Sh,ShF);
-		write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
-	}
-
-// compare FFT NL terms to pure spectral ...
-	l = clock();
-	for(jj=0;jj<10000;jj++) {
-	for(i=0;i<NLAT*(NPHI/2+1);i++) {
-		ShF[i] = 0;	ThF[i] = 0;
-	}
-	ShF[0] = 1.0-I;
-	ShF[NLAT] = 1.0-I;
-	ShF[2*NLAT] = 2.0+I;
-	ShF[5*NLAT] = 3.0+I;
-	ShF[8*NLAT] = 5.0-I;
-	ThF[0] = 1.0-I;
-	ThF[3*NLAT] = 2.0-I;
-	ThF[NLAT] = 3.0+I;
-	ThF[6*NLAT] = 8.0-I;
-	ThF[7*NLAT] = 1.0-3.*I;
-
-		fftw_execute_dft_c2r(ifft,ShF,Sh);
-		fftw_execute_dft_c2r(ifft,ThF,Th);
-		for(i=0;i<NLAT*NPHI;i++) {
-			NL[i] = Sh[i] * Th[i];
-		}
-		fftw_execute_dft_r2c(fft,NL,NLF);
-	}
-	l = clock() - l;
-	printf("fft nl time : %d\n",l);
-		write_mx("NLfft",NL,NPHI/2+1,2*NLAT);
-
-	if (MMAX>0) {
-		fftw_execute_dft_c2r(ifft,ShF,Sh);
-		write_mx("sph",Sh,NPHI,NLAT);
-		fftw_execute_dft_r2c(fft,Sh,ShF);
-		write_mx("sphF",Sh,NPHI/2+1,2*NLAT);
-	}
-	m = clock();
-	for(jj=0;jj<10000;jj++) {
-	for(i=0;i<NLAT*(NPHI/2+1);i++) {
-		ShF[i] = 0;	ThF[i] = 0;
-	}
-	ShF[0] = 1.0-I;
-	ShF[NLAT] = 1.0-I;
-	ShF[2*NLAT] = 2.0+I;
-	ShF[5*NLAT] = 3.0+I;
-	ShF[8*NLAT] = 5.0-I;
-	ThF[0] = 1.0-I;
-	ThF[3*NLAT] = 2.0-I;
-	ThF[NLAT] = 3.0+I;
-	ThF[6*NLAT] = 8.0-I;
-	ThF[7*NLAT] = 1.0-3.*I;
-		NLspec(ShF,ThF, NLF);
-	}
-	m = clock() - m;
-	printf("spectral nl time : %d\n",m);
-	printf("fft/spectral time : %f\n",(double) l / (double) m);
-		write_mx("NLspec",NL,NPHI/2+1,2*NLAT);
-/*
-// test Ylm :
-	im = 0; l=0; m=im*MRES;
-	write_vect("y00",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dy00",&idylm[im][(l-m)*NLAT/2].t,NLAT);
-	im = 0; l=1; m=im*MRES;
-	write_vect("y10",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dty10",&idylm[im][(l-m)*NLAT/2].t,NLAT);
-	im = 0; l=LMAX; m=im*MRES;
-	write_vect("yLmax0",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dtyLmax0",&idylm[im][(l-m)*NLAT/2].t,NLAT);
-	im = MMAX; m=im*MRES; l=m;
-	write_vect("ymmax-mmax",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dtymmax-mmax",&idylm[im][(l-m)*NLAT/2].t,NLAT);
-	im = 3; l=8; m=im*MRES;
-	write_vect("y83",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dty83",&idylm[im][(l-m)*NLAT/2].t,NLAT);
-	im = 10; l=35; m=im*MRES;
-	write_vect("y3510",&iylm[im][(l-m)*NLAT/2],NLAT/2);
-	write_vect("dty3510",&idylm[im][(l-m)*NLAT/2].t,NLAT);
-
-*/
 
 	Slm0 = (complex double *) malloc(sizeof(complex double)* NLM);
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
@@ -189,7 +89,7 @@ int main()
 //	return(1);
 
 // test case...
-#define SHT_ITER 1000
+#define SHT_ITER 10000
 	t = 1.0 / (RAND_MAX/2);
 	for (i=0;i<NLM;i++) {
 		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
@@ -279,6 +179,5 @@ int main()
 	}
 	printf("  Toroidal => max error = %g    rms error = %g\n",tmax,sqrt(n2/NLM));
 	write_vect("Tlm",Tlm,NLM*2);
-	write_vect("Tlm0",Slm0,NLM*2);
 }
 

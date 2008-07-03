@@ -24,11 +24,9 @@ struct TriDiagL {
 	double u;		// upper
 };
 
-struct CinqDiag {
+struct PentaDiag {
 	double l2,l1, d ,u1,u2;
 };
-
-
 
 // discretisation spatiale
 double *r, *r_1, *r_2, *dr;		// r = rayon; r_1 = 1/r; r_2 = 1/(r*r); dr[i] = r[i+1]-r[i];
@@ -91,11 +89,11 @@ inline void cTriMulAdd(struct TriDiagL *M, complex double **x, complex double **
 }
 
 // decomposition PARTIELLE d'une matrice tribande. Les divisions ont lieu dans cette etape.
-// seul l'element diagonal est ecras� !!!
+// seul l'element diagonal est ecrase !!!
 void TriDec(struct TriDiagL *M, int istart, int iend)
 {
 	double tmp;
-	int j,l;
+	long int j,l;
 
 	j = istart;
 		tmp = 1.0;
@@ -147,77 +145,125 @@ inline void cTriSolve(struct TriDiagL *M, complex double **b, complex double **x
 	}	// j=istart
 }
 
-void CinqDec(struct CinqDiag *M, int n)
+// Multiply complex vector by a Penta-diagonal matrix (l-dependant)
+// y = M.x    (y and x MUST be different)
+inline void cPentaMul(struct PentaDiag **M, complex double **x, complex double **y, int istart, int iend)
+{
+	long int j,l,im,lm;
+
+	j=istart;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
+		}
+	j=istart+1;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
+		}
+	for (j=istart+2; j<iend-1; j++) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
+		}
+	}
+	j = iend-1;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm];
+		}
+	j = iend;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm];
+		}
+}
+
+void PentaDec(struct PentaDiag **M, long int istart, long int iend)
 {
 	double alp, bet;
-	int i;
-	
-	if (M[0].d == 0.0) runerr("[CinqDec] first pivot is zero.");
-	
-	i = 1;
-		bet = M[i].l1 / M[i-1].d;
-		M[i].d -= bet * M[i-1].u1;
-		M[i].u1 -= bet * M[i-1].u2;
-	for(i=2;i<n;i++) {
-		if (M[i-1].d == 0.0) runerr("[CinqDec] zero pivot encountered.");
-		alp = M[i].l2 / M[i-2].d;
-		M[i].l1 -= alp * M[i-2].u1;
-		bet = M[i].l1 / M[i-1].d;
-		M[i].d -= bet * M[i-1].u1 + alp * M[i-2].u2;
-		M[i].u1 -= bet * M[i-1].u2;
+	long int i,l;
+
+	i = istart;
+		bet = 1.0;
+		for (l=0;l<=LMAX;l++)
+			bet *= M[i][l].d;
+		if (bet == 0.0) runerr("[PentaDec] first pivot is zero.");
+
+	i = istart+1;
+		for (l=0;l<=LMAX;l++) {
+			bet = M[i][l].l1 / M[i-1][l].d;
+			M[i][l].d -= bet * M[i-1][l].u1;
+			M[i][l].u1 -= bet * M[i-1][l].u2;
+		}
+	for(i=istart+2; i<=iend; i++) {
+		for (l=0;l<=LMAX;l++) {
+			if (M[i-1][l].d == 0.0) runerr("[PentaDec] zero pivot encountered.");
+			alp = M[i][l].l2 / M[i-2][l].d;
+			M[i][l].l1 -= alp * M[i-2][l].u1;
+			bet = M[i][l].l1 / M[i-1][l].d;
+			M[i][l].d -= bet * M[i-1][l].u1 + alp * M[i-2][l].u2;
+			M[i][l].u1 -= bet * M[i-1][l].u2;
+		}
 	}
 
-	for(i=0;i<n;i++) {
-		M[i].d = 1.0 / M[i].d;
-		M[i].l2 *= M[i].d;
-		M[i].l1 *= M[i].d;
-		M[i].u1 *= M[i].d;
-		M[i].u2 *= M[i].d;
+	for(i=istart; i<=iend; i++) {
+		for (l=0;l<=LMAX;l++) {
+			M[i][l].d = 1.0 / M[i][l].d;
+			M[i][l].l2 *= M[i][l].d;
+			M[i][l].l1 *= M[i][l].d;
+			M[i][l].u1 *= M[i][l].d;
+			M[i][l].u2 *= M[i][l].d;
+		}
 	}
 }
 
-void CinqSolve(struct CinqDiag *M, complex double *b, complex double *x, int n)
-/* Solves M x = b, where b and x can be the same array.
-   M is a CinqDiag Matrix, previously decomposed by CinqDec.
+inline void cPentaSolve(struct PentaDiag **M, complex double **b, complex double **x, long int istart, long int iend)
+/* Solves M x = b, where b and x can be the same array. (NR*NLM)
+   M is a CinqDiag Matrix, previously decomposed by CinqDec. (NR*LMAX)
 */
 {
-	long int i;
+	long int i,l,im,lm;
 
-// forward avec condition limite : x[-1] != 0;
-/*	i=0;
-		x[i] = M[i].d * b[i] - M[i].l1*x[i-1];
-	for(i=1;i<n;i++)
-		x[i] = M[i].d * b[i] - M[i].l1 * x[i-1] - M[i].l2 * x[i-2];
-*/
-// forward (suppose CL : x[-1] = 0)
-	i=0;
-		x[i] = M[i].d * b[i];
-	i=1;
-		x[i] = M[i].d * b[i] - M[i].l1 * x[i-1];
-	for(i=2;i<n;i++)
-		x[i] = M[i].d * b[i] - M[i].l1 * x[i-1] - M[i].l2 * x[i-2];
-
-// backward (suppose CL : x[n] = 0)
-/*	i = n-2;
-		x[i] -= M[i].u1 * x[i+1];
-	for(i=n-3;i>=0;i--)
-		x[i] -= M[i].u1 * x[i+1] + M[i].u2 * x[i+2];
-*/
-// backward avec CL : x[n] != 0		(peut etre le cas pour le strain impos� m=2)
-	i = n-1;
-		x[i] -= M[i].u1 * x[i+1];
-	for(i=n-2;i>=0;i--)	// tient compte des conditions limites !!!
-		x[i] -= M[i].u1 * x[i+1] + M[i].u2 * x[i+2];
+// forward
+	i = istart;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] = M[i][l].d * b[i][lm];
+		}
+	i = istart+1;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm];
+		}
+	for(i=istart+2; i<=iend; i++) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm] - M[i][l].l2 * x[i-2][lm];
+		}
+	}
+// backward
+	i = iend;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] -= M[i][l].u1 * x[i+1][lm];
+		}
+	for(i= iend-1; i>=istart; i--) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[i][lm] -= M[i][l].u1 * x[i+1][lm] + M[i][l].u2 * x[i+2][lm];
+		}
+	}
 }
 
 
 
 
-/*	G�n�ration des Grilles et des op�rateurs de d�rivation spatiale.
+/*	Grid Generation with radial derivation operators.
 */
 
 
-void Reg_Grid(double rmin, double rmax)		// Grille r�guli�re.
+void Reg_Grid(double rmin, double rmax)		// Regular Grid
 {
 	double dx;
 	int i;
@@ -313,7 +359,7 @@ void init_Deriv_sph()
 		Gr[i].d = (dr[i]*dr[i] - dr[i-1]*dr[i-1])*t;	// =0 en grille reguliere.
 		Gr[i].u = dr[i-1]*dr[i-1]*t;
 
-		Wr[i].l = r_1[i]* Gr[i].l * r[i-1];	// Wr = 1/r * d/dr(r .), pour la vorticit� m=0 !
+		Wr[i].l = r_1[i]* Gr[i].l * r[i-1];	// Wr = 1/r * d/dr(r .)
 		Wr[i].d =         Gr[i].d;
 		Wr[i].u = r_1[i]* Gr[i].u * r[i+1];
 
@@ -330,7 +376,7 @@ void init_Deriv_sph()
 		Lr[i].u = D2r[i].u + 2.0*r_1[i]*Gr[i].u;
 
 	}
-	// les extremites douvent etre d�termin�es par les CL au cas par cas.
+	// start and end must be determined by BC on a case by case basis.
 	i = 0;
 		Gr[i].l = 0.0; Gr[i].d = 0.0; Gr[i].u = 0.0;
 		Wr[i].l = 0.0;	Wr[i].d = 0.0;	Wr[i].u = 0.0;

@@ -1,8 +1,14 @@
 *** Optimizations ***
 - SHT : use DCT space, keep low NLAT but regular grid and Gauss quadrature (??)
         synthesis should be faster, analysis same speed.
+
 - SHT : implement even and odd sub-cases.
+
 - grid : try full NR*NLM matrices, loops are more efficient but what about cache ???
+
+- wouldn't it be better to store Tlm and Plm with m contiguous for each l ???
+
+(- use "alloca()" to allocate temp memory on the stack with variable lengths)
 
 => time different implementations and chose the fastest...
 
@@ -13,4 +19,7 @@
 - insulating inner core
 
 + boundary conditions dependence
+
+-SHT.c
 + even/odd l dependance...
++ MMAX = 0 case possible
