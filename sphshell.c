@@ -593,7 +593,7 @@ void init_Umatrix(long int BC)
 //	for l>1 : dP/dr = 0
 // Boundary conditions (NO SLIP)
 //	P=0, T=0, dP/dr = 0  => not computed at boundary
-//	with DeltaOmega (couette), at inner core : T(l=1,m=0) = r.DeltaOmega/sqrt(3)
+//	with DeltaOmega (couette), at inner core : T(l=1,m=0) = r.DeltaOmega*Y10_ct
 // Boundary conditions (FREE SLIP)
 //	P=0, d2/dr2 P = 0, d(T/r)/dr = 0  => only T computed at boundary
 
@@ -604,6 +604,7 @@ void init_Umatrix(long int BC)
 		for (l=0; l<=LMAX; l++)	MUt[i-NG].d[l] = (Lr[i].d - r_2[i]*l*(l+1));
 					MUt[i-NG].u =    Lr[i].u;
 	}
+
 	i = NR-1;		// BC poloidal
 		if (BC == BC_FREE_SLIP) {	// free-slip
 			dx_2 = -2.0/(r[i]*(r[i]-r[i-1]));	// -2/(r.dr)
@@ -613,6 +614,7 @@ void init_Umatrix(long int BC)
 					MUt[i-NG].l =    dx_2;
 		for (l=0; l<=LMAX; l++) MUt[i-NG].d[l] = ( -dx_2 - r_2[i]*l*(l+1) );
 					MUt[i-NG].u =    0.0;
+
 	i = NG;		// dx_1 for l=1,  dx_2 for l=2
 		if (r[i] == 0.0) {	// no inner core, use central condition
 			dx_2 = 1.0/(r[i+1]-r[i]);	dx_2 = 2.0*dx_2*dx_2;	// 2/(dr.dr)
@@ -755,12 +757,15 @@ int main (int argc, char *argv[])
 	}
 
 	// init U fields
-	for (i=NG; i<NR; i++) {
+	for (i=0; i<NU; i++) {
 		for (l=0;l<NLM;l++) {
 			UTlm[i][l] = 0.0;
 			UPlm[i][l] = 0.0;
 		}
 	}
+	i = 0;
+		UTlm[i][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
+
 
 	PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, 0, NR-1, BC_MAGNETIC);
 	induction(NLbp2, NLbt2);

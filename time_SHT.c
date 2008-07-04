@@ -13,7 +13,7 @@
 #include <time.h>
 
 
-complex double *Slm, *Slm0, *Tlm;	// spherical harmonics l,m space
+complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
 complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
@@ -74,6 +74,7 @@ int main()
 	NLF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	NL = (double *) NLF;
 
+	Tlm0 = (complex double *) malloc(sizeof(complex double)* NLM);
 	Slm0 = (complex double *) malloc(sizeof(complex double)* NLM);
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) malloc(sizeof(complex double)* NLM);
@@ -94,6 +95,7 @@ int main()
 	t = 1.0 / (RAND_MAX/2);
 	for (i=0;i<NLM;i++) {
 		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 		Slm[i] = Slm0[i];
 	}
 	
@@ -121,23 +123,24 @@ int main()
 // compute error :
 	tmax = 0;	n2 = 0;
 	for (i=0;i<NLM;i++) {
-		if (i <= LMAX) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
 			Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
 		} else {
 			Slm[i] -= Slm0[i];
-			t = cabs(Slm[i]); 
+			t = cabs(Slm[i]);
 		}
 		n2 += t*t;
 		if (t>tmax) tmax = t;
 	}
 	printf("  => max error = %g    rms error = %g\n",tmax,sqrt(n2/NLM));
-
+	write_vect("Qlm",Slm,NLM*2);
 
 	printf(":: performing %d vector SHT\n", SHT_ITER);
 	Slm0[0] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	Tlm0[0] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	for (i=0;i<NLM;i++) {
-		Slm[i] = Slm0[i];	Tlm[i] = Slm0[i];
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
 	}
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
@@ -152,7 +155,7 @@ int main()
 // compute error :
 	tmax = 0;	n2 = 0;
 	for (i=0;i<NLM;i++) {
-		if (i <= LMAX) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
 			Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
 		} else {
@@ -168,11 +171,11 @@ int main()
 // compute error :
 	tmax = 0;	n2 = 0;
 	for (i=0;i<NLM;i++) {
-		if (i <= LMAX) {
-			Tlm[i] = creal(Tlm[i]-Slm0[i]);
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			Tlm[i] = creal(Tlm[i]- Tlm0[i]);
 			t = fabs(creal(Tlm[i]));
 		} else {
-			Tlm[i] -= Slm0[i];
+			Tlm[i] -= Tlm0[i];
 			t = cabs(Tlm[i]); 
 		}
 		n2 += t*t;

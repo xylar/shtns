@@ -64,6 +64,20 @@ inline void cTriMul(struct TriDiagL *M, complex double **x, complex double **y, 
 		}
 }
 
+// x has elements istart-1 and iend+1 set (if zero => same as cTriSolve)
+inline void cTriMulBC(struct TriDiagL *M, complex double **x, complex double **y, int istart, int iend)
+{
+	long int j,l,im,lm;
+
+	for (j=istart; j<=iend; j++) {
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
+		}
+	}
+}
+
+/*
 // Multiplication d'un vecteur complexe par une matrice Tribande dependant de l, ajoute au resultat.
 // y += M.x    (y and x MUST be different)
 inline void cTriMulAdd(struct TriDiagL *M, complex double **x, complex double **y, int istart, int iend)
@@ -87,6 +101,7 @@ inline void cTriMulAdd(struct TriDiagL *M, complex double **x, complex double **
 				y[j][lm] += M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm];
 		}
 }
+*/
 
 // decomposition PARTIELLE d'une matrice tribande. Les divisions ont lieu dans cette etape.
 // seul l'element diagonal est ecrase !!!
@@ -145,6 +160,36 @@ inline void cTriSolve(struct TriDiagL *M, complex double **b, complex double **x
 	}	// j=istart
 }
 
+// x has elements istart-1 and iend+1 set (if zero => same as cTriSolve)
+inline void cTriSolveBC(struct TriDiagL *M, complex double **b, complex double **x, int istart, int iend)
+{
+	long int j,l,im,lm;
+
+	j = istart;	// handle lower boundary : b(j) -> b(j) - Ml(j).x(j-1)
+		for (lm=0; lm<NLM; lm++)  x[j][lm] = b[j][lm] - M[j].l * x[j-1][lm];
+
+	while (j < iend-1) {	// Forward substitution.
+		j++;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[j][lm] = b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm]);
+		}
+	}	// j = iend-1;
+	j = iend;	// handle upper boundary : b(j) -> b(j) - Mu(j).x(j+1)
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[j][lm] = (b[j][lm] - M[j].u*x[j+1][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm])) * M[j].d[l];
+		}
+	while (j > istart) {	// Back-substitution.
+		j--;
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++)
+				x[j][lm] = ( x[j][lm] - M[j].u *x[j+1][lm] ) * M[j].d[l];
+		}
+	}	// j=istart
+}
+
+
 // Multiply complex vector by a Penta-diagonal matrix (l-dependant)
 // y = M.x    (y and x MUST be different)
 inline void cPentaMul(struct PentaDiag **M, complex double **x, complex double **y, int istart, int iend)
@@ -178,32 +223,6 @@ inline void cPentaMul(struct PentaDiag **M, complex double **x, complex double *
 				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm];
 		}
 }
-
-// Multiply complex vector by a Penta-diagonal matrix (l-dependant)
-// y = M.x    (y and x MUST be different)
-// x has (non-zero) border elements istart-1 and iend+1
-inline void cPentaMulBC(struct PentaDiag **M, complex double **x, complex double **y, int istart, int iend)
-{
-	long int j,l,im,lm;
-
-	j=istart;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
-		}
-	for (j=istart+1; j<iend; j++) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
-		}
-	}
-	j = iend;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm];
-		}
-}
-
 
 void PentaDec(struct PentaDiag **M, long int istart, long int iend)
 {
@@ -275,40 +294,6 @@ inline void cPentaSolve(struct PentaDiag **M, complex double **b, complex double
 				x[i][lm] -= M[i][l].u1 * x[i+1][lm];
 		}
 	for(i= iend-2; i>=istart; i--) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] -= M[i][l].u1 * x[i+1][lm] + M[i][l].u2 * x[i+2][lm];
-		}
-	}
-}
-
-inline void cPentaSolveBC(struct PentaDiag **M, complex double **b, complex double **x, long int istart, long int iend)
-/* Solves M x = b, where b and x can be the same array. (NR*NLM)
-   M is a CinqDiag Matrix, previously decomposed by CinqDec. (NR*LMAX)
-   x has (non-zero) border elements istart-1 and iend+1, which are untouched (read but not written)
-*/
-{
-	long int i,l,im,lm;
-
-// forward
-	i = istart;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm];
-		}
-	for(i=istart+1; i<=iend; i++) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm] - M[i][l].l2 * x[i-2][lm];
-		}
-	}
-// backward
-	i = iend;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] -= M[i][l].u1 * x[i+1][lm];
-		}
-	for(i= iend-1; i>=istart; i--) {
 		for (im=0, lm=0; im<=MMAX; im++) {
 			for (l=im*MRES; l<=LMAX; l++, lm++)
 				x[i][lm] -= M[i][l].u1 * x[i+1][lm] + M[i][l].u2 * x[i+2][lm];
