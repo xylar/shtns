@@ -16,7 +16,7 @@
 // number of radial grid points.
 #define NR 100
 // radial points for inner core (NG = 0 : no inner core)
-#define NG 0
+#define NG 35
 #define NU (NR-NG)
 
 #include "grid.c"
@@ -36,6 +36,9 @@ double dtU = 0.0002;	// time step for velocity field.
 
 double Omega0 = 0.0;		// global rotation rate (of outer boundary) => Coriolis force .
 double DeltaOmega = 0.0;	// differential rotation (of inner core)
+
+#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
+//#define DEB (0)
 
 /*
 struct VectField {
@@ -94,7 +97,7 @@ void alloc_Ufields()
 	// not defined inside the inner core.
 	for (ir = 0; ir < NG; ir++) {
 		Ur[ir] = NULL;	Ut[ir] = NULL;	Up[ir] = NULL;
-		UPlm[ir] = NULL;	UTlm[ir] = NULL;
+		UPlm[ir] = NULL;	UTlm[ir] = NULL;	Alm[ir] = NULL;
 		NLup1[ir] = NULL;	NLup2[ir] = NULL;	NLut1[ir] = NULL;	NLut2[ir] = NULL;
 	}
 
@@ -114,7 +117,18 @@ void alloc_Ufields()
 	// buffer for spatial non-linear terms (only one vector shell)
 	NLr = (double *) fftw_malloc( 3* 2*(NPHI/2+1)*NLAT * sizeof(double) );
 	NLt = NLr + 2*(NPHI/2+1)*NLAT;
-	NTp = NLt + 2*(NPHI/2+1)*NLAT;
+	NLp = NLt + 2*(NPHI/2+1)*NLAT;
+}
+
+void alloc_TempFields()
+{
+	long int ir;
+
+	for (ir = 0; ir < NR; ir++) {		// shell by shell allocation.
+		Jr[ir] = (double *) fftw_malloc( 3*(NPHI/2+1)*NLAT * sizeof(complex double));	// 3 components
+		Jt[ir] = Jr[ir] + 2*(NPHI/2+1)*NLAT;
+		Jp[ir] = Jt[ir] + 2*(NPHI/2+1)*NLAT;
+	}
 }
 
 // compute the cartesian coordinates of a vector field at r=0, from its Poloidal value component
@@ -321,7 +335,7 @@ void calc_NLU(double** Vr, double** Vt, double** Vp, complex double **NLP, compl
 	double vr,vt,vp;
 	long int ir,lm;
 
-	for (ir=0; ir<NU; ir++) {
+	for (ir=NG+1; ir<=NR-2; ir++) {
 		for (lm=0; lm<NPHI*NLAT; lm++) {
 			vr = Ut[ir][lm]*Vp[ir][lm] - Up[ir][lm]*Vt[ir][lm];
 			vt = Up[ir][lm]*Vr[ir][lm] - Ur[ir][lm]*Vp[ir][lm];
@@ -329,16 +343,16 @@ void calc_NLU(double** Vr, double** Vt, double** Vp, complex double **NLP, compl
 			Vr[ir][lm] = vr;	Vt[ir][lm] = vt;	Vp[ir][lm] = vp;
 		}
 	}
-	spat_to_rot_PolTor(Vr-NG, Vt-NG, Vp-NG, NLT-NG, NLP-NG, NG+1, NR-1);
+	spat_to_rot_PolTor(Vr, Vt, Vp, NLT, NLP, NG+1, NR-2);
 }
 
 
 
 // compute vorticity field from poloidal/toroidal components of velocity [ie poltor_to_rot_spat applied to U]
 // IN: Plm, Tlm : pol/tor components of velocity
-//     Omega0 : background global rotation (solid body rotation rate) to include in vorticity
+//     Om0 : background global rotation (solid body rotation rate) to include in vorticity
 // OUT: Vr,Vt,Vp : r,theta,phi components of vorticity field
-void calc_vort(complex double **Plm, complex double **Tlm, double Om0, double** Vr, double** Vt, double** Vp)
+void calc_Vort(complex double **Plm, complex double **Tlm, double Om0, double** Vr, double** Vt, double** Vp)
 {
 	complex double Q[NLM];
 	complex double S[NLM];
@@ -351,7 +365,7 @@ void calc_vort(complex double **Plm, complex double **Tlm, double Om0, double** 
 	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> peut etre rajouté à Slm  (=> Vt)
 */
 	Om0 = Om0 * Y10_ct;	// multiply by representation of cos(theta) in spherical harmonics (l=1,m=0)
-	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
+//	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
 			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*Plm[ir][lm] - r_1[ir]*D2r[ir].l*Plm[ir-1][lm] - r_1[ir]*D2r[ir].u*Plm[ir+1][lm];
@@ -370,18 +384,26 @@ void step_NS(long int nstep)
 	long int i,l;
 
 	while(nstep > 0) {
+		nstep--;
+	DEB;
 		CALC_U(BC_NO_SLIP);
-		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp, );
+	DEB;
+		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp);
+	DEB;
 		calc_NLU(Jr, Jt, Jp, NLup1, NLut1);
 
-		cTriMul(MUt, UTlm, Alm, 1, NU-2);
+	DEB;
+		cTriMulBC(MUt, UTlm-NG, Alm, 1, NU-2);
+	DEB;
 		for (i=1; i<NU-1; i++) {
 			for (l=0;l<NLM;l++) {
 				Alm[i][l] += 1.5*NLut1[i][l] - 0.5*NLut2[i][l];
 			}
 		}
-		cTriSolve(MUt_1, Alm, UTlm, 1, NU-2);
+	DEB;
+		cTriSolveBC(MUt_1, Alm, UTlm, 1, NU-2);
 
+	DEB;
 		cPentaMul(MUp, UPlm, Alm, 1, NU-2);
 		for (i=1; i<NU-1; i++) {
 			for (l=0;l<NLM;l++) {
@@ -390,9 +412,10 @@ void step_NS(long int nstep)
 		}
 		cPentaSolve(MUp_1, Alm, UPlm, 1, NU-2);
 
+	DEB;
 
 		CALC_U(BC_NO_SLIP);
-		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp, );
+		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp );
 		calc_NLU(Jr, Jt, Jp, NLup2, NLut2);
 
 		cTriMul(MUt, UTlm, Alm, 1, NU-2);
@@ -401,7 +424,7 @@ void step_NS(long int nstep)
 				Alm[i][l] += 1.5*NLut2[i][l] - 0.5*NLut1[i][l];
 			}
 		}
-		cTriSolve(MUt_1, Alm, UTlm, 1, NU-2);
+		cTriSolveBC(MUt_1, Alm, UTlm, 1, NU-2);
 
 		cPentaMul(MUp, UPlm, Alm, 1, NU-2);
 		for (i=1; i<NU-1; i++) {
@@ -441,7 +464,7 @@ void induction(complex double **NLP, complex double **NLT)
 		for (lm=0; lm<NPHI*NLAT; lm++) {
 			Br[ir][lm] = 0.0;	Bt[ir][lm] = 0.0;	Bp[ir][lm] = 0.0;
 		}*/
-	spat_to_rot_PolTor(Br, Bt, Bp, NLP, NLT, BC_MAGNETIC);
+	spat_to_rot_PolTor(Br, Bt, Bp, NLP, NLT, 1,NR-2);
 }
 
 // compute total Energy
@@ -518,9 +541,11 @@ void write_slice(char *fn, double **v, int im)
 			fprintf(fp,"-%.6g ",ct[NLAT/2-j]);	// first line = cos(theta)
 		}
 	for (i=0;i<NR;i++) {
-		fprintf(fp,"\n%.6g ",r[i]);		// first row = radius
-		for(j=0;j<NLAT;j++) {
-			fprintf(fp,"%.6g ",v[i][im*NLAT + j]);		// data
+		if (v[i] != NULL) {
+			fprintf(fp,"\n%.6g ",r[i]);		// first row = radius
+			for(j=0;j<NLAT;j++) {
+				fprintf(fp,"%.6g ",v[i][im*NLAT + j]);		// data
+			}
 		}
 	}
 	fclose(fp);
@@ -684,7 +709,7 @@ void init_Umatrix(long int BC)
 // for FREE-SLIP, use : cTriSolve(MUt_1, RHS, Tlm, 1, NU-1)
 }
 
-void step_MHD(long int nstep)
+void step_MHD(long int nstep, complex double **Btmp)
 {
 	long int i,l;
 
@@ -738,7 +763,9 @@ int main (int argc, char *argv[])
 	init_SH();
 	init_rad_sph(0.0, 1.0);
 	init_Bmatrix();		init_Umatrix(BC_NO_SLIP);
-	alloc_Bfields();	alloc_Ufields();
+	alloc_Bfields();	alloc_Ufields();	alloc_TempFields();
+
+	DEB;
 
 	for (i=0;i<NR;i++)
 		Alm[i] = (complex double *) malloc( NLM * sizeof(complex double));
@@ -756,34 +783,53 @@ int main (int argc, char *argv[])
 		BPlm[i][1] = 0.0;	// remove dipole.
 	}
 
+	DEB;
 	// init U fields
-	for (i=0; i<NU; i++) {
+	for (i=NG; i<NR; i++) {
 		for (l=0;l<NLM;l++) {
 			UTlm[i][l] = 0.0;
 			UPlm[i][l] = 0.0;
 		}
 	}
-	i = 0;
+	i = NG;
 		UTlm[i][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
 
+	DEB;
 
 	PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, 0, NR-1, BC_MAGNETIC);
 	induction(NLbp2, NLbt2);
 
-	for (it=0; it< 1000; it++) {
+	DEB;
+
+	CALC_U(BC_NO_SLIP);
+	DEB;
+	write_slice("Ur0",Ur,0);
+	write_slice("Ut0",Ut,0);
+	write_slice("Up0",Up,0);
+	DEB;
+	calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp);
+	DEB;
+
+	write_slice("Wr0",Jr,0);
+	write_slice("Wt0",Jt,0);
+	write_slice("Wp0",Jp,0);
+
+	DEB;
+
+	for (it=0; it< 10; it++) {
 		t0 = t1;
 		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
 
-		step_dyncin(1);
+		step_NS(1);
 	}
 
 	write_HS("Bpol",BPlm);	write_HS("Btor",BTlm);
 	write_HS("Upol",UPlm);	write_HS("Utor",UTlm);
 
-	PolTor_to_spat(BPlm, BTlm, Br, Bt, Bp, BC_MAGNETIC);
-	write_slice("Br",Br,0);
-	write_slice("Bt",Bt,0);
-	write_slice("Bp",Bp,0);
+	CALC_U(BC_NO_SLIP);
+	write_slice("Ur",Ur,0);
+	write_slice("Ut",Ut,0);
+	write_slice("Up",Up,0);
 
 	fp = fopen("Pprof","w");
 	for (i=0; i<NR; i++) {
