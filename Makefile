@@ -8,6 +8,8 @@ cmd = gcc -O3
 ## gcc core2 (calcul1&2)
 #cmd = gcc -O3 -march=core2 -mfpmath=sse
 
+default: sphshell
+
 sphere : sphere.c SHT.c SHT.h Makefile
 	$(cmd) sphere.c -lfftw3 -lgsl -lgslcblas -lm -o sphere
 time_SHT : time_SHT.c SHT.c SHT.h Makefile

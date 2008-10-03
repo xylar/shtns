@@ -1,7 +1,9 @@
+/**
 ///////////////////////////////////////////////
 // SHT : Spherical Harmonic Transform
 //   requires SHT.h for size parameters.
 //////////////////////////////////////////////
+*/
 
 #include <complex.h>
 #include <math.h>

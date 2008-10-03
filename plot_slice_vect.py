@@ -7,6 +7,7 @@ import sys              # acces a la ligne de commande.
 print 'loading',sys.argv[1]
 a=load(sys.argv[1])
 s = a.shape
+print s
 
 ct = a[0,1:s[1]]
 st = sqrt(1-ct*ct)
@@ -36,7 +37,7 @@ colorbar()
 l = s[0]
 m = s[1]
 s = l/11
-t = m/16
+t = (m+15)/16
 print s,t
 
 #cartesian coordinates
