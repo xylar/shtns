@@ -228,7 +228,25 @@ void PentaDec(struct PentaDiag **M, long int istart, long int iend)
 {
 	double alp, bet;
 	long int i,l;
+/*
+        u(:,2,4)=u(:,2,4)-u(:,2,2)*u(:,1,5)/u(:,1,3)
+        u(:,2,3)=u(:,2,3)-u(:,2,2)*u(:,1,4)/u(:,1,3)
 
+        do i=3,NS-1
+           u(:,i,2)=u(:,i,2)-u(:,i,1)*u(:,i-2,4)/u(:,i-2,3)
+           u(:,i,4)=u(:,i,4)-u(:,i,2)*u(:,i-1,5)/u(:,i-1,3)
+           u(:,i,3)=u(:,i,3)-u(:,i,2)*u(:,i-1,4)/u(:,i-1,3)-u(:,i,1)*
+     c          u(:,i-2,5)/u(:,i-2,3)
+        enddo
+c! invert d , scale u1,u2,l1,l2
+        do i=1,NS-1
+           u(:,i,3)=1.0/u(:,i,3)
+           u(:,i,4)=u(:,i,4)*u(:,i,3)
+           u(:,i,5)=u(:,i,5)*u(:,i,3)
+           u(:,i,2)=u(:,i,2)*u(:,i,3)
+           u(:,i,1)=u(:,i,1)*u(:,i,3)
+        enddo
+*/
 	i = istart;
 		bet = 1.0;
 		for (l=0;l<=LMAX;l++)
@@ -262,6 +280,7 @@ void PentaDec(struct PentaDiag **M, long int istart, long int iend)
 		}
 	}
 }
+
 
 inline void cPentaSolve(struct PentaDiag **M, complex double **b, complex double **x, long int istart, long int iend)
 /* Solves M x = b, where b and x can be the same array. (NR*NLM)

@@ -14,9 +14,9 @@
 #include "SHT.c"
 
 // number of radial grid points.
-#define NR 101
+#define NR 201
 // radial points for inner core (NG = 0 : no inner core)
-#define NG 30
+#define NG 60
 #define NU (NR-NG)
 
 #include "grid.c"
@@ -30,12 +30,12 @@ struct TriDiagL *MB, *MB_1, *MUt, *MUt_1;
 struct PentaDiag *MUp[NU], *MUp_1[NU];
 
 double eta = 1.0;	// magnetic diffusivity.
-double nu = 1.0;	// kinematic viscosity.
-double dtB = 0.00002;	// time step for magnetic field.
-double dtU = 1.0e-2;	// time step for velocity field.
+double nu = 1.0e-1;	// kinematic viscosity.
+double dtB = 2.0e-5;	// time step for magnetic field.
+double dtU = 1.0e-4;	// time step for velocity field.
 
-double Omega0 = 100.0;		// global rotation rate (of outer boundary) => Coriolis force .
-double DeltaOmega = 1.0e-3;	// differential rotation (of inner core)
+double Omega0 = 1.0e3;		// global rotation rate (of outer boundary) => Coriolis force .
+double DeltaOmega = 1.0;	// differential rotation (of inner core)
 
 //#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
 #define DEB (0)
@@ -364,7 +364,7 @@ void calc_Vort(complex double **Plm, complex double **Tlm, double Om0, double** 
 	cos theta = Y(m=0,l=1) * 2*sqrt(pi/3)		>> peut etre rajouté à Qlm. (=> Vr)
 	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> peut etre rajouté à Slm  (=> Vt)
 */
-	Om0 = Om0 * Y10_ct;	// multiply by representation of cos(theta) in spherical harmonics (l=1,m=0)
+	Om0 = 2.0*Om0 * Y10_ct;	// multiply by representation of cos(theta) in spherical harmonics (l=1,m=0)
 //	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
@@ -383,59 +383,34 @@ void step_NS(long int nstep)
 {
 	long int i,l;
 
+	inline step1(complex double **NLup, complex double **NLut, complex double **NLupo, complex double **NLuto)
+	{
+		CALC_U(BC_NO_SLIP);
+		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp);
+		calc_NLU(Jr, Jt, Jp, NLup, NLut);
+
+		cTriMulBC(MUt, UTlm+NG, Alm, 1, NU-2);
+		for (i=1; i<NU-1; i++) {
+			for (l=1;l<NLM;l++) {
+				Alm[i][l] += 1.5*NLut[i+NG][l] - 0.5*NLuto[i+NG][l];
+			}
+		}
+		cTriSolveBC(MUt_1, Alm, UTlm+NG, 1, NU-2);
+
+		cPentaMul(MUp, UPlm+NG, Alm, 1, NU-2);
+		for (i=1; i<NU-1; i++) {
+			for (l=1;l<NLM;l++) {
+				Alm[i][l] += 1.5*NLup[i+NG][l] - 0.5*NLupo[i+NG][l];
+			}
+		}
+		cPentaSolve(MUp_1, Alm, UPlm+NG, 1, NU-2);
+
+	}
+
 	while(nstep > 0) {
 		nstep--;
-	DEB;
-		CALC_U(BC_NO_SLIP);
-	DEB;
-		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp);
-	DEB;
-		calc_NLU(Jr, Jt, Jp, NLup1, NLut1);
-
-	DEB;
-		cTriMulBC(MUt, UTlm+NG, Alm, 1, NU-2);
-	DEB;
-		for (i=1; i<NU-1; i++) {
-			for (l=0;l<NLM;l++) {
-				Alm[i][l] += 1.5*NLut1[i+NG][l] - 0.5*NLut2[i+NG][l];
-			}
-		}
-	DEB;
-		cTriSolveBC(MUt_1, Alm, UTlm+NG, 1, NU-2);
-
-	DEB;
-		cPentaMul(MUp, UPlm+NG, Alm, 1, NU-2);
-		for (i=1; i<NU-1; i++) {
-			for (l=0;l<NLM;l++) {
-				Alm[i][l] += 1.5*NLup1[i+NG][l] - 0.5*NLup2[i+NG][l];
-			}
-		}
-		cPentaSolve(MUp_1, Alm, UPlm+NG, 1, NU-2);
-
-	DEB;
-
-		CALC_U(BC_NO_SLIP);
-		calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp );
-		calc_NLU(Jr, Jt, Jp, NLup2, NLut2);
-	DEB;
-
-		cTriMulBC(MUt, UTlm+NG, Alm, 1, NU-2);
-		for (i=1; i<NU-1; i++) {
-			for (l=0;l<NLM;l++) {
-				Alm[i][l] += 1.5*NLut2[i+NG][l] - 0.5*NLut1[i+NG][l];
-			}
-		}
-		cTriSolveBC(MUt_1, Alm, UTlm+NG, 1, NU-2);
-	DEB;
-
-		cPentaMul(MUp, UPlm+NG, Alm, 1, NU-2);
-		for (i=1; i<NU-1; i++) {
-			for (l=0;l<NLM;l++) {
-				Alm[i][l] += 1.5*NLup2[i+NG][l] - 0.5*NLup1[i+NG][l];
-			}
-		}
-		cPentaSolve(MUp_1, Alm, UPlm+NG, 1, NU-2);
-	DEB;
+		step1(NLup1, NLut1, NLup2, NLut2);
+		step1(NLup2, NLut2, NLup1, NLut1);
 	}
 }
 
@@ -444,12 +419,14 @@ void step_NS(long int nstep)
 // B is overwritten with u^B
 void induction(complex double **NLP, complex double **NLT)
 {
-	double vr,vt,vp;
-	long int ir,lm;
+	double vr,vt,vp,rO;
+	long int ir,lm,it;
 
-	for (ir=0; ir<NG; ir++) {		// for the inner core : solid body rotation  Up = r.DeltaOmega
-		vp = r[ir]*DeltaOmega;
+	for (ir=0; ir<NG; ir++) {		// for the inner core : solid body rotation  Up = r.sint.DeltaOmega
+		rO = r[ir]*DeltaOmega;
+		it = 0;
 		for (lm=0; lm<NPHI*NLAT; lm++) {
+			vp = rO*st[it]; it++; if (it>=NLAT) it=0;	// TO BE CHECKED !
 			vr = - vp*B0t[ir][lm];
 			vt =   vp*B0r[ir][lm];
 			Br[ir][lm] = vr;	Bt[ir][lm] = vt;	Bp[ir][lm] = 0.0;
@@ -667,27 +644,28 @@ void init_Umatrix(long int BC)
 	i=1;
 		for (l=0; l<=LMAX; l++) {
 			MUp[i][l].l2 = 0.0;
-			MUp[i][l].l1 =           0.5*nu*( MUt[i].l*Lp0d[l] + MUt[i].d[l]*MUt[i].l );
-			MUp[i][l].d  = 1.0/dtU + 0.5*nu*( MUt[i].l*Lp0u[l] + MUt[i].d[l]*MUt[i].d[l] + MUt[i].u*MUt[i+1].l );
-			MUp[i][l].u1 =           0.5*nu*(                    MUt[i].d[l]*MUt[i].u    + MUt[i].u*MUt[i+1].d[l] );
-			MUp[i][l].u2 =           0.5*nu*(                                              MUt[i].u*MUt[i+1].u );
+			MUp[i][l].l1 = -( 1.0/dtU*MUt[i].l    + 0.5*nu*( MUt[i].l*Lp0d[l] + MUt[i].d[l]*MUt[i].l ) );
+			MUp[i][l].d  = -( 1.0/dtU*MUt[i].d[l] + 0.5*nu*( MUt[i].l*Lp0u[l] + MUt[i].d[l]*MUt[i].d[l] + MUt[i].u*MUt[i+1].l ) );
+			MUp[i][l].u1 = -( 1.0/dtU*MUt[i].u    + 0.5*nu*(                    MUt[i].d[l]*MUt[i].u    + MUt[i].u*MUt[i+1].d[l] ) );
+			MUp[i][l].u2 = -(                       0.5*nu*(                                              MUt[i].u*MUt[i+1].u ) );
 		}
 	for (i=2; i<NU-1; i++) {
 		for (l=0; l<=LMAX; l++) {
-			MUp[i][l].l2 =           0.5*nu*( MUt[i].l*MUt[i-1].l );
-			MUp[i][l].l1 =           0.5*nu*( MUt[i].l*MUt[i-1].d[l] + MUt[i].d[l]*MUt[i].l );
-			MUp[i][l].d  = 1.0/dtU + 0.5*nu*( MUt[i].l*MUt[i-1].u    + MUt[i].d[l]*MUt[i].d[l] + MUt[i].u*MUt[i+1].l );
-			MUp[i][l].u1 =           0.5*nu*(                          MUt[i].d[l]*MUt[i].u    + MUt[i].u*MUt[i+1].d[l] );
-			MUp[i][l].u2 =           0.5*nu*(                                                    MUt[i].u*MUt[i+1].u );
+			MUp[i][l].l2 = -(                       0.5*nu*( MUt[i].l*MUt[i-1].l ) );
+			MUp[i][l].l1 = -( 1.0/dtU*MUt[i].l    + 0.5*nu*( MUt[i].l*MUt[i-1].d[l] + MUt[i].d[l]*MUt[i].l ) );
+			MUp[i][l].d  = -( 1.0/dtU*MUt[i].d[l] + 0.5*nu*( MUt[i].l*MUt[i-1].u    + MUt[i].d[l]*MUt[i].d[l] + MUt[i].u*MUt[i+1].l ) );
+			MUp[i][l].u1 = -( 1.0/dtU*MUt[i].u    + 0.5*nu*(                          MUt[i].d[l]*MUt[i].u    + MUt[i].u*MUt[i+1].d[l] ) );
+			MUp[i][l].u2 = -(                       0.5*nu*(                                                    MUt[i].u*MUt[i+1].u ) );
 		}
 	}
+
 	for (i=1; i<NU-1; i++) {
 		for (l=0; l<=LMAX; l++) {
-			MUp_1[i][l].l2 =         - MUp[i][l].l2;
-			MUp_1[i][l].l1 =         - MUp[i][l].l1;
-			MUp_1[i][l].d  = 2.0/dtU - MUp[i][l].d;
-			MUp_1[i][l].u1 =         - MUp[i][l].u1;
-			MUp_1[i][l].u2 =         - MUp[i][l].u2;
+			MUp_1[i][l].l2 =                     - MUp[i][l].l2;
+			MUp_1[i][l].l1 = -2.0/dtU*MUt[i].l    - MUp[i][l].l1;
+			MUp_1[i][l].d  = -2.0/dtU*MUt[i].d[l] - MUp[i][l].d;
+			MUp_1[i][l].u1 = -2.0/dtU*MUt[i].u    - MUp[i][l].u1;
+			MUp_1[i][l].u2 =                     - MUp[i][l].u2;
 		}
 	}
 	PentaDec(MUp_1, 1, NU-2);
@@ -770,6 +748,9 @@ int main (int argc, char *argv[])
 	init_Bmatrix();		init_Umatrix(BC_NO_SLIP);
 	alloc_Bfields();	alloc_Ufields();	alloc_TempFields();
 
+	printf("[Params] Ek=%.2e, Ro=%.2e, Pm=%.2e, Re=%.2e\n",nu/Omega0, r[NG]*DeltaOmega/Omega0, nu/eta, r[NG]*DeltaOmega/nu);
+	printf("         dtU.Omega=%.2e, dtU.nu.R^2=%.2e, dtB.eta.R^2=%.2e, dtB/dtU=%.2e\n",dtU*Omega0, dtU*nu, dtB*eta, dtB/dtU);
+
 	DEB;
 
 	for (i=0;i<NR;i++)
@@ -795,10 +776,10 @@ int main (int argc, char *argv[])
 			UTlm[i][l] = 0.0;
 			UPlm[i][l] = 0.0;
 		}
-		UTlm[i][LM(1,0)] = r[i]*DeltaOmega*(1-(r[i]-r[NG])/(r[NR-1]-r[NG])) * Y10_ct;
+//		UTlm[i][LM(1,0)] = r[i]*DeltaOmega*(1-(r[i]-r[NG])/(r[NR-1]-r[NG])) * Y10_ct;
 	}
 	i = NG;
-//		UTlm[i][LM(1,0)]  = r[i]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
+		UTlm[i][LM(1,0)]  = r[i]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
 
 	DEB;
 
@@ -826,10 +807,11 @@ int main (int argc, char *argv[])
 //		t0 = t1;
 //		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
 		t0 = creal(UTlm[NG+1][1]);
-		printf("test it %d :: %g\n",it,t0);
+		t1 = creal(UPlm[NG+1][2]);
+		printf("test it %d :: P0=%g, T0=%g\n",it,t1, t0);
 		if (isnan(t0)) runerr("NaN encountered");
 
-		step_NS(1);
+		step_NS(100);
 	}
 
 	write_HS("Bpol",BPlm);	write_HS("Btor",BTlm);
@@ -840,14 +822,19 @@ int main (int argc, char *argv[])
 	write_slice("Ut",Ut,0);
 	write_slice("Up",Up,0);
 
+	calc_Vort(UPlm, UTlm, Omega0, Jr, Jt, Jp);
+	write_slice("Wr",Jr,0);
+	write_slice("Wt",Jt,0);
+	write_slice("Wp",Jp,0);
+
 	fp = fopen("Pprof","w");
-	for (i=0; i<NR; i++) {
-		fprintf(fp,"%.6g ",BPlm[i][LM(1,1)]);
+	for (i=NG; i<NR; i++) {
+		fprintf(fp,"%.6g ",UPlm[i][LM(2,0)]);
 	}
 	fclose(fp);
 	fp = fopen("Tprof","w");
-	for (i=0; i<NR; i++) {
-		fprintf(fp,"%.6g ",BTlm[i][LM(1,1)]);
+	for (i=NG; i<NR; i++) {
+		fprintf(fp,"%.6g ",UTlm[i][LM(1,0)]);
 	}
 	fclose(fp);
 
