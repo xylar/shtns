@@ -19,10 +19,5 @@ LMAX, NLAT, MMAX, MRES, NPHI
 #define NPHI 2
 
 //  ADDITIONAL FINE TUNING  //
-// POLAR_OPT_THRESHOLD : value under wich the polar values of the Legendre Polynomials Plm are neglected,
-// leading to increased performance (a few percent)
-// 0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive.
-//#define POLAR_OPT_THRESHOLD 1.e-6
-#define POLAR_OPT_THRESHOLD 0
 // compute and print some debugging information...
-#define _SH_DEBUG_
+//#define _SH_DEBUG_

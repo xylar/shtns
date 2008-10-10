@@ -31,4 +31,5 @@ for i in range(1, argn):
 	contourf(array(x),array(y),a,15,cmap=cm.PuOr)
 	axis('equal')
 	colorbar()
-	show()
+
+show()

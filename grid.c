@@ -47,21 +47,12 @@ inline void cTriMul(struct TriDiagL *M, complex double **x, complex double **y, 
 	long int j,l,im,lm;
 
 	j=istart;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];  )
 	for (j=istart+1; j<iend; j++) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];  )
 	}
 	j = iend;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm];  )
 }
 
 // x has elements istart-1 and iend+1 set (if zero => same as cTriSolve)

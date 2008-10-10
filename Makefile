@@ -7,9 +7,15 @@ cmd = gcc -O3
 #cmd = gcc -O3 -march=k8
 ## gcc core2 (calcul1&2)
 #cmd = gcc -O3 -march=core2 -mfpmath=sse
+## icare 64bits opteron
+#cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
+#cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
 
-default: sphshell
 
+default: xshells
+
+xshells : xshells.c SHT.c SHT.h grid.c Makefile
+	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
 sphere : sphere.c SHT.c SHT.h Makefile
 	$(cmd) sphere.c -lfftw3 -lgsl -lgslcblas -lm -o sphere
 time_SHT : time_SHT.c SHT.c SHT.h Makefile

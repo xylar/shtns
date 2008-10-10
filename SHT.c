@@ -727,12 +727,15 @@ void planFFT()
 	printf("       done.\n");
 }
 
-// initialize SH transform.
-void init_SH()
+/** initialize SH transform.
+input : eps = polar optimization threshold : polar coefficients below that threshold are neglected (for high ms).
+        eps is the value under wich the polar values of the Legendre Polynomials Plm are neglected, leading to increased performance (a few percent).
+	0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive.
+*/
+void init_SH(double eps)
 {
 	double xg[NLAT], wg[NLAT];	// gauss points and weights.
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
-	double eps = POLAR_OPT_THRESHOLD;	// eps : polar coefficients below that threshold are neglected (for high ms)
 	double iylm_fft_norm = 2.0*pi/NPHI;	// normation FFT pour zlm
 	double t,tmax;
 	long int it,im,m,l;

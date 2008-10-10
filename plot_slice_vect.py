@@ -35,8 +35,8 @@ print c.shape
 c=c/array(x)
 
 #colormap for phi component
-pcolor(array(x),array(y),c,shading='interp')
-#contourf(array(x),array(y),c,15,cmap=cm.Spectral)
+#pcolor(array(x),array(y),c,shading='interp')
+contourf(array(x),array(y),c,15,cmap=cm.Spectral)
 colorbar()
 
 #quiver for r,theta
