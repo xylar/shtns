@@ -8,7 +8,7 @@
 
 - wouldn't it be better to store Tlm and Plm with m contiguous for each l ???
 
-(- use "alloca()" to allocate temp memory on the stack with variable lengths)
++(- use "alloca()" to allocate temp memory on the stack with variable lengths) // ultrafast but not ANSI
 
 => time different implementations and chose the fastest...
 
