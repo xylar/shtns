@@ -1,11 +1,13 @@
-// base flow. Cartesien spectral.
+  /////////////////////////////////////////////////////////////////////////
+ // XSHELLS : eXtendable Spherical Harmonic Earth-Like Liquid Simulator //
+/////////////////////////////////////////////////////////////////////////
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <complex.h>
 #include <math.h>
-// FFTW la derivee d/dx = ik	(pas de moins !)
+// FFTW : spatial derivative is d/dx = ik	(no minus sign !)
 #include <fftw3.h>
 // GSL for Legendre functions
 #include <gsl/gsl_errno.h>
@@ -15,10 +17,8 @@
 #include "SHT.c"
 
 // number of radial grid points.
-#define NR 201
-// radial points for inner core (NG = 0 : no inner core)
-#define NG 60
-#define NU (NR-NG)
+long int NR,NU;		//  NR: total radial grid points. NU:for velocity field.
+long int NG=0;		//  NG: grid points for inner core.
 
 #include "grid.c"
 
@@ -29,33 +29,16 @@
 #define BC_MAGNETIC 3
 
 struct TriDiagL *MB, *MB_1, *MUt, *MUt_1;
-struct PentaDiag *MUp[NU], *MUp_1[NU];
+struct PentaDiag **MUp, **MUp_1;
 
 double nu, eta;		// viscosity and magnetic diffusivity.
 double dtU, dtB;	// time step for navier-stokes and induction equation.
 double Omega0;		// global rotation rate (of outer boundary) => Coriolis force .
 double DeltaOmega;	// differential rotation (of inner core)
 
-#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
-//#define DEB (0)
+//#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
+#define DEB (0)
 
-/*
-// Magnetic field representation.
-double *Br[NR], *Bt[NR], *Bp[NR];	// Spatial representation
-double *B0r[NR], *B0t[NR], *B0p[NR];	// Spatial representation
-complex double *BPlm[NR], *BTlm[NR];	// Spherical Harmonics representation
-complex double *NLbp1[NR], *NLbp2[NR], *NLbt1[NR], *NLbt2[NR];	// Adams-Bashforth : 2 non-linear terms stored.
-// Velocity field representation.
-double *Ur[NR], *Ut[NR], *Up[NR];
-complex double *UPlm[NR], *UTlm[NR];
-complex double *NLup1[NR], *NLup2[NR], *NLut1[NR], *NLut2[NR];
-// spare field J (for current density, or vorticity)
-double *Jr[NR], *Jt[NR], *Jp[NR];
-complex double *Alm[NR];	// temp scalar spectral (pol or tor) representation
-
-
-//double *NLr, *NLt, *NLp;	// temporary vector shell for non-linear term calculations (fftw allocated)
-*/
 
 struct VectField {
 	double **r,**t,**p;
@@ -67,24 +50,8 @@ struct PolTor {
 
 struct VectField B, U, W, J, B0;
 struct PolTor Blm, Ulm, NLb1, NLb2, NLu1, NLu2;
-complex double *Alm[NR];		// temp scalar spectral (pol or tor) representation
 
-/*
-// Magnetic field representation.
-double *Br[NR], *Bt[NR], *Bp[NR];	// Spatial representation
-double *B0r[NR], *B0t[NR], *B0p[NR];	// Spatial representation
-complex double *BPlm[NR], *BTlm[NR];	// Spherical Harmonics representation
-complex double *NLbp1[NR], *NLbp2[NR], *NLbt1[NR], *NLbt2[NR];	// Adams-Bashforth : 2 non-linear terms stored.
-// Velocity field representation.
-double *Ur[NR], *Ut[NR], *Up[NR];
-complex double *UPlm[NR], *UTlm[NR];
-complex double *NLup1[NR], *NLup2[NR], *NLut1[NR], *NLut2[NR];
-// spare field J (for current density, or vorticity)
-double *Jr[NR], *Jt[NR], *Jp[NR];
-complex double *Alm[NR];	// temp scalar spectral (pol or tor) representation
-*/
-
-//double *NLr, *NLt, *NLp;	// temporary vector shell for non-linear term calculations (fftw allocated)
+#include "xshells_io.c"
 
 /// Allocate memory for a dynamic vector field (like U or B) and its pol/tor representation + non-linear term storage.
 void alloc_DynamicField(struct PolTor *PT, struct VectField *V, struct PolTor *NL1, struct PolTor *NL2, long int istart, long int iend)
@@ -190,11 +157,13 @@ void init_Umatrix(long int BC)
 	long int i,l;
 
 // allocate toroidal matrix
-	MUt = (struct TriDiagL *) malloc( NU* sizeof(struct TriDiagL));
-	MUt_1 = (struct TriDiagL *) malloc( NU* sizeof(struct TriDiagL));
+	MUt = (struct TriDiagL *) malloc( 2*NU* sizeof(struct TriDiagL));
+	MUt_1 = MUt + NU;
 // allocate poloidal matrix
-	MUp[0] = (struct PentaDiag *) malloc( NU*(LMAX+1)* sizeof(struct PentaDiag));
-	MUp_1[0] = (struct PentaDiag *) malloc( NU*(LMAX+1)* sizeof(struct PentaDiag));
+	MUp = (struct PentaDiag **) malloc( 2*NU * sizeof(struct PentaDiag *) );
+	MUp_1 = MUp + NU;
+	MUp[0] = (struct PentaDiag *) malloc( 2*NU*(LMAX+1)* sizeof(struct PentaDiag));
+	MUp_1[0] = MUp[0] + NU*(LMAX+1);
 	for (i=1; i<NU; i++) {
 		MUp[i] = MUp[i-1] + (LMAX+1);
 		MUp_1[i] = MUp_1[i-1] + (LMAX+1);
@@ -506,26 +475,6 @@ void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **P
 }
 */
 
-/// compute rot(VxW) and its pol-tor components.
-/// output : V unchanged, W = VxW, NL = PolTor[rot(VxW)]
-/// U is kept unchanged
-void calc_NLrot(struct VectField *V, struct VectField *W, complex double **Plm, complex double **Tlm)
-{
-	double vr,vt,vp;
-	long int ir,lm;
-
-	for (ir=NG+1; ir<=NR-2; ir++) {
-		for (lm=0; lm<NPHI*NLAT; lm++) {
-			vr = V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];
-			vt = V->p[ir][lm]*W->r[ir][lm] - V->r[ir][lm]*W->p[ir][lm];
-			vp = V->r[ir][lm]*W->t[ir][lm] - V->t[ir][lm]*W->r[ir][lm];
-			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
-		}
-	}
-	spat_to_rot_PolTor(W, Tlm, Plm, NG+1, NR-2);
-}
-
-
 
 /// compute vorticity field from poloidal/toroidal components of velocity [ie poltor_to_rot_spat applied to U]
 /// IN: PT : pol/tor components of velocity
@@ -558,43 +507,52 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 	}
 }
 
-double step_NS(long int nstep)
+
+// *****************************
+// ***** NON-LINEAR TERMS ******
+// *****************************
+
+/// compute rot(VxW + JxB) and its pol-tor components.
+/// output : V, B, J unchanged, W = VxW + JxB
+///          NL = PolTor[rot(VxW + JxB)]
+void calc_NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, struct PolTor *NL)
 {
-	inline step1(struct PolTor *NL, struct PolTor * NLo, complex double **Alm)
-	{
-		long int i,l;
+	double vr,vt,vp;
+	long int ir,lm;
 
-		CALC_U(BC_NO_SLIP);
-		calc_Vort(&Ulm, Omega0, &W);
-		calc_NLrot(&U, &W, NL->P, NL->T);
+	for (ir=NG+1; ir<=NR-2; ir++) {
+		for (lm=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 4*3 = 12 disjoint arrays.
+			vr =  J->t[ir][lm]*B->p[ir][lm] - J->p[ir][lm]*B->t[ir][lm];	// JxB
+			vt =  J->p[ir][lm]*B->r[ir][lm] - J->r[ir][lm]*B->p[ir][lm];
+			vp =  J->r[ir][lm]*B->t[ir][lm] - J->t[ir][lm]*B->r[ir][lm];
 
-		cTriMulBC(MUt, Ulm.T +NG, Alm, 1, NU-2);
-		for (i=1; i<NU-1; i++) {
-			for (l=1;l<NLM;l++) {
-				Alm[i][l] += 1.5*NL->T[i+NG][l] - 0.5*NLo->T[i+NG][l];
-			}
+			vr += V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];	// VxW
+			vt += V->p[ir][lm]*W->r[ir][lm] - V->r[ir][lm]*W->p[ir][lm];
+			vp += V->r[ir][lm]*W->t[ir][lm] - V->t[ir][lm]*W->r[ir][lm];
+			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
 		}
-		cTriSolveBC(MUt_1, Alm, Ulm.T +NG, 1, NU-2);
-
-		cPentaMul(MUp, Ulm.P +NG, Alm, 1, NU-2);
-		for (i=1; i<NU-1; i++) {
-			for (l=1;l<NLM;l++) {
-				Alm[i][l] += 1.5*NL->P[i+NG][l] - 0.5*NLo->P[i+NG][l];
-			}
-		}
-		cPentaSolve(MUp_1, Alm, Ulm.P +NG, 1, NU-2);
 	}
-
-	while(nstep > 0) {
-		nstep--;
-
-		step1(&NLu1, &NLu2, Alm);
-		step1(&NLu2, &NLu1, Alm);
-	}
-
-	return 2*nstep*dtU;
+	spat_to_rot_PolTor(W, NL->T, NL->P, NG+1, NR-2);
 }
 
+/// compute rot(VxW) and its pol-tor components.
+/// output : V unchanged, W = VxW, NL = PolTor[rot(VxW)]
+/// U is kept unchanged
+void calc_NL_NS(struct VectField *V, struct VectField *W, struct PolTor *NL)
+{
+	double vr,vt,vp;
+	long int ir,lm;
+
+	for (ir=NG+1; ir<=NR-2; ir++) {
+		for (lm=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 2*3 = 6 disjoint arrays.
+			vr = V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];
+			vt = V->p[ir][lm]*W->r[ir][lm] - V->r[ir][lm]*W->p[ir][lm];
+			vp = V->r[ir][lm]*W->t[ir][lm] - V->t[ir][lm]*W->r[ir][lm];
+			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
+		}
+	}
+	spat_to_rot_PolTor(W, NL->T, NL->P, NG+1, NR-2);
+}
 
 /// compute rot(VxB)
 /// IN:  V, B are spatial vector fields (unchanged)
@@ -630,13 +588,57 @@ void induction(struct VectField *V, struct VectField *B, struct VectField *VxB, 
 	spat_to_rot_PolTor(VxB, NL->P, NL->T, 1,NR-2);
 }
 
-void step_MHD(long int nstep)
+// **************************
+// ***** TIME STEPPING ******
+// **************************
+
+/// perform nstep steps of Navier-Stokes equation, with temporary array Alm.
+double step_NS(long int nstep, complex double **Alm)
+{
+	inline step1(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
+	{
+		long int i,l;
+
+		CALC_U(BC_NO_SLIP);
+		calc_Vort(&Ulm, Omega0, &W);
+		calc_NL_NS(&U, &W, NL);
+//		calc_NL_MHD(&U, &W, &B, &J, NL);
+
+		cTriMulBC(MUt, Ulm.T +NG, Alm, 1, NU-2);
+		for (i=1; i<NU-1; i++) {
+			for (l=1;l<NLM;l++) {
+				Alm[i][l] += 1.5*NL->T[i+NG][l] - 0.5*NLo->T[i+NG][l];
+			}
+		}
+		cTriSolveBC(MUt_1, Alm, Ulm.T +NG, 1, NU-2);
+
+		cPentaMul(MUp, Ulm.P +NG, Alm, 1, NU-2);
+		for (i=1; i<NU-1; i++) {
+			for (l=1;l<NLM;l++) {
+				Alm[i][l] += 1.5*NL->P[i+NG][l] - 0.5*NLo->P[i+NG][l];
+			}
+		}
+		cPentaSolve(MUp_1, Alm, Ulm.P +NG, 1, NU-2);
+	}
+
+	while(nstep > 0) {
+		nstep--;
+
+		step1(&NLu1, &NLu2, Alm);
+		step1(&NLu2, &NLu1, Alm);
+	}
+
+	return 2*nstep*dtU;
+}
+
+/// perform nstep steps of inducation equation, with temporary array Alm.
+void step_Induction(long int nstep, complex double **Alm)
 {
 	inline step1(struct PolTor *NL, struct PolTor * NLo, complex double **Btmp)
 	{
 		long int i,l;
 
-		induction(&U, &B, &J, NL);
+		induction(&U, &B0, &J, NL);
 		cTriMul(MB, Blm.P, Btmp, 1, NR-1);
 		for (i=0; i<NR; i++) {
 			for (l=0;l<NLM;l++) {
@@ -663,92 +665,25 @@ void step_MHD(long int nstep)
 }
 
 
-
-
 // compute total Energy
-double Energy(complex double **Plm, complex double **Tlm)
+double Energy(struct PolTor *PT)
 {
+	complex double pt;
 	double E,er;
 	long int ir,lm;
 
 	E = 0.0;
 	for (ir=0; ir<NR; ir++) {
 		er = 0.0;
-		for(lm=0; lm<NLM; lm++)
-			er += creal(Plm[ir][lm])*creal(Plm[ir][lm]) + cimag(Plm[ir][lm])*cimag(Plm[ir][lm]) +
-				creal(Tlm[ir][lm])*creal(Tlm[ir][lm]) + cimag(Tlm[ir][lm])*cimag(Tlm[ir][lm]);
+		for(lm=0; lm<NLM; lm++) {
+			pt = PT->P[ir][lm];
+			er += creal(pt)*creal(pt) + cimag(pt)*cimag(pt);
+			pt = PT->T[ir][lm];
+			er += creal(pt)*creal(pt) + cimag(pt)*cimag(pt);
+		}
 		E += er*dr[ir]*r[ir];
 	}
 	return E;
-}
-
-	
-void write_vect(char *fn, double *vec, int N)
-{
-	FILE *fp; 
-	int i;
-	
-	fp = fopen(fn,"w");
-	for (i=0;i<N;i++) {
-		fprintf(fp,"%.6g ",vec[i]);
-	}
-	fclose(fp);
-}
-
-void write_mx(char *fn, double *mx, int N1, int N2)
-{
-	FILE *fp;
-	int i,j;
-	
-	fp = fopen(fn,"w");
-	for (i=0;i<N1;i++) {
-		for(j=0;j<N2;j++) {
-			fprintf(fp,"%.6g ",mx[i*N2+j]);
-		}
-		fprintf(fp,"\n");
-	}
-	fclose(fp);
-}
-
-void write_HS(char *fn, complex double **HS)
-{
-	FILE *fp;
-	int ir,lm;
-	
-	fp = fopen(fn,"w");
-	for (ir=0;ir<NR;ir++) {
-		if (HS[ir] != NULL) {
-			for(lm=0;lm<NLM;lm++) {
-				fprintf(fp,"%.6g %.6g  ",creal(HS[ir][lm]),cimag(HS[ir][lm]));
-			}
-			fprintf(fp,"\n");
-		}
-	}
-	fclose(fp);
-}
-
-void write_slice(char *fn, double **v, int im)
-{
-	FILE *fp;
-	int i,j;
-
-	fp = fopen(fn,"w");
-		fprintf(fp,"0 ");			// first row = radius
-		for(j=0;j<NLAT/2;j++) {
-			fprintf(fp,"%.6g ",ct[j]);	// first line = cos(theta)
-		}
-		for(j=1;j<=NLAT/2;j++) {
-			fprintf(fp,"-%.6g ",ct[NLAT/2-j]);	// first line = cos(theta)
-		}
-	for (i=0;i<NR;i++) {
-		if (v[i] != NULL) {
-			fprintf(fp,"\n%.6g ",r[i]);		// first row = radius
-			for(j=0;j<NLAT;j++) {
-				fprintf(fp,"%.6g ",v[i][im*NLAT + j]);		// data
-			}
-		}
-	}
-	fclose(fp);
 }
 
 
@@ -784,6 +719,8 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 			if (strcmp(name,"nu") == 0)		nu = tmp;
 			if (strcmp(name,"eta") == 0)		eta = tmp;
 			// NUMERICAL SCHEME
+			if (strcmp(name,"NR") == 0)		NR = tmp;
+			if (strcmp(name,"NG") == 0)		NG = tmp;
 			if (strcmp(name,"dtU") == 0)		dtU = tmp;
 			if (strcmp(name,"dtB") == 0)		dtB = tmp;
 			// TIME DOMAIN
@@ -802,9 +739,11 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 			}
 		}
 	}
+	// SOME BASIC COMPUTATIONS
+	NU = NR-NG;
+
 	fclose(fp);	fclose(fpw);
-	sprintf(str, "%s.%s",fname,job);	rename("tmp.par", str);		// rename file.
-	
+	sprintf(str, "%s.%s",fname,job);	rename("tmp.par", str);		// rename file.	
 	fflush(stdout);		// when writing to a file.
 }
 
@@ -813,6 +752,7 @@ int main (int argc, char *argv[])
 	double t0,t1,Rm,Rm2,z;
 	long int i,im,m,l,jj, it, lmtest;
 	long int iter_max, modulo;
+	complex double **Alm;		// temp scalar spectral (pol or tor) representation
 	FILE *fp;
 	char command[100] = "xshells.par";
 	char job[40];
@@ -824,6 +764,7 @@ int main (int argc, char *argv[])
 
 	init_SH(polar_opt_max);
 	init_rad_sph(0.0, 1.0);
+
 	init_Bmatrix();		init_Umatrix(BC_NO_SLIP);
 
 	alloc_DynamicField(&Blm, &B, &NLb1, &NLb2, 0, NR-1);
@@ -836,6 +777,7 @@ int main (int argc, char *argv[])
 
 	DEB;
 
+	Alm = (complex double **) malloc( NR * sizeof(complex double *));
 	for (i=0;i<NR;i++)
 		Alm[i] = (complex double *) malloc( NLM * sizeof(complex double));
 
@@ -875,16 +817,12 @@ int main (int argc, char *argv[])
 
 	CALC_U(BC_NO_SLIP);
 	DEB;
-	write_slice("Ur0",U.r,0);
-	write_slice("Ut0",U.t,0);
-	write_slice("Up0",U.p,0);
+	write_slice("Ur0",U.r,0);	write_slice("Ut0",U.t,0);	write_slice("Up0",U.p,0);
 	DEB;
 	calc_Vort(&Ulm, Omega0, &W);
 	DEB;
 
-	write_slice("Wr0",W.r,0);
-	write_slice("Wt0",W.t,0);
-	write_slice("Wp0",W.p,0);
+	write_slice("Wr0",W.r,0);	write_slice("Wt0",W.t,0);	write_slice("Wp0",W.p,0);
 
 	DEB;
 
@@ -896,21 +834,17 @@ int main (int argc, char *argv[])
 		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,2*it*modulo*dtU,t1, t0);
 		if (isnan(t0)) runerr("NaN encountered");
 
-		step_NS(modulo);
+		step_NS(modulo, Alm);
 	}
 
 	write_HS("Bpol",Blm.P);	write_HS("Btor",Blm.T);
 	write_HS("Upol",Ulm.P);	write_HS("Utor",Ulm.T);
 
 	CALC_U(BC_NO_SLIP);
-	write_slice("Ur",U.r,0);
-	write_slice("Ut",U.t,0);
-	write_slice("Up",U.p,0);
+	write_slice("Ur",U.r,0);	write_slice("Ut",U.t,0);	write_slice("Up",U.p,0);
 
 	calc_Vort(&Ulm, 0.0, &W);		// without background vorticity
-	write_slice("Wr",W.r,0);
-	write_slice("Wt",W.t,0);
-	write_slice("Wp",W.p,0);
+	write_slice("Wr",W.r,0);	write_slice("Wt",W.t,0);	write_slice("Wp",W.p,0);
 
 	fp = fopen("Pprof","w");
 	for (i=NG; i<NR; i++) {

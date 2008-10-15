@@ -13,6 +13,8 @@ nu = 1.0e-4		# viscosity
 eta = 0.1		# magnetic diffusivity
 
 ### NUMERICAL SCHEME ###
+NR = 201	# number of radial shells
+NG = 60		# number of radial shells in the inner core
 dtU = 0.1	# time step for Navier-Stokes equation
 dtB = 0.1	# time step for Induction equation
 iter_max = 10	# iteration number (ouput #)

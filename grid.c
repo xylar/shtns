@@ -2,11 +2,15 @@
 // grid : Radial finite difference setup
 //////////////////////////////////////////////
 
-/*	Inversion de matrices x-Bandes. (x = 3,5)
-	Les conditions aux limites sont prises en compte (ou pas !)
-	=> pour l'�volution temporelle semi-implicite des potentiels et champs.
-        => Les Matrices ont une taille NR*(LMAX+1), la decomposition se fait sur NR.
+/*	x-banded matrix inversion. (x = 3,5)
+	Bondary condition are taken into acount (or not !)
+	=> for temporal semi-implicit evolution of fields.
+        => matrices have size NR*(LMAX+1), decomposition is done on NR.
 */
+
+#ifndef NR
+long int NR;
+#endif
 
 #define RL(i,l) ( i*(LMAX+1) + l )
 #define RLM(i,lm) ( i*NLM + lm )
@@ -29,7 +33,8 @@ struct PentaDiag {
 };
 
 // discretisation spatiale
-double *r, *r_1, *r_2, *dr;		// r = rayon; r_1 = 1/r; r_2 = 1/(r*r); dr[i] = r[i+1]-r[i];
+double* r = NULL;		// NULL at init time.
+double *r_1, *r_2, *dr;		// r = rayon; r_1 = 1/r; r_2 = 1/(r*r); dr[i] = r[i+1]-r[i];
 struct TriDiag *Gr, *Wr, *D2r, *Lr;	// Gr = Gradient; Wr= 1/r Gr( r .); D2r = d2/dr2; Lr = Laplacien radial scalaire.
 
 /*
