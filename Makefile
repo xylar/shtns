@@ -14,8 +14,12 @@ cmd = gcc -O3
 
 default: xshells
 
-xshells : xshells.c SHT.c SHT.h grid.c Makefile
+xshells : xshells.c SHT.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
+xspp : xspp.c SHT.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile
+	cc xspp.c -lfftw3 -lgsl -lgslcblas -lm -o xspp
+
+
 sphere : sphere.c SHT.c SHT.h Makefile
 	$(cmd) sphere.c -lfftw3 -lgsl -lgslcblas -lm -o sphere
 time_SHT : time_SHT.c SHT.c SHT.h Makefile

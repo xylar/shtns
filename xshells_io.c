@@ -1,87 +1,16 @@
 
-void write_vect(char *fn, double *vec, int N)
-{
-	FILE *fp; 
-	int i;
-	
-	fp = fopen(fn,"w");
-	for (i=0;i<N;i++) {
-		fprintf(fp,"%.6g ",vec[i]);
-	}
-	fclose(fp);
-}
-
-void write_mx(char *fn, double *mx, int N1, int N2)
-{
-	FILE *fp;
-	int i,j;
-	
-	fp = fopen(fn,"w");
-	for (i=0;i<N1;i++) {
-		for(j=0;j<N2;j++) {
-			fprintf(fp,"%.6g ",mx[i*N2+j]);
-		}
-		fprintf(fp,"\n");
-	}
-	fclose(fp);
-}
-
-void write_HS(char *fn, complex double **HS)
-{
-	FILE *fp;
-	int ir,lm;
-	
-	fp = fopen(fn,"w");
-	for (ir=0;ir<NR;ir++) {
-		if (HS[ir] != NULL) {
-			for(lm=0;lm<NLM;lm++) {
-				fprintf(fp,"%.6g %.6g  ",creal(HS[ir][lm]),cimag(HS[ir][lm]));
-			}
-			fprintf(fp,"\n");
-		}
-	}
-	fclose(fp);
-}
-
-void write_slice(char *fn, double **v, int im)
-{
-	FILE *fp;
-	int i,j;
-
-	fp = fopen(fn,"w");
-		fprintf(fp,"0 ");			// first row = radius
-		for(j=0;j<NLAT/2;j++) {
-			fprintf(fp,"%.6g ",ct[j]);	// first line = cos(theta)
-		}
-		for(j=1;j<=NLAT/2;j++) {
-			fprintf(fp,"-%.6g ",ct[NLAT/2-j]);	// first line = cos(theta)
-		}
-	for (i=0;i<NR;i++) {
-		if (v[i] != NULL) {
-			fprintf(fp,"\n%.6g ",r[i]);		// first row = radius
-			for(j=0;j<NLAT;j++) {
-				fprintf(fp,"%.6g ",v[i][im*NLAT + j]);		// data
-			}
-		}
-	}
-	fclose(fp);
-}
-
-
-
-
 
 #define FILE_VERSION 0
 struct Header {
 	int version, lmax, mmax, mres, nlm, nr, irs, ire;	// 8 integers
-	double Omega0, nu, eta, t, d5, d6, d7, d8;		// 8 doubles
-	char text[928];						// 928 chars => total 1024 bytes.
+	int BC, i2, i3, i4, i5, i6, i7, i8;			// 8 integers
+	double Omega0, nu, eta, t, DeltaOmega, d6, d7, d8;		// 8 doubles
+	char text[896];						// 896 chars => total 1024 bytes.
 };
 
 
-
 /// save spherical harmonic representation of Poloidal/Toroidal field PT.
-void save_PolTor(char *fn, struct PolTor *PT, double time)
+void save_PolTor(char *fn, struct PolTor *PT, double time, int BC)
 {
 	long int ir;
 	struct Header fh;
@@ -93,10 +22,10 @@ void save_PolTor(char *fn, struct PolTor *PT, double time)
 	while ((PT->P[ir] != NULL)&&(ir<NR)) ir++;	// find last populated shell.
 	fh.ire = ir-1;
 
-	fh.version = FILE_VERSION;
+	fh.version = FILE_VERSION;	fh.BC = BC;
 	fh.lmax = LMAX;		fh.mmax = MMAX;		fh.mres = MRES;		fh.nlm = NLM;
 	fh.nr = NR;
-	fh.Omega0 = Omega0;	fh.nu = nu;	fh.eta = eta;	fh.t = time;
+	fh.Omega0 = Omega0;	fh.nu = nu;	fh.eta = eta;	fh.t = time;	fh.DeltaOmega = DeltaOmega;
 
 	fp = fopen(fn,"w");
 	fwrite(&fh, sizeof(fh), 1, fp);		// Header.
@@ -111,7 +40,7 @@ void save_PolTor(char *fn, struct PolTor *PT, double time)
 }
 
 /// load spherical harmonic representation of Poloidal/Toroidal field PT.
-void load_PolTor(char *fn, struct PolTor *PT, double time)
+void load_PolTor(char *fn, struct PolTor *PT, double *time, long int *irs, long int *ire, long int *BC)
 {
 	long int ir,im,m,l,lm;
 	long int imt,lmt;
@@ -129,6 +58,9 @@ void load_PolTor(char *fn, struct PolTor *PT, double time)
 	fread(&fh, sizeof(fh), 1, fp);		// read Header
 	printf("[load] from file '%s' : NR=%d, Lmax=%d, Mmax=%d, Mres=%d (Nlm=%d)\n",fn, fh.nr, fh.lmax, fh.mmax, fh.mres, fh.nlm);
 	printf("       Omega0=%.3e, nu=%.3e, eta=%.3e, t=%.3e\n", fh.Omega0, fh.nu, fh.eta, fh.t );
+	printf("       ir_start=%d, ir_end=%d, BC=%d\n", fh.irs, fh.ire, fh.BC);
+	*time = fh.t;	*BC = fh.BC;	*irs = fh.irs;	*ire = fh.ire;
+	Omega0 = fh.Omega0;	DeltaOmega = fh.DeltaOmega;
 
 	if (r == NULL) {
 		r = (double *) malloc(fh.nr * sizeof(double));		// alloc radial grid (global scope)
@@ -139,10 +71,16 @@ void load_PolTor(char *fn, struct PolTor *PT, double time)
 	fread(r, sizeof(double), fh.nr ,fp);			// load radial grid.
 	init_Deriv_sph();					// init radial derivative matrices.
 
+	if (PT->P == NULL)	{	// destination field not yet allocated ?
+		alloc_DynamicField(PT, NULL, NULL, NULL, *irs, *ire);
+	}
+
 	Sp = (complex double **) malloc( fh.nr * sizeof(complex double *) );
 	St = (complex double **) malloc( fh.nr * sizeof(complex double *) );
 
-	for (ir=0; ir<fh.nr; ir++) St[ir] = NULL;		// initialize at NULL pointer.
+	for (ir=0; ir<fh.nr; ir++) {			// initialize at NULL pointer.
+		Sp[ir] = NULL;	St[ir] = NULL;
+	}
 	for (ir= fh.irs; ir<= fh.ire; ir++) {
 		Sp[ir] = (complex double *) malloc(fh.nlm * sizeof(complex double));	// alloc shell
 		St[ir] = (complex double *) malloc(fh.nlm * sizeof(complex double));	// alloc shell

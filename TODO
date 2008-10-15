@@ -1,3 +1,6 @@
+*** BUG ***
+++ It seems that if NPHI=MMAX*2, vector SHTs are not working correctly. if NPHI>MMAX*2 it is...
+
 *** Optimizations ***
 - SHT : use DCT space, keep low NLAT but regular grid and Gauss quadrature (??)
         synthesis should be faster, analysis same speed.

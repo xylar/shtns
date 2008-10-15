@@ -18,6 +18,11 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 #include "SHT.c"
+
+// polar optimization threshold
+#define POLAR_OPT_THR 1e-6
+// number of SH iterations
+#define SHT_ITER 1000
 	
 void write_vect(char *fn, double *vec, int N)
 {
@@ -54,7 +59,7 @@ int main()
 	clock_t tcpu;
 
 	srand( time(NULL) );	// initialise les nombres.
-	init_SH();
+	init_SH( POLAR_OPT_THR );
 
 	t1 = 1.0+2.0*I;
 	t2 = 1.0-I;
@@ -91,7 +96,6 @@ int main()
 //	return(1);
 
 // test case...
-#define SHT_ITER 10000
 	t = 1.0 / (RAND_MAX/2);
 	for (i=0;i<NLM;i++) {
 		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));

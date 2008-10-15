@@ -711,6 +711,10 @@ void planFFT()
 
 	if (NPHI < 2*MMAX) runerr("[FFTW] the condition Nphi >= 2*Mmax is not met.");
 	if (NPHI < 3*MMAX) printf("       ! Warning : 2/3 rule for anti-aliasing not met !\n");
+	if (NPHI == 2*MMAX) {
+		printf("       ***\n       *** WARNING : Nphi=2*MMAX seems to be buggy !!! ***\n       ***\npress ENTER to continue...");
+		getchar();
+	}
 	
 // IFFT : unnormalized.
 	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
