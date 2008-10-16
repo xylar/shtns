@@ -19,8 +19,8 @@
 #define NLM ( (MMAX+1)*(LMAX+1) - MRES* MMAX*(MMAX+1)/2 )
 // LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
 //#define LM(l,m) ((m*(2*LMAX +1-m))/2 + l)
-#define LM(l,m) ( (m/MRES)*(2*LMAX+3 -m)/2 + l-m )
-#define LiM(l,im) ( im*(2*LMAX+3 -(im+2)*MRES)/2 + l )
+#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
+#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;

@@ -18,11 +18,10 @@
 #include "SHT.h"
 // NLM : total number of Spherical Harmonic coefficients.
 //#define NLM ( ((MMAX+1)*(2*LMAX+2-MMAX))/2 )
-#define NLM ( (MMAX+1)*(LMAX+1) - MRES* MMAX*(MMAX+1)/2 )
+#define NLM ( (MMAX+1)*(LMAX+1) - MRES*(MMAX*(MMAX+1))/2 )
 // LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
-//#define LM(l,m) ((m*(2*LMAX +1-m))/2 + l)
-#define LM(l,m) ( (m/MRES)*(2*LMAX+3 -m)/2 + l-m )
-#define LiM(l,im) ( im*(2*LMAX+3 -(im+2)*MRES)/2 + l )
+#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
+#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 
 // useful values for some basic spherical harmonic representations
 // Y00_1 = 1/Y00 = spherical harmonic representation of 1 (l=0,m=0)
@@ -643,6 +642,25 @@ void runerr(const char * error_text)
 	exit(1);
 }
 
+void EqualSpaceNodes(double *x, double *w, int n)
+{
+	double f;
+	int j;
+
+// cos theta of latidunal points (equaly spaced in theta)
+	f = pi/(n-1.0);
+	for (j=0; j<n; j++) {
+		x[j] = cos(f*j);
+	}
+
+// weights
+	for (j=0; j<n; j++) {
+		w[j] = 0.0;	// unsupported yet...
+	}
+	printf("          warning! only synthesis (inverse transform) supported so far for equaly spaced grid)/\n");
+}
+
+
 // Generates the abscissa and weights for a Gauss-Legendre quadrature.
 // Newton method from initial Guess to find the zeros of the Legendre Polynome
 // x = abscissa, w = weights, n points.
@@ -709,12 +727,8 @@ void planFFT()
 
 	printf("[FFTW] Mmax=%d, Nphi=%d\n",MMAX,NPHI);
 
-	if (NPHI < 2*MMAX) runerr("[FFTW] the condition Nphi >= 2*Mmax is not met.");
+	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Mmax < Nphi/2 is not met.");
 	if (NPHI < 3*MMAX) printf("       ! Warning : 2/3 rule for anti-aliasing not met !\n");
-	if (NPHI == 2*MMAX) {
-		printf("       ***\n       *** WARNING : Nphi=2*MMAX seems to be buggy !!! ***\n       ***\npress ENTER to continue...");
-		getchar();
-	}
 	
 // IFFT : unnormalized.
 	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
@@ -744,17 +758,26 @@ void init_SH(double eps)
 	double t,tmax;
 	long int it,im,m,l;
 
-	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, LMmax=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
-	printf("          => using Gauss Nodes\n");
+	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
 	
+#ifdef SHT_EQUAL
+	printf("          => using Equaly Spaced Nodes\n");
+	EqualSpaceNodes(ct,wg,NLAT);		// equaly-spaced points and weights.
+	for (it=0;it<NLAT; it++) {
+		st[it] = sqrt(1.0 - ct[it]*ct[it]);
+		st_1[it] = 1.0/sqrt(1.0 - ct[it]*ct[it]);
+	}
+#else
+	printf("          => using Gauss Nodes\n");
 	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : xg = ]-1,1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
 		ct[it] = xg[NLAT-1-it];			// on prend theta = ]0,pi/2[ => cos(theta) = ]1,0[
 		st[it] = sqrt(1.0 - ct[it]*ct[it]);
 		st_1[it] = 1.0/sqrt(1.0 - ct[it]*ct[it]);
 	}
+#endif
 
 #ifdef _SH_DEBUG_
 // TEST if gauss points are ok.
@@ -791,10 +814,24 @@ void init_SH(double eps)
 //		ylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT/2);
 //		dylm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT/2);
 		for (it=0;it<NLAT/2;it++) {
+#ifdef SHT_EQUAL
+			if ((m==1)&&(st[it]==0.)) {
+				printf("special case : ylm undef (set to zero) for m=1, at the pole.\n");
+				for (l=m; l<=LMAX; l++) {
+					ylm[im][it*(LMAX-m+1) + (l-m)] = 0.0;
+					dylm[im][it*(LMAX-m+1) + (l-m)].t = 0.0;
+					dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
+				}
+			} else {
+#endif
 			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				dylm[im][it*(LMAX-m+1) + (l-m)].t = -st[it] * dtylm[l-m];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
 				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
+#ifdef SHT_EQUAL
+				if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
+			}
+#endif
 			}
 		}
 	}

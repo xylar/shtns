@@ -30,6 +30,7 @@ for i in range(1, argn):
 	#pcolor(array(x),array(y),a,shading='interp')
 	contourf(array(x),array(y),a,15,cmap=cm.PuOr)
 	axis('equal')
+	axis('off')
 	colorbar()
 
 show()

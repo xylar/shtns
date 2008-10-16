@@ -13,7 +13,8 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_sf_legendre.h>
 
-
+// SHT on equal spaced grid + polar points.
+#define SHT_EQUAL
 #include "SHT.c"
 
 // number of radial grid points.
@@ -114,14 +115,15 @@ int main (int argc, char *argv[])
 {
 	double t0;
 	long int BC, irs,ire;
-	long int i,im,m,l;
+	long int i,im,m,l,lm;
 
 	printf(" [XSPP] Xshells Post-Processing   by N. Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
 	if (argc < 3) {
 		printf("\nUsage: xspp <poltor-file-saved-by-xshells> command [args [...]]\n");
 		printf("list of available commands :\n");
-		printf("  slice\twrite meridional slice of vector field\n");
-		printf("  HS\twrite spherical harmonics decomposition\n");
+		printf(" axisym   write meridional slice of axisymetric component (m=0)\n");
+		printf(" slice    write meridional slice of vector field in spherical (default) or cylindrical coordinates\n");
+		printf(" HS       write spherical harmonics decomposition\n");
 		exit(1);
 	}
 
@@ -141,6 +143,21 @@ int main (int argc, char *argv[])
 	printf("> angular grid cos(theta) written to file : o_ct\n");
 
 // parse command line...
+	if (strcmp(argv[2],"axisym") == 0)
+	{
+		for (i=irs; i<=ire; i++) {
+			for (lm=LiM(MRES,1);lm<NLM;lm++) {	// zero out all non-axisymmetric modes.
+				Blm.P[i][lm] = 0.0;
+				Blm.T[i][lm] = 0.0;
+			}
+		}
+		PolTor_to_spat(&Blm, &B, irs, ire, BC);
+		write_slice("o_Vp", B.p, 0);		// write phi component
+		for (i=irs; i<=ire; i++) SH_to_spat(Blm.P[i], B.r[i]);		// Pol scalar to spatial domain
+		write_slice("o_Vpol", B.r, 0);
+		printf("> axisymmetric component written to files : o_Vp (phi component) and o_Vpol (spatial poloidal scalar)\n");
+		exit(0);
+	}
 	if (strcmp(argv[2],"slice") == 0)
 	{
 		PolTor_to_spat(&Blm, &B, irs, ire, BC);
@@ -154,7 +171,6 @@ int main (int argc, char *argv[])
 		printf("> spherical harmonics decomposition written to files : o_Plm, o_Tlm (poloidal/toroidal components)\n");
 		exit(0);
 	}
-
 
 /*
 	fp = fopen("Pprof","w");
