@@ -13,6 +13,12 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_sf_legendre.h>
 
+// parameters for SHT.c
+#define NLAT 256
+#define LMAX 255
+#define NPHI 2
+#define MMAX 0
+#define MRES 1
 // SHT on equal spaced grid + polar points.
 #define SHT_EQUAL
 #include "SHT.c"
@@ -108,24 +114,56 @@ void write_slice(char *fn, double **v, int im)
 }
 
 
+void rot_PolTor(struct PolTor *PT, long int istart, long int iend)
+{
+	complex double tmp[NLM*2];
+	complex double *lapl, *lapd, *lapt;
+	complex double **p;
+	long int ir,lm;
 
+	lapl = tmp;	lapd = tmp + NLM;
+	ir = istart;
+		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+			lapl[lm] = (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm] + Lr[ir].u*PT->P[ir+1][lm];
+		}
+	for (ir=istart+1; ir < iend; ir++) {
+		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+			lapd[lm] = Lr[ir].l*PT->P[ir-1][lm] + (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm] + Lr[ir].u*PT->P[ir+1][lm];
+			PT->P[ir-1][lm] = -lapl[lm];
+		}
+		lapt = lapl;	lapl = lapd;	lapd = lapt;	// rotate buffers.
+	}
+	ir = iend;
+		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+			lapd[lm] = Lr[ir].l*PT->P[ir-1][lm] + (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm];
+			PT->P[ir-1][lm] = -lapl[lm];
+			PT->P[ir][lm] = -lapd[lm];
+		}
+	// switch Pol <> Tor
+	p = PT->P;	PT->P = PT->T;	PT->T = p;
+}
 
+void usage()
+{
+	printf("\nUsage: xspp <poltor-file-saved-by-xshells> [op] command [args [...]]\n");
+	printf("list of available optional ops :\n");
+	printf(" curl : compute curl of field\n");
+	printf("list of available commands :\n");
+	printf(" axi  : write meridional slice of axisymetric component (m=0)\n");
+	printf(" slice [angle]  : write meridional slice at phi=angle in degrees (default=0°) of vector field in spherical coordinates\n");
+	printf(" HS  : write spherical harmonics decomposition\n");
+}
 
 int main (int argc, char *argv[])
 {
-	double t0;
+	double t0, tmp;
 	long int BC, irs,ire;
+	long int ic;
 	long int i,im,m,l,lm;
 
 	printf(" [XSPP] Xshells Post-Processing   by N. Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
-	if (argc < 3) {
-		printf("\nUsage: xspp <poltor-file-saved-by-xshells> command [args [...]]\n");
-		printf("list of available commands :\n");
-		printf(" axisym   write meridional slice of axisymetric component (m=0)\n");
-		printf(" slice    write meridional slice of vector field in spherical (default) or cylindrical coordinates\n");
-		printf(" HS       write spherical harmonics decomposition\n");
-		exit(1);
-	}
+	printf("  => compiled with: nlat=%d, nphi=%d,  lmax=%d, mmax=%d (mres=%d)\n",NLAT,NPHI,LMAX,MMAX,MRES);
+	if (argc <= 2) { usage(); exit(1); }
 
 // init
 	fftw_plan_mode = FFTW_ESTIMATE;		// fast FFTW init.
@@ -136,41 +174,62 @@ int main (int argc, char *argv[])
 	load_PolTor(argv[1], &Blm, &t0, &irs, &ire, &BC);
 	alloc_VectField(&B, irs, ire);
 
+// parse optional op...
+	ic = 2;		// current argument count.
+	if (strcmp(argv[ic],"curl") == 0)
+	{
+		rot_PolTor(&Blm, irs, ire);	// compute rotational of field.
+		printf("> curl computed\n");
+		ic++;	// go to next command line argument.
+	}
+
+	if (argc <= ic) runerr("missing command.");
+
 // write radial grid
 	write_vect("o_r",r,NR);
 	printf("> radial grid points written to file : o_r\n");
 	write_vect("o_ct",ct,NLAT);
 	printf("> angular grid cos(theta) written to file : o_ct\n");
 
-// parse command line...
-	if (strcmp(argv[2],"axisym") == 0)
+// parse commands ...
+	if (strcmp(argv[ic],"axi") == 0)
 	{
 		for (i=irs; i<=ire; i++) {
 			for (lm=LiM(MRES,1);lm<NLM;lm++) {	// zero out all non-axisymmetric modes.
-				Blm.P[i][lm] = 0.0;
-				Blm.T[i][lm] = 0.0;
+				Blm.P[i][lm] = 0.0;	Blm.T[i][lm] = 0.0;
 			}
 		}
 		PolTor_to_spat(&Blm, &B, irs, ire, BC);
 		write_slice("o_Vp", B.p, 0);		// write phi component
-		for (i=irs; i<=ire; i++) SH_to_spat(Blm.P[i], B.r[i]);		// Pol scalar to spatial domain
-		write_slice("o_Vpol", B.r, 0);
-		printf("> axisymmetric component written to files : o_Vp (phi component) and o_Vpol (spatial poloidal scalar)\n");
+		for (i=irs; i<=ire; i++) {
+			SHtor_to_spat(Blm.P[i], B.t[i], B.p[i]);
+			for (l=0;l<NLAT;l++) B.p[i][l] *= -r[i]*st[l];	// stream function
+		}
+		write_slice("o_Vpol", B.p, 0);
+		printf("> axisymmetric component written to files : o_Vp (phi component) and o_Vpol (poloidal potential)\n");
 		exit(0);
 	}
-	if (strcmp(argv[2],"slice") == 0)
+	if (strcmp(argv[ic],"slice") == 0)
 	{
-		PolTor_to_spat(&Blm, &B, irs, ire, BC);
-		write_slice("o_Vr",B.r,0);	write_slice("o_Vt",B.t,0);	write_slice("o_Vp",B.p,0);
-		printf("> meridional slices written to files : o_Vr, o_Vt, o_Vp (spherical vector components)\n");
+		double phi = 0.0;
+		ic++;
+		if (argc > ic) sscanf(argv[ic],"%lf",&phi);
+		PolTor_to_rot_spat(&Blm, 0.0, &B, irs+1, ire-1, BC);
+		i = lround(phi/360. *NPHI) % NPHI;
+		write_slice("o_Vr",B.r,i);	write_slice("o_Vt",B.t,i);	write_slice("o_Vp",B.p,i);
+		printf("> meridional slice #%d (phi=%.1f°) written to files : o_Vr, o_Vt, o_Vp (spherical vector components)\n",i,i*360./NPHI);
 		exit(0);
 	}
-	if (strcmp(argv[2],"HS") == 0)
+	if (strcmp(argv[ic],"HS") == 0)
 	{
 		write_HS("o_Plm",Blm.P);	write_HS("o_Tlm",Blm.T);
 		printf("> spherical harmonics decomposition written to files : o_Plm, o_Tlm (poloidal/toroidal components)\n");
 		exit(0);
 	}
+
+
+	printf("!!! warning: command \"%s\" was not understood !!!\n",argv[ic]);
+	exit(1);
 
 /*
 	fp = fopen("Pprof","w");

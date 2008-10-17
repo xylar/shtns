@@ -9,7 +9,7 @@ job = test  	# job name, used as a suffix for output files.
 ### PHYSICAL PARAMS ###
 Omega0 = 1 		# Global rotation rate
 DeltaOmega = 0.001	# Differential rotation
-nu = 1.0e-4		# viscosity
+nu = 1.0e-3		# viscosity
 eta = 0.1		# magnetic diffusivity
 
 ### NUMERICAL SCHEME ###

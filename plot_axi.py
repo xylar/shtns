@@ -9,7 +9,6 @@ ir0=1
 print 'loading',sys.argv[1]
 a=load(sys.argv[1])
 s = a.shape
-print s
 
 ct = a[0,1:s[1]]
 st = sqrt(1-ct*ct)
@@ -29,13 +28,20 @@ c=a/array(x)
 c[:,s[1]-2] = c[:,s[1]-3]	#remove nan
 c[:,0] = c[:,1]			#remove nan
 
+m=amax(abs(c))
+print 'max angular velocity (absolute value) =',m
+
 #colormap for phi component
 #pcolor(array(x),array(y),c,shading='interp')
-contourf(array(x),array(y),c,15,cmap=cm.Spectral)
+contourf(array(x),array(y),c,15,cmap=cm.RdBu)
 colorbar()
+clim(-m,m)
 
 #contour for poloidal scalar
-contour(array(x),array(y),b,15,colors='k')
+m=amax(abs(b))
+contour(array(x),array(y),b,arange(m/6,m,m/3),colors='k')
+contour(array(x),array(y),b,arange(-m/6,-m,-m/3),colors='k')
+#axvline(x=0, ymin=-1, ymax=1, color='k')
 
 axis('equal')
 axis('off')

@@ -16,8 +16,8 @@ default: xshells
 
 xshells : xshells.c SHT.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
-xspp : xspp.c SHT.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile
-	cc xspp.c -lfftw3 -lgsl -lgslcblas -lm -o xspp
+xspp : xspp.c SHT.c grid.c xshells_fields.c xshells_io.c Makefile
+	$(cmd) xspp.c -lfftw3 -lgsl -lgslcblas -lm -o xspp
 
 
 sphere : sphere.c SHT.c SHT.h Makefile

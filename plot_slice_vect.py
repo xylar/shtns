@@ -32,7 +32,7 @@ c = c[ir0:s[0],1:s[1]]
 print c.shape
 
 #convert Up to angular velocity
-c=c/array(x)
+#c=c/array(x)
 
 #colormap for phi component
 #pcolor(array(x),array(y),c,shading='interp')

@@ -15,9 +15,15 @@
 
 
 // SHT.h : parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
+#ifndef LMAX
 #include "SHT.h"
+#endif
+
+#ifndef MRES
+#define MRES 1
+#endif
+
 // NLM : total number of Spherical Harmonic coefficients.
-//#define NLM ( ((MMAX+1)*(2*LMAX+2-MMAX))/2 )
 #define NLM ( (MMAX+1)*(LMAX+1) - MRES*(MMAX*(MMAX+1))/2 )
 // LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
 #define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
@@ -28,10 +34,6 @@
 #define Y00_1 sqrt(4*pi)
 // Y10_ct = spherical harmonic representation of cos(theta) (l=1,m=0)
 #define Y10_ct sqrt(4.0*pi/3.0)
-
-#ifndef MRES
-#define MRES 1
-#endif
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
@@ -727,7 +729,7 @@ void planFFT()
 
 	printf("[FFTW] Mmax=%d, Nphi=%d\n",MMAX,NPHI);
 
-	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Mmax < Nphi/2 is not met.");
+	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
 	if (NPHI < 3*MMAX) printf("       ! Warning : 2/3 rule for anti-aliasing not met !\n");
 	
 // IFFT : unnormalized.

@@ -6,7 +6,6 @@ import sys              # acces a la ligne de commande.
 ir0=1
 
 argn = len(sys.argv)
-print argn
 
 for i in range(1, argn):
 	print 'loading',sys.argv[i]
@@ -21,16 +20,18 @@ for i in range(1, argn):
 	x = r*matrix(st)
 	y = r*matrix(ct)
 
-	print a.shape
-	
 	#convert Up to angular velocity
 	#a=a/array(x)
 	
+	m=amax(abs(a))
+	print 'max value=',m
 	figure()
 	#pcolor(array(x),array(y),a,shading='interp')
-	contourf(array(x),array(y),a,15,cmap=cm.PuOr)
+	#colormaps : cm.PuOr, cm.RdBu, cm.RdGy
+	contourf(array(x),array(y),a,15,cmap=cm.RdBu)
 	axis('equal')
 	axis('off')
 	colorbar()
+	clim(-m,m)
 
 show()

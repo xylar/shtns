@@ -1,6 +1,6 @@
 *** BUG ***
--- NPHI>MMAX*2 is right condition for the sampling theorem to apply.
--- Bug found in SHT.c : here are the correct versions of LiM() and LM marcros :
+-- NPHI>MMAX*2 is right condition for the sampling theorem to apply.	(16/10/2008)
+-- Bug found in SHT.c : here are the correct versions of LiM() and LM marcros :	(16/10/2008)
 	#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 
@@ -20,12 +20,12 @@
 
 *** Features ***
 + velocity field computation
-- inner core differential rotation
++ inner core differential rotation
 - conducting outer shell
 - insulating inner core
 
 + boundary conditions dependence
 
--SHT.c
+*** SHT.c
 + even/odd l dependance...
 + MMAX = 0 case possible
