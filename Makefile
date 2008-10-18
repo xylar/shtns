@@ -11,14 +11,17 @@ cmd = gcc -O3
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 #cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
 
+shtfiles = SHT.c SHT/ST_to_spat.c SHT/ST_to_spat.gen.c SHT/Makefile
 
-default: xshells
+default : xshells
 
-xshells : xshells.c SHT.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile
+SHT/ST_to_spat.c : SHT/ST_to_spat.gen.c SHT/Makefile
+	$(MAKE) -C SHT
+
+xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
-xspp : xspp.c SHT.c grid.c xshells_fields.c xshells_io.c Makefile
+xspp : xspp.c grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
 	$(cmd) xspp.c -lfftw3 -lgsl -lgslcblas -lm -o xspp
-
 
 sphere : sphere.c SHT.c SHT.h Makefile
 	$(cmd) sphere.c -lfftw3 -lgsl -lgslcblas -lm -o sphere

@@ -199,14 +199,19 @@ int main (int argc, char *argv[])
 				Blm.P[i][lm] = 0.0;	Blm.T[i][lm] = 0.0;
 			}
 		}
-		PolTor_to_spat(&Blm, &B, irs, ire, BC);
-		write_slice("o_Vp", B.p, 0);		// write phi component
 		for (i=irs; i<=ire; i++) {
-			SHtor_to_spat(Blm.P[i], B.t[i], B.p[i]);
-			for (l=0;l<NLAT;l++) B.p[i][l] *= -r[i]*st[l];	// stream function
+			SHtor_to_spat(Blm.T[i], (complex double *)B.t[i], (complex double *)B.p[i]);
+			SHtor_to_spat(Blm.P[i], (complex double *)B.t[i], (complex double *)B.r[i]);
+			for (l=0;l<NLAT;l++) B.r[i][l] *= -r[i]*st[l];	// stream function
 		}
-		write_slice("o_Vpol", B.p, 0);
-		printf("> axisymmetric component written to files : o_Vp (phi component) and o_Vpol (poloidal potential)\n");
+		write_slice("o_Vp", B.p, 0);		// write phi component
+		write_slice("o_Vpol", B.r, 0);		// write stream function
+		printf("> axisymmetric component written to files : o_Vp (phi component) and o_Vpol (poloidal stream function)\n");
+		exit(0);
+	}
+	if (strcmp(argv[ic],"equat") == 0)
+	{
+		
 		exit(0);
 	}
 	if (strcmp(argv[ic],"slice") == 0)

@@ -39,6 +39,9 @@ double DeltaOmega;	// differential rotation (of inner core)
 struct VectField B, U, W, J, B0;
 struct PolTor Blm, Ulm, NLb1, NLb2, NLu1, NLu2;
 
+int MAKE_MOVIE = 0;	// no output by default.
+int SAVE_QUIT = 0;	// for signal catching.
+
 
 void init_Bmatrix()
 {
@@ -296,6 +299,9 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 		if ((str[0] != '#' )&&(strlen(str) > 3)) {	// ignore les lignes commentees (#) et les lignes vides.
 			sscanf(str,"%s = %lf",name,&tmp);
 //			printf("[%s] = %f\n",name,tmp);
+			// JOB
+			if (strcmp(name,"job") == 0) 		sscanf(str,"%s = %s",name,job);
+			if (strcmp(name,"movie") == 0)		MAKE_MOVIE = tmp;
 			// PHYSICAL PARAMS
 			if (strcmp(name,"Omega0") == 0)		Omega0 = tmp;
 			if (strcmp(name,"DeltaOmega") == 0)	DeltaOmega = tmp;
@@ -309,7 +315,6 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 			// TIME DOMAIN
 			if (strcmp(name,"iter_max") == 0)	*iter_max = tmp;
 			if (strcmp(name,"modulo") == 0)		*modulo = tmp;
-			if (strcmp(name,"job") == 0) 		sscanf(str,"%s = %s",name,job);
 			// ALGORITHM TUNING
 			if (strcmp(name,"sht_polar_opt_max") == 0)	*polar_opt_max = tmp;
 			if (strcmp(name,"fftw_plan_mode") == 0) {
@@ -329,6 +334,7 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 	sprintf(str, "%s.%s",fname,job);	rename("tmp.par", str);		// rename file.	
 	fflush(stdout);		// when writing to a file.
 }
+
 
 int main (int argc, char *argv[])
 {
@@ -414,9 +420,15 @@ int main (int argc, char *argv[])
 		if (isnan(t0)) runerr("NaN encountered");
 
 		step_NS(modulo, Alm);
+		if (MAKE_MOVIE != 0) {
+			sprintf(command,"poltroB_%04d.%s\n",it,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
+			sprintf(command,"poltorU_%04d.%s\n",it,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+		}
 	}
 
-	sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
-	sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+	if (MAKE_MOVE == 0) {
+		sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
+		sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+	}
 }
 

@@ -251,6 +251,27 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 	}
 }
 
+/// compute vorticity field from poloidal/toroidal components of velocity [ie poltor_to_rot_spat applied to U]
+/// IN: PT : pol/tor components of velocity
+/// OUT: J : r,theta,phi components of vorticity field
+void calc_J(struct PolTor *PT, struct VectField *J)
+{
+	complex double Q[NLM];
+	complex double S[NLM];
+	complex double T[NLM];
+	long int ir,lm;
+
+//	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
+	for (ir=NG+1; ir <= NR-2; ir++) {
+		for (lm=0; lm<NLM; lm++) {
+			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*PT->P[ir][lm] - r_1[ir]*D2r[ir].l*PT->P[ir-1][lm] - r_1[ir]*D2r[ir].u*PT->P[ir+1][lm];
+			Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
+			S[lm] = Wr[ir].l*PT->T[ir-1][lm] + Wr[ir].d*PT->T[ir][lm] + Wr[ir].u*PT->T[ir+1][lm];
+		}
+		SH_to_spat(Q,(complex double *) J->r[ir]);
+		SHsphtor_to_spat(S, T, (complex double *) J->t[ir], (complex double *) J->p[ir]);
+	}
+}
 
 // *****************************
 // ***** NON-LINEAR TERMS ******
@@ -259,7 +280,7 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 /// compute rot(VxW + JxB) and its pol-tor components.
 /// output : V, B, J unchanged, W = VxW + JxB
 ///          NL = PolTor[rot(VxW + JxB)]
-void calc_NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, struct PolTor *NL)
+void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, struct PolTor *NL)
 {
 	double vr,vt,vp;
 	long int ir,lm;
@@ -282,7 +303,7 @@ void calc_NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, 
 /// compute rot(VxW) and its pol-tor components.
 /// output : V unchanged, W = VxW, NL = PolTor[rot(VxW)]
 /// U is kept unchanged
-void calc_NL_NS(struct VectField *V, struct VectField *W, struct PolTor *NL)
+void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 {
 	double vr,vt,vp;
 	long int ir,lm;
@@ -302,7 +323,7 @@ void calc_NL_NS(struct VectField *V, struct VectField *W, struct PolTor *NL)
 /// IN:  V, B are spatial vector fields (unchanged)
 /// OUT: VxB  is the VxB resulting vector field. (Note: VxB can be either of V or B or a third vector)
 ///      NL is the PolTor component of rot(VxB)
-void induction(struct VectField *V, struct VectField *B, struct VectField *VxB, struct PolTor *NL)
+void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *VxB, struct PolTor *NL)
 {
 	double vr,vt,vp,rO;
 	long int ir,lm,it;
