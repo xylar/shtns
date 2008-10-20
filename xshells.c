@@ -16,19 +16,17 @@
 
 #include "SHT.c"
 
-// number of radial grid points.
-long int NR,NU;		//  NR: total radial grid points. NU:for velocity field.
-long int NG=0;		//  NG: grid points for inner core.
+long int NR, NU;	//  NR: total radial grid points. NU: grid points for velocity field. (=NR-NG)
+long int NG = 0;	//  NG: grid points for inner core.
+double nu, eta;		// viscosity and magnetic diffusivity.
+double dtU, dtB;	// time step for navier-stokes and induction equation.
+double Omega0;		// global rotation rate (of outer boundary) => Coriolis force .
+double DeltaOmega;	// differential rotation (of inner core)
 
 #include "grid.c"
 
 struct TriDiagL *MB, *MB_1, *MUt, *MUt_1;
 struct PentaDiag **MUp, **MUp_1;
-
-double nu, eta;		// viscosity and magnetic diffusivity.
-double dtU, dtB;	// time step for navier-stokes and induction equation.
-double Omega0;		// global rotation rate (of outer boundary) => Coriolis force .
-double DeltaOmega;	// differential rotation (of inner core)
 
 //#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
 #define DEB (0)
@@ -200,80 +198,110 @@ void init_Umatrix(long int BC)
 // ***** TIME STEPPING ******
 // **************************
 
-/// perform nstep steps of Navier-Stokes equation, with temporary array Alm.
+/// substepB : substep advance for B, with NL and NLo set as non-linear terms at time t and t-dtB
+inline substepB(struct PolTor *NL, struct PolTor * NLo, complex double **Btmp)
+{
+	long int i,l;
+
+	cTriMul(MB, Blm.P, Btmp, 1, NR-1);
+	for (i=0; i<NR; i++) {
+		for (l=0;l<NLM;l++) {
+			Btmp[i][l] += 1.5*NL->P[i][l] - 0.5*NLo->P[i][l];
+		}
+	}
+	cTriSolve(MB_1, Btmp, Blm.P, 1, NR-1);
+
+	cTriMul(MB, Blm.T, Btmp, 1, NR-2);
+	for (i=0; i<NR-1; i++) {
+		for (l=0;l<NLM;l++) {
+			Btmp[i][l] += 1.5*NL->T[i][l] - 0.5*NLo->T[i][l];
+		}
+	}
+	cTriSolve(MB_1, Btmp, Blm.T, 1, NR-2);
+}
+
+/// substepU : substep advance for U, with NL and NLo set as non-linear terms at time t and t-dtU
+inline substepU(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
+{
+	long int i,l;
+
+	cTriMulBC(MUt, Ulm.T +NG, Alm, 1, NU-2);
+	for (i=1; i<NU-1; i++) {
+		for (l=1;l<NLM;l++) {
+			Alm[i][l] += 1.5*NL->T[i+NG][l] - 0.5*NLo->T[i+NG][l];
+		}
+	}
+	cTriSolveBC(MUt_1, Alm, Ulm.T +NG, 1, NU-2);
+
+	cPentaMul(MUp, Ulm.P +NG, Alm, 1, NU-2);
+	for (i=1; i<NU-1; i++) {
+		for (l=1;l<NLM;l++) {
+			Alm[i][l] += 1.5*NL->P[i+NG][l] - 0.5*NLo->P[i+NG][l];
+		}
+	}
+	cPentaSolve(MUp_1, Alm, Ulm.P +NG, 1, NU-2);
+}
+
 double step_NS(long int nstep, complex double **Alm)
 {
-	inline step1(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
+	inline step1(struct PolTor *NLu, struct PolTor *NLuo)
 	{
-		long int i,l;
-
 		CALC_U(BC_NO_SLIP);
 		calc_Vort(&Ulm, Omega0, &W);
-		calc_NL_NS(&U, &W, NL);
-//		calc_NL_MHD(&U, &W, &B, &J, NL);
-
-		cTriMulBC(MUt, Ulm.T +NG, Alm, 1, NU-2);
-		for (i=1; i<NU-1; i++) {
-			for (l=1;l<NLM;l++) {
-				Alm[i][l] += 1.5*NL->T[i+NG][l] - 0.5*NLo->T[i+NG][l];
-			}
-		}
-		cTriSolveBC(MUt_1, Alm, Ulm.T +NG, 1, NU-2);
-
-		cPentaMul(MUp, Ulm.P +NG, Alm, 1, NU-2);
-		for (i=1; i<NU-1; i++) {
-			for (l=1;l<NLM;l++) {
-				Alm[i][l] += 1.5*NL->P[i+NG][l] - 0.5*NLo->P[i+NG][l];
-			}
-		}
-		cPentaSolve(MUp_1, Alm, Ulm.P +NG, 1, NU-2);
+		NL_Fluid(&U, &W, NLu);
+		substepU(NLu, NLuo, Alm);
 	}
 
 	while(nstep > 0) {
 		nstep--;
-
-		step1(&NLu1, &NLu2, Alm);
-		step1(&NLu2, &NLu1, Alm);
+		step1(&NLu1, &NLu2);
+		step1(&NLu2, &NLu1);
 	}
-
 	return 2*nstep*dtU;
 }
 
-/// perform nstep steps of inducation equation, with temporary array Alm.
-void step_Induction(long int nstep, complex double **Alm)
+/// perform nstep steps of Navier-Stokes equation, with temporary array Alm.
+double step_MHD(long int nstep, complex double **Alm)
 {
-	inline step1(struct PolTor *NL, struct PolTor * NLo, complex double **Btmp)
+	inline step1(struct PolTor *NLu, struct PolTor *NLb, struct PolTor *NLuo, struct PolTor *NLbo)
 	{
-		long int i,l;
-
-		induction(&U, &B0, &J, NL);
-		cTriMul(MB, Blm.P, Btmp, 1, NR-1);
-		for (i=0; i<NR; i++) {
-			for (l=0;l<NLM;l++) {
-				Btmp[i][l] += 1.5*NL->P[i][l] - 0.5*NLo->P[i][l];
-			}
-		}
-		cTriSolve(MB_1, Btmp, Blm.P, 1, NR-1);
-
-		cTriMul(MB, Blm.T, Btmp, 1, NR-2);
-		for (i=0; i<NR-1; i++) {
-			for (l=0;l<NLM;l++) {
-				Btmp[i][l] += 1.5*NL->T[i][l] - 0.5*NLo->T[i][l];
-			}
-		}
-		cTriSolve(MB_1, Btmp, Blm.T, 1, NR-2);
+		CALC_U(BC_NO_SLIP);
+		calc_Vort(&Ulm, Omega0, &W);
+		calc_J(&Blm, &J);
+		NL_MHD(&U, &W, &B0, &J, NLu);
+		NL_Induction(&U, &B0, &B, NLb);
+		substepU(NLu, NLuo, Alm);
+		substepB(NLb, NLbo, Alm);
 	}
 
 	while(nstep > 0) {
 		nstep--;
-
-		step1(&NLb1, &NLb2, Alm);
-		step1(&NLb2, &NLb1, Alm);
+		step1(&NLu1, &NLb1, &NLu2, &NLb2);
+		step1(&NLu2, &NLb2, &NLu1, &NLb1);
 	}
+	return 2*nstep*dtU;
 }
 
 
-void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, double *polar_opt_max)
+/// perform nstep steps of Induction equation, with temporary array Alm.
+double step_Induction(long int nstep, complex double **Alm)
+{
+	inline step1(struct PolTor *NLb, struct PolTor *NLbo)
+	{
+		NL_Induction(&U, &B0, &B, NLb);
+		substepB(NLb, NLbo, Alm);
+	}
+
+	while(nstep > 0) {
+		nstep--;
+		step1(&NLb1, &NLb2);
+		step1(&NLb2, &NLb1);
+	}
+	return 2*nstep*dtB;
+}
+
+
+void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, double *polar_opt_max, double *Ric)
 {
 	double tmp;
 	int id;
@@ -290,6 +318,7 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 
 	// DEFAULT VALUES
 	Omega0 = 1.0;		// global rotation is on by default.
+	DeltaOmega = 0.0;	// no differential rotation.
 
 	while (!feof(fp))
 	{
@@ -307,6 +336,7 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 			if (strcmp(name,"DeltaOmega") == 0)	DeltaOmega = tmp;
 			if (strcmp(name,"nu") == 0)		nu = tmp;
 			if (strcmp(name,"eta") == 0)		eta = tmp;
+			if (strcmp(name,"Ric") == 0)		*Ric = tmp;
 			// NUMERICAL SCHEME
 			if (strcmp(name,"NR") == 0)		NR = tmp;
 			if (strcmp(name,"NG") == 0)		NG = tmp;
@@ -328,16 +358,22 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 		}
 	}
 	// SOME BASIC COMPUTATIONS
-	NU = NR-NG;
 
 	fclose(fp);	fclose(fpw);
 	sprintf(str, "%s.%s",fname,job);	rename("tmp.par", str);		// rename file.	
 	fflush(stdout);		// when writing to a file.
 }
 
+double j1(double x)
+{
+	if (x==0.0) return(0.0);
+	return (sin(x)/x - cos(x))/x;
+}
 
 int main (int argc, char *argv[])
 {
+	double Ric = 0.0;		// default ic radius
+	double polar_opt_max = 0.0;	// default SHT optimization.
 	double t0,t1,Rm,Rm2,z,time;
 	long int i,im,m,l,jj, it, lmtest;
 	long int iter_max, modulo;
@@ -345,14 +381,13 @@ int main (int argc, char *argv[])
 	FILE *fp;
 	char command[100] = "xshells.par";
 	char job[40];
-	double polar_opt_max = 0.0;	// default SHT optimization.
 
 	printf("[XSHELLS] eXtendable Spherical Harmonic Earth-Like Liquid Simulator\n          by Nathanael Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
 
-	read_Par(command, job, &iter_max, &modulo, &polar_opt_max);
+	read_Par(command, job, &iter_max, &modulo, &polar_opt_max, &Ric);
 
 	init_SH(polar_opt_max);
-	init_rad_sph(0.0, 1.0);
+	init_rad_sph(0.0, Ric, 1.0);
 
 	init_Bmatrix();		init_Umatrix(BC_NO_SLIP);
 
@@ -364,28 +399,24 @@ int main (int argc, char *argv[])
 	printf("         Ek=%.2e, Ro=%.2e, Pm=%.2e, Re=%.2e\n",nu/Omega0, r[NG]*DeltaOmega/Omega0, nu/eta, r[NG]*DeltaOmega/nu);
 	printf("         dtU.Omega=%.2e, dtU.nu.R^2=%.2e, dtB.eta.R^2=%.2e, dtB/dtU=%.2e\n",dtU*Omega0, dtU*nu, dtB*eta, dtB/dtU);
 
-	DEB;
-
 	Alm = (complex double **) malloc( NR * sizeof(complex double *));
 	for (i=0;i<NR;i++)
 		Alm[i] = (complex double *) malloc( NLM * sizeof(complex double));
 
-	DEB;
 	// init B fields.
 	for (i=0; i<NR; i++) {
 		for (l=0;l<NLM;l++) {
 			Blm.P[i][l] = 0.0;
 			Blm.T[i][l] = 0.0;
 		}
-		Blm.P[i][1] = r[i];		// magnetic dipole
+		Blm.P[i][1] = j1(pi*r[i]);		// magnetic dipole
 	}
-	DEB;
+	sprintf(command,"poltorB0.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
 	PolTor_to_spat(&Blm, &B0, 0, NR-1, BC_MAGNETIC);	// background magnetic field.
 	for (i=0; i<NR; i++) {
 		Blm.P[i][1] = 0.0;	// remove dipole.
 	}
 
-	DEB;
 	// init U fields
 	for (i=NG; i<NR; i++) {
 		for (l=0;l<NLM;l++) {
@@ -394,23 +425,24 @@ int main (int argc, char *argv[])
 		}
 //		Ulm.T[i][LM(1,0)] = r[i]*DeltaOmega*(1-(r[i]-r[NG])/(r[NR-1]-r[NG])) * Y10_ct;
 	}
-	i = NG;
-		Ulm.T[i][LM(1,0)]  = r[i]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
+		Ulm.T[NG][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
 
-	DEB;
-
-	PolTor_to_spat(&Blm, &B, 0, NR-1, BC_MAGNETIC);
-	induction(&U, &B, &B, &NLb2);
-
-	DEB;
-
-	sprintf(command,"poltorB0.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
 	sprintf(command,"poltorU0.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 
+	CALC_U(BC_NO_SLIP);
+	calc_Vort(&Ulm, Omega0, &W);
+	calc_J(&Blm, &J);
+	NL_MHD(&U, &W, &B0, &J, &NLu2);
+	NL_Induction(&U, &B0, &B, &NLb2);
 
 	DEB;
 
 	for (it=0; it< iter_max; it++) {
+		if (it==1) {
+			printf(" > inner core stops\n");
+			DeltaOmega = 0.0;
+		}
+		Ulm.T[NG][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
 //		t0 = t1;
 //		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
 		t0 = creal(Ulm.T[NG+1][1]);
@@ -419,14 +451,16 @@ int main (int argc, char *argv[])
 		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,time,t1, t0);
 		if (isnan(t0)) runerr("NaN encountered");
 
+//		step_MHD(modulo, Alm);
 		step_NS(modulo, Alm);
+
 		if (MAKE_MOVIE != 0) {
-			sprintf(command,"poltroB_%04d.%s\n",it,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
-			sprintf(command,"poltorU_%04d.%s\n",it,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+			sprintf(command,"poltorB_%04d.%s",it+1,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
+			sprintf(command,"poltorU_%04d.%s",it+1,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 		}
 	}
 
-	if (MAKE_MOVE == 0) {
+	if (MAKE_MOVIE == 0) {
 		sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
 		sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 	}

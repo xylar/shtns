@@ -1,13 +1,20 @@
 #!/usr/bin/python
 #plot a slice
 from pylab import *     # matplotlib
+from subprocess import *	# lance une ligne de commande
 import sys              # acces a la ligne de commande.
 
 ir0=1
 
+retcode = call("./xspp " + sys.argv[1] + " axi", shell=True)
+if retcode != 0:
+	print 'error from xspp'
+	exit()
+
 #Up
-print 'loading',sys.argv[1]
-a=load(sys.argv[1])
+#print 'loading',sys.argv[1]
+#a=load(sys.argv[1])
+a=load('o_Vp')
 s = a.shape
 
 ct = a[0,1:s[1]]
@@ -19,8 +26,9 @@ x = r*matrix(st)
 y = r*matrix(ct)
 
 #Poloidal scalar
-print 'loading',sys.argv[2]
-b = load(sys.argv[2])
+#print 'loading',sys.argv[2]
+#b = load(sys.argv[2])
+b = load('o_Vpol')
 b = b[ir0:s[0],1:s[1]]
 
 #convert Up to angular velocity

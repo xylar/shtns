@@ -21,6 +21,7 @@
 *** Features ***
 + velocity field computation
 + inner core differential rotation
+- variable time-step ?
 - conducting outer shell
 - insulating inner core
 

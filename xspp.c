@@ -219,10 +219,18 @@ int main (int argc, char *argv[])
 		double phi = 0.0;
 		ic++;
 		if (argc > ic) sscanf(argv[ic],"%lf",&phi);
-		PolTor_to_rot_spat(&Blm, 0.0, &B, irs+1, ire-1, BC);
-		i = lround(phi/360. *NPHI) % NPHI;
-		write_slice("o_Vr",B.r,i);	write_slice("o_Vt",B.t,i);	write_slice("o_Vp",B.p,i);
+		PolTor_to_spat(&Blm, &B, irs, ire, BC);
+		im = lround(phi/360. *NPHI) % NPHI;
+		write_slice("o_Vr",B.r,im);	write_slice("o_Vt",B.t,im);	write_slice("o_Vp",B.p,im);
 		printf("> meridional slice #%d (phi=%.1f°) written to files : o_Vr, o_Vt, o_Vp (spherical vector components)\n",i,i*360./NPHI);
+		for (i=irs;i<=ire;i++) {
+			for(l=0;l<NLAT;l++) {
+				B.p[i][im*NLAT +l] = B.r[i][im*NLAT +l]*ct[l] - B.t[i][im*NLAT +l]*st[l];	// z
+				B.r[i][im*NLAT +l] = B.r[i][im*NLAT +l]*st[l] + B.t[i][im*NLAT +l]*ct[l];	// s
+			}
+		}
+		write_slice("o_Vs",B.r,im);	write_slice("o_Vz",B.p,im);
+		printf("  and files o_Vs, o_Vp, o_Vz (cylindrical vector components)\n",i,i*360./NPHI);
 		exit(0);
 	}
 	if (strcmp(argv[ic],"HS") == 0)

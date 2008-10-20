@@ -16,11 +16,11 @@
 
 // SHT.h : parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
 #ifndef LMAX
-#include "SHT.h"
+# include "SHT.h"
 #endif
 
 #ifndef MRES
-#define MRES 1
+# define MRES 1
 #endif
 
 // NLM : total number of Spherical Harmonic coefficients.
@@ -29,18 +29,21 @@
 #define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 #define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 
+#ifndef M_PI
+# define M_PI 3.1415926535897932384626433832795
+#endif
+
 // useful values for some basic spherical harmonic representations
 // Y00_1 = 1/Y00 = spherical harmonic representation of 1 (l=0,m=0)
-#define Y00_1 sqrt(4*pi)
+#define Y00_1 sqrt(4.*M_PI)
 // Y10_ct = spherical harmonic representation of cos(theta) (l=1,m=0)
-#define Y10_ct sqrt(4.0*pi/3.0)
+#define Y10_ct sqrt(4.*M_PI/3.)
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };
 
-
-double pi = 3.1415926535897932384626433832795;
+const double pi = M_PI;
 double ct[NLAT], st[NLAT], st_1[NLAT];	// cos(theta), sin(theta), 1/sin(theta);
 double el[NLM], l2[NLM], l_2[NLM];		// l, l(l+1) and 1/(l(l+1))
 

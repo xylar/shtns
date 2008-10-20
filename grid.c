@@ -321,17 +321,105 @@ inline void cPentaSolve(struct PentaDiag **M, complex double **b, complex double
 */
 
 
-void Reg_Grid(double rmin, double rmax)		// Regular Grid
+long int Reg_Grid(double rmin, double rg, double rmax)		// Regular Grid
 {
-	double dx;
-	int i;
+	double dx1,dx2;
+	long int i;
 
-	dx = (rmax - rmin)/(NR-1);
-	for(i=0;i<NR;i++)
-		r[i] = ((rmax-rmin)*i)/(NR-1);
+	if (rmin > rg) runerr("rmin > rg");
+	if (rg >= rmax) runerr("rg >= rmax");
 
-	printf("[GRID:Reg] NR=%d, r=[%f, %f], dr=%f\n",NR,r[0],r[NR-1],dx);
+	NG = lround( (rg-rmin)/(rmax-rmin) * NR );	// number of radial points in inner core.
+
+	// inner core
+	dx1 = (rg - rmin)/NG;
+	for (i=0; i<NG; i++)
+		r[i] = ((rg-rmin)*i)/NG +rmin;
+	r[NG] = rg;
+
+	// outer core
+	dx2 = (rmax - rg)/(NR-NG-1);
+	for (i=NG+1; i<NR; i++)
+		r[i] = ((rmax-rg)*(i-NG))/(NR-NG-1) +rg;
+
+	printf("[GRID:Reg] NR=%d, r=[%f, %f], NG=%d, Ric=%f, dx1=%f, dx2=%f\n", NR,r[0], r[NR-1], NG, r[NG], dx1, dx2);
 }
+
+// BL_Grid : grid with densification in Boundary Layers, based on code from D. Jault.
+// in:  rmin, rg, rmax are respectively the minimal, inner core and outer core radius.
+// out: r[NR] is set with grid points (has to be allocated before function call)
+//      NG is set with inner core index.
+void BL_Grid(double rmin, double rg, double rmax)
+{
+	// La somme des N premieres puissances de l'inconnue x est y
+	// on suppose x<1
+	double decre(int N,double y)
+	{	double e,f,x;
+		
+		e=y/(y+1.);	f=N+1.;
+		x=e;
+		while(fabs(y+1-(1-pow(x,f))/(1-x))>0.0001)
+			x=e+pow(x,f)/(y+1);
+		return x;
+	}
+
+	int nh = 0;		// can be made a parameter if required : add nh points to the inner hartman layer.
+	int nr1,nr2, i,j;
+	double e,q,hu,h;
+
+	if (rmin != 0.0) runerr("rmin != 0 not supported.");
+	if (rmax != 1.0) runerr("rmax != 1 not supported.");
+
+	NG = (NR-nh-1)/5 +nh/4;
+	nr1 = NG + (NR-nh-1)/5 +3*nh/4;
+//	nr2=nr1+(NR-nh-1)/3;
+	nr2 = (NR-1) - (NR-nh-1)/5;
+	
+	// each BL has thickness h = 0.15 of the gap
+	// nr1 index of external shell of internal BL
+	// nr2 index of internal shell of external BL
+	h = (rmax-rg)*0.15;
+	hu=(1.0 -h*2. -rg)/(nr2-nr1);
+	r[NG]=rg;
+	r[nr1]=rg+h;	r[nr2]=rmax-h;
+	r[0]=rmin;	r[NR-1]=rmax;
+
+	// Uniform grid in the bulk
+	for(i=nr1+1; i<=nr2-1; i++)
+		r[i] = r[nr1] + (i-nr1)*hu;
+
+	// Outer boundary layer
+	q=decre(NR-1-nr2,h/hu);
+	e=hu;
+	for(i=nr2+1; i<=NR-2; i++) {
+		e*=q;
+		r[i]=r[i-1]+e;
+	}
+
+	// Inner boundary layer
+	q=decre(nr1-NG,h/hu);
+	e=hu;
+	for(i=nr1-1; i>=NG+1; i--) {
+		e*=q;
+		r[i]=r[i+1]-e;
+	}
+
+	// Inner core
+	r[NG-1] = 2*rg - r[NG+1];
+	e = rg - r[NG-1];
+	q = 1.14;
+	for(i=NG-2; e<=r[i+1]/(i+1); i--) {
+		e*=q;
+		r[i]=r[i+1]-e;
+	}
+	hu=r[i+2]/(i+2);
+	for(j=0; j<=i+1; j++)
+		r[j]=j*hu;
+
+	printf("[GRID:BL] NR=%d, r=[%f, %f], NG=%d, Ric=%f\n", NR,r[0], r[NR-1], NG, r[NG]);
+}
+
+
 
 /*
 void Exp_Grid(double dx0, double alpha)		// Grille exponentielle.
@@ -513,10 +601,12 @@ void init_Deriv_cyl()
 */
 
 // genere la grille radiale, et les matrices de derivees spatiales
-void init_rad_sph(double rmin, double rmax)
+void init_rad_sph(double rmin, double Ric, double rmax)
 {
 	r = (double *) malloc(NR * sizeof(double));	// allocation de la grille radiale
-	Reg_Grid(rmin, rmax);
+//	Reg_Grid(rmin, Ric, rmax);
+	BL_Grid(rmin, Ric, rmax);
 	init_Deriv_sph();
+	NU = NR-NG;
 }
 

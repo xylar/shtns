@@ -251,9 +251,9 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 	}
 }
 
-/// compute vorticity field from poloidal/toroidal components of velocity [ie poltor_to_rot_spat applied to U]
-/// IN: PT : pol/tor components of velocity
-/// OUT: J : r,theta,phi components of vorticity field
+/// compute current density field from poloidal/toroidal components of magnetic field [ie poltor_to_rot_spat applied to B]
+/// IN: PT : pol/tor components of magnetic field
+/// OUT: J : r,theta,phi components of current density field
 void calc_J(struct PolTor *PT, struct VectField *J)
 {
 	complex double Q[NLM];
