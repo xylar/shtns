@@ -29,6 +29,9 @@
 #define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 #define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 
+// half the theta length for even/odd decomposition. (NLAT+1)/2 allows odd NLAT.
+#define NLAT_2 ((NLAT+1)/2)
+
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
 #endif
@@ -281,7 +284,7 @@ void init_SH(double eps)
 	printf("          => using Gauss Nodes\n");
 	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : xg = ]-1,1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
-		ct[it] = xg[NLAT-1-it];			// on prend theta = ]0,pi/2[ => cos(theta) = ]1,0[
+		ct[it] = xg[NLAT-1-it];			// on prend theta = ]0,pi[ => cos(theta) = ]1,-1[
 		st[it] = sqrt(1.0 - ct[it]*ct[it]);
 		st_1[it] = 1.0/sqrt(1.0 - ct[it]*ct[it]);
 	}
@@ -290,38 +293,38 @@ void init_SH(double eps)
 #ifdef _SH_DEBUG_
 // TEST if gauss points are ok.
 	tmax = 0.0;
-	for (it = 0; it<NLAT/2; it++) {
+	for (it = 0; it<NLAT_2; it++) {
 		t = gsl_sf_legendre_sphPlm(NLAT, 0, ct[it]);
 		if (t>tmax) tmax = t;
 //		printf("i=%d, x=%12.12g, p=%12.12g\n",i,ct[i],t);
 	}
 	printf("          max zero at Gauss node for Plm[l=LMAX+1,m=0] : %g\n",tmax);
 	printf("          Gauss nodes :");
-	for (it=0;it<NLAT/2; it++)
+	for (it=0;it<NLAT_2; it++)
 		printf(" %g",ct[it]);
 	printf("\n");
 #endif
 
 // Allocate legendre functions lookup tables.
-	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT/2);
-	dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT/2);
-	zlm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT/2);
-	dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT/2);
+	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
+	dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
+	zlm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
+	dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
-		ylm[im+1] = ylm[im] + NLAT/2*(LMAX+1 -m);
-		dylm[im+1] = dylm[im] + NLAT/2*(LMAX+1 -m);
-		zlm[im+1] = zlm[im] + NLAT/2*(LMAX+1 -m);
-		dzlm[im+1] = dzlm[im] + NLAT/2*(LMAX+1 -m);
+		ylm[im+1] = ylm[im] + NLAT_2*(LMAX+1 -m);
+		dylm[im+1] = dylm[im] + NLAT_2*(LMAX+1 -m);
+		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m);
+		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -m);
 	}
 
-// Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT/2 points required.
+// Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT_2 points required.
 // for synthesis (inverse transform)
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-//		ylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT/2);
-//		dylm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT/2);
-		for (it=0;it<NLAT/2;it++) {
+//		ylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT_2);
+//		dylm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT_2);
+		for (it=0;it<NLAT_2;it++) {
 #ifdef SHT_EQUAL
 			if ((m==1)&&(st[it]==0.)) {
 				printf("special case : ylm undef (set to zero) for m=1, at the pole.\n");
@@ -348,25 +351,25 @@ void init_SH(double eps)
 // interleave l and l+1 : this stores data in the way it will be read.
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-//		zlm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT/2);
-//		dzlm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT/2);
-		for (it=0;it<NLAT/2;it++) {
+//		zlm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT_2);
+//		dzlm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT_2);
+		for (it=0;it<NLAT_2;it++) {
 			for (l=m;l<LMAX;l+=2) {
-				zlm[im][(l-m)*NLAT/2 + it*2] = ylm[im][it*(LMAX-m+1) + (l-m)] * wg[it] *iylm_fft_norm;
-				zlm[im][(l-m)*NLAT/2 + it*2 +1] = ylm[im][it*(LMAX-m+1) + (l+1-m)] * wg[it] *iylm_fft_norm;
-				dzlm[im][(l-m)*NLAT/2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wg[it] *iylm_fft_norm /(l*(l+1));
-				dzlm[im][(l-m)*NLAT/2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wg[it] *iylm_fft_norm /(l*(l+1));
-				dzlm[im][(l-m)*NLAT/2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * wg[it] *iylm_fft_norm /((l+1)*(l+2));
-				dzlm[im][(l-m)*NLAT/2 + it*2+1].p = dylm[im][it*(LMAX-m+1) + (l+1-m)].p * wg[it] *iylm_fft_norm /((l+1)*(l+2));
+				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * wg[it] *iylm_fft_norm;
+				zlm[im][(l-m)*NLAT_2 + it*2 +1] =  ylm[im][it*(LMAX-m+1) + (l+1-m)] * wg[it] *iylm_fft_norm;
+				dzlm[im][(l-m)*NLAT_2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wg[it] *iylm_fft_norm /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wg[it] *iylm_fft_norm /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * wg[it] *iylm_fft_norm /((l+1)*(l+2));
+				dzlm[im][(l-m)*NLAT_2 + it*2+1].p = dylm[im][it*(LMAX-m+1) + (l+1-m)].p * wg[it] *iylm_fft_norm /((l+1)*(l+2));
 				if (l == 0) {		// les derivees sont nulles pour l=0 (=> m=0)
-					dzlm[im][(l-m)*NLAT/2 + it*2].t = 0.0;
-					dzlm[im][(l-m)*NLAT/2 + it*2].p = 0.0;
+					dzlm[im][(l-m)*NLAT_2 + it*2].t = 0.0;
+					dzlm[im][(l-m)*NLAT_2 + it*2].p = 0.0;
 				}
 			}
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
-				zlm[im][(l-m)*NLAT/2 + it] = ylm[im][it*(LMAX-m+1) + (l-m)] * wg[it] *iylm_fft_norm;
-				dzlm[im][(l-m)*NLAT/2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wg[it] *iylm_fft_norm /(l*(l+1));
-				dzlm[im][(l-m)*NLAT/2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wg[it] *iylm_fft_norm /(l*(l+1));
+				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * wg[it] *iylm_fft_norm;
+				dzlm[im][(l-m)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wg[it] *iylm_fft_norm /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wg[it] *iylm_fft_norm /(l*(l+1));
 			}
 		}
 	}
@@ -374,7 +377,7 @@ void init_SH(double eps)
 // POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
 	for (im=0;im<=MMAX;im++) {
 		m = im*MRES;
-		tm[im] = 1.0*NLAT;
+		tm[im] = NLAT_2;
 		for (l=m;l<=LMAX;l++) {
 			it=0;
 			while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }

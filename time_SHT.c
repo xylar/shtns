@@ -69,8 +69,8 @@ int main()
 	(double) t2 = 8.1;
 	printf("test : %f, %f, %f, %f\n",creal(t1),cimag(t1), creal(t2),cimag(t2));
 
-	write_vect("cost",ct,NLAT/2);
-	write_vect("sint",st,NLAT/2);
+	write_vect("cost",ct,NLAT);
+	write_vect("sint",st,NLAT);
 
 	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Sh = (double *) ShF;
@@ -84,15 +84,22 @@ int main()
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) malloc(sizeof(complex double)* NLM);
 
-// spat to SH
-	for (im=0;im<NPHI;im++) {
-	for (i=0;i<NLAT/2;i++) {
-		Sh[im*NLAT+i] = ct[i];
-		Sh[im*NLAT+ NLAT-1-i] = -ct[i];
+// SH_to_spat
+	for (i=0;i<NLM;i++) {
+		Slm[i] = 0.0;
 	}
-	}
+	Slm[LiM(LMAX,0)] = Y10_ct;
+	SH_to_spat(Slm,ShF);
+	write_mx("spat",Sh,NPHI,NLAT);
+
+// spat_to_SH
+/*	for (im=0;im<NPHI;im++) {
+		for (i=0;i<NLAT;i++) {
+			Sh[im*NLAT+i] = ct[i];
+		}
+	}*/
 	spat_to_SH(ShF,Slm);
-	write_vect("ylm",Slm,NLM*2);
+	write_vect("ylm",Slm,NLM*2);		// should be sqrt(4pi/3) if l=1, zero if l!=1.
 //	return(1);
 
 // test case...

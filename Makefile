@@ -1,6 +1,6 @@
 # le compilateur :
 ## generic gcc
-cmd = gcc -O3
+cmd = gcc 
 ## recent gcc with native support
 #cmd = gcc -O3 -march=native -mfpmath=sse
 ## gcc k8 (lgitl3)
@@ -11,12 +11,14 @@ cmd = gcc -O3
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 #cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
 
-shtfiles = SHT.c SHT/ST_to_spat.c SHT/SH_to_spat.gen.c SHT/Makefile
+shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat.gen.c SHT/Makefile
 
 default : xshells
 
-SHT/ST_to_spat.c : SHT/SH_to_spat.gen.c SHT/Makefile
+SHT/SH_to_spat.c : SHT/SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) -C SHT
+SHT/spat_to_SH.c : SHT/spat_to_SH.gen.c SHT/Makefile
+	$(MAKE) spat_to_SH.c -C SHT
 
 xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
@@ -25,7 +27,7 @@ xspp : xspp.c grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
 
 sphere : sphere.c SHT.c SHT.h Makefile
 	$(cmd) sphere.c -lfftw3 -lgsl -lgslcblas -lm -o sphere
-time_SHT : time_SHT.c SHT.c SHT.h Makefile
+time_SHT : time_SHT.c SHT.h Makefile $(shtfiles)
 	$(cmd) time_SHT.c -lfftw3 -lgsl -lgslcblas -lm -o time_SHT
 sphere2 : sphere2.c SHTfast.c SHT.h Makefile
 	$(cmd) sphere2.c -lfftw3 -lgsl -lgslcblas -lm -o sphere2

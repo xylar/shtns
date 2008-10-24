@@ -3,8 +3,11 @@
 -- Bug found in SHT.c : here are the correct versions of LiM() and LM marcros :	(16/10/2008)
 	#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
+-- Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
 
 *** Optimizations ***
++ SHT : NLAT odd could be improved a little bit.
+
 - SHT : use DCT space, keep low NLAT but regular grid and Gauss quadrature (??)
         synthesis should be faster, analysis same speed.
 

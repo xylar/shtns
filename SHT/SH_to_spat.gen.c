@@ -35,9 +35,9 @@ X		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 S		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 T		Tl = &Tlm[LiM(0,im)];
 		i=0;
-X		yl = ylm[im] + i*(LMAX-m+1) -m;
+X		yl  = ylm[im] + i*(LMAX-m+1) -m;
 V		dyl = dylm[im] + i*(LMAX-m+1) -m;
-		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+		while (i < NLAT_2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 X			fe = 0.0;	fo = 0.0;
 S			dse = 0.0;	dso = 0.0;
@@ -71,7 +71,7 @@ V			BpF[NLAT-(i+1)] = 0.0
 T				- (dte-dto)
 V				;
 			i++;
-X			yl += (LMAX-m+1);
+X			yl  += (LMAX-m+1);
 V			dyl += (LMAX-m+1);
 		}
 X		BrF += NLAT;
@@ -91,32 +91,32 @@ V			BpF[i] = 0.0;
 V			BpF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes
 			i++;
 		}
-X		yl = ylm[im] + i*(LMAX-m+1) -m;
+X		yl  = ylm[im] + i*(LMAX-m+1) -m;
 V		dyl = dylm[im] + i*(LMAX-m+1) -m;
-		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+		while (i < NLAT_2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 X			fe = 0.0;	fo = 0.0;
 S			dse = 0.0;	dso = 0.0;	se = 0.0;	so = 0.0;
 T			dte = 0.0;	dto = 0.0;	te = 0.0;	to = 0.0;
 			while (l<LMAX) {	// compute even and odd parts
-X				fe += yl[l] * Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-X				fo += yl[l+1] * Ql[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
+X				fe  += yl[l] * Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+X				fo  += yl[l+1] * Ql[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
 T				dto += dyl[l].t * Tl[l];
-T				te += dyl[l].p * Tl[l];
+T				te  += dyl[l].p * Tl[l];
 S				dso += dyl[l].t * Sl[l];
-S				se += dyl[l].p * Sl[l];
+S				se  += dyl[l].p * Sl[l];
 T				dte += dyl[l+1].t * Tl[l+1];
-T				to += dyl[l+1].p * Tl[l+1];
+T				to  += dyl[l+1].p * Tl[l+1];
 S				dse += dyl[l+1].t * Sl[l+1];
-S				so += dyl[l+1].p * Sl[l+1];
+S				so  += dyl[l+1].p * Sl[l+1];
 				l+=2;
 			}
 			if (l==LMAX) {
-X				fe += yl[l] * Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+X				fe  += yl[l] * Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 T				dto += dyl[l].t * Tl[l];
-T				te += dyl[l].p * Tl[l];
+T				te  += dyl[l].p * Tl[l];
 S				dso += dyl[l].t * Sl[l];
-S				se += dyl[l].p * Sl[l];
+S				se  += dyl[l].p * Sl[l];
 			}
 X			BrF[i] = fe + fo;
 X			BrF[NLAT-(i+1)] = fe - fo;
@@ -137,7 +137,7 @@ S					I*(se-so)
 T					- (dte-dto)
 V					;
 			i++;
-X			yl += (LMAX-m+1);
+X			yl  += (LMAX-m+1);
 V			dyl += (LMAX-m+1);
 		}
 X		BrF += NLAT;

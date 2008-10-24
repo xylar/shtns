@@ -96,11 +96,8 @@ void write_slice(char *fn, double **v, int im)
 
 	fp = fopen(fn,"w");
 		fprintf(fp,"0 ");			// first row = radius
-		for(j=0;j<NLAT/2;j++) {
+		for(j=0;j<NLAT;j++) {
 			fprintf(fp,"%.6g ",ct[j]);	// first line = cos(theta)
-		}
-		for(j=1;j<=NLAT/2;j++) {
-			fprintf(fp,"-%.6g ",ct[NLAT/2-j]);	// first line = cos(theta)
 		}
 	for (i=irs;i<=ire;i++) {
 		if (v[i] != NULL) {
