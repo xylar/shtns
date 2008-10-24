@@ -11,11 +11,11 @@ cmd = gcc -O3
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 #cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
 
-shtfiles = SHT.c SHT/ST_to_spat.c SHT/ST_to_spat.gen.c SHT/Makefile
+shtfiles = SHT.c SHT/ST_to_spat.c SHT/SH_to_spat.gen.c SHT/Makefile
 
 default : xshells
 
-SHT/ST_to_spat.c : SHT/ST_to_spat.gen.c SHT/Makefile
+SHT/ST_to_spat.c : SHT/SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) -C SHT
 
 xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)

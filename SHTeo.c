@@ -92,18 +92,14 @@ void spateo_to_SH(long int eo, complex double *ShF, complex double *Slm)
 
 	im = 0;
 		m=im*MRES;
-		for (i=0;i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts. m=0 : everything is REAL
-			(double) fpm[2*i] = (double) ShF[i] + (double) ShF[NLAT-(i+1)];
-			(double) fpm[2*i+1] = (double) ShF[i] - (double) ShF[NLAT-(i+1)];
-		}
 		l=m+eo;
 		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
-		iyl = iylm[im];
+		iyl = iylm[im] +eo;
 		ShF += NLAT;
 		while (l<=LMAX) {
 			Sl[l] = 0.0;
-			for (i=0;i<NLAT;i+=2) {
-				(double) Sl[l] += (double) ShF[i] * iyl[i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
+			for (i=0;i<NLAT;i++) {
+				(double) Sl[l] += (double) ShF[i] * iyl[2*i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
 			}
 			l+=2;
 			iyl += NLAT;
@@ -112,12 +108,12 @@ void spateo_to_SH(long int eo, complex double *ShF, complex double *Slm)
 		m=im*MRES;
 		l=m+eo;
 		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
-		iyl = iylm[im];
+		iyl = iylm[im] +eo;
 		ShF += NLAT;
 		while (l<=LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			Sl[l] = 0.0;	Sl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
-			for (i=tm[im]*2;i<NLAT;i+=2) {	// tm[im] : polar optimization
-				Sl[l] += ShF[i] * iyl[i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
+			for (i=tm[im]*2;i<NLAT;i++) {	// tm[im] : polar optimization
+				Sl[l] += ShF[i] * iyl[2*i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
 			}
 			l+=2;
 			iyl += NLAT;
@@ -141,10 +137,10 @@ void SHeo_to_spat(long int eo, complex double *Slm, complex double *ShF)
 		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 		i=0;
 		yl = ylm[im] + i*(LMAX-m+1) -m;
-		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+		while (i<NLAT) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m+eo;
 			feo = 0.0;
-			while (l<=LMAX) {	// compute even and odd parts
+			while (l<=LMAX) {	// compute even or odd parts
 				(double) feo += yl[l] * (double) Sl[l];
 				l+=2;
 			}
@@ -162,7 +158,7 @@ void SHeo_to_spat(long int eo, complex double *Slm, complex double *ShF)
 			i++;
 		}
 		yl = ylm[im] + i*(LMAX-m+1) -m;
-		while (i<NLAT/2) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+		while (i<NLAT) {	// ops : NLAT/2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m+eo;
 			feo = 0.0;
 			while (l<=LMAX) {	// compute even and odd parts
@@ -176,7 +172,7 @@ void SHeo_to_spat(long int eo, complex double *Slm, complex double *ShF)
 		ShF += NLAT;
 	}
 	for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
-		for (i=0;i<NLAT/2;i++)
+		for (i=0;i<NLAT;i++)
 			ShF[i] = 0.0;
 		ShF += NLAT;
 	}
