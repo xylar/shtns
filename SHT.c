@@ -186,6 +186,20 @@ void SH_to_spat(complex double *Slm, complex double *ShF)
 			i++;
 			yl += (LMAX-m+1);
 		}
+		if (i<(NLAT+1)/2) {	// NLAT impair, fe only
+			l=m;
+			fe = 0.0;
+			while (l<LMAX) {	// compute even and odd parts
+				(double) fe += yl[l] * (double) Sl[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
+				l+=2;
+			}
+			if (l==LMAX) {
+				(double) fe += yl[l] * (double) Sl[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Slm[LiM(l,im)];
+			}
+			ShF[i] = fe;
+			i++;
+			yl += (LMAX-m+1);
+		}
 		ShF += NLAT;
 	for (im=1; im<=MMAX; im++) {
 		m = im*MRES;

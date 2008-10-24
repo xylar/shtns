@@ -124,7 +124,7 @@ void PolTor_to_rot_spat(struct PolTor *PT, double Wz0, struct VectField *W, long
 {
 	complex double Q[NLM];	// l(l+1) * T/r
 	complex double S[NLM];	// dT/dr + T/r
-	complex double T[NLM];	//  [ l(l+1)/r^2 - 1/r d2/dr2(r .) ] P
+	complex double T[NLM];	//  [ l(l+1)/r^2 - 1/r d2/dr2(r .) ] P = -Lap P
 	double dr;
 	long int ir,lm;
 
@@ -142,7 +142,7 @@ void PolTor_to_rot_spat(struct PolTor *PT, double Wz0, struct VectField *W, long
 			for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Toroidal
 				Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
 				S[lm] = Wr[ir].l*PT->T[ir-1][lm] + Wr[ir].d*PT->T[ir][lm] + Wr[ir].u*PT->T[ir+1][lm];
-				T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*PT->P[ir][lm] - r_1[ir]*D2r[ir].l*PT->P[ir-1][lm] - r_1[ir]*D2r[ir].u*PT->P[ir+1][lm];
+				T[lm] = (r_2[ir]*l2[lm] - Lr[ir].d)*PT->P[ir][lm] - Lr[ir].l*PT->P[ir-1][lm] - Lr[ir].u*PT->P[ir+1][lm];
 			}
 			istart++;
 		}
@@ -151,7 +151,7 @@ void PolTor_to_rot_spat(struct PolTor *PT, double Wz0, struct VectField *W, long
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
 			Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
 			S[lm] = Wr[ir].l*PT->T[ir-1][lm] + Wr[ir].d*PT->T[ir][lm] + Wr[ir].u*PT->T[ir+1][lm];
-			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*PT->P[ir][lm] - r_1[ir]*D2r[ir].l*PT->P[ir-1][lm] - r_1[ir]*D2r[ir].u*PT->P[ir+1][lm];
+			T[lm] = (r_2[ir]*l2[lm] - Lr[ir].d)*PT->P[ir][lm] - Lr[ir].l*PT->P[ir-1][lm] - Lr[ir].u*PT->P[ir+1][lm];
 		}
 /* Pour Coriolis : ez ^ u
 	ez = cos(theta).er - sin(theta).etheta
@@ -240,7 +240,7 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 //	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
-			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*PT->P[ir][lm] - r_1[ir]*D2r[ir].l*PT->P[ir-1][lm] - r_1[ir]*D2r[ir].u*PT->P[ir+1][lm];
+			T[lm] = (r_2[ir]*l2[lm] - Lr[ir].d)*PT->P[ir][lm] - Lr[ir].l*PT->P[ir-1][lm] - Lr[ir].u*PT->P[ir+1][lm];
 			Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
 			S[lm] = Wr[ir].l*PT->T[ir-1][lm] + Wr[ir].d*PT->T[ir][lm] + Wr[ir].u*PT->T[ir+1][lm];
 		}
@@ -264,7 +264,7 @@ void calc_J(struct PolTor *PT, struct VectField *J)
 //	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
-			T[lm] = (r_2[ir]*l2[lm] - r_1[ir]*D2r[ir].d)*PT->P[ir][lm] - r_1[ir]*D2r[ir].l*PT->P[ir-1][lm] - r_1[ir]*D2r[ir].u*PT->P[ir+1][lm];
+			T[lm] = (r_2[ir]*l2[lm] - Lr[ir].d)*PT->P[ir][lm] - Lr[ir].l*PT->P[ir-1][lm] - Lr[ir].u*PT->P[ir+1][lm];
 			Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
 			S[lm] = Wr[ir].l*PT->T[ir-1][lm] + Wr[ir].d*PT->T[ir][lm] + Wr[ir].u*PT->T[ir+1][lm];
 		}

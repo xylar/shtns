@@ -512,15 +512,15 @@ void init_Deriv_sph()
 		D2r[i].l =  2.0*dr[i]*t;
 		D2r[i].d =  -2.0*(dr[i-1]+dr[i])*t;
 		D2r[i].u =  2.0*dr[i-1]*t;
-/*
+
 		Lr[i].l = r_1[i]* D2r[i].l * r[i-1];	// Laplacien radial : 1/r . d2/dr2(r .)
 		Lr[i].d =         D2r[i].d;
 		Lr[i].u = r_1[i]* D2r[i].u * r[i+1];
-*/
+/*
 		Lr[i].l = D2r[i].l + 2.0*r_1[i]*Gr[i].l;	// Laplacien radial : d2/dr2 + 2/r.d/r
 		Lr[i].d = D2r[i].d + 2.0*r_1[i]*Gr[i].d;
 		Lr[i].u = D2r[i].u + 2.0*r_1[i]*Gr[i].u;
-
+*/
 	}
 	// start and end must be determined by BC on a case by case basis.
 	i = 0;
@@ -610,3 +610,13 @@ void init_rad_sph(double rmin, double Ric, double rmax)
 	NU = NR-NG;
 }
 
+/// finds the index to the shell with closest radius to radius rr
+long int r_to_idx(double rr)
+{
+	long int i;
+
+	i = NR-2;
+	while((r[i] > rr)&&(i>0)) i--;
+	if ((rr-r[i]) > (r[i+1]-rr)) i++;
+	return i;	// i is always between 0 and NR-1
+}

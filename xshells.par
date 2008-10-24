@@ -9,17 +9,18 @@ movie = 1	# 0=field output at the end only (default), 1=output every modulo
 
 ### PHYSICAL PARAMS ###
 Omega0 = 1 		# Global rotation rate
-DeltaOmega = 0.001	# Differential rotation
+DeltaOmega = 1e-6	# Differential rotation
 nu = 1.0e-4		# viscosity
-eta = 0.1		# magnetic diffusivity
+eta = 1.0e-4		# magnetic diffusivity
 Ric = 0.35		# radius of solid inner sphere (ie earth's inner core)
+B0 = 1.0e-2		# magnetic field scaling factor
 
 ### NUMERICAL SCHEME ###
-NR = 201	# number of radial shells
+NR = 601	# number of radial shells
 dtU = 0.1	# time step for Navier-Stokes equation
 dtB = 0.1	# time step for Induction equation
-iter_max = 30	# iteration number (ouput #)
-modulo = 10	# sub-iterations (time steps between outputs)
+iter_max = 250	# iteration number (ouput #)
+modulo = 1	# sub-iterations (time steps between outputs)
 
 ### ALGORITHM FINE TUNING ###
 # fftw_plan_mode : 0=estimate, 1=measure, 2=patient (default), 3=exhaustive

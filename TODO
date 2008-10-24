@@ -21,6 +21,7 @@
 *** Features ***
 + velocity field computation
 + inner core differential rotation
+- euler explicit (ordre 1), mieux adapté aux transitoires.
 - variable time-step ?
 - conducting outer shell
 - insulating inner core
@@ -29,4 +30,9 @@
 
 *** SHT.c
 + even/odd l dependance...
-+ MMAX = 0 case possible
+	should not change array sizes. only SHT function calls may (must) be different.
++ NPHI = 1 case should be possible.
+	(replace fftw call with a simple reorderer (complex <> double))
++ allow for NLAT odd :
+	use (NLAT+1)/2 as end condition should work in SH_to_spat.
+	change also in ylm etc...

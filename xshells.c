@@ -13,11 +13,10 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_sf_legendre.h>
 
-
 #include "SHT.c"
 
-long int NR, NU;	//  NR: total radial grid points. NU: grid points for velocity field. (=NR-NG)
-long int NG = 0;	//  NG: grid points for inner core.
+long int NR, NU;	// NR: total radial grid points. NU: grid points for velocity field. (=NR-NG)
+long int NG = 0;	// NG: grid points for inner core.
 double nu, eta;		// viscosity and magnetic diffusivity.
 double dtU, dtB;	// time step for navier-stokes and induction equation.
 double Omega0;		// global rotation rate (of outer boundary) => Coriolis force .
@@ -301,7 +300,7 @@ double step_Induction(long int nstep, complex double **Alm)
 }
 
 
-void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, double *polar_opt_max, double *Ric)
+void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, double *polar_opt_max, double *Ric, double *B0)
 {
 	double tmp;
 	int id;
@@ -337,6 +336,7 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 			if (strcmp(name,"nu") == 0)		nu = tmp;
 			if (strcmp(name,"eta") == 0)		eta = tmp;
 			if (strcmp(name,"Ric") == 0)		*Ric = tmp;
+			if (strcmp(name,"B0") == 0)		*B0 = tmp;
 			// NUMERICAL SCHEME
 			if (strcmp(name,"NR") == 0)		NR = tmp;
 			if (strcmp(name,"NG") == 0)		NG = tmp;
@@ -374,6 +374,7 @@ int main (int argc, char *argv[])
 {
 	double Ric = 0.0;		// default ic radius
 	double polar_opt_max = 0.0;	// default SHT optimization.
+	double b0 = 0.0;
 	double t0,t1,Rm,Rm2,z,time;
 	long int i,im,m,l,jj, it, lmtest;
 	long int iter_max, modulo;
@@ -384,7 +385,7 @@ int main (int argc, char *argv[])
 
 	printf("[XSHELLS] eXtendable Spherical Harmonic Earth-Like Liquid Simulator\n          by Nathanael Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
 
-	read_Par(command, job, &iter_max, &modulo, &polar_opt_max, &Ric);
+	read_Par(command, job, &iter_max, &modulo, &polar_opt_max, &Ric, &b0);
 
 	init_SH(polar_opt_max);
 	init_rad_sph(0.0, Ric, 1.0);
@@ -409,7 +410,10 @@ int main (int argc, char *argv[])
 			Blm.P[i][l] = 0.0;
 			Blm.T[i][l] = 0.0;
 		}
-		Blm.P[i][1] = j1(pi*r[i]);		// magnetic dipole
+//		Blm.P[i][1] = b0*j1(pi*r[i]);		// magnetic dipole
+		Blm.P[i][1] = b0 / (2*r[i]*r[i]);	// magnetic dipole like in E.Dormy's thesis (current free)
+		jj=1;
+		if (i<=jj) Blm.P[i][1] = b0/ (2*r[jj]*r[jj]);
 	}
 	sprintf(command,"poltorB0.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
 	PolTor_to_spat(&Blm, &B0, 0, NR-1, BC_MAGNETIC);	// background magnetic field.
@@ -437,11 +441,12 @@ int main (int argc, char *argv[])
 
 	DEB;
 
-	for (it=0; it< iter_max; it++) {
-		if (it==1) {
+	it =0;
+	while(it<iter_max) {
+/*		if (it==1) {
 			printf(" > inner core stops\n");
 			DeltaOmega = 0.0;
-		}
+		}*/
 		Ulm.T[NG][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
 //		t0 = t1;
 //		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
@@ -451,12 +456,13 @@ int main (int argc, char *argv[])
 		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,time,t1, t0);
 		if (isnan(t0)) runerr("NaN encountered");
 
-//		step_MHD(modulo, Alm);
-		step_NS(modulo, Alm);
+		step_MHD(modulo, Alm);
+//		step_NS(modulo, Alm);
 
+		it++;
 		if (MAKE_MOVIE != 0) {
-			sprintf(command,"poltorB_%04d.%s",it+1,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
-			sprintf(command,"poltorU_%04d.%s",it+1,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+			sprintf(command,"poltorB_%04d.%s",it,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
+			sprintf(command,"poltorU_%04d.%s",it,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 		}
 	}
 

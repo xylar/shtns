@@ -42,7 +42,7 @@ double DeltaOmega;	// differential rotation (of inner core)
 struct VectField B;
 struct PolTor Blm;
 
-
+long int BC, irs,ire;
 
 
 void write_vect(char *fn, double *vec, long int N)
@@ -78,7 +78,7 @@ void write_HS(char *fn, complex double **HS)
 	int ir,lm;
 	
 	fp = fopen(fn,"w");
-	for (ir=0;ir<NR;ir++) {
+	for (ir=irs;ir<=ire;ir++) {
 		if (HS[ir] != NULL) {
 			for(lm=0;lm<NLM;lm++) {
 				fprintf(fp,"%.6g %.6g  ",creal(HS[ir][lm]),cimag(HS[ir][lm]));
@@ -102,7 +102,7 @@ void write_slice(char *fn, double **v, int im)
 		for(j=1;j<=NLAT/2;j++) {
 			fprintf(fp,"-%.6g ",ct[NLAT/2-j]);	// first line = cos(theta)
 		}
-	for (i=0;i<NR;i++) {
+	for (i=irs;i<=ire;i++) {
 		if (v[i] != NULL) {
 			fprintf(fp,"\n%.6g ",r[i]);		// first row = radius
 			for(j=0;j<NLAT;j++) {
@@ -123,18 +123,18 @@ void rot_PolTor(struct PolTor *PT, long int istart, long int iend)
 
 	lapl = tmp;	lapd = tmp + NLM;
 	ir = istart;
-		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+		for (lm=0; lm<NLM; lm++) {
 			lapl[lm] = (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm] + Lr[ir].u*PT->P[ir+1][lm];
 		}
 	for (ir=istart+1; ir < iend; ir++) {
-		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+		for (lm=0; lm<NLM; lm++) {
 			lapd[lm] = Lr[ir].l*PT->P[ir-1][lm] + (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm] + Lr[ir].u*PT->P[ir+1][lm];
 			PT->P[ir-1][lm] = -lapl[lm];
 		}
 		lapt = lapl;	lapl = lapd;	lapd = lapt;	// rotate buffers.
 	}
 	ir = iend;
-		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+		for (lm=0; lm<NLM; lm++) {
 			lapd[lm] = Lr[ir].l*PT->P[ir-1][lm] + (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm];
 			PT->P[ir-1][lm] = -lapl[lm];
 			PT->P[ir][lm] = -lapd[lm];
@@ -145,21 +145,47 @@ void rot_PolTor(struct PolTor *PT, long int istart, long int iend)
 
 void usage()
 {
-	printf("\nUsage: xspp <poltor-file-saved-by-xshells> [op] command [args [...]]\n");
+	printf("\nUsage: xspp <poltor-file-saved-by-xshells> [op1] [op2] [...] command [args [...]]\n");
 	printf("list of available optional ops :\n");
 	printf(" curl : compute curl of field\n");
+	printf(" rlim <rmin>:<rmax> : render only from rmin to rmax\n");
 	printf("list of available commands :\n");
 	printf(" axi  : write meridional slice of axisymetric component (m=0)\n");
-	printf(" slice [angle]  : write meridional slice at phi=angle in degrees (default=0°) of vector field in spherical coordinates\n");
+	printf(" merid [angle]  : write meridional slice at phi=angle in degrees (default=0°) of vector field in spherical coordinates\n");
+	printf(" zcut [z]  : write slice at height=z (-1 to 1) of vector field in cylindrical coordinates (s, phi, z)\n");
+	printf(" surf [r]  : write surface data at r (0 to 1) or ir (1 to NR-1) of vector field in spherical coordinates\n");
 	printf(" HS  : write spherical harmonics decomposition\n");
 }
 
 int main (int argc, char *argv[])
 {
 	double t0, tmp;
-	long int BC, irs,ire;
 	long int ic;
 	long int i,im,m,l,lm;
+
+    int parse_op(int ic)	// returns number of parsed command line argument
+    {
+	long int i;
+	if (strcmp(argv[ic],"curl") == 0)
+	{
+		rot_PolTor(&Blm, irs, ire);	// compute rotational of field.
+		printf("> curl computed\n");
+		return 1;	// 1 command line argument parsed.
+	}
+	if (strcmp(argv[ic],"rlim") == 0)
+	{
+		double rmin, rmax;
+		ic++;	// go to next command line argument.
+		if (argc > ic) {
+			sscanf(argv[ic],"%lf:%lf",&rmin,&rmax);
+		} else runerr("rlim <rmin>:<rmax>  => missing arguments\n");
+		i = r_to_idx(rmin);	if (i>irs) irs=i;
+		i = r_to_idx(rmax);	if (i<ire) ire=i;
+		printf("> restricting to shells #%d to #%d (that is r=[%f, %f])\n",irs,ire, r[irs], r[ire]);
+		return 2;	// 2 command line argument parsed.
+	}
+	return 0;
+    }
 
 	printf(" [XSPP] Xshells Post-Processing   by N. Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
 	printf("  => compiled with: nlat=%d, nphi=%d,  lmax=%d, mmax=%d (mres=%d)\n",NLAT,NPHI,LMAX,MMAX,MRES);
@@ -176,12 +202,30 @@ int main (int argc, char *argv[])
 
 // parse optional op...
 	ic = 2;		// current argument count.
+	do {
+		i = parse_op(ic);
+		ic += i;
+	} while(i!=0);
+
+/*
 	if (strcmp(argv[ic],"curl") == 0)
 	{
 		rot_PolTor(&Blm, irs, ire);	// compute rotational of field.
 		printf("> curl computed\n");
 		ic++;	// go to next command line argument.
 	}
+	if (strcmp(argv[ic],"rlim") == 0)
+	{
+		double rmin, rmax;
+		ic++;	// go to next command line argument.
+		if (argc > ic) {
+			sscanf(argv[ic],"%lf:%lf",&rmin,&rmax);
+		} else runerr("rlim <rmin> <rmax>: missing arguments\n");
+		i = r_to_idx(rmin);	if (i>irs) irs=i;
+		i = r_to_idx(rmax);	if (i<ire) ire=i;
+		printf("> restricting to shells #%d to #%d (that is r=[%f, %f])\n",irs,ire, r[irs], r[ire]);
+		ic++;	// go to next command line argument.
+	}*/
 
 	if (argc <= ic) runerr("missing command.");
 
@@ -209,17 +253,34 @@ int main (int argc, char *argv[])
 		printf("> axisymmetric component written to files : o_Vp (phi component) and o_Vpol (poloidal stream function)\n");
 		exit(0);
 	}
-	if (strcmp(argv[ic],"equat") == 0)
+	if (strcmp(argv[ic],"zcut") == 0)
 	{
+		double z = 0.0;
+		ic++;
+		if (argc > ic) sscanf(argv[ic],"%lf",&z);
+		if (z != 0.0) runerr("z != 0 not supported yet...");
 		
+		runerr("sorry, zcut not supported yet...");
 		exit(0);
 	}
-	if (strcmp(argv[ic],"slice") == 0)
+	if (strcmp(argv[ic],"surf") == 0)
+	{
+		double rr = 1.0;
+		ic++;
+		if (argc > ic) sscanf(argv[ic],"%lf",&rr);
+		i = r_to_idx(rr);
+		if ((i<irs)||(i>ire)) runerr("requested r not available");
+		PolTor_to_spat(&Blm, &B, i, i, BC);	// render just one shell.
+		write_mx("o_Sr", B.r[i], NPHI, NLAT);	write_mx("o_St", B.t[i], NPHI, NLAT);	write_mx("o_Sp", B.p[i], NPHI, NLAT);
+		printf("> surface #%d (r=%.4f) written to files : o_Sr, o_St, o_Sp (spherical vector components)\n",i,r[i]);
+		exit(0);
+	}
+	if (strcmp(argv[ic],"merid") == 0)
 	{
 		double phi = 0.0;
 		ic++;
 		if (argc > ic) sscanf(argv[ic],"%lf",&phi);
-		PolTor_to_spat(&Blm, &B, irs, ire, BC);
+		PolTor_to_rot_spat(&Blm, 0.0, &B, irs, ire, BC);
 		im = lround(phi/360. *NPHI) % NPHI;
 		write_slice("o_Vr",B.r,im);	write_slice("o_Vt",B.t,im);	write_slice("o_Vp",B.p,im);
 		printf("> meridional slice #%d (phi=%.1f°) written to files : o_Vr, o_Vt, o_Vp (spherical vector components)\n",i,i*360./NPHI);
