@@ -19,10 +19,15 @@ V	complex double *Sl, *Tl;		// virtual pointers for given im
 X	double *zl;
 V	struct DtDp *dzl;
 	long int i,im,m,l;
-	
+
+ #if NPHI > 1
 X	fftw_execute_dft_r2c(fft,(double *) BrF, BrF);
 V	fftw_execute_dft_r2c(fft,(double *) BtF, BtF);
 V	fftw_execute_dft_r2c(fft,(double *) BpF, BpF);
+ #else
+X	fft_m0_r2c((double *) BrF, BrF);
+V	fft_m0_r2c((double *) BtF, BtF);	fft_m0_r2c((double *) BpF, BpF);
+ #endif
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
 		m=im*MRES;

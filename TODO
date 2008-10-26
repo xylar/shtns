@@ -1,41 +1,40 @@
 *** BUG ***
--- NPHI>MMAX*2 is right condition for the sampling theorem to apply.	(16/10/2008)
--- Bug found in SHT.c : here are the correct versions of LiM() and LM marcros :	(16/10/2008)
++ NPHI>MMAX*2 is right condition for the sampling theorem to apply.	(16/10/2008)
++ Bug found in SHT.c : here are the correct versions of LiM() and LM marcros :	(16/10/2008)
 	#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
--- Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
++ Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
 
 *** Optimizations ***
-+ SHT : NLAT odd could be improved a little bit.
 
-- SHT : use DCT space, keep low NLAT but regular grid and Gauss quadrature (??)
-        synthesis should be faster, analysis same speed.
+- time different implementations and chose the fastest...
 
-- SHT : implement even and odd sub-cases.
-
-- grid : try full NR*NLM matrices, loops are more efficient but what about cache ???
-
-- wouldn't it be better to store Tlm and Plm with m contiguous for each l ???
-
-+(- use "alloca()" to allocate temp memory on the stack with variable lengths) // ultrafast but not ANSI
-
-=> time different implementations and chose the fastest...
+? grid : try full NR*NLM matrices, loops are more efficient but what about cache ???
+? wouldn't it be better to store Tlm and Plm with m contiguous for each l ???
+? (- use "alloca()" to allocate temp memory on the stack with variable lengths) // ultrafast but not ANSI
 
 *** Features ***
 + velocity field computation
 + inner core differential rotation
-- euler explicit (ordre 1), mieux adapté aux transitoires.
-- variable time-step ?
-- conducting outer shell
-- insulating inner core
 
-+ boundary conditions dependence
+-+ boundary conditions dependence should be checked and improved.
+
+- euler explicit (order 1), better suited for fast waves.
+- variable time-step
+- penalization method for complex geometry.
+
+? conducting outer shell
+? insulating inner core
+
 
 *** SHT.c
-+ even/odd l dependance...
+- SHT : implement even and odd l sub-cases.
 	should not change array sizes. only SHT function calls may (must) be different.
-+ NPHI = 1 case should be possible.
-	(replace fftw call with a simple reorderer (complex <> double))
-+ allow for NLAT odd :
-	use (NLAT+1)/2 as end condition should work in SH_to_spat.
-	change also in ylm etc...
+- SHT : NLAT odd could be improved a little bit.
+- SHT : use DCT space, keep low NLAT but regular grid and Gauss quadrature (??)
+	synthesis should be faster, analysis same speed.
+
++ NPHI = 1 is now possible, and does not call FFTW.
+	only 10% performance increase ! I would have expected more...
++ NLAT odd is now allowed
+	special treatment in SHT function. (but could be improved)

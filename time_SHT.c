@@ -88,7 +88,7 @@ int main()
 	for (i=0;i<NLM;i++) {
 		Slm[i] = 0.0;
 	}
-	Slm[LiM(LMAX,0)] = Y10_ct;
+	Slm[LiM(1,0)] = Y10_ct;
 	SH_to_spat(Slm,ShF);
 	write_mx("spat",Sh,NPHI,NLAT);
 

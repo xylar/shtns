@@ -92,6 +92,21 @@ void NLspec(complex double *x, complex double *y, complex double *nl)
 }
 */
 
+/// two pseudo-fft functions for compatibility of data with MMAX=0
+inline void ifft_m0_c2r(complex double *BrF, double *Br)		// in-place only
+{
+	long int i;
+	for (i=1; i<NLAT; i++)		// zero is already in-place.
+		Br[i] = creal(BrF[i]);
+}
+
+inline void fft_m0_r2c(double *Br, complex double *BrF)		//in-place only
+{
+	long int i;
+	for (i=NLAT-1; i>0; i--)		// zero is already in-place.
+		BrF[i] = Br[i];
+}
+
 /////////////////////////////////////////////////////
 //   Scalar Spherical Harmonics Transform
 // input  : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
@@ -394,7 +409,11 @@ void init_SH(double eps)
 #endif
 	}
 
+ #if NPHI > 1
 	planFFT();		// initialize fftw
+ #else
+	printf("          => no fft required for NPHI=1.\n");
+ #endif
 
 // Additional arrays :
 	it = 0;

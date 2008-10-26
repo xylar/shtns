@@ -154,7 +154,12 @@ V		BtF += NLAT;	BpF += NLAT;
 
 X	BrF -= NLAT*(NPHI/2+1);		// restore original pointer
 V	BtF -= NLAT*(NPHI/2+1);	BpF -= NLAT*(NPHI/2+1);		// restore original pointers
+ #if NPHI>1
 X	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
 V	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
+ #else
+X	ifft_m0_c2r(BrF, (double *) BrF);
+V	ifft_m0_c2r(BtF, (double *) BtF);	ifft_m0_c2r(BpF, (double *) BpF);
+ #endif
 # }
