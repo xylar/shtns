@@ -339,25 +339,21 @@ void init_SH(double eps)
 		m = im*MRES;
 //		ylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT_2);
 //		dylm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT_2);
-		for (it=0;it<NLAT_2;it++) {
-#ifdef SHT_EQUAL
-			if ((m==1)&&(st[it]==0.)) {
-				printf("special case : ylm undef (set to zero) for m=1, at the pole.\n");
-				for (l=m; l<=LMAX; l++) {
-					ylm[im][it*(LMAX-m+1) + (l-m)] = 0.0;
-					dylm[im][it*(LMAX-m+1) + (l-m)].t = 0.0;
-					dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
+		for (it=0; it<NLAT_2; it++) {
+			if ((m==1)&&(st[it]==0.)) {		// gsl function diverges for m=1 and sint=0 => use approximation
+				gsl_sf_legendre_sphPlm_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1));
+				gsl_sf_legendre_sphPlm_array(LMAX, m, sqrt(sqrt(ct[it+1])), dtylm);
+				for (l=m; l<=LMAX; l++) {		// d(Pl1)/dt |(t=0) = Pl1(epsilon)/sin(epsilon)
+					dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m] / sqrt(1. - sqrt(ct[it+1]));
+					dylm[im][it*(LMAX-m+1) + (l-m)].p = dylm[im][it*(LMAX-m+1) + (l-m)].t;
 				}
 			} else {
-#endif
-			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
-			for (l=m; l<=LMAX; l++) {
-				dylm[im][it*(LMAX-m+1) + (l-m)].t = -st[it] * dtylm[l-m];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
-				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
-#ifdef SHT_EQUAL
-				if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
-			}
-#endif
+				gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
+				for (l=m; l<=LMAX; l++) {
+					dylm[im][it*(LMAX-m+1) + (l-m)].t = -st[it] * dtylm[l-m];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
+					dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
+					if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
+				}
 			}
 		}
 	}
