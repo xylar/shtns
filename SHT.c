@@ -42,6 +42,19 @@
 // Y10_ct = spherical harmonic representation of cos(theta) (l=1,m=0)
 #define Y10_ct sqrt(4.*M_PI/3.)
 
+// TEST FOR PARAMETERS AT COMPILE TIME
+#if NLAT <= LMAX
+	#error "NLAT must be greater than LMAX !"
+#endif
+#if LMAX < MMAX*MRES
+	#error "MMAX*MRES should not exceed LMAX !"
+#endif
+#if NPHI <= 2*MMAX
+	#error "NPHI and MMAX must conform to the sampling condition NPHI > 2*MMAX !"
+#endif
+
+
+
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };

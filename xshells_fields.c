@@ -452,3 +452,12 @@ void alloc_VectField(struct VectField *V, long int istart, long int iend)
 		V->r[ir] = NULL;	V->t[ir] = NULL;	V->p[ir] = NULL;
 	}
 }
+
+void zero_out_field(struct PolTor *Vlm)
+{
+	long int i,l;
+	for (i=0; i<NR; i++) {		// reset field.
+		if (Vlm->P[i] != NULL) for (l=0;l<NLM;l++) Vlm->P[i][l] = 0.0;
+		if (Vlm->T[i] != NULL) for (l=0;l<NLM;l++) Vlm->T[i][l] = 0.0;
+	}
+}

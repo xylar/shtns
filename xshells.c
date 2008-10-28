@@ -15,8 +15,6 @@
 
 #include "SHT.c"
 
-long int NR, NU;	// NR: total radial grid points. NU: grid points for velocity field. (=NR-NG)
-long int NG = 0;	// NG: grid points for inner core.
 double nu, eta;		// viscosity and magnetic diffusivity.
 double dtU, dtB;	// time step for navier-stokes and induction equation.
 double Omega0;		// global rotation rate (of outer boundary) => Coriolis force .
@@ -281,13 +279,38 @@ double step_MHD(long int nstep, complex double **Alm)
 	return 2*nstep*dtU;
 }
 
+/// perform nstep steps of full coupled dynamo equation, with temporary array Alm.
+double step_Dynamo(long int nstep, complex double **Alm)
+{
+	inline step1(struct PolTor *NLu, struct PolTor *NLb, struct PolTor *NLuo, struct PolTor *NLbo)
+	{
+		CALC_U(BC_NO_SLIP);
+		calc_Vort(&Ulm, Omega0, &W);
+		CALC_B;
+		calc_J(&Blm, &J);
+		NL_MHD(&U, &W, &B, &J, NLu);
+		NL_Induction(&U, &B, &B, NLb);
+		substepU(NLu, NLuo, Alm);
+		substepB(NLb, NLbo, Alm);
+	}
+
+	while(nstep > 0) {
+		nstep--;
+		step1(&NLu1, &NLb1, &NLu2, &NLb2);
+		step1(&NLu2, &NLb2, &NLu1, &NLb1);
+	}
+	return 2*nstep*dtU;
+}
+
+
 
 /// perform nstep steps of Induction equation, with temporary array Alm.
-double step_Induction(long int nstep, complex double **Alm)
+double step_Dyncin(long int nstep, complex double **Alm)
 {
 	inline step1(struct PolTor *NLb, struct PolTor *NLbo)
 	{
-		NL_Induction(&U, &B0, &B, NLb);
+		CALC_B;
+		NL_Induction(&U, &B, &B, NLb);
 		substepB(NLb, NLbo, Alm);
 	}
 
@@ -339,7 +362,7 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 			if (strcmp(name,"B0") == 0)		*B0 = tmp;
 			// NUMERICAL SCHEME
 			if (strcmp(name,"NR") == 0)		NR = tmp;
-			if (strcmp(name,"NG") == 0)		NG = tmp;
+			if (strcmp(name,"NH") == 0)		NH = tmp;
 			if (strcmp(name,"dtU") == 0)		dtU = tmp;
 			if (strcmp(name,"dtB") == 0)		dtB = tmp;
 			// TIME DOMAIN
@@ -372,10 +395,12 @@ double j1(double x)
 
 int main (int argc, char *argv[])
 {
+	double (*ptr_step)(long int, complex double **);
 	double Ric = 0.0;		// default ic radius
 	double polar_opt_max = 0.0;	// default SHT optimization.
 	double b0 = 0.0;
-	double t0,t1,Rm,Rm2,z,time;
+	double time = 0.0;
+	double rr, t0,t1,Rm,Rm2,z;
 	long int i,im,m,l,jj, it, lmtest;
 	long int iter_max, modulo;
 	complex double **Alm;		// temp scalar spectral (pol or tor) representation
@@ -386,89 +411,106 @@ int main (int argc, char *argv[])
 	printf("[XSHELLS] eXtendable Spherical Harmonic Earth-Like Liquid Simulator\n          by Nathanael Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
 
 	read_Par(command, job, &iter_max, &modulo, &polar_opt_max, &Ric, &b0);
-
 	init_SH(polar_opt_max);
 	init_rad_sph(0.0, Ric, 1.0);
 
-	init_Bmatrix();		init_Umatrix(BC_NO_SLIP);
+    if (b0 != 0.0) init_Bmatrix();
+	init_Umatrix(BC_NO_SLIP);
 
-	alloc_DynamicField(&Blm, &B, &NLb1, &NLb2, 0, NR-1);
 	alloc_DynamicField(&Ulm, &U, &NLu1, &NLu2, NG, NR-1);
-	alloc_VectField(&B0,0,NR-1);	alloc_VectField(&J,0,NR-1);	alloc_VectField(&W,NG,NR-1);
+	alloc_VectField(&W,NG,NR-1);
+    if (b0 != 0.0) {
+		alloc_DynamicField(&Blm, &B, &NLb1, &NLb2, 0, NR-1);
+		alloc_VectField(&B0,0,NR-1);	alloc_VectField(&J,0,NR-1);
+    }
 
-	printf("[Params] job name : %s -- NG=%d, rg=%f\n",job,NG,r[NG]);
-	printf("         Ek=%.2e, Ro=%.2e, Pm=%.2e, Re=%.2e\n",nu/Omega0, r[NG]*DeltaOmega/Omega0, nu/eta, r[NG]*DeltaOmega/nu);
+	printf("[Params] job name : %s\n",job);
+	printf("         Ek=%.2e, Ro=%.2e, Pm=%.2e, Re=%.2e, N=%.2e, M=%.2e, Elsasser=%.2e, Lehnert=%.2e\n",nu/Omega0, Ric*DeltaOmega/Omega0, nu/eta, Ric*DeltaOmega/nu, b0*b0/(Ric*DeltaOmega*Ric*DeltaOmega) , b0*0.5/sqrt(nu*eta), b0*b0/(eta*Omega0), b0/Omega0);
 	printf("         dtU.Omega=%.2e, dtU.nu.R^2=%.2e, dtB.eta.R^2=%.2e, dtB/dtU=%.2e\n",dtU*Omega0, dtU*nu, dtB*eta, dtB/dtU);
+	fflush(stdout);
 
 	Alm = (complex double **) malloc( NR * sizeof(complex double *));
 	for (i=0;i<NR;i++)
 		Alm[i] = (complex double *) malloc( NLM * sizeof(complex double));
 
+    if (b0 != 0.0) {
+	printf("=> Imposed magnetic field B0 : using small Rm MHD integration\n");
+	ptr_step = &step_MHD;
 	// init B fields.
+	zero_out_field(&Blm);
+	#define Set_Poloidal( cval ) Blm.P[i][LM(l,m)] = b0 * cval;
+	#define Set_Toroidal( cval ) Blm.T[i][LM(l,m)] = b0 * cval;
 	for (i=0; i<NR; i++) {
-		for (l=0;l<NLM;l++) {
-			Blm.P[i][l] = 0.0;
-			Blm.T[i][l] = 0.0;
-		}
-//		Blm.P[i][1] = b0*j1(pi*r[i]);		// magnetic dipole
-		Blm.P[i][1] = b0 / (2*r[i]*r[i]);	// magnetic dipole like in E.Dormy's thesis (current free)
-		jj=1;
-		if (i<=jj) Blm.P[i][1] = b0/ (2*r[jj]*r[jj]);
+		rr = r[i];
+		#include "inc_B0ini.c"
 	}
+	#ifdef INIT_FIELD_NAME
+	printf("    B0 set to : \"" INIT_FIELD_NAME "\"\n");
+	#endif
 	sprintf(command,"poltorB0.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
 	PolTor_to_spat(&Blm, &B0, 0, NR-1, BC_MAGNETIC);	// background magnetic field.
-	for (i=0; i<NR; i++) {
-		Blm.P[i][1] = 0.0;	// remove dipole.
+	zero_out_field(&Blm);
+	if (argc > 2) {
+		load_PolTor(argv[2], &Blm, &time, &m, &l, &im);
+		printf("    B read from file \"%s\".\n",argv[2]);
 	}
+    } else {
+	printf("=> No imposed magnetic field : using Navier-Stokes integration\n");
+	ptr_step = &step_NS;
+    }
 
 	// init U fields
-	for (i=NG; i<NR; i++) {
-		for (l=0;l<NLM;l++) {
-			Ulm.T[i][l] = 0.0;
-			Ulm.P[i][l] = 0.0;
+	if (argc > 1) {
+		load_PolTor(argv[1], &Ulm, &time, &m, &l, &im);		// load from file.
+		printf("    U field read from file \"%s\".\n",argv[1]);
+	} else {
+		zero_out_field(&Ulm);
+		for (i=NG; i<NR; i++) {
+//			Ulm.T[i][LM(1,0)] = r[i]*DeltaOmega*(1-(r[i]-r[NG])/(r[NR-1]-r[NG])) * Y10_ct;
 		}
-//		Ulm.T[i][LM(1,0)] = r[i]*DeltaOmega*(1-(r[i]-r[NG])/(r[NR-1]-r[NG])) * Y10_ct;
-	}
 		Ulm.T[NG][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
-
-	sprintf(command,"poltorU0.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+		sprintf(command,"poltorU0.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+	}
 
 	CALC_U(BC_NO_SLIP);
 	calc_Vort(&Ulm, Omega0, &W);
+    if (b0 != 0.0) {
 	calc_J(&Blm, &J);
 	NL_MHD(&U, &W, &B0, &J, &NLu2);
 	NL_Induction(&U, &B0, &B, &NLb2);
-
-	DEB;
+    }
 
 	it =0;
+		t0 = creal(Ulm.T[NG+1][1]);	t1 = creal(Ulm.P[NG+1][2]);
+		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,time,t1, t0);	fflush(stdout);
 	while(it<iter_max) {
-/*		if (it==1) {
+#ifdef _IMPULSE_
+		if ((DeltaOmega != 0.0)&&(time > 1)) {
 			printf(" > inner core stops\n");
 			DeltaOmega = 0.0;
-		}*/
+		}
+#endif
 		Ulm.T[NG][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
-//		t0 = t1;
-//		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
-		t0 = creal(Ulm.T[NG+1][1]);
-		t1 = creal(Ulm.P[NG+1][2]);
-		time = 2*it*modulo*dtU;
-		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,time,t1, t0);
+		(*ptr_step)(modulo, Alm);	// go for time integration !!
+
+		time += 2*modulo*dtU;
+		it++;
+		t0 = creal(Ulm.T[NG+1][1]);	t1 = creal(Ulm.P[NG+1][2]);
+		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,time,t1, t0);	fflush(stdout);
 		if (isnan(t0)) runerr("NaN encountered");
 
-		step_MHD(modulo, Alm);
-//		step_NS(modulo, Alm);
+//		t0 = t1;
+//		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
 
-		it++;
 		if (MAKE_MOVIE != 0) {
-			sprintf(command,"poltorB_%04d.%s",it,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
 			sprintf(command,"poltorU_%04d.%s",it,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+			if (b0 != 0.0) { sprintf(command,"poltorB_%04d.%s",it,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
 		}
 	}
 
 	if (MAKE_MOVIE == 0) {
-		sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
 		sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+		if (b0 != 0.0) { sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
 	}
 }
 

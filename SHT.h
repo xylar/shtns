@@ -15,10 +15,10 @@ LMAX, NLAT, MMAX, MRES, NPHI
 // ** MMAX*MRES <= LMAX **
 #define MMAX 0
 // MRES : azimutal symmetry
-#define MRES 3
+#define MRES 1
 // NPHI : number of azimutal grid points, at least 2*MMAX+1, 3*MMAX for antialiasing and 4*MMAX for full dealias
 // power of two is better (but not mandatory), 
-#define NPHI 2
+#define NPHI 1
 
 //  ADDITIONAL FINE TUNING  //
 // compute and print some debugging information...

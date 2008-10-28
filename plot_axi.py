@@ -4,6 +4,7 @@ from pylab import *     # matplotlib
 from subprocess import *	# lance une ligne de commande
 import sys              # acces a la ligne de commande.
 
+rg=0.35
 ir0=1
 
 retcode = call("./xspp " + sys.argv[1] + " axi", shell=True)
@@ -50,6 +51,10 @@ m=amax(abs(b))
 contour(array(x),array(y),b,arange(m/6,m,m/3),colors='k')
 contour(array(x),array(y),b,arange(-m/6,-m,-m/3),colors='k')
 #axvline(x=0, ymin=-1, ymax=1, color='k')
+theta = linspace(-pi/2,pi/2,100)
+#r = ones(100)*rg
+#polar(theta,r)
+#plot(rg*cos(theta),rg*sin(theta),'k')
 
 axis('equal')
 axis('off')

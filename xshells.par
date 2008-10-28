@@ -5,22 +5,23 @@
 ##########################################################################
 
 job = test  	# job name, used as a suffix for output files.
-movie = 0	# 0=field output at the end only (default), 1=output every modulo
+movie = 1	# 0=field output at the end only (default), 1=output every modulo
 
 ### PHYSICAL PARAMS ###
-Omega0 = 1 		# Global rotation rate
+Omega0 = 0 		# Global rotation rate
 DeltaOmega = 1e-6	# Differential rotation
 nu = 1.0e-4		# viscosity
 eta = 1.0e-4		# magnetic diffusivity
 Ric = 0.35		# radius of solid inner sphere (ie earth's inner core)
-B0 = 1.0e-3		# magnetic field scaling factor
+B0 = 1.0e-4		# magnetic field scaling factor
 
 ### NUMERICAL SCHEME ###
-NR = 301	# number of radial shells
+NR = 301	# total number of radial shells
+NH = 0		# number of radial shells in the hartman layer near the inner core.
 dtU = 0.1	# time step for Navier-Stokes equation
 dtB = 0.1	# time step for Induction equation
-iter_max = 5	# iteration number (ouput #)
-modulo = 10	# sub-iterations (time steps between outputs)
+iter_max = 20	# iteration number (ouput #)
+modulo = 20	# sub-iterations (time steps between outputs)
 
 ### ALGORITHM FINE TUNING ###
 # fftw_plan_mode : 0=estimate, 1=measure, 2=patient (default), 3=exhaustive

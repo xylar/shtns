@@ -1,16 +1,21 @@
 #!/usr/bin/python
 #plot a slice
 from pylab import *     # matplotlib
+import os
 import sys              # acces a la ligne de commande.
 
 ir0=1
 rg=0.35
 
-argn = len(sys.argv)
+i=1;	# snapshot numbering
 
-for i in range(1, argn):
-	print 'loading',sys.argv[i]
-	a=load(sys.argv[i])
+for f in sys.argv[1:] :
+	retcode = os.system("./xspp " + f + " axi |grep [load]")
+	if retcode != 0:
+		print 'error from xspp'
+		exit()
+	
+	a=load('o_Vp')
 	s = a.shape
 
 	ct = a[0,1:s[1]]
@@ -23,6 +28,8 @@ for i in range(1, argn):
 
 	#convert Up to angular velocity
 	#a=a/array(x)
+	#a[:,s[1]-2] = a[:,s[1]-3]	#remove nan
+	#a[:,0] = a[:,1]			#remove nan
 	
 	m=amax(abs(a))
 	print 'max value=',m
@@ -39,4 +46,10 @@ for i in range(1, argn):
 	colorbar()
 	clim(-m,m)
 
-show()
+#	savefig( "slide_" + str(i) + ".png" )
+	savefig( "slide_%04d.png" % i )
+	print '>>> slide', i, "saved.\n"
+	i+=1
+	close()
+
+#retcode = os.system( 'mencoder "mf://slide_*.png" -mf fps=10 -o movie.avi -ovc lavc -lavcopts vcodec=mjpeg' )

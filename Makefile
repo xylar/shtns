@@ -1,6 +1,6 @@
 # le compilateur :
 ## generic gcc
-cmd = gcc 
+cmd = gcc -O3
 ## recent gcc with native support
 #cmd = gcc -O3 -march=native -mfpmath=sse
 ## gcc k8 (lgitl3)
@@ -22,6 +22,8 @@ SHT/spat_to_SH.c : SHT/spat_to_SH.gen.c SHT/Makefile
 
 xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
+xshells_imp : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
+	$(cmd) xshells.c -D_IMPULSE_ -lfftw3 -lgsl -lgslcblas -lm -o xshells_imp
 xspp : xspp.c grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
 	$(cmd) xspp.c -lfftw3 -lgsl -lgslcblas -lm -o xspp
 

@@ -8,9 +8,10 @@
         => matrices have size NR*(LMAX+1), decomposition is done on NR.
 */
 
-#ifndef NR
-long int NR;
-#endif
+long int NR;	// total number of radial shells
+long int NU;	// radial shells of fluid
+long int NG;	// radial shells for the solid inner core
+long int NH=0;	// radial shell assigned to hartmann layer densification.
 
 #define RL(i,l) ( i*(LMAX+1) + l )
 #define RLM(i,lm) ( i*NLM + lm )
@@ -363,7 +364,7 @@ void BL_Grid(double rmin, double rg, double rmax)
 		return x;
 	}
 
-	int nh = 0;		// can be made a parameter if required : add nh points to the inner hartman layer.
+	int nh = NH;		// can be made a parameter if required : add nh points to the inner hartman layer.
 	int nr1,nr2, i,j;
 	double e,q,hu,h;
 
@@ -416,7 +417,7 @@ void BL_Grid(double rmin, double rg, double rmax)
 	for(j=0; j<=i+1; j++)
 		r[j]=j*hu;
 
-	printf("[GRID:BL] NR=%d, r=[%f, %f], NG=%d, Ric=%f\n", NR,r[0], r[NR-1], NG, r[NG]);
+	printf("[GRID:BL] NR=%d, r=[%f, %f], NG=%d, Ric=%f   NH=%d\n", NR,r[0], r[NR-1], NG, r[NG], nh);
 }
 
 

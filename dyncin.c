@@ -534,7 +534,7 @@ void init_Bmatrix()
 
 int main (int argc, char *argv[])
 {
-	double t0,t1,Rm,Rm2,z;
+	double t0,t1,Rm,Rm2,rr;
 	int i,im,m,l,jj, it, lmtest;
 	FILE *fp;
 	complex double *Btmp[NR];
@@ -554,6 +554,8 @@ int main (int argc, char *argv[])
 	// Dudley James : Rmcrit around 54 ... for m=1 // I find Rmcrit = 40 for m=2...
 	
 	lmtest = LM(1,1);
+	#define Set_Poloidal( cval ) UPlm[i][LM(l,m)] = cval;
+	#define Set_Toroidal( cval ) UTlm[i][LM(l,m)] = cval;
 	for (i=0; i<NR; i++) {
 		for (l=0;l<NLM;l++) {
 			BPlm[i][l] = 0.0;
@@ -566,22 +568,12 @@ int main (int argc, char *argv[])
 //		BPlm[i][LM(2,2)] = r[i];
 		BPlm[i][lmtest] = r[i];
 
-// WARNING : compared to the article of Dudley & James, the Pol and Tor functions must be divided by r.
-// simple roll flows (eq 24)
-//		UTlm[i][LM(2,0)] = Rm*r[i]*sin(pi*r[i]);
-// 		UPlm[i][LM(2,0)] = 0.14*UTlm[i][LM(2,0)];
-
-// gubins (from Dudley-James)
-		UTlm[i][LM(2,0)] = -r[i]*sin(2*pi*r[i]) * tanh(2*pi*(1-r[i]));
-		UPlm[i][LM(2,0)] = 0.1* UTlm[i][LM(2,0)];
-/*// pekeris (") en j2  (eq 20-21)
-		if (r[i] != 0.0) {
-			z =  5.7634591968447*r[i];
-			UPlm[i][LM(2,2)] = Rm*5.7634591968447 * ((3.0/(z*z*z) -1.0/z)*sin(z) - 3./(z*z) * cos(z));
-			UTlm[i][LM(2,2)] = 5.7634591968447 * UPlm[i][LM(2,2)];
-		}	*/
-//		printf("%f ", UPlm[i][LM(2,2)]);
+		rr = r[i];
+		#include "inc_U0ini.c"
 	}
+	#ifdef INIT_FIELD_NAME
+	printf("    U field set to : \"" INIT_FIELD_NAME "\"\n");
+	#endif
 
 // representation spatiale de U
 // maximum de vitesse :
