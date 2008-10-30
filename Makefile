@@ -1,6 +1,8 @@
 # le compilateur :
 ## generic gcc
 cmd = gcc -O3
+## profiling
+cmd = gcc -O3 -p -fno-inline
 ## recent gcc with native support
 #cmd = gcc -O3 -march=native -mfpmath=sse
 ## gcc k8 (lgitl3)
@@ -12,6 +14,7 @@ cmd = gcc -O3
 #cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
 
 shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat.gen.c SHT/Makefile
+ini = inc_B0ini.c inc_U0ini.c
 
 default : xshells
 
@@ -20,9 +23,9 @@ SHT/SH_to_spat.c : SHT/SH_to_spat.gen.c SHT/Makefile
 SHT/spat_to_SH.c : SHT/spat_to_SH.gen.c SHT/Makefile
 	$(MAKE) spat_to_SH.c -C SHT
 
-xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
+xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
-xshells_imp : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
+xshells_imp : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
 	$(cmd) xshells.c -D_IMPULSE_ -lfftw3 -lgsl -lgslcblas -lm -o xshells_imp
 xspp : xspp.c grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
 	$(cmd) xspp.c -lfftw3 -lgsl -lgslcblas -lm -o xspp

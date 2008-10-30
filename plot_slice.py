@@ -23,19 +23,22 @@ for i in range(1, argn):
 
 	#convert Up to angular velocity
 	#a=a/array(x)
-	
+	#a[:,s[1]-2] = a[:,s[1]-3]	#remove nan
+	#a[:,0] = a[:,1]			#remove nan
+
 	m=amax(abs(a))
 	print 'max value=',m
 	figure()
 	#pcolor(array(x),array(y),a,shading='interp')
 	#colormaps : cm.PuOr, cm.RdBu, cm.RdGy
-	contourf(array(x),array(y),a,15,cmap=cm.RdBu)
+	contourf(array(x),array(y),a,20,cmap=cm.RdBu)
 	theta = linspace(-pi/2,pi/2,100)
 	plot(rg*cos(theta),rg*sin(theta),color='gray')
 	plot(cos(theta),sin(theta),color='gray')
 
 	axis('equal')
 	axis('off')
+#	subplots_adjust(left=0.02, bottom=0.02, right=0.98, top=0.98, wspace=0.1, hspace=0.1)
 	colorbar()
 	clim(-m,m)
 

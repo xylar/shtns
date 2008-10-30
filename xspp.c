@@ -150,35 +150,6 @@ void write_equat(char *fn, double **v, double fac)
 	fclose(fp);
 }
 
-void rot_PolTor(struct PolTor *PT, long int istart, long int iend)
-{
-	complex double tmp[NLM*2];
-	complex double *lapl, *lapd, *lapt;
-	complex double **p;
-	long int ir,lm;
-
-	lapl = tmp;	lapd = tmp + NLM;
-	ir = istart;
-		for (lm=0; lm<NLM; lm++) {
-			lapl[lm] = (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm] + Lr[ir].u*PT->P[ir+1][lm];
-		}
-	for (ir=istart+1; ir < iend; ir++) {
-		for (lm=0; lm<NLM; lm++) {
-			lapd[lm] = Lr[ir].l*PT->P[ir-1][lm] + (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm] + Lr[ir].u*PT->P[ir+1][lm];
-			PT->P[ir-1][lm] = -lapl[lm];
-		}
-		lapt = lapl;	lapl = lapd;	lapd = lapt;	// rotate buffers.
-	}
-	ir = iend;
-		for (lm=0; lm<NLM; lm++) {
-			lapd[lm] = Lr[ir].l*PT->P[ir-1][lm] + (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm];
-			PT->P[ir-1][lm] = -lapl[lm];
-			PT->P[ir][lm] = -lapd[lm];
-		}
-	// switch Pol <> Tor
-	p = PT->P;	PT->P = PT->T;	PT->T = p;
-}
-
 void usage()
 {
 	printf("\nUsage: xspp <poltor-file-saved-by-xshells> [op1] [op2] [...] command [args [...]]\n");
@@ -210,7 +181,7 @@ int main (int argc, char *argv[])
 	if (argc <= ic) return 0;
 	if (strcmp(argv[ic],"curl") == 0)
 	{
-		rot_PolTor(&Blm, irs, ire);	// compute rotational of field.
+		curl_PolTor(&Blm, irs, ire);	// compute rotational of field.
 		printf("> curl computed\n");
 		return 1;	// 1 command line argument parsed.
 	}

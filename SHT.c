@@ -105,19 +105,46 @@ void NLspec(complex double *x, complex double *y, complex double *nl)
 }
 */
 
-/// two pseudo-fft functions for compatibility of data with MMAX=0
+/// two pseudo-fft functions for compatibility of data with FFTW and MMAX=0
 inline void ifft_m0_c2r(complex double *BrF, double *Br)		// in-place only
 {
 	long int i;
 	for (i=1; i<NLAT; i++)		// zero is already in-place.
-		Br[i] = creal(BrF[i]);
+//		Br[i] = creal(BrF[i]);
+		Br[i] = Br[2*i];
 }
 
 inline void fft_m0_r2c(double *Br, complex double *BrF)		//in-place only
 {
 	long int i;
+
+/* algorithm with temp array */
+	double tmp[NLAT];
+
+	for (i=1; i<NLAT; i++)
+		tmp[i] = Br[i];		// copy to temp array
+	for (i=1; i<NLAT; i++)
+//		(double) BrF[i] = tmp[i];	// copy back, interleaved.	*/
+		Br[2*i] = tmp[i];	// copy back, interleaved.	*/
+
+/* simple reverse loop algorithm (BAD performance on x86)
 	for (i=NLAT-1; i>0; i--)		// zero is already in-place.
-		BrF[i] = Br[i];
+		(double) BrF[i] = Br[i];		// backward loop sucks...	*/
+
+/* first upper half can be moved safely in upward direction. (improves things a bit)
+	for (i=(NLAT+1)/2; i<NLAT; i++)
+		(double) BrF[i] = Br[i];	// upper half can be moved safely.
+	for (i=(NLAT-1)/2; i>0; i--)
+		(double) BrF[i] = Br[i];		// backward loop sucks...	*/
+
+/* upper halves are moved in upward direction, recursiveley. (may improve, or may not...)
+	long int i0 = NLAT;
+	while(i0 > 1) {
+		//printf("i0=%d ",i0);
+		for (i=(i0+1)/2; i<i0; i++)
+			(double) BrF[i] = Br[i];	// upper half can be moved safely.
+		i0 = (i0+1)/2;
+	}	//	*/
 }
 
 /////////////////////////////////////////////////////

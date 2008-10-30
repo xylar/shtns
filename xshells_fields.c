@@ -13,6 +13,43 @@ struct VectField {
 struct PolTor {
 	complex double **P,**T;
 };
+struct StatSpecVect {	// a static spectral vector, ready for SHT. Usefull to add "for free" a background variable vector value.
+	long int nlm;	// number of non-zero elements
+	long int *lm;	// array of corresponding indices
+	complex double *QST;	// data ready for SHT. QST[ir*nlm*3 + 3*j] is Pol/(r*l(l+1)) ,QST[ir*nlm*3 + 3*j+1] is spheroidal, QST[ir*nlm*3 + 3*j+2] is toroidal.
+};
+
+
+/// compute curl of PolTor vector.
+void curl_PolTor(struct PolTor *PT, long int istart, long int iend)
+{
+	complex double tmp[NLM*2];
+	complex double *lapl, *lapd, *lapt;
+	complex double **p;
+	long int ir,lm;
+
+	lapl = tmp;	lapd = tmp + NLM;
+	ir = istart;
+		for (lm=0; lm<NLM; lm++) {
+			lapl[lm] = (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm] + Lr[ir].u*PT->P[ir+1][lm];
+		}
+	for (ir=istart+1; ir < iend; ir++) {
+		for (lm=0; lm<NLM; lm++) {
+			lapd[lm] = Lr[ir].l*PT->P[ir-1][lm] + (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm] + Lr[ir].u*PT->P[ir+1][lm];
+			PT->P[ir-1][lm] = -lapl[lm];
+		}
+		lapt = lapl;	lapl = lapd;	lapd = lapt;	// rotate buffers.
+	}
+	ir = iend;
+		for (lm=0; lm<NLM; lm++) {
+			lapd[lm] = Lr[ir].l*PT->P[ir-1][lm] + (Lr[ir].d -l2[lm]*r_2[ir])*PT->P[ir][lm];
+			PT->P[ir-1][lm] = -lapl[lm];
+			PT->P[ir][lm] = -lapd[lm];
+		}
+	// switch Pol <> Tor
+	p = PT->P;	PT->P = PT->T;	PT->T = p;
+}
+
 
 
 /// compute the cartesian coordinates of a vector field at r=0, from its Poloidal value component
@@ -39,7 +76,8 @@ inline void cart_spat0_to_Sph(double Vx, double Vy, double Vz, complex double *S
 }
 
 #define CALC_U(bc)   PolTor_to_spat(&Ulm, &U, NG, NR-1, (bc))
-#define CALC_B       PolTor_to_spat(&Blm, &B, 0, NR-1, BC_MAGNETIC)
+//#define CALC_B       PolTor_to_spat(&Blm, &B, 0, NR-1, BC_MAGNETIC)
+//#define CALC_B       calc_B(&Blm, &B, &B0lm)
 
 /// compute spatial field from Poloidal/Toroidal representation.
 void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, long int iend, long int BC)
@@ -115,11 +153,11 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 }
 
 
-/// Compute W = rot(V) + Wz0.ez  from PolTor components.
+/// Compute W = curl(V) + Wz0.ez  from PolTor components.
 /// IN: PT  : pol/tor components of vector V
 ///     Wz0 : background value along ez
-/// OUT: W : r,theta,phi components of rot(V) + Wz0.ez
-void PolTor_to_rot_spat(struct PolTor *PT, double Wz0, struct VectField *W, long int istart, long int iend, long int BC)
+/// OUT: W : r,theta,phi components of curl(V) + Wz0.ez
+void PolTor_to_curl_spat(struct PolTor *PT, double Wz0, struct VectField *W, long int istart, long int iend, long int BC)
 // Pol = Tor;  Tor = Lap.Pol
 {
 	complex double Q[NLM];	// l(l+1) * T/r
@@ -171,7 +209,7 @@ void PolTor_to_rot_spat(struct PolTor *PT, double Wz0, struct VectField *W, long
 /// spatial to curl : only for ir = 1 .. NR-2
 ///	Pol <- Tor
 ///	Tor <- Q/r - 1/r.d(rS)/dr
-void spat_to_rot_PolTor(struct VectField *V, complex double **Plm, complex double **Tlm, long int istart, long int iend)
+void spat_to_curl_PolTor(struct VectField *V, complex double **Plm, complex double **Tlm, long int istart, long int iend)
 {
 	complex double Q[NLM];		// Q
 	complex double S[NLM*3];	// buffers for S.
@@ -220,7 +258,7 @@ void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **P
 */
 
 
-/// compute vorticity field from poloidal/toroidal components of velocity [ie poltor_to_rot_spat applied to U]
+/// compute vorticity field from poloidal/toroidal components of velocity [ie poltor_to_curl_spat applied to U]
 /// IN: PT : pol/tor components of velocity
 ///     Om0 : background global rotation (solid body rotation rate) to include in vorticity
 /// OUT: W : r,theta,phi components of vorticity field
@@ -251,36 +289,101 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 	}
 }
 
-/// compute current density field from poloidal/toroidal components of magnetic field [ie poltor_to_rot_spat applied to B]
+/// compute current density field from poloidal/toroidal components of magnetic field [ie poltor_to_curl_spat applied to B]
 /// IN: PT : pol/tor components of magnetic field
 /// OUT: J : r,theta,phi components of current density field
-void calc_J(struct PolTor *PT, struct VectField *J)
+void calc_J(struct PolTor *PT, struct VectField *J, struct StatSpecVect *J0)
 {
 	complex double Q[NLM];
 	complex double S[NLM];
 	complex double T[NLM];
 	long int ir,lm;
 
+	complex double *QST;
+	long int *lma;
+	long int j,nj;
+
+	if (J0 != NULL) {	nj = J0->nlm;	lma = J0->lm;	}
+
 //	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
-			T[lm] = (r_2[ir]*l2[lm] - Lr[ir].d)*PT->P[ir][lm] - Lr[ir].l*PT->P[ir-1][lm] - Lr[ir].u*PT->P[ir+1][lm];
 			Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
 			S[lm] = Wr[ir].l*PT->T[ir-1][lm] + Wr[ir].d*PT->T[ir][lm] + Wr[ir].u*PT->T[ir+1][lm];
+			T[lm] = (r_2[ir]*l2[lm] - Lr[ir].d)*PT->P[ir][lm] - Lr[ir].l*PT->P[ir-1][lm] - Lr[ir].u*PT->P[ir+1][lm];
+		}
+		if (J0 != NULL) {		// Add Background Current
+			QST = &(J0->QST[ir*nj*3]);	//QST[ir*nlm*3 + 3*j]
+			for(j= 0; j<nj; j++) {
+				lm = lma[j];
+				Q[lm] += QST[j*3];
+				S[lm] += QST[j*3+1];
+				T[lm] += QST[j*3+2];
+			}
 		}
 		SH_to_spat(Q,(complex double *) J->r[ir]);
 		SHsphtor_to_spat(S, T, (complex double *) J->t[ir], (complex double *) J->p[ir]);
 	}
 }
 
+/// compute spatial field from Poloidal/Toroidal representation.
+void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
+{
+	complex double Q[NLM];	// l(l+1) * P/r
+	complex double S[NLM];	// dP/dr + P/r = 1/r.d(rP)/dr = Wr(P)
+	complex double T[NLM];	// T
+	double dr;
+	long int ir,lm,l;
+
+	complex double *QST;
+	long int *lma;
+	long int j,nj;
+
+	if (B0 != NULL) {	nj = B0->nlm;	lma = B0->lm;	}
+
+	ir = 0;
+		Pol_to_cart_spat0(PT->P, V->r[ir],V->t[ir],V->p[ir]);
+		for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
+			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
+		}
+	for (ir=1; ir<NR-1; ir++) {
+		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+			Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
+			S[lm] = Wr[ir].l*PT->P[ir-1][lm] + Wr[ir].d*PT->P[ir][lm] + Wr[ir].u*PT->P[ir+1][lm];
+			T[lm] = PT->T[ir][lm];
+		}
+		if (B0 != NULL) {		// Add Background Magnetic Field
+			QST = &(B0->QST[ir*nj*3]);	//QST[ir*nlm*3 + 3*j]
+			for(j= 0; j<nj; j++) {
+				lm = lma[j];
+				Q[lm] += QST[j*3];
+				S[lm] += QST[j*3+1];
+				T[lm] += QST[j*3+2];
+			}
+		}
+		SH_to_spat(Q,(complex double *) V->r[ir]);
+		SHsphtor_to_spat(S, T, (complex double *) V->t[ir], (complex double *) V->p[ir]);
+	}
+	ir = NR-1;
+		// Magnetic field (insulator BC) : T=0, dP/dr = -(l+1)/r.P => S = -lP/r
+		for (lm=0, l=0; lm<NLM; lm++) {
+			S[lm] = -l*PT->P[ir][lm]*r_1[ir];
+			if (l < LMAX) { l++; } else { l=0; }
+			Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
+		}
+		SH_to_spat(Q,(complex double *) V->r[ir]);
+		SHsph_to_spat(S, (complex double *) V->t[ir], (complex double *) V->p[ir]);
+}
+
+
 // *****************************
 // ***** NON-LINEAR TERMS ******
 // *****************************
 
-/// compute rot(VxW + JxB) and its pol-tor components.
+/// compute curl(VxW + JxB) and its pol-tor components.
 /// output : V, B, J unchanged, W = VxW + JxB
-///          NL = PolTor[rot(VxW + JxB)]
-void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, struct PolTor *NL)
+///          NL = PolTor[curl(VxW + JxB)]
+void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, /*struct VectField *b, struct VectField *j,*/ struct PolTor *NL)
 {
 	double vr,vt,vp;
 	long int ir,lm;
@@ -290,18 +393,22 @@ void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struc
 			vr =  J->t[ir][lm]*B->p[ir][lm] - J->p[ir][lm]*B->t[ir][lm];	// JxB
 			vt =  J->p[ir][lm]*B->r[ir][lm] - J->r[ir][lm]*B->p[ir][lm];
 			vp =  J->r[ir][lm]*B->t[ir][lm] - J->t[ir][lm]*B->r[ir][lm];
-
+/*
+			vr +=  j->t[ir][lm]*b->p[ir][lm] - j->p[ir][lm]*b->t[ir][lm];	// jxb
+			vt +=  j->p[ir][lm]*b->r[ir][lm] - j->r[ir][lm]*b->p[ir][lm];
+			vp +=  j->r[ir][lm]*b->t[ir][lm] - j->t[ir][lm]*b->r[ir][lm];
+*/
 			vr += V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];	// VxW
 			vt += V->p[ir][lm]*W->r[ir][lm] - V->r[ir][lm]*W->p[ir][lm];
 			vp += V->r[ir][lm]*W->t[ir][lm] - V->t[ir][lm]*W->r[ir][lm];
 			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
 		}
 	}
-	spat_to_rot_PolTor(W, NL->T, NL->P, NG+1, NR-2);
+	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);
 }
 
-/// compute rot(VxW) and its pol-tor components.
-/// output : V unchanged, W = VxW, NL = PolTor[rot(VxW)]
+/// compute curl(VxW) and its pol-tor components.
+/// output : V unchanged, W = VxW, NL = PolTor[curl(VxW)]
 /// U is kept unchanged
 void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 {
@@ -316,13 +423,13 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
 		}
 	}
-	spat_to_rot_PolTor(W, NL->T, NL->P, NG+1, NR-2);
+	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);
 }
 
-/// compute rot(VxB)
+/// compute curl(VxB)
 /// IN:  V, B are spatial vector fields (unchanged)
 /// OUT: VxB  is the VxB resulting vector field. (Note: VxB can be either of V or B or a third vector)
-///      NL is the PolTor component of rot(VxB)
+///      NL is the PolTor component of curl(VxB)
 void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *VxB, struct PolTor *NL)
 {
 	double vr,vt,vp,rO;
@@ -350,7 +457,7 @@ void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *Vx
 		for (lm=0; lm<NPHI*NLAT; lm++) {
 			Br[ir][lm] = 0.0;	Bt[ir][lm] = 0.0;	Bp[ir][lm] = 0.0;
 		}*/
-	spat_to_rot_PolTor(VxB, NL->P, NL->T, 1,NR-2);
+	spat_to_curl_PolTor(VxB, NL->P, NL->T, 1,NR-2);
 }
 
 
@@ -376,7 +483,9 @@ double Energy(struct PolTor *PT)
 	return E;
 }
 
-
+/********************************
+ *** INITIALIZATION FUNCTIONS ***
+ ********************************/
 
 /// Allocate memory for a dynamic vector field (like U or B) and its pol/tor representation + non-linear term storage.
 /// (V, NL1 and NL2 are optional)
@@ -460,4 +569,78 @@ void zero_out_field(struct PolTor *Vlm)
 		if (Vlm->P[i] != NULL) for (l=0;l<NLM;l++) Vlm->P[i][l] = 0.0;
 		if (Vlm->T[i] != NULL) for (l=0;l<NLM;l++) Vlm->T[i][l] = 0.0;
 	}
+}
+
+/// Isolate the non-zero modes in *Vlm and store them pre-computed (ready for SHT) in a minimal way in *ssv and/or *curl
+/// Gives the ability to add "for free" background fields (B, ...)
+/// return number of non-zero modes. 
+int Make_StatSpecVect(struct PolTor *Vlm, struct StatSpecVect *ssv, struct StatSpecVect *curl, long int irs, long int ire, long int BC)
+{
+	long int i,j,lm, inz;
+	long int lmcount = 0;
+	long int lms[NLM];
+	void *ptr;
+
+	// count non-zero modes
+	for (lm=0; lm<NLM; lm++) {
+		inz = 0;
+		for (i=irs; i<=ire; i++) {
+			if ((Vlm->P[i][lm] != 0.0)||(Vlm->T[i][lm] != 0.0)) inz=1;
+		}
+		if (inz > 0) {		// mode is non-zero
+			lms[lmcount] = lm;	// store mode
+			lmcount++;		// count
+		}
+	}
+	if (ssv != NULL) ssv->nlm = lmcount;
+	if (curl != NULL) curl->nlm = lmcount;
+
+	if (lmcount == 0) return lmcount;	// stop here.
+
+	// go buy some memory
+	if (ssv != NULL) {
+DEB;
+		ptr = malloc( lmcount* (sizeof(long int) + 3*NR*sizeof(complex double)) );
+		ssv->lm = (long int *) ptr;
+		ptr = ssv->lm + lmcount;
+		ssv->QST = (complex double *) ptr;
+
+		for (j=0; j<lmcount; j++) ssv->lm[j] = lms[j];		// copy lm indices
+
+		for (i=0; i<NR; i++) {				// zero out modes
+			for (j=0; j<lmcount*3; j++) ssv->QST[i*lmcount*3 +j] = 0.0;
+		}
+
+		// pre-compute and store QST values.
+		for (i=irs; i<=ire; i++) {
+			for (j=0; j<lmcount; j++) {
+				lm = lms[j];
+				ssv->QST[(i*lmcount +j)*3] = r_1[i]*l2[lm] * Vlm->P[i][lm];
+				ssv->QST[(i*lmcount +j)*3 + 1] = Wr[i].l*Vlm->P[i-1][lm] + Wr[i].d*Vlm->P[i][lm] + Wr[i].u*Vlm->P[i+1][lm];
+				ssv->QST[(i*lmcount +j)*3 + 2] = Vlm->T[i][lm];
+			}
+		}
+	}
+	if (curl != NULL) {
+		ptr = malloc( lmcount* (sizeof(long int) + 3*NR*sizeof(complex double)) );
+		curl->lm = (long int *) ptr;
+		ptr = curl->lm + lmcount;
+		curl->QST = (complex double *) ptr;
+
+		for (j=0; j<lmcount; j++) curl->lm[j] = lms[j];		// copy lm indices
+
+		for (i=0; i<NR; i++) {				// zero out modes
+			for (j=0; j<lmcount*3; j++) curl->QST[i*lmcount*3 +j] = 0.0;
+		}
+		// pre-compute and store QST values.
+		for (i=irs; i<=ire; i++) {
+			for (j=0; j<lmcount; j++) {
+				lm = lms[j];
+				curl->QST[(i*lmcount +j)*3] = r_1[i]*l2[lm] * Vlm->T[i][lm];
+				curl->QST[(i*lmcount +j)*3 + 1] = Wr[i].l*Vlm->T[i-1][lm] + Wr[i].d*Vlm->T[i][lm] + Wr[i].u*Vlm->T[i+1][lm];
+				curl->QST[(i*lmcount +j)*3 + 2] = (r_2[i]*l2[lm] - Lr[i].d)*Vlm->P[i][lm] - Lr[i].l*Vlm->P[i-1][lm] - Lr[i].u*Vlm->P[i+1][lm];
+			}
+		}
+	}
+	return lmcount;
 }

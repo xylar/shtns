@@ -45,6 +45,7 @@ for f in sys.argv[1:] :
 	axis('off')
 	colorbar()
 	clim(-m,m)
+	subplots_adjust(left=0.02, bottom=0.02, right=0.98, top=0.98, wspace=0.1, hspace=0.1)
 
 #	savefig( "slide_" + str(i) + ".png" )
 	savefig( "slide_%04d.png" % i )

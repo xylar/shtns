@@ -11,7 +11,7 @@
 /*
 {
 #undef INIT_FIELD_NAME
-#define INIT_FIELD_NAME "m=0 l=2 simple roll flow (eq 24 from Dudely&James)"
+#define INIT_FIELD_NAME "m=0 l=2 simple roll flow (eq 24 from Dudely & James 1989)"
 l=2; m=0;
 	Set_Toroidal( rr*sin(pi*rr) )
 	Set_Poloidal( rr*sin(pi*rr) * 0.14 )
@@ -19,7 +19,7 @@ l=2; m=0;
 */
 {
 #undef INIT_FIELD_NAME
-#define INIT_FIELD_NAME "m=0 l=2 gubins flow (from Dudely&James)"
+#define INIT_FIELD_NAME "m=0 l=2 gubins flow (from Dudely & James 1989)"
 l=2; m=0;
 	Set_Toroidal( -rr*sin(2*pi*rr) * tanh(2*pi*(1-rr)) )
 	Set_Poloidal( -rr*sin(2*pi*rr) * tanh(2*pi*(1-rr)) * 0.1 )
@@ -27,7 +27,7 @@ l=2; m=0;
 /*
 {
 #undef INIT_FIELD_NAME
-#define INIT_FIELD_NAME "m=2 l=2 j2 pekeris flow (eq 20-21 from Dudeley&James)"
+#define INIT_FIELD_NAME "m=2 l=2 j2 pekeris flow (eq 20-21 Dudely & James 1989)"
 l=2; m=0;
 	if (rr != 0.0) {
 		double z =  5.7634591968447*rr;

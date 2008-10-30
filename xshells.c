@@ -25,18 +25,23 @@ double DeltaOmega;	// differential rotation (of inner core)
 struct TriDiagL *MB, *MB_1, *MUt, *MUt_1;
 struct PentaDiag **MUp, **MUp_1;
 
-//#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
-#define DEB (0)
+#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
+//#define DEB (0)
 
 #include "xshells_fields.c"
 #include "xshells_io.c"
 
-struct VectField B, U, W, J, B0;
+//#define _MHD_CURRENT_FREE_SMALL_RM_
+
+struct VectField B, U, W, J;
+#ifdef _MHD_CURRENT_FREE_SMALL_RM_
+	struct VectField B0;
+#endif
 struct PolTor Blm, Ulm, NLb1, NLb2, NLu1, NLu2;
+struct StatSpecVect B0lm, J0lm;
 
 int MAKE_MOVIE = 0;	// no output by default.
 int SAVE_QUIT = 0;	// for signal catching.
-
 
 void init_Bmatrix()
 {
@@ -102,7 +107,7 @@ void init_Umatrix(long int BC)
 //	P=0, d2/dr2 P = 0, d(T/r)/dr = 0  => only T computed at boundary
 
 /// POLOIDAL
-/// (d/dt - nu.Lap)(-Lap.Up) = Toroidal[rot_NL]
+/// (d/dt - nu.Lap)(-Lap.Up) = Toroidal[curl_NL]
 // use toroidal matrix as temporary matrix...
 	for(i=NG+1; i<NR-1; i++) {
 					MUt[i-NG].l =    Lr[i].l;
@@ -169,7 +174,7 @@ void init_Umatrix(long int BC)
 	PentaDec(MUp_1, 1, NU-2);
 
 /// TOROIDAL
-/// (d/dt - nu.Lap) Ut = Poloidal(rot_NL)
+/// (d/dt - nu.Lap) Ut = Poloidal(curl_NL)
 	for(i=NG+1; i<NR-1; i++) {
 					MUt[i-NG].l =              0.5*nu*Lr[i].l;
 		for (l=0; l<=LMAX; l++)	MUt[i-NG].d[l] = 1.0/dtU + 0.5*nu*(Lr[i].d - r_2[i]*l*(l+1));
@@ -264,9 +269,16 @@ double step_MHD(long int nstep, complex double **Alm)
 	{
 		CALC_U(BC_NO_SLIP);
 		calc_Vort(&Ulm, Omega0, &W);
-		calc_J(&Blm, &J);
+#ifdef _MHD_CURRENT_FREE_SMALL_RM_
+		calc_J(&Blm, &J, NULL);
 		NL_MHD(&U, &W, &B0, &J, NLu);
 		NL_Induction(&U, &B0, &B, NLb);
+#else
+		calc_B(&Blm, &B, &B0lm);
+		calc_J(&Blm, &J, &J0lm);
+		NL_MHD(&U, &W, &B, &J, NLu);
+		NL_Induction(&U, &B, &J, NLb);
+#endif
 		substepU(NLu, NLuo, Alm);
 		substepB(NLb, NLbo, Alm);
 	}
@@ -286,8 +298,8 @@ double step_Dynamo(long int nstep, complex double **Alm)
 	{
 		CALC_U(BC_NO_SLIP);
 		calc_Vort(&Ulm, Omega0, &W);
-		CALC_B;
-		calc_J(&Blm, &J);
+		calc_B(&Blm, &B, NULL);
+		calc_J(&Blm, &J, NULL);
 		NL_MHD(&U, &W, &B, &J, NLu);
 		NL_Induction(&U, &B, &B, NLb);
 		substepU(NLu, NLuo, Alm);
@@ -309,7 +321,7 @@ double step_Dyncin(long int nstep, complex double **Alm)
 {
 	inline step1(struct PolTor *NLb, struct PolTor *NLbo)
 	{
-		CALC_B;
+		calc_B(&Blm, &B, NULL);
 		NL_Induction(&U, &B, &B, NLb);
 		substepB(NLb, NLbo, Alm);
 	}
@@ -421,7 +433,10 @@ int main (int argc, char *argv[])
 	alloc_VectField(&W,NG,NR-1);
     if (b0 != 0.0) {
 		alloc_DynamicField(&Blm, &B, &NLb1, &NLb2, 0, NR-1);
-		alloc_VectField(&B0,0,NR-1);	alloc_VectField(&J,0,NR-1);
+		alloc_VectField(&J,0,NR-1);
+#ifdef _MHD_CURRENT_FREE_SMALL_RM_
+		alloc_VectField(&B0,0,NR-1);
+#endif
     }
 
 	printf("[Params] job name : %s\n",job);
@@ -434,7 +449,6 @@ int main (int argc, char *argv[])
 		Alm[i] = (complex double *) malloc( NLM * sizeof(complex double));
 
     if (b0 != 0.0) {
-	printf("=> Imposed magnetic field B0 : using small Rm MHD integration\n");
 	ptr_step = &step_MHD;
 	// init B fields.
 	zero_out_field(&Blm);
@@ -444,12 +458,20 @@ int main (int argc, char *argv[])
 		rr = r[i];
 		#include "inc_B0ini.c"
 	}
-	#ifdef INIT_FIELD_NAME
-	printf("    B0 set to : \"" INIT_FIELD_NAME "\"\n");
-	#endif
 	sprintf(command,"poltorB0.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC);
+#ifdef _MHD_CURRENT_FREE_SMALL_RM_
 	PolTor_to_spat(&Blm, &B0, 0, NR-1, BC_MAGNETIC);	// background magnetic field.
+	printf("=> Imposed magnetic field B0 : using small Rm MHD integration (assuming current-free B0)\n");
+#else
+	printf("=> Imposed magnetic field B0 : using full MHD integration\n");
+#endif
+	i = Make_StatSpecVect(&Blm, &B0lm, &J0lm, 1, NR-2, BC_NONE);
+	#ifdef INIT_FIELD_NAME
+	printf("    B0 set to : \"" INIT_FIELD_NAME "\" (%d modes)\n",i);
+	#endif
+
 	zero_out_field(&Blm);
+DEB;
 	if (argc > 2) {
 		load_PolTor(argv[2], &Blm, &time, &m, &l, &im);
 		printf("    B read from file \"%s\".\n",argv[2]);
@@ -472,12 +494,21 @@ int main (int argc, char *argv[])
 		sprintf(command,"poltorU0.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 	}
 
+DEB;
 	CALC_U(BC_NO_SLIP);
+DEB;
 	calc_Vort(&Ulm, Omega0, &W);
     if (b0 != 0.0) {
-	calc_J(&Blm, &J);
+#ifdef _MHD_CURRENT_FREE_SMALL_RM_
+	calc_J(&Blm, &J, NULL);
 	NL_MHD(&U, &W, &B0, &J, &NLu2);
 	NL_Induction(&U, &B0, &B, &NLb2);
+#else
+	calc_B(&Blm, &B, &B0lm);
+	calc_J(&Blm, &J, &J0lm);
+	NL_MHD(&U, &W, &B, &J, &NLu2);
+	NL_Induction(&U, &B, &B, &NLb2);
+#endif
     }
 
 	it =0;
