@@ -1,16 +1,28 @@
 #!/usr/bin/python
-#plot a slice
+
+############################
+# plot an axisymmetric slice of poltor field (calls xspp)
+# uasge :
+#   plot_axi.py <poltor.field.from.xshells> [ang]
+# the optional argument [ang] shows angular velocity instead of simply phi component
+############################
+
 from pylab import *     # matplotlib
 from subprocess import *	# lance une ligne de commande
 import sys              # acces a la ligne de commande.
 
 rg=0.35
 ir0=1
+ang=0	# draw as is
 
 retcode = call("./xspp " + sys.argv[1] + " axi", shell=True)
 if retcode != 0:
 	print 'error from xspp'
 	exit()
+
+if len(sys.argv) > 2 :
+	if sys.argv[2] == 'ang' :
+		ang=1	# draw as angular velocity (dividing by s)
 
 #Up
 #print 'loading',sys.argv[1]
@@ -37,12 +49,17 @@ c=a/array(x)
 c[:,s[1]-2] = c[:,s[1]-3]	#remove nan
 c[:,0] = c[:,1]			#remove nan
 
-m=amax(abs(c))
-print 'max angular velocity (absolute value) =',m
+if ang==1 :
+	m=amax(abs(c))
+	print 'max angular velocity (absolute value) =',m
+	contourf(array(x),array(y),c,15,cmap=cm.RdBu)
+	#pcolor(array(x),array(y),c,shading='interp')
+else:
+	m=amax(abs(a))
+	print 'max vphi (absolute value) =',m
+	contourf(array(x),array(y),a,15,cmap=cm.RdBu)
+	#pcolor(array(x),array(y),a,shading='interp')
 
-#colormap for phi component
-#pcolor(array(x),array(y),c,shading='interp')
-contourf(array(x),array(y),c,15,cmap=cm.RdBu)
 colorbar()
 clim(-m,m)
 

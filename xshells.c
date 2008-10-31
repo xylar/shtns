@@ -417,6 +417,7 @@ int main (int argc, char *argv[])
 	long int iter_max, modulo;
 	complex double **Alm;		// temp scalar spectral (pol or tor) representation
 	FILE *fp;
+	struct JobInfo jinfo;
 	char command[100] = "xshells.par";
 	char job[40];
 
@@ -440,7 +441,7 @@ int main (int argc, char *argv[])
     }
 
 	printf("[Params] job name : %s\n",job);
-	printf("         Ek=%.2e, Ro=%.2e, Pm=%.2e, Re=%.2e, N=%.2e, M=%.2e, Elsasser=%.2e, Lehnert=%.2e\n",nu/Omega0, Ric*DeltaOmega/Omega0, nu/eta, Ric*DeltaOmega/nu, b0*b0/(Ric*DeltaOmega*Ric*DeltaOmega) , b0*0.5/sqrt(nu*eta), b0*b0/(eta*Omega0), b0/Omega0);
+	printf("         Ek=%.2e, Ro=%.2e, Pm=%.2e, Re=%.2e, S=%.2e, N=%.2e, M=%.2e, Elsasser=%.2e, Lehnert=%.2e\n",nu/Omega0, Ric*DeltaOmega/Omega0, nu/eta, Ric*DeltaOmega/nu, b0/eta, b0*b0/(Ric*DeltaOmega*Ric*DeltaOmega) , b0*0.5/sqrt(nu*eta), b0*b0/(eta*Omega0), b0/Omega0);
 	printf("         dtU.Omega=%.2e, dtU.nu.R^2=%.2e, dtB.eta.R^2=%.2e, dtB/dtU=%.2e\n",dtU*Omega0, dtU*nu, dtB*eta, dtB/dtU);
 	fflush(stdout);
 
@@ -471,10 +472,11 @@ int main (int argc, char *argv[])
 	#endif
 
 	zero_out_field(&Blm);
-DEB;
+
 	if (argc > 2) {
-		load_PolTor(argv[2], &Blm, &time, &m, &l, &im);
-		printf("    B read from file \"%s\".\n",argv[2]);
+		load_PolTor(argv[2], &Blm, &jinfo);
+		time = jinfo.t;
+		printf("    B read from file \"%s\" (t=%f).\n",argv[2],time);
 	}
     } else {
 	printf("=> No imposed magnetic field : using Navier-Stokes integration\n");
@@ -483,8 +485,9 @@ DEB;
 
 	// init U fields
 	if (argc > 1) {
-		load_PolTor(argv[1], &Ulm, &time, &m, &l, &im);		// load from file.
-		printf("    U field read from file \"%s\".\n",argv[1]);
+		load_PolTor(argv[1], &Ulm, &jinfo);		// load from file.
+		time = jinfo.t;
+		printf("    U field read from file \"%s\" (t=%f).\n",argv[1],time);
 	} else {
 		zero_out_field(&Ulm);
 		for (i=NG; i<NR; i++) {
@@ -494,9 +497,7 @@ DEB;
 		sprintf(command,"poltorU0.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 	}
 
-DEB;
 	CALC_U(BC_NO_SLIP);
-DEB;
 	calc_Vort(&Ulm, Omega0, &W);
     if (b0 != 0.0) {
 #ifdef _MHD_CURRENT_FREE_SMALL_RM_

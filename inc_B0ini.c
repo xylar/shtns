@@ -14,15 +14,15 @@ l=1; m=0;
 	Set_Poloidal( rr/2. * Y10_ct)	// Y10_ct  makes it unitary in physical space.
 }*/
 
-{
+/*{
 #undef INIT_FIELD_NAME
 #define INIT_FIELD_NAME "current-free dipole"
 l=1; m=0;
 	Set_Poloidal( 1.0/(2.*rr*rr) )		// magnetic dipole like in E. Dormy's thesis (current free)
 	if (rr < 0.1) Set_Poloidal( 1.0/ (2.*0.1*0.1) )		// avoid divergence at r=0
-}
+}*/
 
-/*{
+{
 #undef INIT_FIELD_NAME
 #define INIT_FIELD_NAME "Jault 2008 (not current-free)"
 l=1; m=0;
@@ -33,7 +33,7 @@ l=3; m=0;
 	v = 5.7635 * rr;	
 	Set_Poloidal( -0.2*((sin(v)*(3./(v*v)-1.)-3.*cos(v)/v)/v) )	// -0.2*j3(k*r)
 	if (rr == 0.0) Set_Poloidal( 0.0 )
-}*/
+}
 
 // do not remove the following lines
 #undef Set_Poloidal

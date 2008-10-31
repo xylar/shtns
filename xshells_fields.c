@@ -599,7 +599,6 @@ int Make_StatSpecVect(struct PolTor *Vlm, struct StatSpecVect *ssv, struct StatS
 
 	// go buy some memory
 	if (ssv != NULL) {
-DEB;
 		ptr = malloc( lmcount* (sizeof(long int) + 3*NR*sizeof(complex double)) );
 		ssv->lm = (long int *) ptr;
 		ptr = ssv->lm + lmcount;

@@ -3,18 +3,31 @@
 from pylab import *     # matplotlib
 import os
 import sys              # acces a la ligne de commande.
+import glob
+import time
 
 ir0=1
 rg=0.35
 
 i=1;	# snapshot numbering
 
-for f in sys.argv[1:] :
-	retcode = os.system("./xspp " + f + " axi |grep [load]")
+base=sys.argv[1]
+job=sys.argv[2]
+files=glob.glob( base + '_*.' + job)
+
+if len(sys.argv) >=3:
+	i = int(sys.argv[3])
+
+for f in files[i-1:] :
+	retcode = os.system("./xspp " + f + " axi")
 	if retcode != 0:
-		print 'error from xspp'
-		exit()
-	
+		print 'error from xspp, I will retry in 5 seconds'
+		time.sleep(5)
+		retcode = os.system("./xspp " + f + " axi")
+		if retcode != 0:
+			print 'error from xspp again, abort.'
+			exit()
+
 	a=load('o_Vp')
 	s = a.shape
 
@@ -46,6 +59,7 @@ for f in sys.argv[1:] :
 	colorbar()
 	clim(-m,m)
 	subplots_adjust(left=0.02, bottom=0.02, right=0.98, top=0.98, wspace=0.1, hspace=0.1)
+	figtext(0.05, 0.9, str(i))
 
 #	savefig( "slide_" + str(i) + ".png" )
 	savefig( "slide_%04d.png" % i )

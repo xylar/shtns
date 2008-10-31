@@ -14,8 +14,8 @@
 #include <gsl/gsl_sf_legendre.h>
 
 // parameters for SHT.c
-#define NLAT 201
-#define LMAX 200
+#define NLAT 601
+#define LMAX 300
 #define NPHI 1
 #define MMAX 0
 #define MRES 1
@@ -47,6 +47,10 @@ long int irs, ire;	// loaded from file.
 long int ips=0, ipe=NPHI-1;
 long int its=0, ite=NLAT-1;
 
+long int mmin=0, mmax=MMAX;
+long int lmin=0, lmax=LMAX;
+
+struct JobInfo jpar;	// parameters from loaded file
 
 // find closest index to phi angle.
 inline long int phi_to_idx(double phi) {
@@ -72,16 +76,70 @@ void write_vect(char *fn, double *vec, long int N)
 
 void write_HS(char *fn, complex double **HS)
 {
+	long int ir,lm,l,m;
 	FILE *fp;
-	long int ir,lm;
 	
 	fp = fopen(fn,"w");
+	fprintf(fp,"%%  Spherical Harmonics coefficients : MMAX=%d, LMAX=%d, MRES=%d", mmax, lmax, jpar.mres);
 	for (ir=irs;ir<=ire;ir++) {
 		if (HS[ir] != NULL) {
-			for(lm=0;lm<NLM;lm++) {
-				fprintf(fp,"%.6g %.6g  ",creal(HS[ir][lm]),cimag(HS[ir][lm]));
+			fprintf(fp,"\n%%  ir=%d, r=%f\n",ir,r[ir]);
+			for (m=0; m<=mmax; m+=jpar.mres) {
+				for (l=m; l<=lmax; l++) {
+					lm = LM(l,m);
+					fprintf(fp,"%.6g %.6g  ",creal(HS[ir][lm]),cimag(HS[ir][lm]));
+				}
 			}
-			fprintf(fp,"\n");
+		}
+	}
+	fclose(fp);
+}
+
+void write_Spec_m(char *fn, complex double **HS)
+{
+	double sum, cr,ci;
+	long int ir,lm,l,m;
+	FILE *fp;
+
+	fp = fopen(fn,"w");
+	fprintf(fp,"%%  Spherical Harmonics m-spectrum : MMAX=%d", mmax);
+	for (ir=irs;ir<=ire;ir++) {
+		if (HS[ir] != NULL) {
+			fprintf(fp,"\n%%  ir=%d, r=%f\n",ir,r[ir]);
+			for (m=0; m<=mmax; m+=jpar.mres) {
+				sum = 0.0;
+				for (l=m; l<=lmax; l++) {
+					lm = LM(l,m);
+					cr = creal(HS[ir][lm]);	ci = cimag(HS[ir][lm]);
+					sum += cr*cr + ci*ci;
+				}
+				fprintf(fp,"%.6g ",sum);
+			}
+		}
+	}
+	fclose(fp);
+}
+
+void write_Spec_l(char *fn, complex double **HS)
+{
+	double sum, cr,ci;
+	long int ir,lm,l,m;
+	FILE *fp;
+
+	fp = fopen(fn,"w");
+	fprintf(fp,"%%  Spherical Harmonics l-spectrum : LMAX=%d", lmax);
+	for (ir=irs;ir<=ire;ir++) {
+		if (HS[ir] != NULL) {
+			fprintf(fp,"\n%%  ir=%d, r=%f\n",ir,r[ir]);
+			for (l=0; l<=lmax; l++) {
+				sum = 0.0;
+				for (m=0; (m<=mmax)&&(m<=l); m+=jpar.mres) {
+					lm = LM(l,m);
+					cr = creal(HS[ir][lm]);	ci = cimag(HS[ir][lm]);
+					sum += cr*cr + ci*ci;
+				}
+				fprintf(fp,"%.6g ",sum);
+			}
 		}
 	}
 	fclose(fp);
@@ -150,6 +208,35 @@ void write_equat(char *fn, double **v, double fac)
 	fclose(fp);
 }
 
+// apply (l,m) filter
+void filter_lm(struct PolTor *Blm, int lmin, int lmax, int mmin, int mmax)
+{
+	long int ir, m, l, lm;
+
+	if (lmax > LMAX) lmax = LMAX;	if (mmax > MMAX) mmax = MMAX;
+
+	for (ir=irs; ir<=ire; ir++) {
+		for (m=0; m<mmin; m++) {
+			for(l=m; l<=lmax; l++) {
+				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
+			}
+		}
+		for (m=mmin; m<=mmax; m++) {
+			for(l=m; l<lmin; l++) {
+				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
+			}
+			for(l=lmax+1; l<=LMAX; l++) {
+				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
+			}
+		}
+		for (m=mmax+1; m<=MMAX; m++) {
+			for(l=m; l<=lmax; l++) {
+				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
+			}
+		}
+	}
+}
+
 void usage()
 {
 	printf("\nUsage: xspp <poltor-file-saved-by-xshells> [op1] [op2] [...] command [args [...]]\n");
@@ -157,21 +244,25 @@ void usage()
 	printf(" curl : compute curl of field\n");
 	printf(" rlim <rmin>:<rmax> : render only from rmin to rmax\n");
 	printf(" philim <min>:<max> : render only from min to max azimutal degrees\n");
+	printf(" llim <lmin>:<lmax> : use only spherical harmonic degree from lmin to lmax.\n");
+	printf(" mlim <mmin>:<mmax> : use only spherical harmonic orders from mmin to mmax.\n");
 	printf("list of available commands :\n");
 	printf(" axi  : write meridional slice of axisymetric component (m=0)\n");
 	printf(" equat  : write equatorial cut of vector field in cylindrical coordinates (r, phi)\n");
 	printf(" merid [angle]  : write meridional slice at phi=angle in degrees (default=0°) of vector field in spherical coordinates\n");
 //	printf(" zcut [z]  : write slice at height=z (-1 to 1) of vector field in cylindrical coordinates (s, phi, z)\n");
 	printf(" surf [r]  : write surface data at r (0 to 1) or ir (1 to NR-1) of vector field in spherical coordinates\n");
-	printf(" HS  : write spherical harmonics decomposition\n");
+	printf(" HS  : write full spherical harmonics decomposition\n");
+	printf(" spec  : write spherical harmonic (l and m)-spectra for each shell\n");
 	printf(" 3D  : write three-dimensional vector in cartesian coordinates on spherical grid.\n");
 }
 
 int main (int argc, char *argv[])
 {
-	double t0, tmp;
+	double tmp;
 	long int ic;
 	long int i,im,m,l,lm;
+	int filter_req = 0;
 
     int parse_op(int ic)	// returns number of parsed command line argument
     {
@@ -206,6 +297,30 @@ int main (int argc, char *argv[])
 		printf("> restricting to slice #%d to #%d (that is phi=[%f, %f])\n",ips,ipe, phi_deg(ips), phi_deg(ipe));
 		return 2;	// 2 command line argument parsed.
 	}
+	if (strcmp(argv[ic],"mlim") == 0)
+	{
+		ic++;	// go to next command line argument.
+		if (argc > ic) {
+			sscanf(argv[ic],"%lf:%lf",&min,&max);
+		} else runerr("mlim <min>:<max>  => missing arguments\n");
+		mmin = min;	mmax = max;
+		if (mmax > jpar.mmax) mmax = jpar.mmax;	if (mmin < 0) mmin = 0;
+		printf("> using only m = #%d to #%d\n",mmin, mmax);
+		filter_req = 1;
+		return 2;	// 2 command line argument parsed.
+	}
+	if (strcmp(argv[ic],"llim") == 0)
+	{
+		ic++;	// go to next command line argument.
+		if (argc > ic) {
+			sscanf(argv[ic],"%lf:%lf",&min,&max);
+		} else runerr("llim <min>:<max>  => missing arguments\n");
+		lmin = min;	lmax = max;
+		if (lmax > jpar.lmax) lmax = jpar.lmax;	if (lmin < 0) lmin = 0;
+		printf("> using only l = #%d to #%d\n",lmin, lmax);
+		filter_req = 1;
+		return 2;	// 2 command line argument parsed.
+	}
 	return 0;
     }
 
@@ -219,7 +334,7 @@ int main (int argc, char *argv[])
 
 //load
 	Blm.P = NULL;		// require allocation by load_PolTor
-	load_PolTor(argv[1], &Blm, &t0, &irs, &ire, &BC);
+	load_PolTor(argv[1], &Blm, &jpar);	irs = jpar.irs;	ire = jpar.ire;	BC = jpar.BC;
 	alloc_VectField(&B, irs, ire);
 
 // parse optional op...
@@ -230,6 +345,10 @@ int main (int argc, char *argv[])
 	} while(i!=0);
 
 	if (argc <= ic) runerr("missing command.");
+
+// apply (l,m) restrictions
+	if (lmax > LMAX) lmax = LMAX;	if (mmax > MMAX) mmax = MMAX;
+	if (filter_req) filter_lm(&Blm, lmin, lmax, mmin, mmax);
 
 // write radial grid
 	write_vect("o_r",&r[irs],ire-irs+1);
@@ -298,6 +417,13 @@ int main (int argc, char *argv[])
 	{
 		write_HS("o_Plm",Blm.P);	write_HS("o_Tlm",Blm.T);
 		printf("> spherical harmonics decomposition written to files : o_Plm, o_Tlm (poloidal/toroidal components)\n");
+		exit(0);
+	}
+	if (strcmp(argv[ic],"spec") == 0)
+	{
+		write_Spec_l("o_Pl",Blm.P);	write_Spec_l("o_Tl",Blm.T);
+		write_Spec_m("o_Pm",Blm.P);	write_Spec_m("o_Tm",Blm.T);
+		printf("> spherical harmonics spectrum written to files : o_Pl, o_Tl, o_Pm, o_Tl (poloidal/toroidal, l/m)\n");
 		exit(0);
 	}
 	if (strcmp(argv[ic],"3D") == 0)

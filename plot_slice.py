@@ -38,7 +38,7 @@ for i in range(1, argn):
 
 	axis('equal')
 	axis('off')
-#	subplots_adjust(left=0.02, bottom=0.02, right=0.98, top=0.98, wspace=0.1, hspace=0.1)
+	subplots_adjust(left=0.02, bottom=0.02, right=0.98, top=0.98, wspace=0.1, hspace=0.1)
 	colorbar()
 	clim(-m,m)
 
