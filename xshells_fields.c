@@ -16,7 +16,7 @@ struct PolTor {
 struct StatSpecVect {	// a static spectral vector, ready for SHT. Usefull to add "for free" a background variable vector value.
 	long int nlm;	// number of non-zero elements
 	long int *lm;	// array of corresponding indices
-	complex double *QST;	// data ready for SHT. QST[ir*nlm*3 + 3*j] is Pol/(r*l(l+1)) ,QST[ir*nlm*3 + 3*j+1] is spheroidal, QST[ir*nlm*3 + 3*j+2] is toroidal.
+	complex float *QST;	// data ready for SHT. QST[ir*nlm*3 + 3*j] is Pol/(r*l(l+1)) ,QST[ir*nlm*3 + 3*j+1] is spheroidal, QST[ir*nlm*3 + 3*j+2] is toroidal.
 };
 
 
@@ -299,7 +299,7 @@ void calc_J(struct PolTor *PT, struct VectField *J, struct StatSpecVect *J0)
 	complex double T[NLM];
 	long int ir,lm;
 
-	complex double *QST;
+	complex float *QST;
 	long int *lma;
 	long int j,nj;
 
@@ -335,7 +335,7 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 	double dr;
 	long int ir,lm,l;
 
-	complex double *QST;
+	complex float *QST;
 	long int *lma;
 	long int j,nj;
 
@@ -383,7 +383,7 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 /// compute curl(VxW + JxB) and its pol-tor components.
 /// output : V, B, J unchanged, W = VxW + JxB
 ///          NL = PolTor[curl(VxW + JxB)]
-void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, /*struct VectField *b, struct VectField *j,*/ struct PolTor *NL)
+void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, struct PolTor *NL)
 {
 	double vr,vt,vp;
 	long int ir,lm;
@@ -393,16 +393,23 @@ void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struc
 			vr =  J->t[ir][lm]*B->p[ir][lm] - J->p[ir][lm]*B->t[ir][lm];	// JxB
 			vt =  J->p[ir][lm]*B->r[ir][lm] - J->r[ir][lm]*B->p[ir][lm];
 			vp =  J->r[ir][lm]*B->t[ir][lm] - J->t[ir][lm]*B->r[ir][lm];
-/*
-			vr +=  j->t[ir][lm]*b->p[ir][lm] - j->p[ir][lm]*b->t[ir][lm];	// jxb
-			vt +=  j->p[ir][lm]*b->r[ir][lm] - j->r[ir][lm]*b->p[ir][lm];
-			vp +=  j->r[ir][lm]*b->t[ir][lm] - j->t[ir][lm]*b->r[ir][lm];
-*/
+			
 			vr += V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];	// VxW
 			vt += V->p[ir][lm]*W->r[ir][lm] - V->r[ir][lm]*W->p[ir][lm];
 			vp += V->r[ir][lm]*W->t[ir][lm] - V->t[ir][lm]*W->r[ir][lm];
 			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
 		}
+#ifdef MASK
+		if (mask[ir] != NULL) {
+			for (lm=0; lm<NPHI*NLAT; lm++) {
+				if (mask[ir][lm] != 0.0) {
+					W->r[ir][lm] -= mask[ir][lm] * ( V->r[ir][lm] );
+					W->t[ir][lm] -= mask[ir][lm] * ( V->t[ir][lm] );
+					W->p[ir][lm] -= mask[ir][lm] * ( V->p[ir][lm] );
+				}
+			}
+		}
+#endif
 	}
 	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);
 }
@@ -422,6 +429,17 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 			vp = V->r[ir][lm]*W->t[ir][lm] - V->t[ir][lm]*W->r[ir][lm];
 			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
 		}
+#ifdef MASK
+		if (mask[ir] != NULL) {
+			for (lm=0; lm<NPHI*NLAT; lm++) {
+				if (mask[ir][lm] != 0.0) {
+					W->r[ir][lm] -= mask[ir][lm] * ( V->r[ir][lm] );
+					W->t[ir][lm] -= mask[ir][lm] * ( V->t[ir][lm] );
+					W->p[ir][lm] -= mask[ir][lm] * ( V->p[ir][lm] );
+				}
+			}
+		}
+#endif
 	}
 	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);
 }
@@ -453,6 +471,15 @@ void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *Vx
 			VxB->r[ir][lm] = vr;	VxB->t[ir][lm] = vt;	VxB->p[ir][lm] = vp;
 		}
 	}
+#ifdef COIL
+	if (Icoil != 0.0) {
+		for (ir=0; ir<NR; ir++) {
+			if (Jcoil[ir] != NULL) {
+				for (lm=0; lm<NPHI*NLAT; lm++) VxB->p[ir][lm] += Icoil * Jcoil[ir][lm];
+			}
+		}
+	}
+#endif
 /*	ir = NR-1;	// U = 0
 		for (lm=0; lm<NPHI*NLAT; lm++) {
 			Br[ir][lm] = 0.0;	Bt[ir][lm] = 0.0;	Bp[ir][lm] = 0.0;
@@ -599,10 +626,10 @@ int Make_StatSpecVect(struct PolTor *Vlm, struct StatSpecVect *ssv, struct StatS
 
 	// go buy some memory
 	if (ssv != NULL) {
-		ptr = malloc( lmcount* (sizeof(long int) + 3*NR*sizeof(complex double)) );
+		ptr = malloc( lmcount* (sizeof(long int) + 3*NR*sizeof(complex float)) );
 		ssv->lm = (long int *) ptr;
 		ptr = ssv->lm + lmcount;
-		ssv->QST = (complex double *) ptr;
+		ssv->QST = (complex float *) ptr;
 
 		for (j=0; j<lmcount; j++) ssv->lm[j] = lms[j];		// copy lm indices
 
@@ -621,10 +648,10 @@ int Make_StatSpecVect(struct PolTor *Vlm, struct StatSpecVect *ssv, struct StatS
 		}
 	}
 	if (curl != NULL) {
-		ptr = malloc( lmcount* (sizeof(long int) + 3*NR*sizeof(complex double)) );
+		ptr = malloc( lmcount* (sizeof(long int) + 3*NR*sizeof(complex float)) );
 		curl->lm = (long int *) ptr;
 		ptr = curl->lm + lmcount;
-		curl->QST = (complex double *) ptr;
+		curl->QST = (complex float *) ptr;
 
 		for (j=0; j<lmcount; j++) curl->lm[j] = lms[j];		// copy lm indices
 

@@ -5,10 +5,10 @@ LMAX, NLAT, MMAX, MRES, NPHI
 
 //  SIZES  //
 // LMAX : maximum degree of Spherical Harmonic
-#define LMAX 30
+#define LMAX 200
 // NLAT : number of latitudinal (theta) gauss points, at least (LMAX+1)
 // (and (LMAX+1)*2 for dealias) **can be EVEN or ODD**
-#define NLAT 32
+#define NLAT 300
 //#define NLAT 144
 
 // MMAX : max number of fourrier decomposition (degree = MMAX * MRES)

@@ -28,10 +28,104 @@ struct PentaDiag **MUp, **MUp_1;
 #define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
 //#define DEB (0)
 
+#define MASK
+//#define COIL
+//#define _MHD_CURRENT_FREE_SMALL_RM_
+
+#ifdef MASK
+float **mask;
+
+/// Allocate a vector field (not evolved) like J, W, B0, ...
+void alloc_float(float ***msk, long int istart, long int iend)
+{
+	void *ptr;
+	long int ir;
+	
+	ptr = malloc( NR*sizeof(float *) + (iend-istart+1)*NPHI*NLAT*sizeof(float) );
+	*msk = (float **) ptr;
+	ptr = (*msk + NR);
+	(*msk)[istart] = (float *) ptr;
+	for (ir = istart+1; ir <= iend; ir++)
+		(*msk)[ir] = (*msk)[ir-1] + NPHI*NLAT;
+	for (ir = 0; ir < istart; ir++) (*msk)[ir] = NULL;
+	for (ir = iend+1; ir<NR; ir++) (*msk)[ir] = NULL;
+}
+
+void mask_cyl(float ***msk, double ar, double C)
+{
+	double L, d;
+	double rr,s,z,phi,theta;
+	long int irs, i,j,k;
+	
+	L = 0.99/sqrt(1. + ar*ar);	// 0.99 : to avoid touching the outer sphere.
+	d = L*ar;
+	
+	s = 3./NR;	z = pi/NLAT;
+	printf("2/NR=%f, pi/NLAT=%f\n",s,z);
+	if (z > s) s = z;
+	C = nu/(4.*s*s);
+
+	if (L>d) { rr = d; } else { rr = L; }
+	irs = r_to_idx(rr)-1;	// ir_start for mask.
+	alloc_float(msk, irs, NR-1);
+	printf("[mask] Cylinder in Sphere : L=%.2f, d=%.2f, C=%g, ir_start=%d\n",L,d,C,irs);
+
+	for (i = irs; i<NR; i++) {
+		rr = r[i];
+		for (j=0; j<NPHI; j++) {
+			phi = j * (2.*pi/(MRES*NPHI));
+			for (k=0; k<NLAT; k++) {
+				(*msk)[i][j*NLAT + k] = 0.0;
+				s = r[i]*st[k];	z = r[i]*ct[k];	theta = acos( ct[k] );
+
+				if ((s > d)||(z > L)||(z < -L))
+					(*msk)[i][j*NLAT + k] = C;
+			}
+		}
+	}
+}
+#endif
+
+#ifdef COIL
+double Icoil = 0.0;
+float **Jcoil;
+
+void init_Jcoil(double s0, double z0, double h)
+{
+	double rr,s,z,phi,theta, j0;
+	long int i,j,k, irs,ire;
+	
+	j0 = 1.0/(pi*h*h);	// convert intensity 1.0 to current density
+	j0 *= eta;		// eta = sigma = convert current density to emf
+
+	
+	irs = r_to_idx(sqrt(s0*s0 + z0*z0) - h) -1;	// ir_start for coil.
+	ire = r_to_idx(sqrt(s0*s0 + z0*z0) + h) +1;	// ir_end for coil.
+
+	alloc_float(&Jcoil, irs, ire);
+
+	for (i=irs; i<=ire; i++) {
+		rr = r[i];
+		for (j=0; j<NPHI; j++) {
+			phi = j * (2.0*pi/(MRES*NPHI));
+			for (k=0; k<NLAT; k++) {
+				s = rr*st[k];	z = rr*ct[k];	theta = acos( ct[k] );
+				Jcoil[i][j*NLAT + k] = 0.0;
+
+				if ( (s-s0)*(s-s0) + (z-z0)*(z-z0) < h*h ) {
+					Jcoil[i][j*NLAT + k] = j0;
+				}
+			}
+		}
+	}
+}
+#endif
+
+
+
 #include "xshells_fields.c"
 #include "xshells_io.c"
 
-//#define _MHD_CURRENT_FREE_SMALL_RM_
 
 struct VectField B, U, W, J;
 #ifdef _MHD_CURRENT_FREE_SMALL_RM_
@@ -39,6 +133,7 @@ struct VectField B, U, W, J;
 #endif
 struct PolTor Blm, Ulm, NLb1, NLb2, NLu1, NLu2;
 struct StatSpecVect B0lm, J0lm;
+
 
 int MAKE_MOVIE = 0;	// no output by default.
 int SAVE_QUIT = 0;	// for signal catching.
@@ -413,7 +508,7 @@ int main (int argc, char *argv[])
 	double b0 = 0.0;
 	double time = 0.0;
 	double rr, t0,t1,Rm,Rm2,z;
-	long int i,im,m,l,jj, it, lmtest;
+	long int i,j,k, im,m,l, it, lmtest;
 	long int iter_max, modulo;
 	complex double **Alm;		// temp scalar spectral (pol or tor) representation
 	FILE *fp;
@@ -496,6 +591,15 @@ int main (int argc, char *argv[])
 		Ulm.T[NG][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
 		sprintf(command,"poltorU0.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 	}
+
+#ifdef MASK
+	DEB;
+	mask_cyl(&mask, 1.0, 1./NR);	// define cylindric mask.
+	DEB;
+#endif
+#ifdef COIL
+	init_Jcoil(double s0, double z0, double h)
+#endif
 
 	CALC_U(BC_NO_SLIP);
 	calc_Vort(&Ulm, Omega0, &W);
