@@ -31,7 +31,7 @@ for i in range(1, argn):
 	figure()
 	#pcolor(array(x),array(y),a,shading='interp')
 	#colormaps : cm.PuOr, cm.RdBu, cm.RdGy
-	contourf(array(x),array(y),a,20,cmap=cm.RdBu)
+	contourf(array(x),array(y),a,20,cmap=cm.PuOr)
 	theta = linspace(-pi/2,pi/2,100)
 	plot(rg*cos(theta),rg*sin(theta),color='gray')
 	plot(cos(theta),sin(theta),color='gray')
@@ -41,5 +41,7 @@ for i in range(1, argn):
 	subplots_adjust(left=0.02, bottom=0.02, right=0.98, top=0.98, wspace=0.1, hspace=0.1)
 	colorbar()
 	clim(-m,m)
+	figtext(0.05, 0.9, sys.argv[i])
+
 
 show()

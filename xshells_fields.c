@@ -269,10 +269,10 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 	complex double T[NLM];
 	long int ir,lm;
 
-/* Pour Coriolis : ez ^ u
+/* for Coriolis : ez ^ u
 	ez = cos(theta).er - sin(theta).etheta
-	cos theta = Y(m=0,l=1) * 2*sqrt(pi/3)		>> peut etre rajouté à Qlm. (=> Vr)
-	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> peut etre rajouté à Slm  (=> Vt)
+	cos theta = Y(m=0,l=1) * 2*sqrt(pi/3)		>> add to Qlm. (=> Vr)
+	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> add to Slm  (=> Vt)
 */
 	Om0 = 2.0*Om0 * Y10_ct;	// multiply by representation of cos(theta) in spherical harmonics (l=1,m=0)
 //	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
@@ -509,6 +509,7 @@ double Energy(struct PolTor *PT)
 	}
 	return E;
 }
+
 
 /********************************
  *** INITIALIZATION FUNCTIONS ***

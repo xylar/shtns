@@ -2,7 +2,7 @@
 ## generic gcc
 cmd = gcc -O3
 ## profiling
-cmd = gcc -O3 -p -fno-inline
+#cmd = gcc -O3 -p -fno-inline
 ## recent gcc with native support
 #cmd = gcc -O3 -march=native -mfpmath=sse
 ## gcc k8 (lgitl3)

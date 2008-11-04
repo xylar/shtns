@@ -18,9 +18,9 @@ B0 = 0.0e-3		# magnetic field scaling factor
 ### NUMERICAL SCHEME ###
 NR = 301	# total number of radial shells
 NH = 0		# number of radial shells in the hartman layer near the inner core.
-dtU = 0.1	# time step for Navier-Stokes equation
-dtB = 0.1	# time step for Induction equation
-iter_max = 100	# iteration number (ouput #)
+dtU = 0.03	# time step for Navier-Stokes equation
+dtB = 0.03	# time step for Induction equation
+iter_max = 5	# iteration number (ouput #)
 modulo = 20	# sub-iterations (time steps between outputs)
 
 ### ALGORITHM FINE TUNING ###
@@ -31,4 +31,5 @@ fftw_plan_mode = 0
 # sht_polar_opt_max = SHT polar optimization threshold : polar coefficients below that threshold are neglected (for high ms).
 #    value under wich the polar values of the Legendre Polynomials Plm are neglected, leading to increased performance (a few percent).
 #    0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive.
+#sht_polar_opt_max = 1.0e-10
 #sht_polar_opt_max = 1.0e-10

@@ -223,7 +223,7 @@ void EqualSpaceNodes(double *x, double *w, int n)
 	for (j=0; j<n; j++) {
 		w[j] = 0.0;	// unsupported yet...
 	}
-	printf("          warning! only synthesis (inverse transform) supported so far for equaly spaced grid)\n");
+	printf("          ! warning : only synthesis (inverse transform) supported so far for equaly spaced grid !\n");
 }
 
 
@@ -308,7 +308,7 @@ void planFFT()
 
 //	fft_norm = 1.0/nfft;
 	fftw_free(ShF);
-	printf("       done.\n");
+//	printf("       done.\n");
 }
 
 /** initialize SH transform.

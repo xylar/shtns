@@ -20,6 +20,10 @@ double dtU, dtB;	// time step for navier-stokes and induction equation.
 double Omega0;		// global rotation rate (of outer boundary) => Coriolis force .
 double DeltaOmega;	// differential rotation (of inner core)
 
+//#define MASK
+//#define COIL
+//#define _MHD_CURRENT_FREE_SMALL_RM_
+
 #include "grid.c"
 
 struct TriDiagL *MB, *MB_1, *MUt, *MUt_1;
@@ -28,14 +32,10 @@ struct PentaDiag **MUp, **MUp_1;
 #define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
 //#define DEB (0)
 
-#define MASK
-//#define COIL
-//#define _MHD_CURRENT_FREE_SMALL_RM_
-
 #ifdef MASK
 float **mask;
 
-/// Allocate a vector field (not evolved) like J, W, B0, ...
+/// Allocate a constant scalar field like mask or constant ... (low precision)
 void alloc_float(float ***msk, long int istart, long int iend)
 {
 	void *ptr;
@@ -51,9 +51,9 @@ void alloc_float(float ***msk, long int istart, long int iend)
 	for (ir = iend+1; ir<NR; ir++) (*msk)[ir] = NULL;
 }
 
-void mask_cyl(float ***msk, double ar, double C)
+void mask_cyl(float ***msk, double ar)
 {
-	double L, d;
+	double L, d, C;
 	double rr,s,z,phi,theta;
 	long int irs, i,j,k;
 	
@@ -61,14 +61,14 @@ void mask_cyl(float ***msk, double ar, double C)
 	d = L*ar;
 	
 	s = 3./NR;	z = pi/NLAT;
-	printf("2/NR=%f, pi/NLAT=%f\n",s,z);
 	if (z > s) s = z;
-	C = nu/(4.*s*s);
+	C = nu/(4.*s*s);		// Penalization cannot exceed this value, for Boundary Layers must be resolved...
+	if (C > 1.0/dtU) C = 1.0/dtU;	// cannot exceed 1/dt eiter !
 
 	if (L>d) { rr = d; } else { rr = L; }
 	irs = r_to_idx(rr)-1;	// ir_start for mask.
 	alloc_float(msk, irs, NR-1);
-	printf("[mask] Cylinder in Sphere : L=%.2f, d=%.2f, C=%g, ir_start=%d\n",L,d,C,irs);
+	printf("[mask] Cylinder in Sphere : L=%.4f, d=%.4f, C=%g, ir_start=%d\n",L,d,C,irs);
 
 	for (i = irs; i<NR; i++) {
 		rr = r[i];
@@ -101,8 +101,11 @@ void init_Jcoil(double s0, double z0, double h)
 	
 	irs = r_to_idx(sqrt(s0*s0 + z0*z0) - h) -1;	// ir_start for coil.
 	ire = r_to_idx(sqrt(s0*s0 + z0*z0) + h) +1;	// ir_end for coil.
+	if (ire >= NR) runerr("coil does not fit in sphere...\n");
+	printf("[coil] irs=%d, ire=%d\n",irs,ire);
 
 	alloc_float(&Jcoil, irs, ire);
+	DEB;
 
 	for (i=irs; i<=ire; i++) {
 		rr = r[i];
@@ -138,6 +141,14 @@ struct StatSpecVect B0lm, J0lm;
 int MAKE_MOVIE = 0;	// no output by default.
 int SAVE_QUIT = 0;	// for signal catching.
 
+
+
+	/* MATRIX INITIALIZATION */
+
+/// Initialize semi-implicit part of Induction equation
+///      matrix   MB = (1/dt + 0.5*eta*Lap)
+/// and  matrix MB_1 = (1/dt - 0.5*eta*Lap)^(-1)
+/// Same matrix MB and MB_1 is used for Poloidal and Toroidal components. (Polidal up to NR-1, Toroidal up to NR-2)
 void init_Bmatrix()
 {
 	double dx_1,dx_2;
@@ -171,7 +182,10 @@ void init_Bmatrix()
 // for toroidal, use : cTriSolve(MB_1, RHS, Tlm, 1, NR-2)
 }
 
-// BC : boundary condition, can be BC_NO_SLIP or BC_FREE_SLIP
+/// Initialize semi-implicit part of Induction equation
+///      matrix   MUt = (1/dt + 0.5*nu*Lap)	  	MUp = -(1/dt + 0.5*nu*Lap)*Lap
+/// and  matrix MUt_1 = (1/dt - 0.5*nu*Lap)^(-1)	MUp_1 = -((1/dt - 0.5*nu*Lap)*Lap)^(-1)
+/// BC : boundary condition, can be BC_NO_SLIP or BC_FREE_SLIP
 void init_Umatrix(long int BC)
 {
 	double dx_1,dx_2;
@@ -327,6 +341,13 @@ inline substepU(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
 		for (l=1;l<NLM;l++) {
 			Alm[i][l] += 1.5*NL->T[i+NG][l] - 0.5*NLo->T[i+NG][l];
 		}
+/*#ifdef MASK
+		if (mask[i+NG] != NULL) {
+			SH_to_spat(Alm[i], (complex double *) W.r[NG+1]);
+			for (l=0; l<NPHI*NLAT; l++) W.r[NG+1][l] *= mask[i+NG][l];
+			spat_to_SH((complex double *) W.r[NG+1], Alm[i]);
+		}
+#endif*/
 	}
 	cTriSolveBC(MUt_1, Alm, Ulm.T +NG, 1, NU-2);
 
@@ -335,9 +356,17 @@ inline substepU(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
 		for (l=1;l<NLM;l++) {
 			Alm[i][l] += 1.5*NL->P[i+NG][l] - 0.5*NLo->P[i+NG][l];
 		}
+/*#ifdef MASK
+		if (mask[i+NG] != NULL) {
+			SH_to_spat(Alm[i], (complex double *) W.r[NG+1]);
+			for (l=0; l<NPHI*NLAT; l++) W.r[NG+1][l] *= mask[i+NG][l];
+			spat_to_SH((complex double *) W.r[NG+1], Alm[i]);
+		}
+#endif*/
 	}
 	cPentaSolve(MUp_1, Alm, Ulm.P +NG, 1, NU-2);
 }
+
 
 double step_NS(long int nstep, complex double **Alm)
 {
@@ -430,6 +459,19 @@ double step_Dyncin(long int nstep, complex double **Alm)
 }
 
 
+/*
+void save_n_quit(char* fprefix, char* job, long int it, double t)
+{
+	char fn[100];
+
+	sprintf(fn,"%s.%s",fprefix,job);
+	printf("  => Signal received : saving before quitting...\n");	fflush(stdout);
+	save_all(fn, it, t);
+	printf("     current state successfully saved to file %s\n",fn);	fflush(stdout);
+	exit(0);
+}
+*/
+
 void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, double *polar_opt_max, double *Ric, double *B0)
 {
 	double tmp;
@@ -498,6 +540,15 @@ double j1(double x)
 {
 	if (x==0.0) return(0.0);
 	return (sin(x)/x - cos(x))/x;
+}
+
+void sig_handler(int sig_num)
+{
+	switch(sig_num) {
+		case 15 : SAVE_QUIT = -2; break;	// TERM signal : save state as soon as possible !
+		case 30 : SAVE_QUIT = 1; break;		// Save snapshot
+		case 31 : SAVE_QUIT = -1;		// Save & quit
+	}
 }
 
 int main (int argc, char *argv[])
@@ -593,12 +644,11 @@ int main (int argc, char *argv[])
 	}
 
 #ifdef MASK
-	DEB;
-	mask_cyl(&mask, 1.0, 1./NR);	// define cylindric mask.
-	DEB;
+	mask_cyl(&mask, 1.0);	// define cylindric mask
 #endif
 #ifdef COIL
-	init_Jcoil(double s0, double z0, double h)
+	init_Jcoil(0.4, -0.77, 0.06);
+	Icoil = 1.0;
 #endif
 
 	CALC_U(BC_NO_SLIP);
@@ -615,6 +665,9 @@ int main (int argc, char *argv[])
 	NL_Induction(&U, &B, &B, &NLb2);
 #endif
     }
+
+// Initialisation signal handler.
+	signal(30,&sig_handler);	signal(31,&sig_handler);	signal(15,&sig_handler);
 
 	it =0;
 		t0 = creal(Ulm.T[NG+1][1]);	t1 = creal(Ulm.P[NG+1][2]);
@@ -638,13 +691,20 @@ int main (int argc, char *argv[])
 //		t0 = t1;
 //		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
 
-		if (MAKE_MOVIE != 0) {
+		if ((MAKE_MOVIE != 0)||(SAVE_QUIT != 0)) {
 			sprintf(command,"poltorU_%04d.%s",it,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 			if (b0 != 0.0) { sprintf(command,"poltorB_%04d.%s",it,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
+			if (SAVE_QUIT > 0) {
+				printf(" > signal received, snapshot dumped.\n");	fflush(stdout);
+				SAVE_QUIT = 0;
+			} else {
+				printf("  > signal received : save & quit.\n");	fflush(stdout);
+				break;
+			}
 		}
 	}
 
-	if (MAKE_MOVIE == 0) {
+	if ((MAKE_MOVIE == 0)&&(SAVE_QUIT != 0)) {
 		sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 		if (b0 != 0.0) { sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
 	}

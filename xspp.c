@@ -14,10 +14,10 @@
 #include <gsl/gsl_sf_legendre.h>
 
 // parameters for SHT.c
-#define NLAT 601
-#define LMAX 300
-#define NPHI 1
-#define MMAX 0
+#define NLAT 301
+#define LMAX 100
+#define NPHI 100
+#define MMAX 48
 #define MRES 1
 // SHT on equal spaced grid + polar points.
 #define SHT_EQUAL
@@ -334,7 +334,10 @@ int main (int argc, char *argv[])
 
 //load
 	Blm.P = NULL;		// require allocation by load_PolTor
-	load_PolTor(argv[1], &Blm, &jpar);	irs = jpar.irs;	ire = jpar.ire;	BC = jpar.BC;
+	load_PolTor(argv[1], &Blm, &jpar);
+		irs = jpar.irs;	ire = jpar.ire;	BC = jpar.BC;
+		if ((lmax < jpar.lmax)||(mmax < jpar.mmax))
+			printf("  ! warning : data has higher resolution than compile time set up. => truncated.\n");
 	alloc_VectField(&B, irs, ire);
 
 // parse optional op...
@@ -348,6 +351,7 @@ int main (int argc, char *argv[])
 
 // apply (l,m) restrictions
 	if (lmax > LMAX) lmax = LMAX;	if (mmax > MMAX) mmax = MMAX;
+	if (lmax > jpar.lmax) lmax=jpar.lmax;	if (mmax > jpar.mmax) mmax=jpar.mmax;
 	if (filter_req) filter_lm(&Blm, lmin, lmax, mmin, mmax);
 
 // write radial grid

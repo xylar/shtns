@@ -44,7 +44,7 @@ void load_PolTor(char *fn, struct PolTor *PT, struct JobInfo *fh)
 {
 	long int ir,im,m,l,lm;
 	long int imt,lmt;
-	complex double **St, **Sp;
+	complex double *St, *Sp;
 	FILE *fp;
 
 	long int lim(long int l, long int im) {
@@ -73,18 +73,12 @@ void load_PolTor(char *fn, struct PolTor *PT, struct JobInfo *fh)
 	if (PT->P == NULL)	{	// destination field not yet allocated ?
 		alloc_DynamicField(PT, NULL, NULL, NULL, fh->irs, fh->ire);
 	}
+	Sp = (complex double *) malloc(fh->nlm * 2*sizeof(complex double));	// alloc shell
+	St = Sp + fh->nlm;
 
-	Sp = (complex double **) malloc( fh->nr * sizeof(complex double *) );
-	St = (complex double **) malloc( fh->nr * sizeof(complex double *) );
-
-	for (ir=0; ir<fh->nr; ir++) {			// initialize at NULL pointer.
-		Sp[ir] = NULL;	St[ir] = NULL;
-	}
 	for (ir= fh->irs; ir<= fh->ire; ir++) {
-		Sp[ir] = (complex double *) malloc(fh->nlm * sizeof(complex double));	// alloc shell
-		St[ir] = (complex double *) malloc(fh->nlm * sizeof(complex double));	// alloc shell
-		fread(Sp[ir], sizeof(complex double), fh->nlm, fp);	// load data
-		fread(St[ir], sizeof(complex double), fh->nlm, fp);	// load data
+		fread(Sp, sizeof(complex double), fh->nlm, fp);	// load data
+		fread(St, sizeof(complex double), fh->nlm, fp);	// load data
 		for (im=0, lm=0, imt=0, lmt=0; im<=MMAX; im++) {
 			m=im*MRES;
 			while(m > imt*fh->mres) {		// skip data if not required.
@@ -94,8 +88,8 @@ void load_PolTor(char *fn, struct PolTor *PT, struct JobInfo *fh)
 			if ((imt <= fh->mmax) && (m == imt*fh->mres)) {		// data present : copy
 				for (l=m; l<= LMAX; l++) {
 					if (l<=fh->lmax) {
-						PT->P[ir][lm] = Sp[ir][lmt];
-						PT->T[ir][lm] = St[ir][lmt];
+						PT->P[ir][lm] = Sp[lmt];
+						PT->T[ir][lm] = St[lmt];
 						lmt++;
 					} else {
 						PT->P[ir][lm] = 0.0;
@@ -116,9 +110,6 @@ void load_PolTor(char *fn, struct PolTor *PT, struct JobInfo *fh)
 		}
 	}
 
-	for (ir=fh->nr-1; ir>=0; ir--) {	// free memory allocated for shells.
-		if (St[ir] != NULL) { free(St[ir]);	free(Sp[ir]); }
-	}
-	free(St);	free(Sp);
+	free(Sp);
 	fclose(fp);
 }

@@ -7,6 +7,8 @@
 
 *** Optimizations ***
 
+- mask
+
 - time different implementations and chose the fastest...
 
 ? grid : try full NR*NLM matrices, loops are more efficient but what about cache ???
@@ -28,6 +30,7 @@
 
 
 *** SHT.c
+- FFTW : out-of-place is faster than in-place. switch ?
 - SHT : implement even and odd l sub-cases.
 	should not change array sizes. only SHT function calls may (must) be different.
 - SHT : NLAT odd could be improved a little bit.

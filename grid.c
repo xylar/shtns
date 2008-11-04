@@ -605,8 +605,11 @@ void init_Deriv_cyl()
 void init_rad_sph(double rmin, double Ric, double rmax)
 {
 	r = (double *) malloc(NR * sizeof(double));	// allocation de la grille radiale
-//	Reg_Grid(rmin, Ric, rmax);
+#ifdef MASK
+	Reg_Grid(rmin, Ric, rmax);
+#else
 	BL_Grid(rmin, Ric, rmax);
+#endif
 	init_Deriv_sph();
 	NU = NR-NG;
 }
