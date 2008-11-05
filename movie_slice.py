@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #plot a slice
 from pylab import *     # matplotlib
-import os
+from subprocess import *
 import sys              # acces a la ligne de commande.
 import glob
 import time
@@ -13,20 +13,17 @@ i=1;	# snapshot numbering
 
 base=sys.argv[1]
 job=sys.argv[2]
-files=glob.glob( base + '_*.' + job)
+files=sorted(glob.glob( base + '_*.' + job))
 
-if len(sys.argv) >=3:
+if len(sys.argv) >3:
 	i = int(sys.argv[3])
 
 for f in files[i-1:] :
-	retcode = os.system("./xspp " + f + " axi")
+	retcode = call("./xspp " + f + " axi", shell=True)
+	#retcode = os.system("./xspp " + f + " axi")
 	if retcode != 0:
-		print 'error from xspp, I will retry in 5 seconds'
-		time.sleep(5)
-		retcode = os.system("./xspp " + f + " axi")
-		if retcode != 0:
-			print 'error from xspp again, abort.'
-			exit()
+		print 'error from xspp again, abort.'
+		exit()
 
 	a=load('o_Vp')
 	s = a.shape

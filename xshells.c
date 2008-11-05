@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <complex.h>
 #include <math.h>
 // FFTW : spatial derivative is d/dx = ik	(no minus sign !)
@@ -566,6 +567,7 @@ int main (int argc, char *argv[])
 	struct JobInfo jinfo;
 	char command[100] = "xshells.par";
 	char job[40];
+	clock_t tcpu;
 
 	printf("[XSHELLS] eXtendable Spherical Harmonic Earth-Like Liquid Simulator\n          by Nathanael Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
 
@@ -638,8 +640,11 @@ int main (int argc, char *argv[])
 		zero_out_field(&Ulm);
 		for (i=NG; i<NR; i++) {
 //			Ulm.T[i][LM(1,0)] = r[i]*DeltaOmega*(1-(r[i]-r[NG])/(r[NR-1]-r[NG])) * Y10_ct;
+			for (im=1;im<=MMAX;im++)
+				Ulm.T[i][LM(MRES*im+1,im)] = DeltaOmega*1e-8;	// non-zero initial value...
 		}
 		Ulm.T[NG][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
+
 		sprintf(command,"poltorU0.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 	}
 
@@ -679,13 +684,16 @@ int main (int argc, char *argv[])
 			DeltaOmega = 0.0;
 		}
 #endif
+
 		Ulm.T[NG][LM(1,0)]  = r[NG]*DeltaOmega * Y10_ct;	// rotation differentielle de la graine.
+		tcpu = clock();
 		(*ptr_step)(modulo, Alm);	// go for time integration !!
+		tcpu = clock() - tcpu;
 
 		time += 2*modulo*dtU;
 		it++;
 		t0 = creal(Ulm.T[NG+1][1]);	t1 = creal(Ulm.P[NG+1][2]);
-		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,time,t1, t0);	fflush(stdout);
+		printf("[it %d] t=%g, P0=%g, T0=%g  (cpu=%d)\n",it,time,t1, t0, (int) tcpu);	fflush(stdout);
 		if (isnan(t0)) runerr("NaN encountered");
 
 //		t0 = t1;
@@ -704,7 +712,7 @@ int main (int argc, char *argv[])
 		}
 	}
 
-	if ((MAKE_MOVIE == 0)&&(SAVE_QUIT != 0)) {
+	if ((MAKE_MOVIE == 0)&&(SAVE_QUIT == 0)) {
 		sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 		if (b0 != 0.0) { sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
 	}

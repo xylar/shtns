@@ -15,7 +15,7 @@
 
 // parameters for SHT.c
 #define NLAT 301
-#define LMAX 100
+#define LMAX 200
 #define NPHI 100
 #define MMAX 48
 #define MRES 1
@@ -406,7 +406,7 @@ int main (int argc, char *argv[])
 		PolTor_to_spat(&Blm, &B, irs, ire, BC);
 		im = phi_to_idx(phi);
 		write_slice("o_Vr",B.r,im);	write_slice("o_Vt",B.t,im);	write_slice("o_Vp",B.p,im);
-		printf("> meridional slice #%d (phi=%.1f°) written to files : o_Vr, o_Vt, o_Vp (spherical vector components)\n",i,phi_deg(i));
+		printf("> meridional slice #%d (phi=%.1f°) written to files : o_Vr, o_Vt, o_Vp (spherical vector components)\n",im,phi_deg(im));
 		for (i=irs;i<=ire;i++) {
 			for(l=0;l<NLAT;l++) {
 				B.p[i][im*NLAT +l] = B.r[i][im*NLAT +l]*ct[l] - B.t[i][im*NLAT +l]*st[l];	// z

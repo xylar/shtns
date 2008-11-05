@@ -100,6 +100,7 @@ void load_PolTor(char *fn, struct PolTor *PT, struct JobInfo *fh)
 				for (l=LMAX+1; l<fh->lmax; l++) {
 					lmt++;
 				}
+				imt++;
 			} else {	// data not present : set to zero
 				for (l=m; l<= LMAX; l++) {
 					PT->P[ir][lm] = 0.0;
