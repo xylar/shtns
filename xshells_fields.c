@@ -79,13 +79,13 @@ inline void cart_spat0_to_Sph(double Vx, double Vy, double Vz, complex double *S
 //#define CALC_B       PolTor_to_spat(&Blm, &B, 0, NR-1, BC_MAGNETIC)
 //#define CALC_B       calc_B(&Blm, &B, &B0lm)
 
-/// compute spatial field from Poloidal/Toroidal representation.
+/// compute spatial field from Poloidal/Toroidal representation (assumes istart-1 and iend+1 are present for BC)
 void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, long int iend, long int BC)
 {
 	complex double Q[NLM];	// l(l+1) * P/r
 	complex double S[NLM];	// dP/dr + P/r = 1/r.d(rP)/dr = Wr(P)
 	double dr;
-	long int ir,lm,l;
+	long int ir,lm,l,im;
 
 	ir = istart;
 	if ((istart == 0)&&(r[ir] == 0.0)) {	// field at r=0 : S = 2.dP/dr (l=1 seulement) => store Bx, By, Bz (cartesian coordinates)
@@ -93,14 +93,17 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 		for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
 			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
 		}
+	} else if ( (PT->P[ir-1] != NULL) ) {	// data present, no need for explicit BC.
+		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+			S[lm] = Wr[ir].l*PT->P[ir-1][lm] + Wr[ir].d*PT->P[ir][lm] + Wr[ir].u*PT->P[ir+1][lm];
+			Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
+		}
+		SH_to_spat(Q,(complex double *) V->r[ir]);
+		SHsphtor_to_spat(S, PT->T[ir], (complex double *) V->t[ir], (complex double *) V->p[ir]);
 	} else if (BC == BC_NO_SLIP) {
-		// Velocity field (no slip => Ur=0, Ut=0, Up=r.sint.DeltaOmega)
-		for (lm=0; lm<NLAT*NPHI; lm++) {
-			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;
-		}
-		for (lm=0; lm<NPHI; lm++) {
-			for (l=0; l<NLAT; l++) V->p[ir][lm*NLAT+l] = r[ir]*st[l]*DeltaOmega;
-		}
+		// Velocity field (no slip => P=0, S=0, T=boundary motion) => only toroidal motion.
+		SHtor_to_spat(PT->T[ir], (complex double *) V->t[ir], (complex double *) V->p[ir]);
+		for (lm=0; lm<NLAT*NPHI; lm++)	V->r[ir][lm] = 0.0;
 	} else if (BC == BC_FREE_SLIP) {
 		// Velocity field (free slip BC) : P = 0, d(T/r)/dr = 0   => Ur=0
 		dr = r[ir+1]/(r[ir]*(r[ir+1]-r[ir]));
@@ -108,8 +111,10 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 			S[lm] = dr * PT->P[ir+1][lm];
 		}
 		SHsphtor_to_spat(S, PT->T[ir], (complex double *) V->t[ir], (complex double *) V->p[ir]);
+		for (lm=0; lm<NLAT*NPHI; lm++)	V->r[ir][lm] = 0.0;
+	} else {
 		for (lm=0; lm<NLAT*NPHI; lm++) {
-			V->r[ir][lm] = 0.0;
+			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
 		}
 	}
 
@@ -123,11 +128,18 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 	}
 
 	ir = iend;
-	if (BC == BC_NO_SLIP) {
-		// Velocity field (no slip => U = 0)
-		for (lm=0; lm<NLAT*NPHI; lm++) {
-			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
+	if ( (ir+1 < NR) && (PT->P[ir+1] != NULL) ) {	// data present, no need for explicit BC.
+		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+			S[lm] = Wr[ir].l*PT->P[ir-1][lm] + Wr[ir].d*PT->P[ir][lm] + Wr[ir].u*PT->P[ir+1][lm];
+			Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
 		}
+		SH_to_spat(Q,(complex double *) V->r[ir]);
+		SHsphtor_to_spat(S, PT->T[ir], (complex double *) V->t[ir], (complex double *) V->p[ir]);
+		return;
+	} else if (BC == BC_NO_SLIP) {
+		// Velocity field (no slip => P=0, S=0, T=boundary motion) => only toroidal motion.
+		SHtor_to_spat(PT->T[ir], (complex double *) V->t[ir], (complex double *) V->p[ir]);
+		for (lm=0; lm<NLAT*NPHI; lm++)	V->r[ir][lm] = 0.0;
 		return;
 	} else if (BC == BC_FREE_SLIP) {
 		// Velocity field (free slip BC) : P = 0, d(T/r)/dr = 0   => Ur=0
@@ -136,19 +148,23 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 			S[lm] = dr * PT->P[ir-1][lm];
 		}
 		SHsphtor_to_spat(S, PT->T[ir], (complex double *) V->t[ir], (complex double *) V->p[ir]);
-		for (lm=0; lm<NLAT*NPHI; lm++) {
-			V->r[ir][lm] = 0.0;
-		}
+		for (lm=0; lm<NLAT*NPHI; lm++)	V->r[ir][lm] = 0.0;
 		return;
 	} else if (BC == BC_MAGNETIC) {
 		// Magnetic field (insulator BC) : T=0, dP/dr = -(l+1)/r.P => S = -lP/r
-		for (lm=0, l=0; lm<NLM; lm++) {
-			S[lm] = -l*PT->P[ir][lm]*r_1[ir];
-			if (l < LMAX) { l++; } else { l=0; }
-			Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++) {
+				S[lm] = -l*PT->P[ir][lm]*r_1[ir];
+				Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
+			}
 		}
 		SH_to_spat(Q,(complex double *) V->r[ir]);
 		SHsph_to_spat(S, (complex double *) V->t[ir], (complex double *) V->p[ir]);
+		return;
+	} else {
+		for (lm=0; lm<NLAT*NPHI; lm++) {
+			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
+		}
 	}
 }
 
@@ -333,7 +349,7 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 	complex double S[NLM];	// dP/dr + P/r = 1/r.d(rP)/dr = Wr(P)
 	complex double T[NLM];	// T
 	double dr;
-	long int ir,lm,l;
+	long int ir,lm,l, im;
 
 	complex float *QST;
 	long int *lma;
@@ -341,7 +357,7 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 
 	if (B0 != NULL) {	nj = B0->nlm;	lma = B0->lm;	}
 
-	ir = 0;
+	ir = 0;		// field at r=0 : S = 2.dP/dr (l=1 only) => store Bx, By, Bz (cartesian coordinates)
 		Pol_to_cart_spat0(PT->P, V->r[ir],V->t[ir],V->p[ir]);
 		for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
 			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
@@ -366,10 +382,11 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 	}
 	ir = NR-1;
 		// Magnetic field (insulator BC) : T=0, dP/dr = -(l+1)/r.P => S = -lP/r
-		for (lm=0, l=0; lm<NLM; lm++) {
-			S[lm] = -l*PT->P[ir][lm]*r_1[ir];
-			if (l < LMAX) { l++; } else { l=0; }
-			Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
+		for (im=0, lm=0; im<=MMAX; im++) {
+			for (l=im*MRES; l<=LMAX; l++, lm++) {
+				S[lm] = -l*PT->P[ir][lm]*r_1[ir];
+				Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
+			}
 		}
 		SH_to_spat(Q,(complex double *) V->r[ir]);
 		SHsph_to_spat(S, (complex double *) V->t[ir], (complex double *) V->p[ir]);
@@ -457,7 +474,7 @@ void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *Vx
 		rO = r[ir]*DeltaOmega;
 		it = 0;
 		for (lm=0; lm<NPHI*NLAT; lm++) {
-			vp = rO*st[it]; it++; if (it>=NLAT) it=0;	// TO BE CHECKED !
+			vp = rO*st[it];		it++; if (it>=NLAT) it=0;	// TO BE CHECKED !
 			vr = - vp*B->t[ir][lm];
 			vt =   vp*B->r[ir][lm];
 			VxB->r[ir][lm] = vr;	VxB->t[ir][lm] = vt;	VxB->p[ir][lm] = 0.0;

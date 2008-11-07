@@ -30,7 +30,19 @@
 #define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 
 // half the theta length for even/odd decomposition. (NLAT+1)/2 allows odd NLAT.
-#define NLAT_2 ((NLAT+1)/2)
+#ifndef NLAT
+ #ifndef NLAT_2
+  #error "NLAT or NLAT_2 must be defined"
+ #endif
+ #define NLAT (2*NLAT_2)
+#endif
+
+#ifndef NLAT_2
+ #ifndef NLAT
+  #error "NLAT or NLAT_2 must be defined"
+ #endif
+ #define NLAT_2 ((NLAT+1)/2)
+#endif
 
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
@@ -179,22 +191,22 @@ void SH_to_spat(complex double *Qlm, complex double *BrF)
 //          complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
 void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF)
 {
-#include "SHT/ST_to_spat.c"
+#include "SHT/SHst_to_spat.c"
 }
 
 void SHsph_to_spat(complex double *Slm, complex double *BtF, complex double *BpF)
 {
-#include "SHT/S_to_spat.c"
+#include "SHT/SHs_to_spat.c"
 }
 
 void SHtor_to_spat(complex double *Tlm, complex double *BtF, complex double *BpF)
 {
-#include "SHT/T_to_spat.c"
+#include "SHT/SHt_to_spat.c"
 }
 
 void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
 {
-#include "SHT/spat_to_SHsphtor.c"
+#include "SHT/spat_to_SHst.c"
 }
 
 

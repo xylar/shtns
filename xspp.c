@@ -50,6 +50,9 @@ long int its=0, ite=NLAT-1;
 long int mmin=0, mmax=MMAX;
 long int lmin=0, lmax=LMAX;
 
+double lspec[LMAX+1];	// spectra
+double mspec[MMAX+1];
+
 struct JobInfo jpar;	// parameters from loaded file
 
 // find closest index to phi angle.
@@ -68,10 +71,11 @@ void write_vect(char *fn, double *vec, long int N)
 	long int i;
 	
 	fp = fopen(fn,"w");
+	fprintf(fp,"%% [XSHELLS] vector\n");
 	for (i=0;i<N;i++) {
 		fprintf(fp,"%.6g ",vec[i]);
 	}
-	fclose(fp);
+	fprintf(fp,"\n");	fclose(fp);
 }
 
 void write_HS(char *fn, complex double **HS)
@@ -80,7 +84,7 @@ void write_HS(char *fn, complex double **HS)
 	FILE *fp;
 	
 	fp = fopen(fn,"w");
-	fprintf(fp,"%%  Spherical Harmonics coefficients : MMAX=%d, LMAX=%d, MRES=%d", mmax, lmax, jpar.mres);
+	fprintf(fp,"%% [XSHELLS] Spherical Harmonics coefficients : MMAX=%d, LMAX=%d, MRES=%d. l-contiguous storing", mmax, lmax, jpar.mres);
 	for (ir=irs;ir<=ire;ir++) {
 		if (HS[ir] != NULL) {
 			fprintf(fp,"\n%%  ir=%d, r=%f\n",ir,r[ir]);
@@ -92,7 +96,7 @@ void write_HS(char *fn, complex double **HS)
 			}
 		}
 	}
-	fclose(fp);
+	fprintf(fp,"\n");	fclose(fp);
 }
 
 void write_Spec_m(char *fn, complex double **HS)
@@ -102,10 +106,10 @@ void write_Spec_m(char *fn, complex double **HS)
 	FILE *fp;
 
 	fp = fopen(fn,"w");
-	fprintf(fp,"%%  Spherical Harmonics m-spectrum : MMAX=%d", mmax);
+	fprintf(fp,"%% [XSHELLS] Spherical Harmonics m-spectrum : MMAX=%d, MRES=%d. first row is r", mmax, jpar.mres);
 	for (ir=irs;ir<=ire;ir++) {
 		if (HS[ir] != NULL) {
-			fprintf(fp,"\n%%  ir=%d, r=%f\n",ir,r[ir]);
+			fprintf(fp,"\n%%  ir=%d, r=%f\n%.6g ",ir,r[ir],r[ir]);
 			for (m=0; m<=mmax; m+=jpar.mres) {
 				sum = 0.0;
 				for (l=m; l<=lmax; l++) {
@@ -117,7 +121,7 @@ void write_Spec_m(char *fn, complex double **HS)
 			}
 		}
 	}
-	fclose(fp);
+	fprintf(fp,"\n");	fclose(fp);
 }
 
 void write_Spec_l(char *fn, complex double **HS)
@@ -127,10 +131,10 @@ void write_Spec_l(char *fn, complex double **HS)
 	FILE *fp;
 
 	fp = fopen(fn,"w");
-	fprintf(fp,"%%  Spherical Harmonics l-spectrum : LMAX=%d", lmax);
+	fprintf(fp,"%% [XSHELLS] Spherical Harmonics l-spectrum : LMAX=%d. first row is r", lmax);
 	for (ir=irs;ir<=ire;ir++) {
 		if (HS[ir] != NULL) {
-			fprintf(fp,"\n%%  ir=%d, r=%f\n",ir,r[ir]);
+			fprintf(fp,"\n%%  ir=%d, r=%f\n%.6g ",ir,r[ir],r[ir]);
 			for (l=0; l<=lmax; l++) {
 				sum = 0.0;
 				for (m=0; (m<=mmax)&&(m<=l); m+=jpar.mres) {
@@ -142,7 +146,7 @@ void write_Spec_l(char *fn, complex double **HS)
 			}
 		}
 	}
-	fclose(fp);
+	fprintf(fp,"\n");	fclose(fp);
 }
 
 void write_shell(char *fn, double *mx)
@@ -151,7 +155,7 @@ void write_shell(char *fn, double *mx)
 	long int i,j;	//phi, theta
 	
 	fp = fopen(fn,"w");
-		fprintf(fp,"0 ");			// first row = phi
+	fprintf(fp,"%% [XSHELLS] Surface data (sphere). first line is theta, first row is phi.\n0 ");
 		for(j=its;j<=ite;j++) {
 			fprintf(fp,"%.6g ",acos(ct[j]));	// first line = theta (radians)
 		} 
@@ -161,7 +165,7 @@ void write_shell(char *fn, double *mx)
 			fprintf(fp,"%.6g ",mx[i*NLAT+j]);
 		}
 	}
-	fclose(fp);
+	fprintf(fp,"\n");	fclose(fp);
 }
 
 void write_slice(char *fn, double **v, long int im)
@@ -170,7 +174,7 @@ void write_slice(char *fn, double **v, long int im)
 	long int i,j;
 
 	fp = fopen(fn,"w");
-		fprintf(fp,"0 ");			// first row = radius
+	fprintf(fp,"%% [XSHELLS] Meridian slice. first line is cos(theta), first row is r.\n0 ");
 		for(j=its; j<=ite; j++) {
 			fprintf(fp,"%.6g ",ct[j]);	// first line = cos(theta)
 		}
@@ -182,7 +186,7 @@ void write_slice(char *fn, double **v, long int im)
 			}
 		}
 	}
-	fclose(fp);
+	fprintf(fp,"\n");	fclose(fp);
 }
 
 // equatorial cut : fac is used to change the sign of theta component to get z-component.
@@ -193,9 +197,9 @@ void write_equat(char *fn, double **v, double fac)
 	long int it = NLAT/2;	// equator is at NLAT/2.
 
 	fp = fopen(fn,"w");
-		fprintf(fp,"0 ");			// first row = radius
+	fprintf(fp,"%% [XSHELLS] Equatorial cut. first line is phi (in radian), first row is r.\n0 ");
 		for(j=ips; j<=ipe; j++) {
-			fprintf(fp,"%.6g ",phi_rad(j));	// first line = phi angle (radians)
+			fprintf(fp,"%.6g ",phi_rad(j));	// first line = phi angle (radian)
 		}
 	for (i=irs;i<=ire;i++) {
 		if (v[i] != NULL) {
@@ -205,7 +209,7 @@ void write_equat(char *fn, double **v, double fac)
 			}
 		}
 	}
-	fclose(fp);
+	fprintf(fp,"\n");	fclose(fp);
 }
 
 // apply (l,m) filter
@@ -215,7 +219,7 @@ void filter_lm(struct PolTor *Blm, int lmin, int lmax, int mmin, int mmax)
 
 	if (lmax > LMAX) lmax = LMAX;	if (mmax > MMAX) mmax = MMAX;
 
-	for (ir=irs; ir<=ire; ir++) {
+	for (ir=jpar.irs; ir<=jpar.ire; ir++) {		// filter all data, not only restricted data...
 		for (m=0; m<mmin; m++) {
 			for(l=m; l<=lmax; l++) {
 				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
@@ -232,6 +236,28 @@ void filter_lm(struct PolTor *Blm, int lmin, int lmax, int mmin, int mmax)
 		for (m=mmax+1; m<=MMAX; m++) {
 			for(l=m; l<=lmax; l++) {
 				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
+			}
+		}
+	}
+}
+
+void calc_spec(complex double **HS, double *spl, double *spm)
+{
+	double cr,ci;
+	long int ir,lm,l,m;
+
+	for (l=0; l<=LMAX; l++)	spl[l] = 0.0;
+	for (m=0; m<=MMAX; m++)	spm[m] = 0.0;
+
+	for (ir=irs;ir<=ire;ir++) {
+		if (HS[ir] != NULL) {
+			for (m=0; m<=mmax; m+=jpar.mres) {
+				for (l=m; l<=lmax; l++) {
+					lm = LM(l,m);
+					cr = creal(HS[ir][lm]);	ci = cimag(HS[ir][lm]);
+					spl[l] += cr*cr + ci*ci;
+					spm[m] += cr*cr + ci*ci;
+				}
 			}
 		}
 	}
@@ -425,9 +451,11 @@ int main (int argc, char *argv[])
 	}
 	if (strcmp(argv[ic],"spec") == 0)
 	{
-		write_Spec_l("o_Pl",Blm.P);	write_Spec_l("o_Tl",Blm.T);
-		write_Spec_m("o_Pm",Blm.P);	write_Spec_m("o_Tm",Blm.T);
-		printf("> spherical harmonics spectrum written to files : o_Pl, o_Tl, o_Pm, o_Tl (poloidal/toroidal, l/m)\n");
+		write_Spec_l("o_Plr",Blm.P);	write_Spec_l("o_Tlr",Blm.T);
+		write_Spec_m("o_Pmr",Blm.P);	write_Spec_m("o_Tmr",Blm.T);
+		printf("> spherical harmonics spectrum written to files : o_Plr, o_Tlr, o_Pmr, o_Tlr (poloidal/toroidal, l/m, at each r)\n");
+		calc_spec(Blm.P, lspec, mspec);		write_vect("o_Pl",lspec, lmax+1);	write_vect("o_Pm",mspec, mmax+1);
+		calc_spec(Blm.T, lspec, mspec);		write_vect("o_Tl",lspec, lmax+1);	write_vect("o_Tm",mspec, mmax+1);
 		exit(0);
 	}
 	if (strcmp(argv[ic],"3D") == 0)

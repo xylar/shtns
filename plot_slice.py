@@ -10,7 +10,7 @@ argn = len(sys.argv)
 
 for i in range(1, argn):
 	print 'loading',sys.argv[i]
-	a=load(sys.argv[i])
+	a=load(sys.argv[i],comments='%')
 	s = a.shape
 
 	ct = a[0,1:s[1]]

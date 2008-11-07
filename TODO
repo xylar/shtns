@@ -19,6 +19,7 @@
 + velocity field computation
 + inner core differential rotation
 
+- compute spectrum and use them...
 -+ boundary conditions dependence should be checked and improved.
 
 - euler explicit (order 1), better suited for fast waves.
@@ -30,9 +31,11 @@
 
 
 *** SHT.c
-- FFTW : out-of-place is faster than in-place. switch ?
 - SHT : implement even and odd l sub-cases.
 	should not change array sizes. only SHT function calls may (must) be different.
+
+- FFTW : out-of-place is faster than in-place. switch ? http://www.fftw.org/speed/CoreDuo-3.0GHz-icc64/
+- try blas ?
 
 - SHT : NLAT odd could be improved a little bit.
 - SHT : use DCT space, keep low NLAT but regular grid and Gauss quadrature (??)

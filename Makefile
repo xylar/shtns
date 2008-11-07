@@ -13,13 +13,13 @@ cmd = gcc -O3
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 #cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
 
-shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat.gen.c SHT/Makefile
+shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat.gen.c SHT/spat_to_SH.gen.c SHT/Makefile
 ini = inc_B0ini.c inc_U0ini.c
 
 default : xshells
 
 SHT/SH_to_spat.c : SHT/SH_to_spat.gen.c SHT/Makefile
-	$(MAKE) -C SHT
+	$(MAKE) SH_to_spat.c -C SHT
 SHT/spat_to_SH.c : SHT/spat_to_SH.gen.c SHT/Makefile
 	$(MAKE) spat_to_SH.c -C SHT
 

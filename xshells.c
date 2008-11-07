@@ -285,23 +285,31 @@ void init_Umatrix(long int BC)
 
 /// TOROIDAL
 /// (d/dt - nu.Lap) Ut = Poloidal(curl_NL)
+	i = NG;		// BC toroidal (free-slip) : d(T/r)/dr = 0 =>  dT/dr = T/r
+		dx_1 = 1.0/(r[i+1]-r[i]);	dx_2 = dx_1*dx_1;
+					MUt[i-NG].l = 0.0;
+		for (l=0; l<=LMAX; l++) MUt[i-NG].d[l] = 1.0/dtU + nu*( -dx_2 - r_1[i]*dx_1 + (1.0 - 0.5*l*(l+1))*r_2[i] );
+					MUt[i-NG].u =              nu * dx_2;
 	for(i=NG+1; i<NR-1; i++) {
 					MUt[i-NG].l =              0.5*nu*Lr[i].l;
 		for (l=0; l<=LMAX; l++)	MUt[i-NG].d[l] = 1.0/dtU + 0.5*nu*(Lr[i].d - r_2[i]*l*(l+1));
 					MUt[i-NG].u =              0.5*nu*Lr[i].u;
 	}
-	i = NR-1;		// BC toroidal (free-slip) : d(T/r)/dr = 0 =>  dT/dr = T/r
+	i = NR-1;	// BC toroidal (free-slip) : d(T/r)/dr = 0 =>  dT/dr = T/r
 		dx_1 = 1.0/(r[i]-r[i-1]);	dx_2 = dx_1*dx_1;
 					MUt[i-NG].l =              nu * dx_2;
 		for (l=0; l<=LMAX; l++) MUt[i-NG].d[l] = 1.0/dtU + nu*( -dx_2 + r_1[i]*dx_1 + (1.0 - 0.5*l*(l+1))*r_2[i] );
 					MUt[i-NG].u = 0.0;
 
-	for(i=1; i<NU; i++) {
+	for(i=0; i<NU; i++) {
 					MUt_1[i].l =            - MUt[i].l;
 		for (l=0; l<=LMAX; l++) MUt_1[i].d[l] = 2.0/dtU - MUt[i].d[l];
 					MUt_1[i].u =            - MUt[i].u;
 	}
-	TriDec(MUt_1, 1, NU-1);		// for no-slip : 1 to NU-2, for free-slip : 1 to NU-1
+	if (BC == BC_FREE_SLIP) {
+		TriDec(MUt_1, 0, NU-1);		// for free-slip : 0 to NU-1
+	} else  TriDec(MUt_1, 1, NU-2);		// for no-slip : 1 to NU-2
+	
 // for NO-SLIP, use : cTriSolve(MUt_1, RHS, Tlm, 1, NU-2)
 // for FREE-SLIP, use : cTriSolve(MUt_1, RHS, Tlm, 1, NU-1)
 }
@@ -337,7 +345,8 @@ inline substepU(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
 {
 	long int i,l;
 
-	cTriMulBC(MUt, Ulm.T +NG, Alm, 1, NU-2);
+	cTriMulBC(MUt, Ulm.T +NG, Alm, 1, NU-2);	// no slip
+//	cTriMul(MUt, Ulm.T +NG, Alm, 0, NU-1);		// free slip
 	for (i=1; i<NU-1; i++) {
 		for (l=1;l<NLM;l++) {
 			Alm[i][l] += 1.5*NL->T[i+NG][l] - 0.5*NLo->T[i+NG][l];
@@ -350,7 +359,8 @@ inline substepU(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
 		}
 #endif*/
 	}
-	cTriSolveBC(MUt_1, Alm, Ulm.T +NG, 1, NU-2);
+	cTriSolveBC(MUt_1, Alm, Ulm.T +NG, 1, NU-2);	// no slip
+//	cTriSolve(MUt_1, Alm, Ulm.T +NG, 0, NU-1);	// free slip
 
 	cPentaMul(MUp, Ulm.P +NG, Alm, 1, NU-2);
 	for (i=1; i<NU-1; i++) {
@@ -638,7 +648,7 @@ int main (int argc, char *argv[])
 		printf("    U field read from file \"%s\" (t=%f).\n",argv[1],time);
 	} else {
 		zero_out_field(&Ulm);
-		for (i=NG; i<NR; i++) {
+		for (i=NG+1; i<NR-1; i++) {
 //			Ulm.T[i][LM(1,0)] = r[i]*DeltaOmega*(1-(r[i]-r[NG])/(r[NR-1]-r[NG])) * Y10_ct;
 			for (im=1;im<=MMAX;im++)
 				Ulm.T[i][LM(MRES*im+1,im)] = DeltaOmega*1e-8;	// non-zero initial value...
@@ -702,12 +712,13 @@ int main (int argc, char *argv[])
 		if ((MAKE_MOVIE != 0)||(SAVE_QUIT != 0)) {
 			sprintf(command,"poltorU_%04d.%s",it,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
 			if (b0 != 0.0) { sprintf(command,"poltorB_%04d.%s",it,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
+			if (SAVE_QUIT < 0) {
+				printf("  > signal received : save & quit.\n");	fflush(stdout);
+				break;
+			}
 			if (SAVE_QUIT > 0) {
 				printf(" > signal received, snapshot dumped.\n");	fflush(stdout);
 				SAVE_QUIT = 0;
-			} else {
-				printf("  > signal received : save & quit.\n");	fflush(stdout);
-				break;
 			}
 		}
 	}
