@@ -13,7 +13,7 @@
 #include <gsl/gsl_sf_legendre.h>
 
 
-// SHT.h : parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
+#ifndef LMAX
 
 //  SIZES  //
 // LMAX : maximum degree of Spherical Harmonic
@@ -30,6 +30,8 @@
 #define NPHI (3*MMAX)
 // compute and print some debugging information...
 #define _SH_DEBUG_
+
+#endif
 
 
 // NLM : total number of Spherical Harmonic coefficients.
@@ -347,7 +349,7 @@ void GaussNodes(double *x, double *w, int n)
 //#define NG (LMAX+1)
 #define NG ((LMAX+1)*2)
 // initialize SH transform.
-void init_SH()
+void init_SH(double eps)
 {
 	double tg[NG],xg[NG],wg[NG];	// Gauss quadrature weights.
 	double *ft,*Zlm;		// for DCT.

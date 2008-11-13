@@ -34,14 +34,22 @@
  #ifndef NLAT_2
   #error "NLAT or NLAT_2 must be defined"
  #endif
+ #ifndef _SHT_EO_
  #define NLAT (2*NLAT_2)
+ #else
+  #define NLAT NLAT_2
+ #endif
 #endif
 
 #ifndef NLAT_2
  #ifndef NLAT
   #error "NLAT or NLAT_2 must be defined"
  #endif
- #define NLAT_2 ((NLAT+1)/2)
+ #ifndef _SHT_EO_
+  #define NLAT_2 ((NLAT+1)/2)
+ #else
+  #define NLAT_2 NLAT
+ #endif
 #endif
 
 #ifndef M_PI
@@ -55,8 +63,8 @@
 #define Y10_ct sqrt(4.*M_PI/3.)
 
 // TEST FOR PARAMETERS AT COMPILE TIME
-#if NLAT <= LMAX
-	#error "NLAT must be greater than LMAX !"
+#if NLAT_2 <= LMAX/2
+	#error "NLAT_2 must be greater than LMAX/2 !"
 #endif
 #if LMAX < MMAX*MRES
 	#error "MMAX*MRES should not exceed LMAX !"
@@ -165,7 +173,11 @@ inline void fft_m0_r2c(double *Br, complex double *BrF)		//in-place only
 // output : Slm = spherical harmonics coefficients : complex double array of size NLM
 void spat_to_SH(complex double *BrF, complex double *Qlm)
 {
-#include "SHT/spat_to_SH.c"
+#ifndef _SHT_EO_
+  #include "SHT/spat_to_SH.c"
+#else
+  #include "SHT/spat_to_SHo.c"
+#endif
 }
 
 
@@ -175,7 +187,11 @@ void spat_to_SH(complex double *BrF, complex double *Qlm)
 // output : BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
 void SH_to_spat(complex double *Qlm, complex double *BrF)
 {
-#include "SHT/SH_to_spat.c"
+#ifndef _SHT_EO_
+  #include "SHT/SH_to_spat.c"
+#else
+  #include "SHT/SHo_to_spat.c"
+#endif
 }
 
 //void SH_to_grad_spat(complex double *Slm, complex double *BtF, complex double *BpF)
@@ -191,7 +207,11 @@ void SH_to_spat(complex double *Qlm, complex double *BrF)
 //          complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
 void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF)
 {
-#include "SHT/SHst_to_spat.c"
+#ifndef _SHT_EO_
+  #include "SHT/SHst_to_spat.c"
+#else
+  #include "SHT/SHost_to_spat.c"
+#endif
 }
 
 void SHsph_to_spat(complex double *Slm, complex double *BtF, complex double *BpF)
@@ -206,7 +226,11 @@ void SHtor_to_spat(complex double *Tlm, complex double *BtF, complex double *BpF
 
 void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
 {
-#include "SHT/spat_to_SHst.c"
+#ifndef _SHT_EO_
+  #include "SHT/spat_to_SHst.c"
+#else
+  #include "SHT/spat_to_SHost.c"
+#endif
 }
 
 
@@ -226,7 +250,11 @@ void EqualSpaceNodes(double *x, double *w, int n)
 	int j;
 
 // cos theta of latidunal points (equaly spaced in theta)
+#ifndef _SHT_EO_
 	f = pi/(n-1.0);
+#else
+	f = pi/(2.*n-1.0);
+#endif
 	for (j=0; j<n; j++) {
 		x[j] = cos(f*j);
 	}
@@ -250,10 +278,13 @@ void GaussNodes(double *x, double *w, int n)
 
 	eps = 1.0e-15;	// desired precision, minimum = 2.2204e-16 (double)
 
+#ifdef _SHT_EO_
+	n *=2;
+#endif
 	m = (n+1)/2;
 	for (i=1;i<=m;i++) {
 		z = cos(pi*((double)i-0.25)/((double)n+0.5));
-		z1 = z+1;
+		z1 = z+1.;
 		while ( fabs(z-z1) > eps )
 		{
 			p1 = 1.0;
@@ -267,24 +298,26 @@ void GaussNodes(double *x, double *w, int n)
 			z1 = z;
 			z = z1-p1/pp;
 		}
-		x[i-1] = -z;		// Build up the abscissas.
-		x[n-i] = z;
+		x[i-1] = z;		// Build up the abscissas.
 		w[i-1] = 2.0/((1-z*z)*(pp*pp));		// Build up the weights.
+#ifndef _SHT_EO_
+		x[n-i] = -z;
 		w[n-i] = w[i-1];
+#endif
 	}
 
 // as we started with initial guesses, we should check if the gauss points are actually unique.
-	for (i=n; i>0; i--) {
+	for (i=m; i>0; i--) {
 		if (x[i] == x[i-1]) runerr("bad gauss points\n");
 	}
 
 #ifdef _SH_DEBUG_
 // test integral to compute :
 	z = 0;
-	for (i=0;i<n;i++) {
+	for (i=0;i<m;i++) {
 		z += w[i]*x[i]*x[i];
 	}
-	printf("          quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*1.5,z*1.5-1.0);
+	printf("          quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*3.0,z*3.0-1.0);
 #endif
 }
 
@@ -330,34 +363,33 @@ input : eps = polar optimization threshold : polar coefficients below that thres
 */
 void init_SH(double eps)
 {
-	double xg[NLAT], wg[NLAT];	// gauss points and weights.
+	double wg[NLAT];	// gauss points and weights.
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
 	double iylm_fft_norm = 2.0*pi/NPHI;	// normation FFT pour zlm
 	double t,tmax;
 	long int it,im,m,l;
 
+#ifdef _SHT_EO_
+	iylm_fft_norm *= 2.0;	// normation must be multiplied by 2.
+#endif
 	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
-	
+
 #ifdef SHT_EQUAL
 	printf("          => using Equaly Spaced Nodes\n");
 	EqualSpaceNodes(ct,wg,NLAT);		// equaly-spaced points and weights.
-	for (it=0;it<NLAT; it++) {
-		st[it] = sqrt(1.0 - ct[it]*ct[it]);
-		st_1[it] = 1.0/sqrt(1.0 - ct[it]*ct[it]);
-	}
 #else
 	printf("          => using Gauss Nodes\n");
-	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : xg = ]-1,1[ = cos(theta)
+	GaussNodes(ct,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
+#endif
 	for (it=0; it<NLAT; it++) {
-		ct[it] = xg[NLAT-1-it];			// on prend theta = ]0,pi[ => cos(theta) = ]1,-1[
 		st[it] = sqrt(1.0 - ct[it]*ct[it]);
 		st_1[it] = 1.0/sqrt(1.0 - ct[it]*ct[it]);
 	}
-#endif
 
 #ifdef _SH_DEBUG_
+	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
 // TEST if gauss points are ok.
 	tmax = 0.0;
 	for (it = 0; it<NLAT_2; it++) {

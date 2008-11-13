@@ -31,6 +31,7 @@ struct TriDiagL *MB, *MB_1, *MUt, *MUt_1;
 struct PentaDiag **MUp, **MUp_1;
 
 #define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
+//#define DEB printf("thread %d :: %s:%u pass\n",omp_get_thread_num(), __FILE__, __LINE__)
 //#define DEB (0)
 
 #ifdef MASK
@@ -580,6 +581,9 @@ int main (int argc, char *argv[])
 	clock_t tcpu;
 
 	printf("[XSHELLS] eXtendable Spherical Harmonic Earth-Like Liquid Simulator\n          by Nathanael Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
+#ifdef _NTH_
+	printf("          ++ OMP Parallel version, %d threads.\n",_NTH_);
+#endif
 
 	read_Par(command, job, &iter_max, &modulo, &polar_opt_max, &Ric, &b0);
 	init_SH(polar_opt_max);
