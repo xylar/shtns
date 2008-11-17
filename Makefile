@@ -1,6 +1,7 @@
 # le compilateur :
 ## generic gcc
 cmd = gcc -O3
+cmdp = gcc -O3 -fopenmp
 ## profiling
 #cmd = gcc -O3 -p -fno-inline
 ## recent gcc with native support
@@ -25,6 +26,9 @@ SHT/spat_to_SH.c : SHT/spat_to_SH.gen.c SHT/Makefile
 
 xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
+pxshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
+	$(cmdp) xshells.c -D_NTH_=8 -lfftw3 -lgsl -lgslcblas -lm -o pxshells
+
 xshells_imp : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
 	$(cmd) xshells.c -D_IMPULSE_ -lfftw3 -lgsl -lgslcblas -lm -o xshells_imp
 xspp : xspp.c grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)

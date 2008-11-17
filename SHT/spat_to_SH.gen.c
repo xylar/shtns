@@ -72,7 +72,7 @@ VE			Sl[l] = 0.0;	Tl[l+1] = 0.0;
 VO			Tl[l] = 0.0;	Sl[l+1] = 0.0;
 			for (i=0; i < NLAT_2; i++) {
 QE				(double) Ql[l] += (double) re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				(double) Ql[l+1] += (double) ro * zl[2*i+1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];				
+QO				(double) Ql[l+1] += (double) ro * zl[2*i+1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
 VE				(double) Sl[l]   += dzl[2*i].t * (double) to;
 VO				(double) Tl[l]   -= dzl[2*i].t * (double) po;
 VO				(double) Sl[l+1] += dzl[2*i+1].t * (double) te;
@@ -109,7 +109,7 @@ VB			peo[2*i] = BpF[i];		peo[2*i+1] = 0.0;
  B		}
 		l=m;
 Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
-V		Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];		// virtual pointer for l=0 and im		
+V		Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];		// virtual pointer for l=0 and im
 Q		zl = zlm[im];
 V		dzl = dzlm[im];
 Q		BrF += NLAT;
@@ -123,7 +123,7 @@ VO			Tl[l] = 0.0;	Sl[l+1] = 0.0;
 QE				Ql[l]   += re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 QO				Ql[l+1] += ro * zl[2*i+1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
 VE				Sl[l]   += dzl[2*i].t *to - dzl[2*i].p *pe*I;		// ref: these E. Dormy p 72.
-VO				Tl[l]   -= dzl[2*i].t *po + dzl[2*i].p *te*I;				
+VO				Tl[l]   -= dzl[2*i].t *po + dzl[2*i].p *te*I;
 VO				Sl[l+1] += dzl[2*i+1].t *te - dzl[2*i+1].p *po*I;
 VE				Tl[l+1] -= dzl[2*i+1].t *pe + dzl[2*i+1].p *to*I;
 			}

@@ -388,7 +388,7 @@ int main (int argc, char *argv[])
 	if (argc <= ic) return 0;
 	if (strcmp(argv[ic],"curl") == 0)
 	{
-		curl_PolTor(&Blm, irs, ire);	// compute rotational of field.
+		curl_PolTor(&Blm, irs, ire);	// compute curl of field.
 		printf("> curl computed\n");
 		return 1;	// 1 command line argument parsed.
 	}

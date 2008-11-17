@@ -179,6 +179,9 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 		}
 	}
 
+  #pragma omp parallel num_threads(_NTH_)
+  {
+	#pragma omp for schedule(static) private(ir,lm, Q,S) nowait
 	for (ir=istart+1; ir<iend; ir++) {
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
 			S[lm] = Wr[ir].l*PT->P[ir-1][lm] + Wr[ir].d*PT->P[ir][lm] + Wr[ir].u*PT->P[ir+1][lm];
@@ -187,6 +190,7 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 		SH_to_spat(Q,(complex double *) V->r[ir]);
 		SHsphtor_to_spat(S, PT->T[ir], (complex double *) V->t[ir], (complex double *) V->p[ir]);
 	}
+  }
 
 	ir = iend;
 	if ( (ir+1 < NR) && (PT->P[ir+1] != NULL) ) {	// data present, no need for explicit BC.
@@ -278,12 +282,12 @@ void PolTor_to_curl_spat(struct PolTor *PT, double Wz0, struct VectField *W, lon
 	ir = iend;
 }
 
+#ifndef _NTH_
 /// spatial to curl : only for ir = 1 .. NR-2
 ///	Pol <- Tor
 ///	Tor <- Q/r - 1/r.d(rS)/dr
 void spat_to_curl_PolTor(struct VectField *V, complex double **Plm, complex double **Tlm, long int istart, long int iend)
 {
-	complex double Q[NLM];		// Q
 	complex double S[NLM*3];	// buffers for S.
 	complex double *St, *Sl, *Sd, *Su;	// pointers to S (temp, lower, diag, upper)
 	long int ir,lm;
@@ -293,37 +297,81 @@ void spat_to_curl_PolTor(struct VectField *V, complex double **Plm, complex doub
 	ir = istart;
 		spat_to_SHsphtor((complex double *) V->t[ir], (complex double *) V->p[ir], Sd, Plm[ir]);
 		spat_to_SHsphtor((complex double *) V->t[ir+1], (complex double *) V->p[ir+1], Su, Plm[ir+1]);
-		spat_to_SH((complex double *) V->r[ir], Q);
+		spat_to_SH((complex double *) V->r[ir], Tlm[ir]);
 		for (lm=0; lm<NLM; lm++) {
-			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);		// Sl = 0
+			Tlm[ir][lm] = r_1[ir]*Tlm[ir][lm] - (Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);		// Sl = 0
 		}
 	for (ir=istart+1; ir < iend; ir++) {
 		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
 		spat_to_SHsphtor((complex double *) V->t[ir+1], (complex double *) V->p[ir+1], Su, Plm[ir+1]);
-		spat_to_SH((complex double *) V->r[ir], Q);
+		spat_to_SH((complex double *) V->r[ir], Tlm[ir]);
 		for (lm=0; lm<NLM; lm++) {
-			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
+			Tlm[ir][lm] = r_1[ir]*Tlm[ir][lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
 		}
 	}
 	ir = iend;
 		St = Sl;	Sl = Sd;	Sd = Su;	Su = St;		// rotate buffers.
-		spat_to_SH((complex double *) V->r[ir], Q);
+		spat_to_SH((complex double *) V->r[ir], Tlm[ir]);
 		for (lm=0; lm<NLM; lm++) {
-			Tlm[ir][lm] = r_1[ir]*Q[lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm]);		// Su=0
+			Tlm[ir][lm] = r_1[ir]*Tlm[ir][lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm]);		// Su=0
 		}
 }
+#else
+/// spatial to curl : only for ir = 1 .. NR-2
+///	Pol <- Tor
+///	Tor <- Q/r - 1/r.d(rS)/dr
+/// parallel-able version, with VectField V destroyed (used as temporary storage)
+void spat_to_curl_PolTor(struct VectField *V, complex double **Plm, complex double **Tlm, long int istart, long int iend)
+{
+	complex double *Sl, *Sd, *Su;	// temporary storage mapped on Vr (overwritten)
+	long int ir,lm;
+
+//  #pragma omp parallel private(ir,lm, Sl, Sd, Su) num_threads(_NTH_)
+  {
+	#pragma omp for schedule(static)
+	for (ir=istart; ir <= iend; ir++) {
+		Sd = (complex double *) V->r[ir];
+		spat_to_SH(Sd, Tlm[ir]);	// compute Tlm from Vr first. Vr not required any more.
+		spat_to_SHsphtor((complex double *) V->t[ir], (complex double *) V->p[ir], Sd, Plm[ir]);	// overwrite Vr
+	}
+	#pragma omp single nowait
+	{
+		ir = istart;
+		Sd = (complex double *) V->r[ir];	Su = (complex double *) V->r[ir+1];
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Tlm[ir][lm] - (Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);	// Sl = 0
+		}
+	}
+	#pragma omp for schedule(static) nowait
+	for (ir=istart+1; ir < iend; ir++) {
+		Sl = (complex double *) V->r[ir-1];	Sd = (complex double *) V->r[ir];	Su = (complex double *) V->r[ir+1];
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Tlm[ir][lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm] + Wr[ir].u * Su[lm]);
+		}
+	}
+	#pragma omp single
+	{
+		ir = iend;
+		Sl = (complex double *) V->r[ir-1];	Sd = (complex double *) V->r[ir];
+		for (lm=0; lm<NLM; lm++) {
+			Tlm[ir][lm] = r_1[ir]*Tlm[ir][lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm]);	// Su = 0
+		}
+	}
+  }
+}
+#endif
+
 
 /*
 void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Slm, complex double **Tlm)
 {
-	complex double Q[NLM];	// l(l+1) * P/r
 	long int ir,lm;
 
 	for (ir=0; ir<NR; ir++) {
 		spat_to_SHsphtor((complex double *) Bt[ir], (complex double *) Bp[ir], Slm[ir], Tlm[ir]);
-		spat_to_SH((complex double *) Br[ir], Q);
+		spat_to_SH((complex double *) Br[ir], Plm[ir]);		// l(l+1) * P/r
 		for (lm=0; lm<NLM; lm++) {
-			Plm[ir][lm] = r[ir]*l_2[lm] * Q[lm];		// poloidal
+			Plm[ir][lm] = r[ir]*l_2[lm] * Plm[ir][lm];		// poloidal
 		}
 	}
 }
@@ -348,6 +396,9 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 */
 	Om0 = 2.0*Om0 * Y10_ct;	// multiply by representation of cos(theta) in spherical harmonics (l=1,m=0)
 //	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
+    #pragma omp parallel num_threads(_NTH_)
+    {
+	#pragma omp for schedule(static) private(ir,lm, Q, S, T) nowait
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
 			T[lm] = (r_2[ir]*l2[lm] - Lr[ir].d)*PT->P[ir][lm] - Lr[ir].l*PT->P[ir-1][lm] - Lr[ir].u*PT->P[ir+1][lm];
@@ -359,6 +410,7 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 		SH_to_spat(Q,(complex double *) W->r[ir]);
 		SHsphtor_to_spat(S, T, (complex double *) W->t[ir], (complex double *) W->p[ir]);
 	}
+    }
 }
 
 /// compute current density field from poloidal/toroidal components of magnetic field [ie poltor_to_curl_spat applied to B]
@@ -490,6 +542,9 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 	double vr,vt,vp;
 	long int ir,lm;
 
+    #pragma omp parallel num_threads(_NTH_)
+    {
+	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp) nowait
 	for (ir=NG+1; ir<=NR-2; ir++) {
 		for (lm=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 2*3 = 6 disjoint arrays.
 			vr = V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];
@@ -510,6 +565,7 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 #endif
 	}
 	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);
+    }
 }
 
 /// compute curl(VxB)

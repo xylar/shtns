@@ -18,12 +18,14 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
-#define NLAT 100
-#define LMAX 6
-#define NPHI 5
-#define MMAX 2
+#define NLAT_2 100
+#define LMAX 60
+#define NPHI 16
+#define MMAX 5
 #define MRES 1
 
+#define _SH_DEBUG_
+#define _SHT_EO_
 //#define SHT_EQUAL	/* SHT on equal spaced grid + polar points. */
 #include "SHT.c"
 
@@ -165,10 +167,15 @@ int main()
 	}
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
+#ifndef _SHT_EO_
 // synthese (inverse legendre)
 		SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
 // analyse (direct legendre)
 		spat_to_SHsphtor(ShF,ThF,Slm,Tlm);
+#else
+		SHsphtor_to_spat(Slm,Slm,ShF,ThF);
+		spat_to_SHsphtor(ShF,ThF,Slm,Slm);
+#endif
 	}
 	tcpu = clock() - tcpu;
 	printf("iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
