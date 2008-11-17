@@ -50,7 +50,68 @@ void curl_PolTor(struct PolTor *PT, long int istart, long int iend)
 	p = PT->P;	PT->P = PT->T;	PT->T = p;
 }
 
+/// evaluates spatial field at given point (with r[ir])
+void PolTor_to_point(struct PolTor *PT, long int ir, double cost, double phi, 
+					 double *vr, double *vt, double *vp)
+{
+	complex double Q[NLM];	// l(l+1) * P/r
+	complex double S[NLM];	// dP/dr + P/r = 1/r.d(rP)/dr = Wr(P)
+	complex double T[NLM];
+	long int lm;
+	
+	if ((ir == 0)||(PT->P[ir-1] == NULL)) ir++;
+	if ((ir == NR-1)||(PT->P[ir+1] == NULL)) ir--;
+	if (PT->P[ir] == NULL) {
+		*vr = 0.0; *vt = 0.0; *vp = 0.0;	// undefined.
+		return;
+	}
+	for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+		S[lm] = Wr[ir].l*PT->P[ir-1][lm] + Wr[ir].d*PT->P[ir][lm] + Wr[ir].u*PT->P[ir+1][lm];
+		Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
+		T[lm] = PT->T[ir][lm];
+	}
+	SHqst_to_point(Q,S,T, cost, phi, vr, vt, vp);
+}
 
+/// evaluates spatial field at given point, with cubic interpolation in radius.
+void PolTor_to_point_interp(struct PolTor *PT, double rr, double cost, double phi, 
+					 double *vr, double *vt, double *vp)
+{
+	complex double Q[NLM];	// l(l+1) * P/r
+	complex double S[NLM];	// dP/dr + P/r = 1/r.d(rP)/dr = Wr(P)
+	complex double T[NLM];
+	complex double f0,f1, df0, df1, a,b;
+	double dr,x,x2,x3,dr_1;
+	long int ir,lm;
+	
+	ir = NR-3;		// ensures ir+2 is in bounds.
+	while((r[ir] > rr)&&(ir>1)) ir--;		// r[ir] <= rr <= r[ir+2]
+	
+	if (PT->P[ir-1] == NULL) ir++;
+	if (PT->P[ir+2] == NULL) ir--;
+	if ((PT->P[ir-1] == NULL)||(PT->P[ir+2]==NULL)||(rr>r[NR-1])) {
+		*vr = 0.0; *vt = 0.0; *vp = 0.0;	// undefined.
+		return;
+	}
+	dr = r[ir+1] - r[ir];	dr_1 = 1.0/dr;
+	x = (rr - r[ir])*dr_1;	x2 = x*x;	x3 = x*x*x;
+	rr = 1.0/rr;
+	for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
+		f0 = PT->P[ir][lm];		f1 = PT->P[ir+1][lm];
+		df0 = ( Gr[ir].l   *PT->P[ir-1][lm] + Gr[ir].d   *f0 + Gr[ir].u   *f1 )*dr;
+		df1 = ( Gr[ir+1].l *f0              + Gr[ir+1].d *f1 + Gr[ir+1].u *PT->P[ir+2][lm] )*dr;
+		a = df1+df0 -2.*(f1-f0);		b = 3.*(f1-f0) - df1 - 2.*df0;
+		f1 = (a*x3 + b*x2 + df0*x + f0)*rr;		df1 = (3.*a*x2 + b*x + df0)*dr_1;
+		Q[lm] = f1 * l2[lm];		S[lm] = df1 + f1;
+
+		f0 = PT->T[ir][lm];		f1 = PT->T[ir+1][lm];
+		df0 = ( Gr[ir].l   *PT->T[ir-1][lm] + Gr[ir].d   *f0 + Gr[ir].u   *f1 )*dr;
+		df1 = ( Gr[ir+1].l *f0              + Gr[ir+1].d *f1 + Gr[ir+1].u *PT->T[ir+2][lm] )*dr;
+		a = df1+df0 -2.*(f1-f0);		b = 3.*(f1-f0) - df1 - 2.*df0;
+		T[lm] = a*x3 + b*x2 + df0*x + f0;
+	}
+	SHqst_to_point(Q,S,T, cost, phi, vr, vt, vp);
+}
 
 /// compute the cartesian coordinates of a vector field at r=0, from its Poloidal value component
 inline void Pol_to_cart_spat0(complex double **Plm, double *Vx, double *Vy, double *Vz)
@@ -85,7 +146,7 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 	complex double Q[NLM];	// l(l+1) * P/r
 	complex double S[NLM];	// dP/dr + P/r = 1/r.d(rP)/dr = Wr(P)
 	double dr;
-	long int ir,lm,l,im;
+	long int ir,lm, im,l;
 
 	ir = istart;
 	if ((istart == 0)&&(r[ir] == 0.0)) {	// field at r=0 : S = 2.dP/dr (l=1 seulement) => store Bx, By, Bz (cartesian coordinates)
@@ -152,12 +213,7 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 		return;
 	} else if (BC == BC_MAGNETIC) {
 		// Magnetic field (insulator BC) : T=0, dP/dr = -(l+1)/r.P => S = -lP/r
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++) {
-				S[lm] = -l*PT->P[ir][lm]*r_1[ir];
-				Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
-			}
-		}
+		LM_LOOP(  S[lm] = -l*PT->P[ir][lm]*r_1[ir];		Q[lm] = r_1[ir]*l*(l+1) * PT->P[ir][lm];  )
 		SH_to_spat(Q,(complex double *) V->r[ir]);
 		SHsph_to_spat(S, (complex double *) V->t[ir], (complex double *) V->p[ir]);
 		return;
@@ -349,7 +405,7 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 	complex double S[NLM];	// dP/dr + P/r = 1/r.d(rP)/dr = Wr(P)
 	complex double T[NLM];	// T
 	double dr;
-	long int ir,lm,l, im;
+	long int ir,lm, im,l;
 
 	complex float *QST;
 	long int *lma;
@@ -382,12 +438,7 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 	}
 	ir = NR-1;
 		// Magnetic field (insulator BC) : T=0, dP/dr = -(l+1)/r.P => S = -lP/r
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++) {
-				S[lm] = -l*PT->P[ir][lm]*r_1[ir];
-				Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
-			}
-		}
+		LM_LOOP(  S[lm] = -l*PT->P[ir][lm]*r_1[ir];		Q[lm] = r_1[ir]*l*(l+1) * PT->P[ir][lm];  )
 		SH_to_spat(Q,(complex double *) V->r[ir]);
 		SHsph_to_spat(S, (complex double *) V->t[ir], (complex double *) V->p[ir]);
 }

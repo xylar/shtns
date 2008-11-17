@@ -2,6 +2,9 @@
  // XSPP : XShells post-processing //
 ////////////////////////////////////
 
+#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
+//#define DEB (0)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,9 +18,9 @@
 
 // parameters for SHT.c
 #define NLAT 301
-#define LMAX 200
-#define NPHI 100
-#define MMAX 48
+#define LMAX 30
+#define NPHI 64
+#define MMAX 30
 #define MRES 1
 // SHT on equal spaced grid + polar points.
 #define SHT_EQUAL
@@ -32,9 +35,6 @@
 double nu, eta;		// viscosity and magnetic diffusivity.
 double Omega0;		// global rotation rate (of outer boundary) => Coriolis force .
 double DeltaOmega;	// differential rotation (of inner core)
-
-//#define DEB printf("%s:%u pass\n", __FILE__, __LINE__)
-#define DEB (0)
 
 #include "xshells_fields.c"
 #include "xshells_io.c"
@@ -168,7 +168,7 @@ void write_shell(char *fn, double *mx)
 	fprintf(fp,"\n");	fclose(fp);
 }
 
-void write_slice(char *fn, double **v, long int im)
+void write_merid(char *fn, double **v, long int im)
 {
 	FILE *fp;
 	long int i,j;
@@ -210,6 +210,94 @@ void write_equat(char *fn, double **v, double fac)
 		}
 	}
 	fprintf(fp,"\n");	fclose(fp);
+}
+
+// vector vr, vt, vp is converted to cartesian coordinates.
+void spher_to_cart(double ct,double p,double *vr,double *vt,double *vp)
+{
+	double st, cp,sp;
+	double vx,vy,vz,vs;
+	
+	st = sqrt(1.0 -ct*ct);	cp = cos(p);	sp = sin(p);
+	vz = *vr*ct - *vt*st;		vs = *vr*st + *vt*ct;
+	vx = vs*cp - *vp*sp;		vy = vs*sp + *vp*cp;
+	*vr = vx;	*vt = vy;	*vp = vz;
+}
+
+void write_line(char *fn,double x,double y,double z,double vx,double vy,double vz,int ni, struct PolTor *Blm)
+{
+	double rr,cost,phi;
+	double br,bt,bp;
+	int i;
+	FILE *fp;
+	
+	fp = fopen(fn,"w");
+	fprintf(fp,"%% [XSHELLS] line profile starting at %f,%f,%f with increment %f,%f,%f\n%% x y z\tr cos(theta) phi\tvr vt vp\n",x,y,z, vx,vy,vz);
+	for (i=0; i<ni; i++) {
+		rr = sqrt(x*x + y*y + z*z);		cost = z/rr;
+		phi = atan(y/x);	if (x < 0.0) phi += pi;
+		PolTor_to_point_interp(Blm, rr, cost, phi, &br, &bt, &bp);
+		fprintf(fp,"%.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g\n",x,y,z, rr, cost, phi, br,bt,bp);
+		x+=vx;	y+=vy;	z+=vz;
+	}
+	fclose(fp);
+	printf("> line profile starting at at %.3f,%.3f,%.3f with increment %.4g,%.4g,%.4g written to %s\n",x,y,z, vx,vy,vz,fn);
+}
+
+void write_disc(char *fn,double x0,double y0,double z0, int nphi, struct PolTor *Blm)
+{
+	double r2, ct0, st0, phi0, s0;	// absolute coordinates of center.
+	double s, ca, sa;			// disc coordinates
+	double rr, cost,phi;		// spherical coordinates
+	double x,y,z;				// cartesian coordinates
+	double bx,by,bz;			// vector
+	int ir, ip;
+	FILE *fp;
+
+	r2 = x0*x0 + y0*y0 + z0*z0;		rr = sqrt(r2);	// center position.
+	ct0 = z0/rr;	st0 = sqrt(1. - ct0*ct0);
+	phi0 = atan(y0/x0);	if (x0 < 0.) phi0 += pi;
+	s0 = sqrt(x0*x0 + y0*y0);		// rotation of phi0.
+	if (s0 == 0.) phi0 = 0.;
+
+	fp = fopen(fn,"w");
+	if (rr < r[NR-1]) {		// vector is normal and center of disc
+		fprintf(fp,"%% [XSHELLS] disc slice centered at %f,%f,%f (first row is disc-radius)",x0,y0,z0);
+	} else {		// vector is normal and center is 0,0,0
+		fprintf(fp,"%% [XSHELLS] disc slice centered at 0 with normal %f,%f,%f (first row is disc-radius)",x0,y0,z0);
+		x0 = 0.;	y0 = 0.;	z0 = 0.;	rr = 0.;	r2 = 0.;
+	}
+	ir = r_to_idx(rr);	if (r[ir] <= rr) ir++;	//r[ir] > rr;
+	while((Blm->P[ir] == NULL)&&(ir<NR)) ir++;	// skip undef data.
+	printf("> writing disc slice centered at x=%.3f, y=%.3f, z=%.3f to %s\n",x0,y0,z0,fn);
+	printf("    normal : phi=%.1fdeg, cos(theta)=%.4f, sin(theta)=%.4f\n",phi0*180./pi,ct0,st0);
+	printf("    start at ir=%d r=%.4f\n",ir, r[ir]);
+
+	while ((ir<NR-1)&&(Blm->P[ir] != NULL)) {
+		rr = r[ir];
+		printf("ir=%d  r=%f\r",ir,rr);	fflush(stdout);
+		s = sqrt(rr*rr - r2);		// disc radius.
+		fprintf(fp,"\n%.6g ",s);	// first row = disc radius.
+		for (ip=0; ip<nphi; ip++) {
+			phi = ip*(2.*pi/nphi);		// disc angle
+			ca = cos(phi);	sa = sin(phi);
+			z = z0 + s*sa*st0;
+			x = s0 - s*sa*ct0;
+			y = s*ca;
+			phi = atan(y/x);	if (x < 0.0) phi += pi;
+			cost = z/rr;
+			PolTor_to_point(Blm, ir, cost, phi+phi0, &bx, &by, &bz);
+			spher_to_cart(cost, phi, &bx, &by, &bz);
+			y = bz*st0 - bx*ct0;		// project into disc-relative coordinates.
+			z = bz*ct0 + bx*st0;
+			x = by;
+//			fprintf(fp,"%.6g %.6g %.6g ",x*ca+y*sa, y*ca-x*sa, z);	// write data
+			fprintf(fp,"%.6g %.6g %.6g ",x, y, z);	// write data
+		}
+		ir++;
+	}
+	fprintf(fp,"\n");	fclose(fp);
+	printf("    end at ir=%d r=%.4f.\n",ir-1, rr);
 }
 
 // apply (l,m) filter
@@ -280,6 +368,8 @@ void usage()
 	printf(" surf [r]  : write surface data at r (0 to 1) or ir (1 to NR-1) of vector field in spherical coordinates\n");
 	printf(" HS  : write full spherical harmonics decomposition\n");
 	printf(" spec  : write spherical harmonic (l and m)-spectra for each shell\n");
+	printf(" line ni x0,y0,z0 vx,vy,vz  : write ni points along line profile starting at (x0,y0,z0) along increment vector (vx,vy,vz)\n");
+	printf(" disc nphi x0,y0,z0 : write disc slice centered at (x0,y0,z0) with nphi azimutal points.\n      if center is outside data domain, then it is taken as a normal vector, and the center is 0\n");
 	printf(" 3D  : write three-dimensional vector in cartesian coordinates on spherical grid.\n");
 }
 
@@ -399,8 +489,8 @@ int main (int argc, char *argv[])
 			SHtor_to_spat(Blm.P[i], (complex double *)B.t[i], (complex double *)B.r[i]);
 			for (l=0;l<NLAT;l++) B.r[i][l] *= -r[i]*st[l];	// stream function
 		}
-		write_slice("o_Vp", B.p, 0);		// write phi component
-		write_slice("o_Vpol", B.r, 0);		// write stream function
+		write_merid("o_Vp", B.p, 0);		// write phi component
+		write_merid("o_Vpol", B.r, 0);		// write stream function
 		printf("> axisymmetric component written to files : o_Vp (phi component) and o_Vpol (poloidal stream function)\n");
 		exit(0);
 	}
@@ -431,7 +521,7 @@ int main (int argc, char *argv[])
 		if (argc > ic) sscanf(argv[ic],"%lf",&phi);
 		PolTor_to_spat(&Blm, &B, irs, ire, BC);
 		im = phi_to_idx(phi);
-		write_slice("o_Vr",B.r,im);	write_slice("o_Vt",B.t,im);	write_slice("o_Vp",B.p,im);
+		write_merid("o_Vr",B.r,im);	write_merid("o_Vt",B.t,im);	write_merid("o_Vp",B.p,im);
 		printf("> meridional slice #%d (phi=%.1f°) written to files : o_Vr, o_Vt, o_Vp (spherical vector components)\n",im,phi_deg(im));
 		for (i=irs;i<=ire;i++) {
 			for(l=0;l<NLAT;l++) {
@@ -439,7 +529,7 @@ int main (int argc, char *argv[])
 				B.r[i][im*NLAT +l] = B.r[i][im*NLAT +l]*st[l] + B.t[i][im*NLAT +l]*ct[l];	// s
 			}
 		}
-		write_slice("o_Vs",B.r,im);	write_slice("o_Vz",B.p,im);
+		write_merid("o_Vs",B.r,im);	write_merid("o_Vz",B.p,im);
 		printf("  and files o_Vs, o_Vp, o_Vz (cylindrical vector components)\n",i,phi_deg(i));
 		exit(0);
 	}
@@ -456,6 +546,29 @@ int main (int argc, char *argv[])
 		printf("> spherical harmonics spectrum written to files : o_Plr, o_Tlr, o_Pmr, o_Tlr (poloidal/toroidal, l/m, at each r)\n");
 		calc_spec(Blm.P, lspec, mspec);		write_vect("o_Pl",lspec, lmax+1);	write_vect("o_Pm",mspec, mmax+1);
 		calc_spec(Blm.T, lspec, mspec);		write_vect("o_Tl",lspec, lmax+1);	write_vect("o_Tm",mspec, mmax+1);
+		exit(0);
+	}
+	if (strcmp(argv[ic],"line") == 0)
+	{
+		double x,y,z, vx,vy,vz;
+		long int ni;
+		ic++;
+		if (ic+2 >= argc) runerr("line definition is missing...\n");
+		sscanf(argv[ic],"%lf",&x);	ni = x;
+		sscanf(argv[ic+1],"%lf,%lf,%lf",&x, &y, &z);
+		sscanf(argv[ic+2],"%lf,%lf,%lf",&vx, &vy, &vz);
+		write_line("o_line",x,y,z,vx,vy,vz,ni,&Blm);
+		exit(0);
+	}
+	if (strcmp(argv[ic],"disc") == 0)
+	{
+		double x,y,z;
+		long int nphi;
+		ic++;
+		if (ic+1 >= argc) runerr("disc definition is missing...\n");
+		sscanf(argv[ic],"%lf",&x);	nphi = x;
+		sscanf(argv[ic+1],"%lf,%lf,%lf",&x, &y, &z);
+		write_disc("o_disc",x,y,z,nphi,&Blm);
 		exit(0);
 	}
 	if (strcmp(argv[ic],"3D") == 0)

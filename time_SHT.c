@@ -158,8 +158,8 @@ int main()
 	write_vect("Qlm",Slm,NLM*2);
 
 	printf(":: performing %d vector SHT\n", SHT_ITER);
-	Slm0[0] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
-	Tlm0[0] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
 	}

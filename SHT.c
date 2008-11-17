@@ -23,11 +23,24 @@
 # define MRES 1
 #endif
 
+/** ACCESS TO SPHERICAL HARMONICS COMPONENTS **
+  NLM : total number of (l,m) components.
+  LM(l,m) : macro returning array index for given l and m.
+  LiM(l,im) : macro returning array index for given l and im.
+  LM_LOOP( action ) : macro that performs "action" for every (l,m), with l and lm set, but neither m nor im.
+**/
 // NLM : total number of Spherical Harmonic coefficients.
 #define NLM ( (MMAX+1)*(LMAX+1) - MRES*(MMAX*(MMAX+1))/2 )
 // LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
 #define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 #define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
+
+// LM_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined. (but NOT m and im)
+//  double-loop version : assumes contiguous l-storage with 1 stride. (not compatible with even/odd packed)
+#define LM_LOOP( action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=LMAX; l++, lm++) { action } }
+//  single-loop + lookup array : no assumption on l-storage is made.
+//#define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { l=el[lm]; { action } }
+
 
 // half the theta length for even/odd decomposition. (NLAT+1)/2 allows odd NLAT.
 #ifndef NLAT
@@ -63,6 +76,9 @@
 #endif
 #if NPHI <= 2*MMAX
 	#error "NPHI and MMAX must conform to the sampling condition NPHI > 2*MMAX !"
+#endif
+#if MRES == 0
+	#error "MRES cannot be 0 !"
 #endif
 
 
@@ -207,6 +223,66 @@ void SHtor_to_spat(complex double *Tlm, complex double *BtF, complex double *BpF
 void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
 {
 #include "SHT/spat_to_SHst.c"
+}
+
+double SH_to_point(complex double *Qlm, double cost, double phi)
+{
+	double yl[LMAX+1];
+	complex double eimp;
+	double vr;
+	complex double *Ql;
+	long int l,m,im;
+	
+	vr = 0.0;
+	m=0;
+		gsl_sf_legendre_sphPlm_array(LMAX, m, cost, &yl[m]);
+		for (l=m; l<=LMAX; l++)
+			vr += yl[l] * creal( Qlm[l] );
+	for (im=1; im<=MMAX; im++) {
+		m = im*MRES;
+		gsl_sf_legendre_sphPlm_array(LMAX, m, cost, &yl[m]);
+		eimp = cos(m*phi) + I*sin(m*phi);
+		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
+		for (l=m; l<=LMAX; l++)
+			vr += yl[l] * creal( Ql[l]*eimp );
+	}
+	return vr;
+}
+
+double SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost, double phi,
+					   double *vr, double *vt, double *vp)
+{
+	double yl[LMAX+1];
+	double dtyl[LMAX+1];
+	complex double eimp;
+	double sint, vst, vtt, vsp, vtp;
+	complex double *Ql, *Sl, *Tl;
+	long int l,m,im;
+	
+	sint = sqrt(1.0 - cost*cost);
+	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; *vr = 0.;
+	m=0;
+		gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, cost, &yl[m], &dtyl[m]);
+		for (l=m; l<=LMAX; l++) {
+			*vr += yl[l] * creal( Qlm[l] );
+			vst += (-sint *dtyl[l]) * creal( Slm[l] );
+			vtt += (-sint *dtyl[l]) * creal( Tlm[l] );
+		}
+	for (im=1; im<=MMAX; im++) {
+		m = im*MRES;
+		gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, cost, &yl[m], &dtyl[m]);
+		eimp = cos(m*phi) + I*sin(m*phi);
+		Ql = &Qlm[LiM(0,im)];	Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
+		for (l=m; l<=LMAX; l++) {
+			*vr += yl[l] * creal( Ql[l]*eimp );
+			vst += (-sint *dtyl[l]) * creal(Sl[l]*eimp);
+			vtt += (-sint *dtyl[l]) * creal(Tl[l]*eimp);
+			vsp += (yl[l] *m/sint) * creal(I*Sl[l]*eimp);
+			vtp += (yl[l] *m/sint) * creal(I*Tl[l]*eimp);
+		}
+	}
+	*vt = vtp + vst;	// Bt = I.m/sint *T  + dS/dt
+	*vp = vsp - vtt;	// Bp = I.m/sint *S  - dT/dt
 }
 
 

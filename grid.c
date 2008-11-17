@@ -13,11 +13,8 @@ long int NU;	// radial shells of fluid
 long int NG;	// radial shells for the solid inner core
 long int NH=0;	// radial shell assigned to hartmann layer densification.
 
-#define RL(i,l) ( i*(LMAX+1) + l )
-#define RLM(i,lm) ( i*NLM + lm )
-
-// LM_LOOP : loop over all (l,im) and perform "action"  : l,im,lm are defined. (but NOT m )
-#define LM_LOOP( action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=LMAX; l++, lm++) { action } }
+//#define RL(i,l) ( i*(LMAX+1) + l )
+//#define RLM(i,lm) ( i*NLM + lm )
 
 struct TriDiag {
 	double l,d,u;		// lower, diagonal, upper.
@@ -67,10 +64,7 @@ inline void cTriMulBC(struct TriDiagL *M, complex double **x, complex double **y
 	long int j,l,im,lm;
 
 	for (j=istart; j<=iend; j++) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];  )
 	}
 }
 
@@ -82,21 +76,12 @@ inline void cTriMulAdd(struct TriDiagL *M, complex double **x, complex double **
 	long int j,l,im,lm;
 
 	j=istart;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] += M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
-		}
+		LM_LOOP(  y[j][lm] += M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];  )
 	for (j=istart+1; j<iend; j++) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] += M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];
-		}
+		LM_LOOP(  y[j][lm] += M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm] + M[j].u * x[j+1][lm];  )
 	}
 	j = iend;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] += M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm];
-		}
+		LM_LOOP(  y[j][lm] += M[j].l * x[j-1][lm] + M[j].d[l] * x[j][lm];  )
 }
 */
 
@@ -138,22 +123,13 @@ inline void cTriSolve(struct TriDiagL *M, complex double **b, complex double **x
 	}
 	while (j < iend-1) {	// Forward substitution.
 		j++;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[j][lm] = b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm]);
-		}
+		LM_LOOP(  x[j][lm] = b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm]);  )
 	}	// j = iend-1;
 	j = iend;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[j][lm] = (b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm])) * M[j].d[l];
-		}
+		LM_LOOP(  x[j][lm] = (b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm])) * M[j].d[l];  )
 	while (j > istart) {	// Back-substitution.
 		j--;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[j][lm] = ( x[j][lm] - M[j].u *x[j+1][lm] ) * M[j].d[l];
-		}
+		LM_LOOP(  x[j][lm] = ( x[j][lm] - M[j].u *x[j+1][lm] ) * M[j].d[l];  )
 	}	// j=istart
 }
 
@@ -167,22 +143,13 @@ inline void cTriSolveBC(struct TriDiagL *M, complex double **b, complex double *
 
 	while (j < iend-1) {	// Forward substitution.
 		j++;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[j][lm] = b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm]);
-		}
+		LM_LOOP(  x[j][lm] = b[j][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm]);  )
 	}	// j = iend-1;
 	j = iend;	// handle upper boundary : b(j) -> b(j) - Mu(j).x(j+1)
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[j][lm] = (b[j][lm] - M[j].u*x[j+1][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm])) * M[j].d[l];
-		}
+		LM_LOOP(  x[j][lm] = (b[j][lm] - M[j].u*x[j+1][lm] - (M[j].l * M[j-1].d[l] * x[j-1][lm])) * M[j].d[l];  )
 	while (j > istart) {	// Back-substitution.
 		j--;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[j][lm] = ( x[j][lm] - M[j].u *x[j+1][lm] ) * M[j].d[l];
-		}
+		LM_LOOP(  x[j][lm] = ( x[j][lm] - M[j].u *x[j+1][lm] ) * M[j].d[l];  )
 	}	// j=istart
 }
 
@@ -194,56 +161,23 @@ inline void cPentaMul(struct PentaDiag **M, complex double **x, complex double *
 	long int j,l,im,lm;
 
 	j=istart;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];  )
 	j=istart+1;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];  )
 	for (j=istart+2; j<iend-1; j++) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm] + M[j][l].u2 * x[j+2][lm];  )
 	}
 	j = iend-1;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm] + M[j][l].u1 * x[j+1][lm];  )
 	j = iend;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm];
-		}
+		LM_LOOP(  y[j][lm] = M[j][l].l2 * x[j-2][lm] + M[j][l].l1 * x[j-1][lm] + M[j][l].d * x[j][lm];  )
 }
 
 void PentaDec(struct PentaDiag **M, long int istart, long int iend)
 {
 	double alp, bet;
 	long int i,l;
-/*
-        u(:,2,4)=u(:,2,4)-u(:,2,2)*u(:,1,5)/u(:,1,3)
-        u(:,2,3)=u(:,2,3)-u(:,2,2)*u(:,1,4)/u(:,1,3)
-
-        do i=3,NS-1
-           u(:,i,2)=u(:,i,2)-u(:,i,1)*u(:,i-2,4)/u(:,i-2,3)
-           u(:,i,4)=u(:,i,4)-u(:,i,2)*u(:,i-1,5)/u(:,i-1,3)
-           u(:,i,3)=u(:,i,3)-u(:,i,2)*u(:,i-1,4)/u(:,i-1,3)-u(:,i,1)*
-     c          u(:,i-2,5)/u(:,i-2,3)
-        enddo
-c! invert d , scale u1,u2,l1,l2
-        do i=1,NS-1
-           u(:,i,3)=1.0/u(:,i,3)
-           u(:,i,4)=u(:,i,4)*u(:,i,3)
-           u(:,i,5)=u(:,i,5)*u(:,i,3)
-           u(:,i,2)=u(:,i,2)*u(:,i,3)
-           u(:,i,1)=u(:,i,1)*u(:,i,3)
-        enddo
-*/
+	
 	i = istart;
 		bet = 1.0;
 		for (l=0;l<=LMAX;l++)
@@ -288,32 +222,17 @@ inline void cPentaSolve(struct PentaDiag **M, complex double **b, complex double
 
 // forward
 	i = istart;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] = M[i][l].d * b[i][lm];
-		}
+		LM_LOOP(  x[i][lm] = M[i][l].d * b[i][lm];  )
 	i = istart+1;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm];
-		}
+		LM_LOOP(  x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm];  )
 	for(i=istart+2; i<=iend; i++) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm] - M[i][l].l2 * x[i-2][lm];
-		}
+		LM_LOOP(  x[i][lm] = M[i][l].d * b[i][lm] - M[i][l].l1 * x[i-1][lm] - M[i][l].l2 * x[i-2][lm];  )
 	}
 // backward
 	i = iend-1;
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] -= M[i][l].u1 * x[i+1][lm];
-		}
+		LM_LOOP(  x[i][lm] -= M[i][l].u1 * x[i+1][lm];  )
 	for(i= iend-2; i>=istart; i--) {
-		for (im=0, lm=0; im<=MMAX; im++) {
-			for (l=im*MRES; l<=LMAX; l++, lm++)
-				x[i][lm] -= M[i][l].u1 * x[i+1][lm] + M[i][l].u2 * x[i+2][lm];
-		}
+		LM_LOOP(  x[i][lm] -= M[i][l].u1 * x[i+1][lm] + M[i][l].u2 * x[i+2][lm];  )
 	}
 }
 
@@ -574,7 +493,7 @@ void init_Deriv_cyl()
 		Gr[i].d = (dr[i]*dr[i] - dr[i-1]*dr[i-1])*t;	// =0 en grille reguliere.
 		Gr[i].u = dr[i-1]*dr[i-1]*t;
 
-		Wr[i].l = r_1[i]* Gr[i].l * r[i-1];	// Wr = 1/r * d/dr(r .), pour la vorticit� m=0 !
+		Wr[i].l = r_1[i]* Gr[i].l * r[i-1];	// Wr = 1/r * d/dr(r .), pour la vorticite m=0 !
 		Wr[i].d = Gr[i].d;
 		Wr[i].u = r_1[i]* Gr[i].u * r[i+1];
 

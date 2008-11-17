@@ -112,7 +112,7 @@ void spateo_to_SH(long int eo, complex double *ShF, complex double *Slm)
 		ShF += NLAT;
 		while (l<=LMAX) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			Sl[l] = 0.0;	Sl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
-			for (i=tm[im]*2;i<NLAT;i++) {	// tm[im] : polar optimization
+			for (i=tm[im];i<NLAT;i++) {	// tm[im] : polar optimization
 				Sl[l] += ShF[i] * iyl[2*i];		// Slm[LiM(l,im)] += iylm[im][(l-m)*NLAT/2 + i] * fp[i];
 			}
 			l+=2;

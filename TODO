@@ -4,12 +4,14 @@
 	#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 + Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
+- BUG: xspp disc has problem with x (phi) component...
 
 *** Optimizations ***
 
 - mask
 - try blas ?
 - time different implementations and chose the fastest...
+- use blas ???
 
 ? grid : try full NR*NLM matrices, loops are more efficient but what about cache ???
 ? wouldn't it be better to store Tlm and Plm with m contiguous for each l ???
@@ -19,8 +21,10 @@
 + velocity field computation
 + inner core differential rotation
 
+
 - compute spectrum and use them...
 -+ boundary conditions dependence should be checked and improved.
+-   ghost point could be mapped with a pointer !!! (or not)
 
 - euler explicit (order 1), better suited for fast waves.
 - variable time-step
