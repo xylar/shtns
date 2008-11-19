@@ -265,7 +265,7 @@ double SH_to_point(complex double *Qlm, double cost, double phi)
 	for (im=1; im<=MMAX; im++) {
 		m = im*MRES;
 		gsl_sf_legendre_sphPlm_array(LMAX, m, cost, &yl[m]);
-		eimp = cos(m*phi) + I*sin(m*phi);
+		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 		for (l=m; l<=LMAX; l++)
 			vr += yl[l] * creal( Ql[l]*eimp );
@@ -295,7 +295,7 @@ double SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *
 	for (im=1; im<=MMAX; im++) {
 		m = im*MRES;
 		gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, cost, &yl[m], &dtyl[m]);
-		eimp = cos(m*phi) + I*sin(m*phi);
+		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 		Ql = &Qlm[LiM(0,im)];	Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
 		for (l=m; l<=LMAX; l++) {
 			*vr += yl[l] * creal( Ql[l]*eimp );

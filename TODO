@@ -4,7 +4,7 @@
 	#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 + Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
-- BUG: xspp disc has problem with x (phi) component...
++ BUG: xspp disc seems ok for n = z, and n.z=0. others seem ok but not sure...
 
 *** Optimizations ***
 
@@ -21,7 +21,6 @@
 + velocity field computation
 + inner core differential rotation
 
-
 - compute spectrum and use them...
 -+ boundary conditions dependence should be checked and improved.
 -   ghost point could be mapped with a pointer !!! (or not)
@@ -37,6 +36,7 @@
 *** SHT.c
 - SHT : implement even and odd l sub-cases.
 	should not change array sizes. only SHT function calls may (must) be different.
+-!!!	grid.c should also treat even/odd sub-cases. !!!
 
 - FFTW : out-of-place is faster than in-place. switch ? http://www.fftw.org/speed/CoreDuo-3.0GHz-icc64/
 - try blas ?

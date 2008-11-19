@@ -1,7 +1,7 @@
 # le compilateur :
 ## generic gcc
-cmd = gcc -O3
-cmdp = gcc -O3 -fopenmp
+cmd = gcc -O3 -ffast-math
+cmdp = gcc -O3 -fopenmp -ffast-math
 ## profiling
 #cmd = gcc -O3 -p -fno-inline
 ## recent gcc with native support
@@ -14,6 +14,7 @@ cmdp = gcc -O3 -fopenmp
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 #cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
 
+NTH=8	#number of threads for parallel version (can be overwritten with command line)
 shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat.gen.c SHT/spat_to_SH.gen.c SHT/Makefile
 ini = inc_B0ini.c inc_U0ini.c
 
@@ -27,7 +28,7 @@ SHT/spat_to_SH.c : SHT/spat_to_SH.gen.c SHT/Makefile
 xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
 pxshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
-	$(cmdp) xshells.c -D_NTH_=8 -lfftw3 -lgsl -lgslcblas -lm -o pxshells
+	$(cmdp) xshells.c -D_NTH_=$(NTH) -lfftw3 -lgsl -lgslcblas -lm -o pxshells
 
 xshells_imp : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
 	$(cmd) xshells.c -D_IMPULSE_ -lfftw3 -lgsl -lgslcblas -lm -o xshells_imp
@@ -45,3 +46,6 @@ sphshell : sphshell.c SHT.c SHT.h grid.c Makefile
 dyncin : dyncin.c SHT.c SHT.h grid.c Makefile
 	$(cmd) dyncin.c -lfftw3 -lgsl -lgslcblas -lm -o dyncin
 
+
+#fftw compiling options :
+#-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000

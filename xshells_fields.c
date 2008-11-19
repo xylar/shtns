@@ -317,23 +317,29 @@ void spat_to_curl_PolTor(struct VectField *V, complex double **Plm, complex doub
 		}
 }
 #else
-/// spatial to curl : only for ir = 1 .. NR-2
+/// spatial to curl : only for ir = istart to iend, assuming S[istart-1] = 0 and S[iend+1] = 0
 ///	Pol <- Tor
 ///	Tor <- Q/r - 1/r.d(rS)/dr
 /// parallel-able version, with VectField V destroyed (used as temporary storage)
 void spat_to_curl_PolTor(struct VectField *V, complex double **Plm, complex double **Tlm, long int istart, long int iend)
 {
-	complex double *Sl, *Sd, *Su;	// temporary storage mapped on Vr (overwritten)
+	complex double *Sl, *Sd, *Su;	// temporary storage mapped on Vr (overwritten). requires NLAT*NPHI >= 2*NLM
 	long int ir,lm;
+
+#if NLAT*NPHI < 2*NLM
+	#error "parallel version spat_to_curl_PolTor storage problem : NLAT*NPHI must be greater than 2*NLM."
+#endif
 
 //  #pragma omp parallel private(ir,lm, Sl, Sd, Su) num_threads(_NTH_)
   {
+	#pragma omp barrier
 	#pragma omp for schedule(static)
 	for (ir=istart; ir <= iend; ir++) {
 		Sd = (complex double *) V->r[ir];
 		spat_to_SH(Sd, Tlm[ir]);	// compute Tlm from Vr first. Vr not required any more.
 		spat_to_SHsphtor((complex double *) V->t[ir], (complex double *) V->p[ir], Sd, Plm[ir]);	// overwrite Vr
 	}
+	#pragma omp barrier
 	#pragma omp single nowait
 	{
 		ir = istart;
@@ -357,10 +363,10 @@ void spat_to_curl_PolTor(struct VectField *V, complex double **Plm, complex doub
 			Tlm[ir][lm] = r_1[ir]*Tlm[ir][lm] - (Wr[ir].l * Sl[lm] + Wr[ir].d * Sd[lm]);	// Su = 0
 		}
 	}
+	#pragma omp barrier
   }
 }
 #endif
-
 
 /*
 void spat_to_PolSphTor(double** Br, double** Bt, double** Bp, complex double **Plm, complex double **Slm, complex double **Tlm)
@@ -430,6 +436,9 @@ void calc_J(struct PolTor *PT, struct VectField *J, struct StatSpecVect *J0)
 	if (J0 != NULL) {	nj = J0->nlm;	lma = J0->lm;	}
 
 //	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
+    #pragma omp parallel num_threads(_NTH_)
+    {
+	#pragma omp for schedule(static) private(ir,lm, Q, S, T)
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
 			Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
@@ -448,6 +457,7 @@ void calc_J(struct PolTor *PT, struct VectField *J, struct StatSpecVect *J0)
 		SH_to_spat(Q,(complex double *) J->r[ir]);
 		SHsphtor_to_spat(S, T, (complex double *) J->t[ir], (complex double *) J->p[ir]);
 	}
+    }
 }
 
 /// compute spatial field from Poloidal/Toroidal representation.
@@ -470,6 +480,9 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 		for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
 			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
 		}
+    #pragma omp parallel num_threads(_NTH_)
+    {
+	#pragma omp for schedule(static) private(ir,lm, Q, S, T)
 	for (ir=1; ir<NR-1; ir++) {
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
 			Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
@@ -488,6 +501,7 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 		SH_to_spat(Q,(complex double *) V->r[ir]);
 		SHsphtor_to_spat(S, T, (complex double *) V->t[ir], (complex double *) V->p[ir]);
 	}
+   }
 	ir = NR-1;
 		// Magnetic field (insulator BC) : T=0, dP/dr = -(l+1)/r.P => S = -lP/r
 		LM_LOOP(  S[lm] = -l*PT->P[ir][lm]*r_1[ir];		Q[lm] = r_1[ir]*l*(l+1) * PT->P[ir][lm];  )
@@ -501,13 +515,16 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 // *****************************
 
 /// compute curl(VxW + JxB) and its pol-tor components.
-/// output : V, B, J unchanged, W = VxW + JxB
+/// output : V, B, J unchanged, W destroyed.
 ///          NL = PolTor[curl(VxW + JxB)]
 void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, struct PolTor *NL)
 {
 	double vr,vt,vp;
 	long int ir,lm;
 
+    #pragma omp parallel num_threads(_NTH_)
+    {
+	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp)
 	for (ir=NG+1; ir<=NR-2; ir++) {
 		for (lm=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 4*3 = 12 disjoint arrays.
 			vr =  J->t[ir][lm]*B->p[ir][lm] - J->p[ir][lm]*B->t[ir][lm];	// JxB
@@ -531,12 +548,12 @@ void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struc
 		}
 #endif
 	}
-	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);
+	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);	// W destroyed.
+    }
 }
 
 /// compute curl(VxW) and its pol-tor components.
-/// output : V unchanged, W = VxW, NL = PolTor[curl(VxW)]
-/// U is kept unchanged
+/// output : V unchanged, W destroyed, NL = PolTor[curl(VxW)]
 void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 {
 	double vr,vt,vp;
@@ -544,7 +561,7 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 
     #pragma omp parallel num_threads(_NTH_)
     {
-	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp) nowait
+	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp)
 	for (ir=NG+1; ir<=NR-2; ir++) {
 		for (lm=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 2*3 = 6 disjoint arrays.
 			vr = V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];
@@ -564,19 +581,22 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 		}
 #endif
 	}
-	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);
+	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);	// W destroyed
     }
 }
 
 /// compute curl(VxB)
 /// IN:  V, B are spatial vector fields (unchanged)
-/// OUT: VxB  is the VxB resulting vector field. (Note: VxB can be either of V or B or a third vector)
+/// OUT: VxB  is the temporary VxB resulting vector field, which is destroyed. (Note: VxB can be either of V or B or a third vector)
 ///      NL is the PolTor component of curl(VxB)
 void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *VxB, struct PolTor *NL)
 {
 	double vr,vt,vp,rO;
 	long int ir,lm,it;
 
+    #pragma omp parallel num_threads(_NTH_)
+    {
+	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp) nowait
 	for (ir=0; ir<NG; ir++) {		// for the inner core : solid body rotation  Up = r.sint.DeltaOmega
 		rO = r[ir]*DeltaOmega;
 		it = 0;
@@ -587,6 +607,7 @@ void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *Vx
 			VxB->r[ir][lm] = vr;	VxB->t[ir][lm] = vt;	VxB->p[ir][lm] = 0.0;
 		}
 	}
+	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp) nowait
 	for (ir=NG; ir<NR; ir++) {
 		for (lm=0; lm<NPHI*NLAT; lm++) {
 			vr = V->t[ir][lm]*B->p[ir][lm] - V->p[ir][lm]*B->t[ir][lm];
@@ -597,6 +618,7 @@ void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *Vx
 	}
 #ifdef COIL
 	if (Icoil != 0.0) {
+		#pragma omp for schedule(static) private(ir,lm, vr,vt,vp) nowait
 		for (ir=0; ir<NR; ir++) {
 			if (Jcoil[ir] != NULL) {
 				for (lm=0; lm<NPHI*NLAT; lm++) VxB->p[ir][lm] += Icoil * Jcoil[ir][lm];
@@ -608,7 +630,8 @@ void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *Vx
 		for (lm=0; lm<NPHI*NLAT; lm++) {
 			Br[ir][lm] = 0.0;	Bt[ir][lm] = 0.0;	Bp[ir][lm] = 0.0;
 		}*/
-	spat_to_curl_PolTor(VxB, NL->P, NL->T, 1,NR-2);
+	spat_to_curl_PolTor(VxB, NL->P, NL->T, 1,NR-2);		// VxB destroyed.
+    }
 }
 
 

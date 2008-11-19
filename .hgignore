@@ -5,8 +5,9 @@ syntax: glob
 *.orig
 o_*
 poltor*
+SHT/*spat.c
 
 # switch to regexp syntax.
 syntax: regexp
-
+SHT/.*SH[eost]*.c
 

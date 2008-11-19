@@ -484,7 +484,7 @@ void save_n_quit(char* fprefix, char* job, long int it, double t)
 }
 */
 
-void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, double *polar_opt_max, double *Ric, double *B0)
+void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, double *polar_opt_max, double *Ric, double *B0, double *B1)
 {
 	double tmp;
 	int id;
@@ -521,6 +521,7 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 			if (strcmp(name,"eta") == 0)		eta = tmp;
 			if (strcmp(name,"Ric") == 0)		*Ric = tmp;
 			if (strcmp(name,"B0") == 0)		*B0 = tmp;
+			if (strcmp(name,"B1") == 0)		*B1 = tmp;
 			// NUMERICAL SCHEME
 			if (strcmp(name,"NR") == 0)		NR = tmp;
 			if (strcmp(name,"NH") == 0)		NH = tmp;
@@ -569,6 +570,7 @@ int main (int argc, char *argv[])
 	double Ric = 0.0;		// default ic radius
 	double polar_opt_max = 0.0;	// default SHT optimization.
 	double b0 = 0.0;
+	double b1 = 0.0;
 	double time = 0.0;
 	double rr, t0,t1,Rm,Rm2,z;
 	long int i,j,k, im,m,l, it, lmtest;
@@ -585,7 +587,7 @@ int main (int argc, char *argv[])
 	printf("          ++ OMP Parallel version, %d threads.\n",_NTH_);
 #endif
 
-	read_Par(command, job, &iter_max, &modulo, &polar_opt_max, &Ric, &b0);
+	read_Par(command, job, &iter_max, &modulo, &polar_opt_max, &Ric, &b0, &b1);
 	init_SH(polar_opt_max);
 	init_rad_sph(0.0, Ric, 1.0);
 

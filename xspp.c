@@ -57,7 +57,9 @@ struct JobInfo jpar;	// parameters from loaded file
 
 // find closest index to phi angle.
 inline long int phi_to_idx(double phi) {
-	return lround(phi/360. *NPHI*MRES) % NPHI;
+	long int j = lround(phi/360. *NPHI*MRES) % NPHI;
+	if (j < 0.0) j += NPHI;
+	return j;
 }
 
 // get phi angle from index
@@ -149,20 +151,21 @@ void write_Spec_l(char *fn, complex double **HS)
 	fprintf(fp,"\n");	fclose(fp);
 }
 
-void write_shell(char *fn, double *mx)
+void write_shell(char *fn, struct VectField *V, long int ir)
 {
 	FILE *fp;
-	long int i,j;	//phi, theta
+	long int i,j,k;	//phi, theta
 	
 	fp = fopen(fn,"w");
-	fprintf(fp,"%% [XSHELLS] Surface data (sphere). first line is theta, first row is phi.\n0 ");
+	fprintf(fp,"%% [XSHELLS] Surface data (sphere). first line is (theta 0 0), first row is phi, then for each point, (r,theta,phi) components are stored together.\n0 ");
 		for(j=its;j<=ite;j++) {
-			fprintf(fp,"%.6g ",acos(ct[j]));	// first line = theta (radians)
-		} 
+			fprintf(fp,"%.6g 0 0 ",acos(ct[j]));	// first line = theta (radians)
+		}
 	for (i=ips; i<=ipe; i++) {
 		fprintf(fp,"\n%.6g ",phi_rad(i));		// first row = phi (radians)
 		for(j=its; j<=ite; j++) {
-			fprintf(fp,"%.6g ",mx[i*NLAT+j]);
+			k = i*NLAT+j;
+			fprintf(fp,"%.6g %.6g %.6g  ",V->r[ir][k],V->t[ir][k],V->p[ir][k]);		// data
 		}
 	}
 	fprintf(fp,"\n");	fclose(fp);
@@ -190,22 +193,20 @@ void write_merid(char *fn, double **v, long int im)
 }
 
 // equatorial cut : fac is used to change the sign of theta component to get z-component.
-void write_equat(char *fn, double **v, double fac)
+void write_equat(char *fn, struct VectField *V)
 {
 	FILE *fp;
-	long int i,j;
+	long int i,j,k;
 	long int it = NLAT/2;	// equator is at NLAT/2.
 
 	fp = fopen(fn,"w");
-	fprintf(fp,"%% [XSHELLS] Equatorial cut. first line is phi (in radian), first row is r.\n0 ");
-		for(j=ips; j<=ipe; j++) {
-			fprintf(fp,"%.6g ",phi_rad(j));	// first line = phi angle (radian)
-		}
+	fprintf(fp,"%% [XSHELLS] Equatorial cut (r,pĥi), in cylindrical coordinates. first row is r, then for each point, (r,phi,z) components are written together.");
 	for (i=irs;i<=ire;i++) {
-		if (v[i] != NULL) {
+		if (V->r[i] != NULL) {
 			fprintf(fp,"\n%.6g ",r[i]);		// first row = radius
 			for(j=ips; j<=ipe; j++) {
-				fprintf(fp,"%.6g ",v[i][j*NLAT + it] * fac);		// data
+				k = j*NLAT+it;
+				fprintf(fp,"%.6g %.6g %.6g  ",V->r[i][k], V->p[i][k], - V->t[i][k]);	// data
 			}
 		}
 	}
@@ -227,7 +228,7 @@ void spher_to_cart(double ct,double p,double *vr,double *vt,double *vp)
 void write_line(char *fn,double x,double y,double z,double vx,double vy,double vz,int ni, struct PolTor *Blm)
 {
 	double rr,cost,phi;
-	double br,bt,bp;
+	double bx,by,bz;
 	int i;
 	FILE *fp;
 	
@@ -236,8 +237,9 @@ void write_line(char *fn,double x,double y,double z,double vx,double vy,double v
 	for (i=0; i<ni; i++) {
 		rr = sqrt(x*x + y*y + z*z);		cost = z/rr;
 		phi = atan(y/x);	if (x < 0.0) phi += pi;
-		PolTor_to_point_interp(Blm, rr, cost, phi, &br, &bt, &bp);
-		fprintf(fp,"%.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g\n",x,y,z, rr, cost, phi, br,bt,bp);
+		PolTor_to_point_interp(Blm, rr, cost, phi, &bx, &by, &bz);
+		spher_to_cart(cost, phi, &bx, &by, &bz);
+		fprintf(fp,"%.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g\n",x,y,z, rr, cost, phi, bx,by,bz);
 		x+=vx;	y+=vy;	z+=vz;
 	}
 	fclose(fp);
@@ -258,14 +260,14 @@ void write_disc(char *fn,double x0,double y0,double z0, int nphi, struct PolTor 
 	ct0 = z0/rr;	st0 = sqrt(1. - ct0*ct0);
 	phi0 = atan(y0/x0);	if (x0 < 0.) phi0 += pi;
 	s0 = sqrt(x0*x0 + y0*y0);		// rotation of phi0.
-	if (s0 == 0.) phi0 = 0.;
+	if (s0 == 0.) phi0 = -pi/2.;	// compatibility with equat.
 
 	fp = fopen(fn,"w");
 	if (rr < r[NR-1]) {		// vector is normal and center of disc
 		fprintf(fp,"%% [XSHELLS] disc slice centered at %f,%f,%f (first row is disc-radius)",x0,y0,z0);
 	} else {		// vector is normal and center is 0,0,0
 		fprintf(fp,"%% [XSHELLS] disc slice centered at 0 with normal %f,%f,%f (first row is disc-radius)",x0,y0,z0);
-		x0 = 0.;	y0 = 0.;	z0 = 0.;	rr = 0.;	r2 = 0.;
+		s0 = 0.;	x0 = 0.;	y0 = 0.;	z0 = 0.;	rr = 0.;	r2 = 0.;
 	}
 	ir = r_to_idx(rr);	if (r[ir] <= rr) ir++;	//r[ir] > rr;
 	while((Blm->P[ir] == NULL)&&(ir<NR)) ir++;	// skip undef data.
@@ -281,18 +283,18 @@ void write_disc(char *fn,double x0,double y0,double z0, int nphi, struct PolTor 
 		for (ip=0; ip<nphi; ip++) {
 			phi = ip*(2.*pi/nphi);		// disc angle
 			ca = cos(phi);	sa = sin(phi);
+			x = s*ca;
+			y = s0 - s*sa*ct0;	// normal is along y
 			z = z0 + s*sa*st0;
-			x = s0 - s*sa*ct0;
-			y = s*ca;
-			phi = atan(y/x);	if (x < 0.0) phi += pi;
+			phi = atan(x/y);        if (y < 0.0) phi += pi;
 			cost = z/rr;
-			PolTor_to_point(Blm, ir, cost, phi+phi0, &bx, &by, &bz);
-			spher_to_cart(cost, phi, &bx, &by, &bz);
-			y = bz*st0 - bx*ct0;		// project into disc-relative coordinates.
+			PolTor_to_point(Blm, ir, cost, phi+phi0, &bx, &by, &bz);	// phi0 is normal vector (y) => -pi/2 for x.
+			spher_to_cart(cost, phi, &bx, &by, &bz);	// now x is normal vector,
+			x = by;			// project into disc-relative coordinates.
+			y = -bx*ct0 + bz*st0;
 			z = bz*ct0 + bx*st0;
-			x = by;
-//			fprintf(fp,"%.6g %.6g %.6g ",x*ca+y*sa, y*ca-x*sa, z);	// write data
-			fprintf(fp,"%.6g %.6g %.6g ",x, y, z);	// write data
+			fprintf(fp,"%.6g %.6g %.6g ",x*ca+y*sa, y*ca-x*sa, z);	// write data
+//			fprintf(fp,"%.6g %.6g %.6g ",x, y, z);	// write data
 		}
 		ir++;
 	}
@@ -498,8 +500,8 @@ int main (int argc, char *argv[])
 	{
 		if (!(NLAT%2)) runerr("equatorial cut not supported for even NLAT");
 		PolTor_to_spat(&Blm, &B, irs, ire, BC);
-		write_equat("o_Vr",B.r, 1.);	write_equat("o_Vp",B.p, 1.);	write_equat("o_Vz",B.t, -1.);
-		printf("> equatorial slice written to files : o_Vr, o_Vp, o_Vz (cylindrical vector components)\n");
+		write_equat("o_equat",&B);
+		printf("> equatorial slice written to file : o_equat (cylindrical vector components)\n");
 		exit(0);
 	}
 	if (strcmp(argv[ic],"surf") == 0)
@@ -510,8 +512,8 @@ int main (int argc, char *argv[])
 		i = r_to_idx(rr);
 		if ((i<irs)||(i>ire)) runerr("requested r not available");
 		PolTor_to_spat(&Blm, &B, i, i, BC);	// render just one shell.
-		write_shell("o_Sr", B.r[i]);	write_shell("o_St", B.t[i]);	write_shell("o_Sp", B.p[i]);
-		printf("> surface #%d (r=%.4f) written to files : o_Sr, o_St, o_Sp (spherical vector components)\n",i,r[i]);
+		write_shell("o_shell", &B, i);
+		printf("> surface #%d (r=%.4f) written to file : o_shell (spherical vector components)\n",i,r[i]);
 		exit(0);
 	}
 	if (strcmp(argv[ic],"merid") == 0)
