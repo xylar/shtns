@@ -13,6 +13,10 @@ cmdp = gcc -O3 -fopenmp -ffast-math
 ## icare 64bits opteron
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 #cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
+## r2d2
+#cmd = gcc -march=core2 -O3 -ffast-math -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
+#cmdp = gcc -march=core2 -O3 -fopenmp -ffast-math -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
+
 
 NTH=8	#number of threads for parallel version (can be overwritten with command line)
 shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat.gen.c SHT/spat_to_SH.gen.c SHT/Makefile

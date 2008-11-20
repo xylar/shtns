@@ -8,6 +8,9 @@
 
 *** Optimizations ***
 
++ OpenMP parallelization : 8 threads on r2d2 cluster gives a x 5.45 speedup compared to 1 thread (Navier-Stokes only)
+     code is validated: exactly same result with 8 threads or without OpenMP.
+
 - mask
 - try blas ?
 - time different implementations and chose the fastest...

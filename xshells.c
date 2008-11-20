@@ -687,7 +687,7 @@ int main (int argc, char *argv[])
 #endif
     }
 
-// Initialisation signal handler.
+// Initializing signal handler.
 	signal(30,&sig_handler);	signal(31,&sig_handler);	signal(15,&sig_handler);
 
 	it =0;
@@ -715,23 +715,24 @@ int main (int argc, char *argv[])
 //		t0 = t1;
 //		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));
 
-		if ((MAKE_MOVIE != 0)||(SAVE_QUIT != 0)) {
-			sprintf(command,"poltorU_%04d.%s",it,job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
-			if (b0 != 0.0) { sprintf(command,"poltorB_%04d.%s",it,job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
-			if (SAVE_QUIT < 0) {
-				printf("  > signal received : save & quit.\n");	fflush(stdout);
-				break;
-			}
-			if (SAVE_QUIT > 0) {
-				printf(" > signal received, snapshot dumped.\n");	fflush(stdout);
-				SAVE_QUIT = 0;
-			}
+		if (SAVE_QUIT < 0) {
+			printf("  > signal received : save & quit.\n");	fflush(stdout);
+			break;
+		}
+		if (SAVE_QUIT > 0) {
+			sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+			if (b0 != 0.0) { sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
+			printf(" > signal received, snapshot dumped.\n");	fflush(stdout);
+			SAVE_QUIT = 0;
+		}
+		if (MAKE_MOVIE != 0) {
+			sprintf(command,"poltorU_%04d.%s",it,job);	save_PolTor_single(command, &Ulm, time, BC_NO_SLIP);
+			if (b0 != 0.0) { sprintf(command,"poltorB_%04d.%s",it,job);	save_PolTor_single(command, &Blm, time, BC_MAGNETIC); }
 		}
 	}
 
-	if ((MAKE_MOVIE == 0)&&(SAVE_QUIT == 0)) {
-		sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
-		if (b0 != 0.0) { sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
-	}
+	// save full double-precision data at the end (for restart)
+	sprintf(command,"poltorU.%s",job);	save_PolTor(command, &Ulm, time, BC_NO_SLIP);
+	if (b0 != 0.0) { sprintf(command,"poltorB.%s",job);	save_PolTor(command, &Blm, time, BC_MAGNETIC); }
+	printf("[XSHELLS] all done.\n");
 }
-
