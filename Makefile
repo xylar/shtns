@@ -34,8 +34,6 @@ xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfil
 pxshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
 	$(cmdp) xshells.c -D_NTH_=$(NTH) -lfftw3 -lgsl -lgslcblas -lm -o pxshells
 
-xshells_imp : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
-	$(cmd) xshells.c -D_IMPULSE_ -lfftw3 -lgsl -lgslcblas -lm -o xshells_imp
 xspp : xspp.c grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
 	$(cmd) xspp.c -lfftw3 -lgsl -lgslcblas -lm -o xspp
 
