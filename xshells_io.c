@@ -89,7 +89,7 @@ void load_PolTor(char *fn, struct PolTor *PT, struct JobInfo *fh)
 
 	fread(fh, sizeof(struct JobInfo), 1, fp);		// read Header
 	printf("[load] from file '%s' : NR=%d, Lmax=%d, Mmax=%d, Mres=%d (Nlm=%d)\n",fn, fh->nr, fh->lmax, fh->mmax, fh->mres, fh->nlm);
-	printf("       Omega0=%.3e, nu=%.3e, eta=%.3e, t=%.3e\n", fh->Omega0, fh->nu, fh->eta, fh->t );
+	printf("       Omega0=%.3e, nu=%.3e, eta=%.3e, t=%.3f\n", fh->Omega0, fh->nu, fh->eta, fh->t );
 	printf("       ir_start=%d, ir_end=%d, BC=%d\n", fh->irs, fh->ire, fh->BC);
 //	*time = fh->t;	*BC = fh->BC;	*irs = fh->irs;	*ire = fh->ire;
 	Omega0 = fh->Omega0;	DeltaOmega = fh->DeltaOmega;

@@ -31,7 +31,7 @@ for i in range(1, argn):
 	figure()
 	#pcolor(array(x),array(y),a,shading='interp')
 	#colormaps : cm.PuOr, cm.RdBu, cm.RdGy
-	contourf(array(x),array(y),a,20,cmap=cm.PuOr)
+	contourf(array(x),array(y),a,30,cmap=cm.PuOr)
 	theta = linspace(-pi/2,pi/2,100)
 	plot(rg*cos(theta),rg*sin(theta),color='gray')
 	plot(cos(theta),sin(theta),color='gray')

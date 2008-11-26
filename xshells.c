@@ -23,10 +23,11 @@ double DeltaOmega;	// differential rotation (of inner core)
 
 double ftime = 0.0;		// current fluid time.
 double t_forcing = 0.0;		// forcing time-scale.
+double a_forcing;		// forcing amplitude.
 
 //#define MASK
 //#define COIL
-//#define _MHD_CURRENT_FREE_SMALL_RM_
+#define XS_LINEAR
 
 #include "grid.c"
 
@@ -136,8 +137,8 @@ void init_Jcoil(double s0, double z0, double h)
 
 
 struct VectField B, U, W, J;
-#ifdef _MHD_CURRENT_FREE_SMALL_RM_
-	struct VectField B0;
+#ifdef XS_LINEAR
+	struct VectField B0, J0;
 #endif
 struct PolTor Blm, Ulm, NLb1, NLb2, NLu1, NLu2;
 struct StatSpecVect B0lm, J0lm;
@@ -171,7 +172,7 @@ void init_Bmatrix()
 		for (l=0; l<=LMAX; l++)	MB[i].d[l] = 1.0/dtB + 0.5*eta*(Lr[i].d - r_2[i]*l*(l+1));
 					MB[i].u =              0.5*eta*Lr[i].u;
 	}
-	i = NR-1;		// CL poloidale : dP/dr = -(l+1)/r P => allows to aproximate d2P/dr2 withe only 2 points.
+	i = NR-1;		// CL poloidale : dP/dr = -(l+1)/r P => allows to aproximate d2P/dr2 with only 2 points.
 		dx_1 = 1.0/(r[i]-r[i-1]);	dx_2 = dx_1*dx_1;
 					MB[i].l =              eta * dx_2;
 		for (l=0; l<=LMAX; l++) MB[i].d[l] = 1.0/dtB + eta*( -dx_2 - (l+1.0)*r_1[i]*dx_1 -(l+1.0 + 0.5*l*(l+1))*r_2[i] );
@@ -383,19 +384,17 @@ inline substepU(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
 }
 
 
-/// updates the forcing at each time-step.
+/// updates the forcing at each time-step (DeltaOmega)
 inline void calc_Uforcing(double t)
 {
-	double domega;
-
 	if (t_forcing > 0.0) {			// no forcing if t_forcing = 0.0
 		if (t > t_forcing * 10) {
-			domega = 0.0;	t_forcing = 0.0;	// no more forcing afterwards.
+			DeltaOmega = 0.0;	t_forcing = 0.0;	// no more forcing afterwards.
 		} else {
 			t = (t - 3*t_forcing)/t_forcing;
-			domega = DeltaOmega * exp(-t*t);	//   /(t_forcing*sqrt(pi)); //constant energy forcing.
+			DeltaOmega = a_forcing * exp(-t*t);	//   /(t_forcing*sqrt(pi)); //constant energy forcing.
 		}
-		Ulm.T[NG][LM(1,0)]  = r[NG]* domega * Y10_ct;	// set differential rotation of inner core.
+		Ulm.T[NG][LM(1,0)]  = r[NG]* DeltaOmega * Y10_ct;	// set differential rotation of inner core.
 	}
 }
 
@@ -405,8 +404,12 @@ double step_NS(long int nstep, complex double **Alm)
 	{
 		calc_Uforcing(ftime);
 		CALC_U(BC_NO_SLIP);
+#ifdef XS_LINEAR
+		NL_Fluid_lin(&U, Omega0, NLu);
+#else
 		calc_Vort(&Ulm, Omega0, &W);
 		NL_Fluid(&U, &W, NLu);
+#endif
 		substepU(NLu, NLuo, Alm);
 		ftime += dtU;
 	}
@@ -427,12 +430,17 @@ double step_MHD(long int nstep, complex double **Alm)
 		
 		calc_Uforcing(ftime);
 		CALC_U(BC_NO_SLIP);
-		calc_Vort(&Ulm, Omega0, &W);
-#ifdef _MHD_CURRENT_FREE_SMALL_RM_
+#ifdef XS_LINEAR
 		calc_J(&Blm, &J, NULL);
-		NL_MHD(&U, &W, &B0, &J, NLu);
+		#ifndef XS_CUR_FREE
+			calc_B(&Blm, &B, NULL);
+			NL_MHD_lin(&U, Omega0, &B0, &J, &B, &J0, NLu);
+		#else
+			NL_MHD_lin(&U, Omega0, &B0, &J, NULL, NULL, NLu);
+		#endif
 		NL_Induction(&U, &B0, &B, NLb);
 #else
+		calc_Vort(&Ulm, Omega0, &W);
 		calc_B(&Blm, &B, &B0lm);
 		calc_J(&Blm, &J, &J0lm);
 		NL_MHD(&U, &W, &B, &J, NLu);
@@ -451,6 +459,7 @@ double step_MHD(long int nstep, complex double **Alm)
 	return 2*nstep*dtU;
 }
 
+#ifndef XS_LINEAR
 /// perform nstep steps of full coupled dynamo equation, with temporary array Alm.
 double step_Dynamo(long int nstep, complex double **Alm)
 {
@@ -475,8 +484,7 @@ double step_Dynamo(long int nstep, complex double **Alm)
 	}
 	return 2*nstep*dtU;
 }
-
-
+#endif
 
 /// perform nstep steps of Induction equation, with temporary array Alm.
 double step_Dyncin(long int nstep, complex double **Alm)
@@ -614,8 +622,15 @@ int main (int argc, char *argv[])
 	clock_t tcpu;
 
 	printf("[XSHELLS] eXtendable Spherical Harmonic Earth-Like Liquid Simulator\n          by Nathanael Schaeffer / LGIT, build %s, %s\n",__DATE__,__TIME__);
+#ifdef XS_LINEAR
+	printf("          ++ LINEAR,");
+#else
+	printf("          ++ Non-Linear,");
+#endif
 #ifdef _NTH_
-	printf("          ++ OMP Parallel version, %d threads.\n",_NTH_);
+	printf(" %d bit, OMP Parallel version with %d threads.\n",8*sizeof(void *),_NTH_);
+#else
+	printf(" %d bit version\n",8*sizeof(void *));
 #endif
 
 	read_Par(command, job, &iter_max, &modulo, &polar_opt_max, &Ric, &b0, &b1);
@@ -630,8 +645,11 @@ int main (int argc, char *argv[])
 	if (b0 != 0.0) {
 		alloc_DynamicField(&Blm, &B, &NLb1, &NLb2, 0, NR-1);
 		alloc_VectField(&J,0,NR-1);
-#ifdef _MHD_CURRENT_FREE_SMALL_RM_
+#ifdef XS_LINEAR
 		alloc_VectField(&B0,0,NR-1);
+		#ifndef XS_CUR_FREE
+			alloc_VectField(&J0,NG,NR-1);
+		#endif
 #endif
 	}
 
@@ -655,9 +673,13 @@ int main (int argc, char *argv[])
 			#include "inc_B0ini.c"
 		}
 		sprintf(command,"poltorB0.%s",job);	save_PolTor(command, &Blm, ftime, BC_MAGNETIC);
-		#ifdef _MHD_CURRENT_FREE_SMALL_RM_
-			PolTor_to_spat(&Blm, &B0, 0, NR-1, BC_MAGNETIC);	// background magnetic field.
-			printf("=> Imposed magnetic field B0 : using small Rm MHD integration (assuming current-free B0)\n");
+		#ifdef XS_LINEAR
+			calc_B(&Blm, &B0, NULL);
+			#ifndef XS_CUR_FREE
+				calc_J(&Blm, &J0, NULL);
+			#endif
+//			PolTor_to_spat(&Blm, &B0, 0, NR-1, BC_MAGNETIC);	// background magnetic field.
+			printf("=> Imposed magnetic field B0 : using *LINEAR* MHD integration\n");
 		#else
 			printf("=> Imposed magnetic field B0 : using full MHD integration\n");
 		#endif
@@ -672,14 +694,20 @@ int main (int argc, char *argv[])
 			ftime = jinfo.t;
 			printf("    B read from file \"%s\" (t=%f).\n",argv[2],ftime);
 		}
+
 	} else {
-		printf("=> No imposed magnetic field : using Navier-Stokes integration\n");
+		#ifdef XS_LINEAR
+			printf("=> No imposed magnetic field : using *LINEAR* Navier-Stokes integration\n");
+		#else
+			printf("=> No imposed magnetic field : using Navier-Stokes integration\n");
+		#endif
 		ptr_step = &step_NS;
 	}
 
 	// init U fields
 	if (t_forcing > 0.0) {
 		printf("=> Forcing on time-scale t_forcing=%f\n",t_forcing);
+		a_forcing = DeltaOmega;
 	}
 	if (argc > 1) {
 		load_PolTor(argv[1], &Ulm, &jinfo);		// load from file.
@@ -705,26 +733,40 @@ int main (int argc, char *argv[])
 
 // Initializing signal handler.
 	signal(30,&sig_handler);	signal(31,&sig_handler);	signal(15,&sig_handler);
+	if (b0 != 0.0) {	zero_out_field(&NLb1);	zero_out_field(&NLb2);	}
+	zero_out_field(&NLu1);	zero_out_field(&NLu2);
 
 	printf("let's go for %d iterations !\n",iter_max);
 	it =0;		// some pre-requisites are computed here.
 		calc_Uforcing(ftime);		// update forcing
 		CALC_U(BC_NO_SLIP);
-		calc_Vort(&Ulm, Omega0, &W);
 		if (b0 == 0.0) {
+#ifdef XS_LINEAR
+			NL_Fluid_lin(&U, Omega0, &NLu2);
+#else
+			calc_Vort(&Ulm, Omega0, &W);
 			NL_Fluid(&U, &W, &NLu2);
+#endif
 		} else {
-#ifdef _MHD_CURRENT_FREE_SMALL_RM_
+#ifdef XS_LINEAR
 			calc_J(&Blm, &J, NULL);
-			NL_MHD(&U, &W, &B0, &J, &NLu2);
+			#ifndef XS_CUR_FREE
+				calc_B(&Blm, &B, NULL);
+				NL_MHD_lin(&U, Omega0, &B0, &J, &B, &J0, &NLu2);
+			#else
+				NL_MHD_lin(&U, Omega0, &B0, &J, NULL, NULL, &NLu2);
+			#endif
 			NL_Induction(&U, &B0, &B, &NLb2);
 #else
+			calc_Vort(&Ulm, Omega0, &W);
 			calc_B(&Blm, &B, &B0lm);
 			calc_J(&Blm, &J, &J0lm);
 			NL_MHD(&U, &W, &B, &J, &NLu2);
 			NL_Induction(&U, &B, &B, &NLb2);
 #endif
 		}
+		save_PolTor("poltorNLu0",&NLu2, 0.0,BC_NO_SLIP);
+		if (b0 != 0.0) save_PolTor("poltorNLb0",&NLb2, 0.0,BC_MAGNETIC);
 		t0 = creal(Ulm.T[NG][1]);	t1 = creal(Ulm.P[NG+1][2]);
 		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,ftime,t1, t0);	fflush(stdout);
 
@@ -736,7 +778,7 @@ int main (int argc, char *argv[])
 
 		it++;
 		t0 = creal(Ulm.T[NG][1]);	t1 = creal(Ulm.P[NG+1][2]);
-		printf("[it %d] t=%g, P0=%g, T0=%g  (cpu=%d)\n",it,ftime,t1, t0, (int) tcpu);	fflush(stdout);
+		printf("[it %d] t=%g, P0=%g, T0=%g  (cpu=%ld)\n",it,ftime,t1, t0, (long int) tcpu);	fflush(stdout);
 		if (isnan(t0)) runerr("NaN encountered");
 
 //		t0 = t1;

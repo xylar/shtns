@@ -17,10 +17,10 @@
 #include <gsl/gsl_sf_legendre.h>
 
 // parameters for SHT.c
-#define NLAT 301
-#define LMAX 30
-#define NPHI 64
-#define MMAX 30
+#define NLAT 361
+#define LMAX 240
+#define NPHI 1
+#define MMAX 0
 #define MRES 1
 // SHT on equal spaced grid + polar points.
 #define SHT_EQUAL
@@ -192,7 +192,7 @@ void write_merid(char *fn, double **v, long int im)
 	fprintf(fp,"\n");	fclose(fp);
 }
 
-// equatorial cut : fac is used to change the sign of theta component to get z-component.
+// equatorial cut
 void write_equat(char *fn, struct VectField *V)
 {
 	FILE *fp;

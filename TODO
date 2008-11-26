@@ -24,6 +24,9 @@
 + velocity field computation
 + inner core differential rotation
 
+- BACKGROUND boundary-condition should be added
+- Boundary condition handling should be improved !!!
+
 - compute spectrum and use them...
 -+ boundary conditions dependence should be checked and improved.
 -   ghost point could be mapped with a pointer !!! (or not)

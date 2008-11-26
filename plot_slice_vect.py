@@ -7,7 +7,7 @@ ir0=1
 
 #Ur
 print 'loading',sys.argv[1]
-a=load(sys.argv[1])
+a=load(sys.argv[1],comments='%')
 s = a.shape
 print s
 
@@ -21,12 +21,12 @@ y = r*matrix(ct)
 
 #Ut
 print 'loading',sys.argv[2]
-b = load(sys.argv[2])
+b = load(sys.argv[2],comments='%')
 b = b[ir0:s[0],1:s[1]]
 
 #Up
 print 'loading',sys.argv[3]
-c = load(sys.argv[3])
+c = load(sys.argv[3],comments='%')
 c = c[ir0:s[0],1:s[1]]
 
 print c.shape

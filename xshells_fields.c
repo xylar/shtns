@@ -438,7 +438,7 @@ void calc_J(struct PolTor *PT, struct VectField *J, struct StatSpecVect *J0)
 //	Plm -= NG;	Tlm -= NG;	Vr -= NG;	Vt -= NG;	Vp -= NG;	// adjust pointers.
     #pragma omp parallel num_threads(_NTH_)
     {
-	#pragma omp for schedule(static) private(ir,lm, Q, S, T)
+	#pragma omp for schedule(static) private(ir,lm,j, Q,S,T, QST) firstprivate(nj, lma)
 	for (ir=NG+1; ir <= NR-2; ir++) {
 		for (lm=0; lm<NLM; lm++) {
 			Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
@@ -482,7 +482,7 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 		}
     #pragma omp parallel num_threads(_NTH_)
     {
-	#pragma omp for schedule(static) private(ir,lm, Q, S, T)
+	#pragma omp for schedule(static) private(ir,lm,j, Q,S,T, QST) firstprivate(nj, lma)
 	for (ir=1; ir<NR-1; ir++) {
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
 			Q[lm] = r_1[ir]*l2[lm] * PT->P[ir][lm];
@@ -505,6 +505,14 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 	ir = NR-1;
 		// Magnetic field (insulator BC) : T=0, dP/dr = -(l+1)/r.P => S = -lP/r
 		LM_LOOP(  S[lm] = -l*PT->P[ir][lm]*r_1[ir];		Q[lm] = r_1[ir]*l*(l+1) * PT->P[ir][lm];  )
+		if (B0 != NULL) {		// Add Background Magnetic Field
+			QST = &(B0->QST[ir*nj*3]);	//QST[ir*nlm*3 + 3*j]
+			for(j= 0; j<nj; j++) {
+				lm = lma[j];
+				Q[lm] += QST[j*3];
+				S[lm] += QST[j*3+1];
+			}
+		}
 		SH_to_spat(Q,(complex double *) V->r[ir]);
 		SHsph_to_spat(S, (complex double *) V->t[ir], (complex double *) V->p[ir]);
 }
@@ -514,8 +522,9 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 // ***** NON-LINEAR TERMS ******
 // *****************************
 
+#ifndef XS_LINEAR
 /// compute curl(VxW + JxB) and its pol-tor components.
-/// output : V, B, J unchanged, W destroyed.
+/// output : V, B, W unchanged, J destroyed.
 ///          NL = PolTor[curl(VxW + JxB)]
 void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struct VectField *J, struct PolTor *NL)
 {
@@ -525,35 +534,84 @@ void NL_MHD(struct VectField *V, struct VectField *W, struct VectField *B, struc
     #pragma omp parallel num_threads(_NTH_)
     {
 	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp)
-	for (ir=NG+1; ir<=NR-2; ir++) {
+	for (ir=NG; ir<=NR-2; ir++) {
+#ifdef MASK
+	  if (mask[ir] != NULL) {
+		for (lm=0; lm<NPHI*NLAT; lm++) {
+			J->r[ir][lm] = -mask[ir][lm] * ( V->r[ir][lm] );
+			J->t[ir][lm] = -mask[ir][lm] * ( V->t[ir][lm] );
+			J->p[ir][lm] = -mask[ir][lm] * ( V->p[ir][lm] );
+		}
+	  } else {
+#endif
 		for (lm=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 4*3 = 12 disjoint arrays.
-			vr =  J->t[ir][lm]*B->p[ir][lm] - J->p[ir][lm]*B->t[ir][lm];	// JxB
-			vt =  J->p[ir][lm]*B->r[ir][lm] - J->r[ir][lm]*B->p[ir][lm];
-			vp =  J->r[ir][lm]*B->t[ir][lm] - J->t[ir][lm]*B->r[ir][lm];
-			
-			vr += V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];	// VxW
-			vt += V->p[ir][lm]*W->r[ir][lm] - V->r[ir][lm]*W->p[ir][lm];
-			vp += V->r[ir][lm]*W->t[ir][lm] - V->t[ir][lm]*W->r[ir][lm];
-			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
+			vr = V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];	// VxW
+			vt = V->p[ir][lm]*W->r[ir][lm] - V->r[ir][lm]*W->p[ir][lm];
+			vp = V->r[ir][lm]*W->t[ir][lm] - V->t[ir][lm]*W->r[ir][lm];
+
+			vr +=  J->t[ir][lm]*B->p[ir][lm] - J->p[ir][lm]*B->t[ir][lm];	// JxB
+			vt +=  J->p[ir][lm]*B->r[ir][lm] - J->r[ir][lm]*B->p[ir][lm];
+			vp +=  J->r[ir][lm]*B->t[ir][lm] - J->t[ir][lm]*B->r[ir][lm];
+			J->r[ir][lm] = vr;	J->t[ir][lm] = vt;	J->p[ir][lm] = vp;
 		}
 #ifdef MASK
-		if (mask[ir] != NULL) {
-			for (lm=0; lm<NPHI*NLAT; lm++) {
-				if (mask[ir][lm] != 0.0) {
-					W->r[ir][lm] -= mask[ir][lm] * ( V->r[ir][lm] );
-					W->t[ir][lm] -= mask[ir][lm] * ( V->t[ir][lm] );
-					W->p[ir][lm] -= mask[ir][lm] * ( V->p[ir][lm] );
-				}
-			}
-		}
+	  }
 #endif
 	}
-	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);	// W destroyed.
+	spat_to_curl_PolTor(J, NL->T, NL->P, NG+1, NR-2);	// W destroyed.
     }
 }
+#else
+void NL_MHD_lin(struct VectField *V, double Om0, struct VectField *B, struct VectField *J, struct VectField *B1, struct VectField *J1, struct PolTor *NL)
+{
+	double vr,vt,vp;
+	long int ir,lm,it;
 
+	Om0 *= 2.;
+
+    #pragma omp parallel num_threads(_NTH_)
+    {
+	#pragma omp for schedule(static) private(ir,lm,it, vr,vt,vp)
+	for (ir=NG; ir<=NR-2; ir++) {
+#ifdef MASK
+	  if (mask[ir] != NULL) {
+		for (lm=0; lm<NPHI*NLAT; lm++) {
+			J->r[ir][lm] = -mask[ir][lm] * ( V->r[ir][lm] );
+			J->t[ir][lm] = -mask[ir][lm] * ( V->t[ir][lm] );
+			J->p[ir][lm] = -mask[ir][lm] * ( V->p[ir][lm] );
+		}
+	  } else {
+#endif
+		for (lm=0, it=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 5*3 = 15 disjoint arrays.
+			vt = Om0 *ct[it];	vr = Om0 *st[it];	// project wz to wr=vt and wt=-vr
+				it++; if (it>=NLAT) it=0;
+			vp = - (V->r[ir][lm]*vr + V->t[ir][lm]*vt);	// VxW
+			vr *= V->p[ir][lm];
+			vt *= V->p[ir][lm];
+
+		    if ((B1 != NULL)&&(J1 != NULL)) {
+			vr +=  J1->t[ir][lm]*B1->p[ir][lm] - J1->p[ir][lm]*B1->t[ir][lm];	// J1xB1
+			vt +=  J1->p[ir][lm]*B1->r[ir][lm] - J1->r[ir][lm]*B1->p[ir][lm];
+			vp +=  J1->r[ir][lm]*B1->t[ir][lm] - J1->t[ir][lm]*B1->r[ir][lm];
+		    }
+
+			vr +=  J->t[ir][lm]*B->p[ir][lm] - J->p[ir][lm]*B->t[ir][lm];	// JxB
+			vt +=  J->p[ir][lm]*B->r[ir][lm] - J->r[ir][lm]*B->p[ir][lm];
+			vp +=  J->r[ir][lm]*B->t[ir][lm] - J->t[ir][lm]*B->r[ir][lm];
+			J->r[ir][lm] = vr;	J->t[ir][lm] = vt;	J->p[ir][lm] = vp;
+		}
+#ifdef MASK
+	  }
+#endif
+	}
+	spat_to_curl_PolTor(J, NL->T, NL->P, NG+1, NR-2);	// W destroyed.
+    }
+}
+#endif
+
+#ifndef XS_LINEAR
 /// compute curl(VxW) and its pol-tor components.
-/// output : V unchanged, W destroyed, NL = PolTor[curl(VxW)]
+/// output : VxW destroyed, NL = PolTor[curl(VxW)]
 void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 {
 	double vr,vt,vp;
@@ -563,6 +621,15 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
     {
 	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp)
 	for (ir=NG+1; ir<=NR-2; ir++) {
+#ifdef MASK
+	  if (mask[ir] != NULL) {
+		for (lm=0; lm<NPHI*NLAT; lm++) {
+			W->r[ir][lm] = -mask[ir][lm] * ( V->r[ir][lm] );
+			W->t[ir][lm] = -mask[ir][lm] * ( V->t[ir][lm] );
+			W->p[ir][lm] = -mask[ir][lm] * ( V->p[ir][lm] );
+		}
+	  } else {
+#endif
 		for (lm=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 2*3 = 6 disjoint arrays.
 			vr = V->t[ir][lm]*W->p[ir][lm] - V->p[ir][lm]*W->t[ir][lm];
 			vt = V->p[ir][lm]*W->r[ir][lm] - V->r[ir][lm]*W->p[ir][lm];
@@ -570,20 +637,49 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 			W->r[ir][lm] = vr;	W->t[ir][lm] = vt;	W->p[ir][lm] = vp;
 		}
 #ifdef MASK
-		if (mask[ir] != NULL) {
-			for (lm=0; lm<NPHI*NLAT; lm++) {
-				if (mask[ir][lm] != 0.0) {
-					W->r[ir][lm] -= mask[ir][lm] * ( V->r[ir][lm] );
-					W->t[ir][lm] -= mask[ir][lm] * ( V->t[ir][lm] );
-					W->p[ir][lm] -= mask[ir][lm] * ( V->p[ir][lm] );
-				}
-			}
-		}
+	  }
 #endif
 	}
-	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);	// W destroyed
+	spat_to_curl_PolTor(W, NL->T, NL->P, NG+1, NR-2);	// VxW destroyed
     }
 }
+#else
+void NL_Fluid_lin(struct VectField *V, double Om0, struct PolTor *NL)
+{
+	double vp, wr,wt;
+	long int ir,lm,it;
+
+	Om0 *= 2.;	// vorticity.
+
+    #pragma omp parallel num_threads(_NTH_)
+    {
+	#pragma omp for schedule(static) private(ir,lm,it, vp,wr,wt)
+	for (ir=NG+1; ir<=NR-2; ir++) {
+#ifdef MASK
+	  if (mask[ir] != NULL) {
+		for (lm=0; lm<NPHI*NLAT; lm++) {
+			V->r[ir][lm] = -mask[ir][lm] * ( V->r[ir][lm] );
+			V->t[ir][lm] = -mask[ir][lm] * ( V->t[ir][lm] );
+			V->p[ir][lm] = -mask[ir][lm] * ( V->p[ir][lm] );
+		}
+	  } else {
+#endif
+		for (lm=0, it=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 2*3 = 6 disjoint arrays.
+			wr = Om0 *ct[it];	wt = Om0 *st[it];	// project wz to wr and -wt.
+				it++; if (it>=NLAT) it=0;
+			vp = - (V->r[ir][lm]*wt + V->t[ir][lm]*wr);
+			V->r[ir][lm] = V->p[ir][lm]*wt;
+			V->t[ir][lm] = V->p[ir][lm]*wr;
+			V->p[ir][lm] = vp;
+		}
+#ifdef MASK
+	  }
+#endif
+	}
+	spat_to_curl_PolTor(V, NL->T, NL->P, NG+1, NR-2);	// VxW destroyed
+    }
+}
+#endif
 
 /// compute curl(VxB)
 /// IN:  V, B are spatial vector fields (unchanged)
@@ -591,17 +687,16 @@ void NL_Fluid(struct VectField *V, struct VectField *W, struct PolTor *NL)
 ///      NL is the PolTor component of curl(VxB)
 void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *VxB, struct PolTor *NL)
 {
-	double vr,vt,vp,rO;
+	double vr,vt,vp,rOm;
 	long int ir,lm,it;
 
     #pragma omp parallel num_threads(_NTH_)
     {
-	#pragma omp for schedule(static) private(ir,lm, vr,vt,vp) nowait
+	#pragma omp for schedule(static) private(ir,lm,it, rOm,vr,vt,vp) nowait
 	for (ir=0; ir<NG; ir++) {		// for the inner core : solid body rotation  Up = r.sint.DeltaOmega
-		rO = r[ir]*DeltaOmega;
-		it = 0;
-		for (lm=0; lm<NPHI*NLAT; lm++) {
-			vp = rO*st[it];		it++; if (it>=NLAT) it=0;	// TO BE CHECKED !
+		rOm = r[ir]*DeltaOmega;
+		for (lm=0, it=0; lm<NPHI*NLAT; lm++) {
+			vp = rOm*st[it];		it++; if (it>=NLAT) it=0;
 			vr = - vp*B->t[ir][lm];
 			vt =   vp*B->r[ir][lm];
 			VxB->r[ir][lm] = vr;	VxB->t[ir][lm] = vt;	VxB->p[ir][lm] = 0.0;
@@ -618,7 +713,7 @@ void NL_Induction(struct VectField *V, struct VectField *B, struct VectField *Vx
 	}
 #ifdef COIL
 	if (Icoil != 0.0) {
-		#pragma omp for schedule(static) private(ir,lm, vr,vt,vp) nowait
+		#pragma omp for schedule(static) private(ir,lm) nowait
 		for (ir=0; ir<NR; ir++) {
 			if (Jcoil[ir] != NULL) {
 				for (lm=0; lm<NPHI*NLAT; lm++) VxB->p[ir][lm] += Icoil * Jcoil[ir][lm];
@@ -735,6 +830,23 @@ void alloc_VectField(struct VectField *V, long int istart, long int iend)
 	for (ir = iend+1; ir<NR; ir++) {
 		V->r[ir] = NULL;	V->t[ir] = NULL;	V->p[ir] = NULL;
 	}
+}
+
+/// set poloidal/toroidal value, with some checkings.
+inline int set_poltor(struct PolTor *Vlm, int ir, int l, int m, double pol, double tor)
+{
+	long int lm;
+
+	if ((m % MRES) || (l > LMAX) || (m > MMAX*MRES))
+		return -1;	// (l,m) out of range
+	if ((ir<0)||(ir>=NR))
+		return -2;	// ir out of range
+	if (Vlm->P[ir] == NULL)
+		return -3;	// ir not allocated
+
+	lm = LM(l,m);
+	Vlm->P[ir][lm] = pol;	Vlm->T[ir][lm] = tor;
+	return 0;
 }
 
 void zero_out_field(struct PolTor *Vlm)

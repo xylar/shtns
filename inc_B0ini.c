@@ -22,7 +22,7 @@ l=1; m=0;
 	if (rr < 0.1) Set_Poloidal( 1.0/ (2.*0.1*0.1) )		// avoid divergence at r=0
 }*/
 
-/*{
+{
 #define INIT_FIELD_NAME "Jault 2008 (not current-free)"
 l=1; m=0;
 	double v = pi * rr;
@@ -32,9 +32,9 @@ l=3; m=0;
 	v = 5.7635 * rr;	
 	Set_Poloidal( -0.2*((sin(v)*(3./(v*v)-1.)-3.*cos(v)/v)/v) )	// -0.2*j3(k*r)
 	if (rr == 0.0) Set_Poloidal( 0.0 )
-}*/
+}
 
-{
+/*{
 #define INIT_FIELD_NAME "3D based on Jault 2008 (not current-free)"
 l=1; m=0;
 	double v = pi * rr;
@@ -50,7 +50,7 @@ l=3; m=0;
 	Set_Poloidal( v )
 l=MRES+3; m=MRES;
 	Set_Poloidal( b1*v )
-}
+}*/
 
 // do not remove the following lines
 #undef Set_Poloidal
