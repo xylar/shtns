@@ -1,0 +1,31 @@
+#!/bin/bash
+FROM=xshells@ujf-grenoble.fr
+TO=nathanael.schaeffer@obs.ujf-grenoble.fr
+CC=nathanael.schaeffer@gmail.com
+SUBJECT=$1
+parfile="$2"
+outfile="$3"
+#echo HELO ‘hostname’
+#sleep 1
+echo "MAIL FROM:<"$FROM">"
+sleep 1
+echo "RCPT TO:<"$TO">"
+sleep 1
+echo "RCPT TO:<"$CC">"
+sleep 1
+echo DATA
+#echo From: $FROM
+#echo To: $TO
+#echo CC: $CC
+echo Subject: $SUBJECT
+echo
+sed $parfile -e "/^#/d"
+echo
+echo "** output head **"
+head $outfile
+echo
+echo "** output tail **"
+tail $outfile
+echo .
+sleep 1
+echo quit

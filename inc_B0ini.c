@@ -23,14 +23,14 @@ l=1; m=0;
 }*/
 
 {
-#define INIT_FIELD_NAME "Jault 2008 (not current-free)"
+#define INIT_FIELD_NAME "Jault 2008 (not current-free) normalized version"
 l=1; m=0;
 	double v = pi * rr;
-	Set_Poloidal( ((sin(v)/v-cos(v))/v - 0.3*(sin(2*v)/(2*v)-cos(2*v))/(2*v)) )		// j1(pi*r) - 0.3*j1(2*pi*r)
+	Set_Poloidal( ((sin(v)/v-cos(v))/v - 0.3*(sin(2*v)/(2*v)-cos(2*v))/(2*v)) *sqrt(4.*pi/(2*l+1)) )		// j1(pi*r) - 0.3*j1(2*pi*r)
 	if (rr == 0.0) Set_Poloidal( 0.0 )
 l=3; m=0;
 	v = 5.7635 * rr;	
-	Set_Poloidal( -0.2*((sin(v)*(3./(v*v)-1.)-3.*cos(v)/v)/v) )	// -0.2*j3(k*r)
+	Set_Poloidal( -0.2*((sin(v)*(3./(v*v)-1.)-3.*cos(v)/v)/v) *sqrt(4.*pi/(2*l+1)) )	// -0.2*j3(k*r)
 	if (rr == 0.0) Set_Poloidal( 0.0 )
 }
 

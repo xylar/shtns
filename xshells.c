@@ -14,7 +14,13 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_sf_legendre.h>
 
+#include "xshells.h"
 #include "SHT.c"
+
+#ifdef XS_LINEAR
+  // Linear computation never includes B0xJ0
+  #undef NO_J0xB0
+#endif
 
 double nu, eta;		// viscosity and magnetic diffusivity.
 double dtU, dtB;	// time step for navier-stokes and induction equation.
@@ -24,10 +30,6 @@ double DeltaOmega;	// differential rotation (of inner core)
 double ftime = 0.0;		// current fluid time.
 double t_forcing = 0.0;		// forcing time-scale.
 double a_forcing;		// forcing amplitude.
-
-//#define MASK
-//#define COIL
-#define XS_LINEAR
 
 #include "grid.c"
 
@@ -142,6 +144,9 @@ struct VectField B, U, W, J;
 #endif
 struct PolTor Blm, Ulm, NLb1, NLb2, NLu1, NLu2;
 struct StatSpecVect B0lm, J0lm;
+#ifdef NO_J0xB0
+struct PolTor NLubase;
+#endif
 
 
 int MAKE_MOVIE = 0;	// no output by default.
@@ -354,7 +359,11 @@ inline substepU(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
 //	cTriMul(MUt, Ulm.T +NG, Alm, 0, NU-1);		// free slip
 	for (i=1; i<NU-1; i++) {
 		for (l=1;l<NLM;l++) {
+#ifndef NO_J0xB0
 			Alm[i][l] += 1.5*NL->T[i+NG][l] - 0.5*NLo->T[i+NG][l];
+#else
+			Alm[i][l] += 1.5*NL->T[i+NG][l] - 0.5*NLo->T[i+NG][l]   - NLubase.T[i+NG][l];
+#endif
 		}
 /*#ifdef MASK
 		if (mask[i+NG] != NULL) {
@@ -370,7 +379,11 @@ inline substepU(struct PolTor *NL, struct PolTor *NLo, complex double **Alm)
 	cPentaMul(MUp, Ulm.P +NG, Alm, 1, NU-2);
 	for (i=1; i<NU-1; i++) {
 		for (l=1;l<NLM;l++) {
+#ifndef NO_J0xB0
 			Alm[i][l] += 1.5*NL->P[i+NG][l] - 0.5*NLo->P[i+NG][l];
+#else
+			Alm[i][l] += 1.5*NL->P[i+NG][l] - 0.5*NLo->P[i+NG][l]   - NLubase.P[i+NG][l];
+#endif
 		}
 /*#ifdef MASK
 		if (mask[i+NG] != NULL) {
@@ -637,10 +650,14 @@ int main (int argc, char *argv[])
 	init_SH(polar_opt_max);
 	init_rad_sph(0.0, Ric, 1.0);
 
+/// MEMORY ALLOCATION
 	if (b0 != 0.0) init_Bmatrix();
 	init_Umatrix(BC_NO_SLIP);
 
 	alloc_DynamicField(&Ulm, &U, &NLu1, &NLu2, NG, NR-1);
+	#ifdef NO_J0xB0
+		alloc_PolTorField(&NLubase, NG, NR-1);
+	#endif
 	alloc_VectField(&W,NG,NR-1);
 	if (b0 != 0.0) {
 		alloc_DynamicField(&Blm, &B, &NLb1, &NLb2, 0, NR-1);
@@ -652,16 +669,17 @@ int main (int argc, char *argv[])
 		#endif
 #endif
 	}
+	Alm = (complex double **) malloc( NR * sizeof(complex double *));
+	for (i=0;i<NR;i++)
+		Alm[i] = (complex double *) malloc( NLM * sizeof(complex double));
 
+/// PRINT PARAMS
 	printf("[Params] job name : %s\n",job);
 	printf("         Ek=%.2e, Ro=%.2e, Pm=%.2e, Re=%.2e, S=%.2e, N=%.2e, M=%.2e, Elsasser=%.2e, Lehnert=%.2e\n",nu/Omega0, Ric*DeltaOmega/Omega0, nu/eta, Ric*DeltaOmega/nu, b0/eta, b0*b0/(Ric*DeltaOmega*Ric*DeltaOmega) , b0*0.5/sqrt(nu*eta), b0*b0/(eta*Omega0), b0/Omega0);
 	printf("         dtU.Omega=%.2e, dtU.nu.R^2=%.2e, dtB.eta.R^2=%.2e, dtB/dtU=%.2e\n",dtU*Omega0, dtU*nu, dtB*eta, dtB/dtU);
 	fflush(stdout);
 
-	Alm = (complex double **) malloc( NR * sizeof(complex double *));
-	for (i=0;i<NR;i++)
-		Alm[i] = (complex double *) malloc( NLM * sizeof(complex double));
-
+/// INITIALIZATION
 	if (b0 != 0.0) {
 		ptr_step = &step_MHD;
 		// init B fields.
@@ -683,18 +701,24 @@ int main (int argc, char *argv[])
 		#else
 			printf("=> Imposed magnetic field B0 : using full MHD integration\n");
 		#endif
+
 		i = Make_StatSpecVect(&Blm, &B0lm, &J0lm, 1, NR-2, BC_NONE);
 		#ifdef INIT_FIELD_NAME
 			printf("    B0 set to : \"" INIT_FIELD_NAME "\" (%d modes)\n",i);
 		#endif
-
 		zero_out_field(&Blm);
+		#ifdef NO_B0xJ0
+			calc_B(&Blm,&B, &B0lm);	// B0
+			calc_J(&Blm,&J, &J0lm);	// J0
+			NL_fluid(&J,&B, &NLubase);	// J0xB0
+			printf("=> J0xB0 will be removed at each time-step\n");
+		#endif
+
 		if (argc > 2) {
 			load_PolTor(argv[2], &Blm, &jinfo);
 			ftime = jinfo.t;
 			printf("    B read from file \"%s\" (t=%f).\n",argv[2],ftime);
 		}
-
 	} else {
 		#ifdef XS_LINEAR
 			printf("=> No imposed magnetic field : using *LINEAR* Navier-Stokes integration\n");
@@ -736,6 +760,7 @@ int main (int argc, char *argv[])
 	if (b0 != 0.0) {	zero_out_field(&NLb1);	zero_out_field(&NLb2);	}
 	zero_out_field(&NLu1);	zero_out_field(&NLu2);
 
+/// PREPARE FIRST ITERATION
 	printf("let's go for %d iterations !\n",iter_max);
 	it =0;		// some pre-requisites are computed here.
 		calc_Uforcing(ftime);		// update forcing
@@ -770,7 +795,7 @@ int main (int argc, char *argv[])
 		t0 = creal(Ulm.T[NG][1]);	t1 = creal(Ulm.P[NG+1][2]);
 		printf("[it %d] t=%g, P0=%g, T0=%g\n",it,ftime,t1, t0);	fflush(stdout);
 
-/* MAIN LOOP */
+/// MAIN LOOP
 	while (it < iter_max) {
 		tcpu = clock();
 		(*ptr_step)(modulo, Alm);	// go for time integration !!
@@ -779,7 +804,7 @@ int main (int argc, char *argv[])
 		it++;
 		t0 = creal(Ulm.T[NG][1]);	t1 = creal(Ulm.P[NG+1][2]);
 		printf("[it %d] t=%g, P0=%g, T0=%g  (cpu=%ld)\n",it,ftime,t1, t0, (long int) tcpu);	fflush(stdout);
-		if (isnan(t0)) runerr("NaN encountered");
+		if (isnan(t1)) runerr("NaN encountered");
 
 //		t0 = t1;
 //		printf("%g :: tx=%g\n",t1,log(t1/t0)/(2*dtB));

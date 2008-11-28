@@ -113,6 +113,7 @@ void PolTor_to_point_interp(struct PolTor *PT, double rr, double cost, double ph
 	SHqst_to_point(Q,S,T, cost, phi, vr, vt, vp);
 }
 
+/*
 /// compute the cartesian coordinates of a vector field at r=0, from its Poloidal value component
 inline void Pol_to_cart_spat0(complex double **Plm, double *Vx, double *Vy, double *Vz)
 {
@@ -135,6 +136,7 @@ inline void cart_spat0_to_Sph(double Vx, double Vy, double Vz, complex double *S
 	*S10 = Vz * dx;		// l=1, m=0
 	*S11 = (Vx + I*Vy) *dx;	// l=1, m=1
 }
+*/
 
 #define CALC_U(bc)   PolTor_to_spat(&Ulm, &U, NG, NR-1, (bc))
 //#define CALC_B       PolTor_to_spat(&Blm, &B, 0, NR-1, BC_MAGNETIC)
@@ -149,11 +151,13 @@ void PolTor_to_spat(struct PolTor *PT, struct VectField *V, long int istart, lon
 	long int ir,lm, im,l;
 
 	ir = istart;
-	if ((istart == 0)&&(r[ir] == 0.0)) {	// field at r=0 : S = 2.dP/dr (l=1 seulement) => store Bx, By, Bz (cartesian coordinates)
-		Pol_to_cart_spat0(PT->P, V->r[ir],V->t[ir],V->p[ir]);
-		for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
-			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
-		}
+	if ((istart == 0)&&(r[ir] == 0.0)) {	// field at r=0 : P=0, T=0, but S = 2.dP/dr (l=1 only) and Q=S
+		dr = 2.0/r[ir+1];
+		for(lm=0; lm<NLM; lm++) S[NLM] = 0.0;
+		lm = LM(1,0);	S[lm] = dr * PT->P[ir+1][lm];
+		lm = LM(1,1);	S[lm] = dr * PT->P[ir+1][lm];
+		SH_to_spat(S,(complex double *) V->r[ir]);
+		SHsph_to_spat(S, (complex double *) V->t[ir], (complex double *) V->p[ir]);
 	} else if ( (PT->P[ir-1] != NULL) ) {	// data present, no need for explicit BC.
 		for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Poloidal
 			S[lm] = Wr[ir].l*PT->P[ir-1][lm] + Wr[ir].d*PT->P[ir][lm] + Wr[ir].u*PT->P[ir+1][lm];
@@ -246,11 +250,13 @@ void PolTor_to_curl_spat(struct PolTor *PT, double Wz0, struct VectField *W, lon
 
 	if (istart == 0) {
 		ir = istart;
-		if (r[ir] = 0.0) {	// field at r=0 : S = 2.dT/dr (l=1 seulement) => store Bx, By, Bz (cartesian coordinates)
-			Pol_to_cart_spat0(PT->T, W->r[ir],W->t[ir],W->p[ir]);
-			for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
-				W->r[ir][lm] = 0.0;	W->t[ir][lm] = 0.0;	W->p[ir][lm] = 0.0;
-			}
+		if (r[ir] = 0.0) {	// curl field at r=0 : P=0, T=0, but S = 2.dT/dr (l=1 only) and Q=S
+			dr = 2.0/r[ir+1];
+			for(lm=0; lm<NLM; lm++) S[NLM] = 0.0;
+			lm = LM(1,0);	S[lm] = dr * PT->T[ir+1][lm]  + Wz0;
+			lm = LM(1,1);	S[lm] = dr * PT->T[ir+1][lm];
+//			SH_to_spat(S,(complex double *) W->r[ir]);
+//			SHsph_to_spat(S, (complex double *) W->t[ir], (complex double *) W->p[ir]);
 			istart++;
 		} else if (BC == BC_NO_SLIP) {
 			for (lm=0; lm<NLM; lm++) {		// Solenoidal deduced from radial derivative of Toroidal
@@ -273,8 +279,9 @@ void PolTor_to_curl_spat(struct PolTor *PT, double Wz0, struct VectField *W, lon
 	-sin theta = dY(m=0,l=1)/dt * 2*sqrt(pi/3)	>> peut etre rajouté à Slm  (=> Vt)
 */
 		// add Background mode (l=1, m=0) [ie Coriolis force (2*Omega0) or Magnetic field (B0z)]
-		(double) Q[1] += Wz0;
-		(double) S[1] += Wz0;
+		lm = LM(1,0);
+		(double) Q[lm] += Wz0;
+		(double) S[lm] += Wz0;
 		SH_to_spat(Q,(complex double *) W->r[ir]);
 		SHsphtor_to_spat(S, T, (complex double *) W->t[ir], (complex double *) W->p[ir]);
 	}
@@ -411,8 +418,9 @@ void calc_Vort(struct PolTor *PT, double Om0, struct VectField *W)
 			Q[lm] = r_1[ir]*l2[lm] * PT->T[ir][lm];
 			S[lm] = Wr[ir].l*PT->T[ir-1][lm] + Wr[ir].d*PT->T[ir][lm] + Wr[ir].u*PT->T[ir+1][lm];
 		}
-		(double) Q[1] += Om0;		// add Background Vorticity for Coriolis Force (l=1, m=0)
-		(double) S[1] += Om0;		// add Background Vorticity for Coriolis Force (l=1, m=0)
+		lm = LM(1,0);
+		(double) Q[lm] += Om0;		// add Background Vorticity for Coriolis Force (l=1, m=0)
+		(double) S[lm] += Om0;		// add Background Vorticity for Coriolis Force (l=1, m=0)
 		SH_to_spat(Q,(complex double *) W->r[ir]);
 		SHsphtor_to_spat(S, T, (complex double *) W->t[ir], (complex double *) W->p[ir]);
 	}
@@ -475,11 +483,13 @@ void calc_B(struct PolTor *PT, struct VectField *V, struct StatSpecVect *B0)
 
 	if (B0 != NULL) {	nj = B0->nlm;	lma = B0->lm;	}
 
-	ir = 0;		// field at r=0 : S = 2.dP/dr (l=1 only) => store Bx, By, Bz (cartesian coordinates)
-		Pol_to_cart_spat0(PT->P, V->r[ir],V->t[ir],V->p[ir]);
-		for (lm=1; lm<NLAT*NPHI; lm++) {	// zero for the rest.
-			V->r[ir][lm] = 0.0;	V->t[ir][lm] = 0.0;	V->p[ir][lm] = 0.0;
-		}
+	ir = 0;		// field at r=0 : P=0, T=0, but S = 2.dP/dr (l=1 only) and Q=S
+		dr = 2.0/r[ir+1];
+		for(lm=0; lm<NLM; lm++) S[NLM] = 0.0;
+		lm = LM(1,0);	S[lm] = dr * PT->P[ir+1][lm];
+		lm = LM(1,1);	S[lm] = dr * PT->P[ir+1][lm];
+		SH_to_spat(S,(complex double *) V->r[ir]);
+		SHsph_to_spat(S, (complex double *) V->t[ir], (complex double *) V->p[ir]);
     #pragma omp parallel num_threads(_NTH_)
     {
 	#pragma omp for schedule(static) private(ir,lm,j, Q,S,T, QST) firstprivate(nj, lma)
@@ -763,7 +773,7 @@ void alloc_DynamicField(struct PolTor *PT, struct VectField *V, struct PolTor *N
 {
 	long int ir, k;
 
-	// how much space is required for NL terms ?	
+	// how much space is required for NL terms ?
 	k = 6;
 	if (NL2 == NULL)  k = 4;
 	if (NL1 == NULL)  { k = 2; NL2 = NULL; };	// does not allow to set NL2 if NL1 not set.
@@ -807,6 +817,28 @@ void alloc_DynamicField(struct PolTor *PT, struct VectField *V, struct PolTor *N
 		if (V != NULL) { V->r[ir] = NULL;	V->t[ir] = NULL;	V->p[ir] = NULL; }
 		if (NL1 != NULL) { NL1->P[ir] = NULL;	NL1->T[ir] = NULL; }
 		if (NL2 != NULL) { NL2->P[ir] = NULL;	NL2->T[ir] = NULL; }
+	}
+}
+
+void alloc_PolTorField(struct PolTor *PT, long int istart, long int iend)
+{
+	long int ir, k;
+
+	k=2;
+	// alloc radial structure.
+	PT->P = (complex double **) malloc( k*NR * sizeof(complex double *) );
+	PT->T = PT->P + NR;
+
+	// not defined here, set as NULL pointer.
+	for (ir = 0; ir < istart; ir++) {
+		PT->P[ir] = NULL;	PT->T[ir] = NULL;
+	}
+	for (ir = istart; ir <= iend; ir++) {		// shell by shell allocation.
+		PT->P[ir] = (complex double *) malloc( k*NLM * sizeof(complex double));	// Pol/Tor
+		PT->T[ir] = PT->P[ir] + NLM;
+	}
+	for (ir = iend+1; ir<NR; ir++) {
+		PT->P[ir] = NULL;	PT->T[ir] = NULL;
 	}
 }
 
