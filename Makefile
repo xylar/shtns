@@ -20,7 +20,7 @@ cmdp = gcc -O3 -fopenmp -ffast-math
 
 NTH=8 #number of threads for parallel version (can be overwritten with command line)
 shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat.gen.c SHT/spat_to_SH.gen.c SHT/Makefile
-ini = inc_B0ini.c inc_U0ini.c xshells.h
+ini = xshells.h
 
 default : xshells
 

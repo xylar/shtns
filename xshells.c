@@ -14,8 +14,13 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_sf_legendre.h>
 
+// set pol/tor macros with allowed value checking (used in xshells.h)
+#define Set_Poloidal( cval ) if ( (!(m % MRES)) && (l <= LMAX) && (m <= MMAX*MRES) ) Pol[LM(l,m)] = cval;
+#define Set_Toroidal( cval ) if ( (!(m % MRES)) && (l <= LMAX) && (m <= MMAX*MRES) ) Tor[LM(l,m)] = cval;
+
 #include "xshells.h"
 #include "SHT.c"
+#include "xshells.h"
 
 #ifdef XS_LINEAR
   // Linear computation never includes B0xJ0
@@ -596,6 +601,14 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 	// SOME BASIC COMPUTATIONS
 	if (eta == 0) eta = nu;
 	if (nu == 0) nu = eta;
+	sprintf(str,"## compile-time parameters : LMAX=%d, MMAX=%d, MRES=%d   NLAT=%d, NPHI=%d\n",LMAX, MMAX, MRES, NLAT, NPHI);
+	fputs(str,fpw);
+	#ifdef B0_NAME
+		fputs("## B field set to '" B0_NAME "\n", fpw);
+	#endif
+	#ifdef U0_NAME
+		fputs("## U field set to '" U0_NAME "\n", fpw);
+	#endif
 
 	fclose(fp);	fclose(fpw);
 	sprintf(str, "%s.%s",fname,job);	rename("tmp.par", str);		// rename file.	
@@ -684,11 +697,8 @@ int main (int argc, char *argv[])
 		ptr_step = &step_MHD;
 		// init B fields.
 		zero_out_field(&Blm);
-		#define Set_Poloidal( cval ) Blm.P[i][LM(l,m)] = b0*(cval);
-		#define Set_Toroidal( cval ) Blm.T[i][LM(l,m)] = b0*(cval);
 		for (i=0; i<NR; i++) {
-			rr = r[i];
-			#include "inc_B0ini.c"
+			init_B0(r[i], b0, b1, Blm.P[i], Blm.T[i]);	// call custom function defined in xshells.h
 		}
 		sprintf(command,"poltorB0.%s",job);	save_PolTor(command, &Blm, ftime, BC_MAGNETIC);
 		#ifdef XS_LINEAR
@@ -703,14 +713,14 @@ int main (int argc, char *argv[])
 		#endif
 
 		i = Make_StatSpecVect(&Blm, &B0lm, &J0lm, 1, NR-2, BC_NONE);
-		#ifdef INIT_FIELD_NAME
-			printf("    B0 set to : \"" INIT_FIELD_NAME "\" (%d modes)\n",i);
+		#ifdef B0_NAME
+			printf("    B0 set to : \"" B0_NAME "\" (%d modes)\n",i);
 		#endif
 		zero_out_field(&Blm);
-		#ifdef NO_B0xJ0
+		#ifdef NO_J0xB0
 			calc_B(&Blm,&B, &B0lm);	// B0
 			calc_J(&Blm,&J, &J0lm);	// J0
-			NL_fluid(&J,&B, &NLubase);	// J0xB0
+			NL_Fluid(&J,&B, &NLubase);	// J0xB0
 			printf("=> J0xB0 will be removed at each time-step\n");
 		#endif
 

@@ -23,9 +23,11 @@
 *** Features ***
 + velocity field computation
 + inner core differential rotation
++ linear mode : linearized MHD equation
++ no_j0xb0 mode : do not include j0xb0 in MHD equation (like D. Jault 2008 study)
 
+- **** Boundary condition handling should be improved !!! ****
 - BACKGROUND boundary-condition should be added
-- Boundary condition handling should be improved !!!
 
 - compute spectrum and use them...
 -+ boundary conditions dependence should be checked and improved.
@@ -54,4 +56,4 @@
 + NPHI = 1 is now possible, and does not call FFTW.
 	only 10% performance increase ! I would have expected more...
 + NLAT odd is now allowed
-	special treatment in SHT function. (but could be improved)
+	special treatment in SHT function. (but could be improved : point NLAT_2 has only even component)

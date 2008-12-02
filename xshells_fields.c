@@ -674,7 +674,7 @@ void NL_Fluid_lin(struct VectField *V, double Om0, struct PolTor *NL)
 		}
 	  } else {
 #endif
-		for (lm=0, it=0; lm<NPHI*NLAT; lm++) {	// catastrophic memory accesses... 2*3 = 6 disjoint arrays.
+		for (lm=0, it=0; lm<NPHI*NLAT; lm++) {
 			wr = Om0 *ct[it];	wt = Om0 *st[it];	// project wz to wr and -wt.
 				it++; if (it>=NLAT) it=0;
 			vp = - (V->r[ir][lm]*wt + V->t[ir][lm]*wr);

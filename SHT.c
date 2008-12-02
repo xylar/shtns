@@ -441,7 +441,7 @@ void init_SH(double eps)
 {
 	double wg[NLAT];	// gauss points and weights.
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
-	double iylm_fft_norm = 2.0*pi/NPHI;	// normation FFT pour zlm
+	double iylm_fft_norm = 2.0*M_PI/NPHI;	// normation FFT pour zlm
 	double t,tmax;
 	long int it,im,m,l;
 
