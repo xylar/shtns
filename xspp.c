@@ -19,9 +19,9 @@
 // parameters for SHT.c
 #define NLAT 361
 #define LMAX 240
-#define NPHI 1
-#define MMAX 0
-#define MRES 1
+#define NPHI 32 
+#define MMAX 8
+#define MRES 4
 // SHT on equal spaced grid + polar points.
 #define SHT_EQUAL
 #include "SHT.c"
@@ -90,7 +90,7 @@ void write_HS(char *fn, complex double **HS)
 	for (ir=irs;ir<=ire;ir++) {
 		if (HS[ir] != NULL) {
 			fprintf(fp,"\n%%  ir=%d, r=%f\n",ir,r[ir]);
-			for (m=0; m<=mmax; m+=jpar.mres) {
+			for (m=0; m<=mmax*MRES; m+=jpar.mres) {
 				for (l=m; l<=lmax; l++) {
 					lm = LM(l,m);
 					fprintf(fp,"%.6g %.6g  ",creal(HS[ir][lm]),cimag(HS[ir][lm]));
@@ -112,7 +112,7 @@ void write_Spec_m(char *fn, complex double **HS)
 	for (ir=irs;ir<=ire;ir++) {
 		if (HS[ir] != NULL) {
 			fprintf(fp,"\n%%  ir=%d, r=%f\n%.6g ",ir,r[ir],r[ir]);
-			for (m=0; m<=mmax; m+=jpar.mres) {
+			for (m=0; m<=mmax*MRES; m+=jpar.mres) {
 				sum = 0.0;
 				for (l=m; l<=lmax; l++) {
 					lm = LM(l,m);
@@ -139,7 +139,7 @@ void write_Spec_l(char *fn, complex double **HS)
 			fprintf(fp,"\n%%  ir=%d, r=%f\n%.6g ",ir,r[ir],r[ir]);
 			for (l=0; l<=lmax; l++) {
 				sum = 0.0;
-				for (m=0; (m<=mmax)&&(m<=l); m+=jpar.mres) {
+				for (m=0; (m<=mmax*MRES)&&(m<=l); m+=jpar.mres) {
 					lm = LM(l,m);
 					cr = creal(HS[ir][lm]);	ci = cimag(HS[ir][lm]);
 					sum += cr*cr + ci*ci;
@@ -200,7 +200,7 @@ void write_equat(char *fn, struct VectField *V)
 	long int it = NLAT/2;	// equator is at NLAT/2.
 
 	fp = fopen(fn,"w");
-	fprintf(fp,"%% [XSHELLS] Equatorial cut (r,pĥi), in cylindrical coordinates. first row is r, then for each point, (r,phi,z) components are written together.");
+	fprintf(fp,"%% [XSHELLS] Equatorial cut (r,phi), in cylindrical coordinates. first row is r, then for each point, (r,phi,z) components are written together.");
 	for (i=irs;i<=ire;i++) {
 		if (V->r[i] != NULL) {
 			fprintf(fp,"\n%.6g ",r[i]);		// first row = radius
@@ -233,7 +233,7 @@ void write_line(char *fn,double x,double y,double z,double vx,double vy,double v
 	FILE *fp;
 	
 	fp = fopen(fn,"w");
-	fprintf(fp,"%% [XSHELLS] line profile starting at %f,%f,%f with increment %f,%f,%f\n%% x y z\tr cos(theta) phi\tvr vt vp\n",x,y,z, vx,vy,vz);
+	fprintf(fp,"%% [XSHELLS] line profile starting at %f,%f,%f with increment %f,%f,%f\n%% x y z\tr cos(theta) phi\tvx vy vz\n",x,y,z, vx,vy,vz);
 	for (i=0; i<ni; i++) {
 		rr = sqrt(x*x + y*y + z*z);		cost = z/rr;
 		phi = atan(y/x);	if (x < 0.0) phi += pi;
@@ -305,17 +305,19 @@ void write_disc(char *fn,double x0,double y0,double z0, int nphi, struct PolTor 
 // apply (l,m) filter
 void filter_lm(struct PolTor *Blm, int lmin, int lmax, int mmin, int mmax)
 {
-	long int ir, m, l, lm;
+	long int ir, im, m, l, lm;
 
 	if (lmax > LMAX) lmax = LMAX;	if (mmax > MMAX) mmax = MMAX;
 
 	for (ir=jpar.irs; ir<=jpar.ire; ir++) {		// filter all data, not only restricted data...
-		for (m=0; m<mmin; m++) {
+		for (im=0; im<mmin; im++) {
+			m = im*MRES;
 			for(l=m; l<=lmax; l++) {
 				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
 			}
 		}
-		for (m=mmin; m<=mmax; m++) {
+		for (im=mmin; im<=mmax; im++) {
+			m = im*MRES;
 			for(l=m; l<lmin; l++) {
 				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
 			}
@@ -323,7 +325,8 @@ void filter_lm(struct PolTor *Blm, int lmin, int lmax, int mmin, int mmax)
 				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
 			}
 		}
-		for (m=mmax+1; m<=MMAX; m++) {
+		for (im=mmax+1; im<=MMAX; im++) {
+			m = im*MRES;
 			for(l=m; l<=lmax; l++) {
 				lm = LM(l,m);	Blm->P[ir][lm] = 0.0;	Blm->T[ir][lm] = 0.0;
 			}
@@ -341,7 +344,7 @@ void calc_spec(complex double **HS, double *spl, double *spm)
 
 	for (ir=irs;ir<=ire;ir++) {
 		if (HS[ir] != NULL) {
-			for (m=0; m<=mmax; m+=jpar.mres) {
+			for (m=0; m<=mmax*MRES; m+=jpar.mres) {
 				for (l=m; l<=lmax; l++) {
 					lm = LM(l,m);
 					cr = creal(HS[ir][lm]);	ci = cimag(HS[ir][lm]);
@@ -422,7 +425,7 @@ int main (int argc, char *argv[])
 			sscanf(argv[ic],"%lf:%lf",&min,&max);
 		} else runerr("mlim <min>:<max>  => missing arguments\n");
 		mmin = min;	mmax = max;
-		if (mmax > jpar.mmax) mmax = jpar.mmax;	if (mmin < 0) mmin = 0;
+		if (mmax*MRES > jpar.mmax*jpar.mres) mmax = (jpar.mmax*jpar.mres)/MRES;	if (mmin < 0) mmin = 0;
 		printf("> using only m = #%d to #%d\n",mmin, mmax);
 		filter_req = 1;
 		return 2;	// 2 command line argument parsed.
@@ -469,8 +472,10 @@ int main (int argc, char *argv[])
 
 // apply (l,m) restrictions
 	if (lmax > LMAX) lmax = LMAX;	if (mmax > MMAX) mmax = MMAX;
-	if (lmax > jpar.lmax) lmax=jpar.lmax;	if (mmax > jpar.mmax) mmax=jpar.mmax;
+	if (lmax > jpar.lmax) lmax=jpar.lmax;
+	if (mmax*MRES > jpar.mmax*jpar.mres) mmax=(jpar.mmax*jpar.mres)/MRES;
 	if (filter_req) filter_lm(&Blm, lmin, lmax, mmin, mmax);
+	printf("lmin=%d, lmax=%d, mmin=%d, mmax=%d\n",lmin, lmax, mmin*MRES, mmax*MRES);
 
 // write radial grid
 	write_vect("o_r",&r[irs],ire-irs+1);
@@ -545,9 +550,10 @@ int main (int argc, char *argv[])
 	{
 		write_Spec_l("o_Plr",Blm.P);	write_Spec_l("o_Tlr",Blm.T);
 		write_Spec_m("o_Pmr",Blm.P);	write_Spec_m("o_Tmr",Blm.T);
-		printf("> spherical harmonics spectrum written to files : o_Plr, o_Tlr, o_Pmr, o_Tlr (poloidal/toroidal, l/m, at each r)\n");
+		printf("> spherical harmonics spectrum written to files : o_Plr, o_Tlr, o_Pmr, o_Tmr (poloidal/toroidal, l/m, at each r)\n");
 		calc_spec(Blm.P, lspec, mspec);		write_vect("o_Pl",lspec, lmax+1);	write_vect("o_Pm",mspec, mmax+1);
 		calc_spec(Blm.T, lspec, mspec);		write_vect("o_Tl",lspec, lmax+1);	write_vect("o_Tm",mspec, mmax+1);
+		printf("     o_Pl, o_Tl, o_Pm, o_Tm (poloidal/toroidal, l/m summed over r)\n");
 		exit(0);
 	}
 	if (strcmp(argv[ic],"line") == 0)
