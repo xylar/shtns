@@ -191,6 +191,13 @@ inline void fft_m0_r2c(double *Br, complex double *BrF)		//in-place only
 	}	//	*/
 }
 
+// run-time truncation at LMAX and MMAX
+#ifndef LTR
+  #define LTR LMAX
+#endif
+#ifndef MTR
+  #define MTR MMAX
+#endif
 /////////////////////////////////////////////////////
 //   Scalar Spherical Harmonics Transform
 // input  : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
@@ -267,15 +274,15 @@ double SH_to_point(complex double *Qlm, double cost, double phi)
 	
 	vr = 0.0;
 	m=0;
-		gsl_sf_legendre_sphPlm_array(LMAX, m, cost, &yl[m]);
-		for (l=m; l<=LMAX; l++)
+		gsl_sf_legendre_sphPlm_array(LTR, m, cost, &yl[m]);
+		for (l=m; l<=LTR; l++)
 			vr += yl[l] * creal( Qlm[l] );
-	for (im=1; im<=MMAX; im++) {
+	for (im=1; im<=MTR; im++) {
 		m = im*MRES;
-		gsl_sf_legendre_sphPlm_array(LMAX, m, cost, &yl[m]);
+		gsl_sf_legendre_sphPlm_array(LTR, m, cost, &yl[m]);
 		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
-		for (l=m; l<=LMAX; l++)
+		for (l=m; l<=LTR; l++)
 			vr += yl[l] * creal( Ql[l]*eimp );
 	}
 	return vr;
@@ -294,18 +301,18 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	sint = sqrt(1.0 - cost*cost);
 	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; *vr = 0.;
 	m=0;
-		gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, cost, &yl[m], &dtyl[m]);
-		for (l=m; l<=LMAX; l++) {
+		gsl_sf_legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
+		for (l=m; l<=LTR; l++) {
 			*vr += yl[l] * creal( Qlm[l] );
 			vst += dtyl[l] * creal( Slm[l] );
 			vtt += dtyl[l] * creal( Tlm[l] );
 		}
-	for (im=1; im<=MMAX; im++) {
+	for (im=1; im<=MTR; im++) {
 		m = im*MRES;
-		gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, cost, &yl[m], &dtyl[m]);
+		gsl_sf_legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
 		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 		Ql = &Qlm[LiM(0,im)];	Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
-		for (l=m; l<=LMAX; l++) {
+		for (l=m; l<=LTR; l++) {
 			*vr += yl[l] * creal( Ql[l]*eimp );
 			vst += dtyl[l] * creal(Sl[l]*eimp);
 			vtt += dtyl[l] * creal(Tl[l]*eimp);

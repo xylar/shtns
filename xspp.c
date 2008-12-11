@@ -22,6 +22,12 @@
 #define NPHI 32 
 #define MMAX 8
 //#define MRES 4
+
+long int mmin=0, mmax=MMAX;
+long int lmin=0, lmax=LMAX;
+// run-time truncation LTR and MTR
+#define LTR lmax
+#define MTR mmax
 // SHT on equal spaced grid + polar points.
 #define SHT_EQUAL
 #include "SHT.c"
@@ -46,9 +52,6 @@ long int BC;
 long int irs, ire;	// loaded from file.
 long int ips=0, ipe=NPHI-1;
 long int its=0, ite=NLAT-1;
-
-long int mmin=0, mmax=MMAX;
-long int lmin=0, lmax=LMAX;
 
 double lspec[LMAX+1];	// spectra
 double mspec[MMAX+1];

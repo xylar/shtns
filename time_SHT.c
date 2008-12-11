@@ -25,7 +25,7 @@ double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 #define MRES 1
 
 #define _SH_DEBUG_
-#define _SHT_EO_
+//#define _SHT_EO_
 //#define SHT_EQUAL	/* SHT on equal spaced grid + polar points. */
 #include "SHT.c"
 

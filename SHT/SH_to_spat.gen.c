@@ -42,7 +42,7 @@ V		dyl = dylm[im] + i*(LMAX-m+1) -m;
 Q			fe = 0.0;	fo = 0.0;
 S			dse = 0.0;	dso = 0.0;
 T			dte = 0.0;	dto = 0.0;
-			while (l<LMAX) {	// compute even and odd parts
+			while (l<LTR) {	// compute even and odd parts
 QE				(double) fe += yl[l] * (double) Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 QO				(double) fo += yl[l+1] * (double) Ql[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
 TO				(double) dto += dyl[l].t * (double) Tl[l];	// m=0 : everything is real.
@@ -51,7 +51,7 @@ TE				(double) dte += dyl[l+1].t * (double) Tl[l+1];
 SO				(double) dse += dyl[l+1].t * (double) Sl[l+1];
 				l+=2;
 			}
-			if (l==LMAX) {
+			if (l==LTR) {
 QE				(double) fe += yl[l] * (double) Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 TO				(double) dto += dyl[l].t * Tl[l];
 SE				(double) dso += dyl[l].t * Sl[l];
@@ -76,7 +76,7 @@ V			dyl += (LMAX-m+1);
 		}
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
-	for (im=1; im<=MMAX; im++) {
+	for (im=1; im<=MTR; im++) {
 		m = im*MRES;
 Q		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 S		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
@@ -98,7 +98,7 @@ V		dyl = dylm[im] + i*(LMAX-m+1) -m;
 Q			fe = 0.0;	fo = 0.0;
 S			dse = 0.0;	dso = 0.0;	se = 0.0;	so = 0.0;
 T			dte = 0.0;	dto = 0.0;	te = 0.0;	to = 0.0;
-			while (l<LMAX) {	// compute even and odd parts
+			while (l<LTR) {	// compute even and odd parts
 QE				fe  += yl[l] * Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 QO				fo  += yl[l+1] * Ql[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
 TO				dto += dyl[l].t * Tl[l];
@@ -111,7 +111,7 @@ SO				dse += dyl[l+1].t * Sl[l+1];
 SO				so  += dyl[l+1].p * Sl[l+1];
 				l+=2;
 			}
-			if (l==LMAX) {
+			if (l==LTR) {
 QE				fe  += yl[l] * Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 TO				dto += dyl[l].t * Tl[l];
 TO				te  += dyl[l].p * Tl[l];
@@ -143,8 +143,8 @@ V			dyl += (LMAX-m+1);
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
-	for (i=0; i < NLAT*(NPHI/2 -MMAX); i++) {	// padding for high m's
-	//for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
+	for (i=0; i < NLAT*(NPHI/2 -MTR); i++) {	// padding for high m's
+	//for(im=MTR+1; im<=NPHI/2; im++) {	// padding for high m's
 	//	for (i=0;i<NLAT;i++) {
 Q			BrF[i] = 0.0;
 V			BtF[i] = 0.0;	BpF[i] = 0.0;
@@ -155,8 +155,8 @@ V	//	BtF += NLAT;	BpF += NLAT;
 
 Q	//BrF -= NLAT*(NPHI/2+1);		// restore original pointer
 V	//BtF -= NLAT*(NPHI/2+1);	BpF -= NLAT*(NPHI/2+1);		// restore original pointers
-Q	BrF -= NLAT*(MMAX+1);		// restore original pointer
-V	BtF -= NLAT*(MMAX+1);	BpF -= NLAT*(MMAX+1);		// restore original pointers
+Q	BrF -= NLAT*(MTR+1);		// restore original pointer
+V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);		// restore original pointers
  #if NPHI>1
 Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
