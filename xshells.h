@@ -75,21 +75,21 @@ void init_B0(double r, double b0, double b1, complex double *Pol, complex double
 		Set_Poloidal( b0* z )
 	}
 */
-#define B0_NAME "3D based on Jault 2008 (dipole symmetry, not current-free, normalized version)"
+#define B0_NAME "3D based on Jault 2008 (dipole symmetry, not current-free, normalized version, no toroidal)"
 	if (r != 0.0) {
 	l=1; m=0;
 		v = pi * r;
-		z = ((sin(v)/v-cos(v))/v - 0.3*(sin(2*v)/(2*v)-cos(2*v))/(2*v)));	// j1(pi*r) - 0.3*j1(2*pi*r)
-		Set_Poloidal( b0* z *sqrt(4.*pi/(2*l+1))
+		z = ((sin(v)/v-cos(v))/v - 0.3*(sin(2*v)/(2*v)-cos(2*v))/(2*v));	// j1(pi*r) - 0.3*j1(2*pi*r)
+		Set_Poloidal( b0* z *sqrt(4.*pi/(2*l+1)) )
 //              Set_Toroidal( 10.0 * b0*(r-1.)*(r-0.35)* z *sqrt(4.*pi/(2*l+1)) )
 	l=MRES*2+1; m=MRES;
-		Set_Poloidal( 10.*r*r/(l*l) * b0* b1*z *sqrt(4.*pi/(2*l+1))
+		Set_Poloidal( 10.*r*r/(l*l) * b0* b1*z *sqrt(4.*pi/(2*l+1)) )
 	l=3; m=0;
 		v = 5.7635 * r;
-		z = -0.2*((sin(v)*(3./(v*v)-1.)-3.*cos(v)/v)/v) );	// -0.2*j3(k*r)
-		Set_Poloidal( b0* z *sqrt(4.*pi/(2*l+1))
+		z = -0.2*((sin(v)*(3./(v*v)-1.)-3.*cos(v)/v)/v);	// -0.2*j3(k*r)
+		Set_Poloidal( b0* z *sqrt(4.*pi/(2*l+1)) )
 	l=MRES*2+4; m=MRES;
-		Set_Poloidal( 10.*r*r/(l*l) * b0* b1*z *sqrt(4.*pi/(2*l+1))
+		Set_Poloidal( 10.*r*r/(l*l) * b0* b1*z *sqrt(4.*pi/(2*l+1)) )
 	}
 /*
 #define B0_NAME "3D quadrupole symmetry (not current-free, normalized version)"

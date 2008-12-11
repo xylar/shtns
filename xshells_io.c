@@ -94,6 +94,11 @@ void load_PolTor(char *fn, struct PolTor *PT, struct JobInfo *fh)
 //	*time = fh->t;	*BC = fh->BC;	*irs = fh->irs;	*ire = fh->ire;
 	Omega0 = fh->Omega0;	DeltaOmega = fh->DeltaOmega;
 
+	#if MRES == _mres_
+		MRES = fh->mres;	// if MRES is set at runtime : use MRES from file.
+		_nlm_ = nlm_calc(LMAX, MMAX, MRES);	// store "precomputed" NLM
+	#endif
+
 	if (r == NULL) {
 		r = (double *) malloc(fh->nr * sizeof(double));		// alloc radial grid (global scope)
 		NR = fh->nr;
@@ -156,6 +161,7 @@ void load_PolTor(char *fn, struct PolTor *PT, struct JobInfo *fh)
 			}
 		}
 	}
+
 	if (fh->version >= FILE_SINGLE_PREC) free(Sf);
 	free(Sp);
 	fclose(fp);

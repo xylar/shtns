@@ -57,20 +57,20 @@ TO				(double) dto += dyl[l].t * Tl[l];
 SE				(double) dso += dyl[l].t * Sl[l];
 			}
 Q			BrF[i] = fe + fo;
-QB			BrF[NLAT-(i+1)] = fe - fo;
 V			BtF[i] = 0.0
 S				+ (dse+dso)			// Bt = dS/dt
 V				;
-VB			BtF[NLAT-(i+1)] = 0.0
-SB		 		+ (dse-dso)
-VB				;
 V			BpF[i] = 0.0
 T		 		- (dte+dto)			// Bp = - dT/dt
 V				;
-VB			BpF[NLAT-(i+1)] = 0.0
+			i++;
+QB			BrF[NLAT-i] = fe - fo;
+VB			BtF[NLAT-i] = 0.0
+SB		 		+ (dse-dso)
+VB				;
+VB			BpF[NLAT-i] = 0.0
 TB				- (dte-dto)
 VB				;
-			i++;
 Q			yl  += (LMAX-m+1);
 V			dyl += (LMAX-m+1);
 		}
@@ -119,41 +119,44 @@ SE				dso += dyl[l].t * Sl[l];
 SE				se  += dyl[l].p * Sl[l];
 			}
 Q			BrF[i] = fe + fo;
-QB			BrF[NLAT-(i+1)] = fe - fo;
 V			BtF[i] = 		// Bt = dS/dt       + I.m/sint *T
 S					(dse+dso)
 T					+ I*(te+to)
 V					;
-VB			BtF[NLAT-(i+1)] =
-SB					(dse-dso)
-TB					+ I*(te-to)
-VB					;
 V			BpF[i] = 		// Bp = I.m/sint * S - dT/dt
 S					I*(se+so)
 T					- (dte+dto)
 V					;
-VB			BpF[NLAT-(i+1)] =
+			i++;
+QB			BrF[NLAT-i] = fe - fo;
+VB			BtF[NLAT-i] =
+SB					(dse-dso)
+TB					+ I*(te-to)
+VB					;
+VB			BpF[NLAT-i] =
 SB					I*(se-so)
 TB					- (dte-dto)
 VB					;
-			i++;
 Q			yl  += (LMAX-m+1);
 V			dyl += (LMAX-m+1);
 		}
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
-	for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
-		for (i=0;i<NLAT;i++) {
+	for (i=0; i < NLAT*(NPHI/2 -MMAX); i++) {	// padding for high m's
+	//for(im=MMAX+1; im<=NPHI/2; im++) {	// padding for high m's
+	//	for (i=0;i<NLAT;i++) {
 Q			BrF[i] = 0.0;
 V			BtF[i] = 0.0;	BpF[i] = 0.0;
-		}
-Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
+	//	}
+Q	//	BrF += NLAT;
+V	//	BtF += NLAT;	BpF += NLAT;
 	}
 
-Q	BrF -= NLAT*(NPHI/2+1);		// restore original pointer
-V	BtF -= NLAT*(NPHI/2+1);	BpF -= NLAT*(NPHI/2+1);		// restore original pointers
+Q	//BrF -= NLAT*(NPHI/2+1);		// restore original pointer
+V	//BtF -= NLAT*(NPHI/2+1);	BpF -= NLAT*(NPHI/2+1);		// restore original pointers
+Q	BrF -= NLAT*(MMAX+1);		// restore original pointer
+V	BtF -= NLAT*(MMAX+1);	BpF -= NLAT*(MMAX+1);		// restore original pointers
  #if NPHI>1
 Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);

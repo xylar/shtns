@@ -583,6 +583,9 @@ void read_Par(char *fname, char *job, long int *iter_max, long int *modulo, doub
 			if (strcmp(name,"NH") == 0)		NH = tmp;
 			if (strcmp(name,"dtU") == 0)		dtU = tmp;
 			if (strcmp(name,"dtB") == 0)		dtB = tmp;
+		#if MRES == _mres_
+			if (strcmp(name,"MRES") == 0)		MRES = tmp;	// if MRES is set at runtime : use MRES from par file.
+		#endif
 			// TIME DOMAIN
 			if (strcmp(name,"iter_max") == 0)	*iter_max = tmp;
 			if (strcmp(name,"modulo") == 0)		*modulo = tmp;

@@ -21,7 +21,7 @@
 #define LMAX 240
 #define NPHI 32 
 #define MMAX 8
-#define MRES 4
+//#define MRES 4
 // SHT on equal spaced grid + polar points.
 #define SHT_EQUAL
 #include "SHT.c"
@@ -157,7 +157,7 @@ void write_shell(char *fn, struct VectField *V, long int ir)
 	long int i,j,k;	//phi, theta
 	
 	fp = fopen(fn,"w");
-	fprintf(fp,"%% [XSHELLS] Surface data (sphere). first line is (theta 0 0), first row is phi, then for each point, (r,theta,phi) components are stored together.\n0 ");
+	fprintf(fp,"%% [XSHELLS] Surface data (sphere) shell #%d (r=%.4f). first line is (theta 0 0), first row is phi, then for each point, (r,theta,phi) components are stored together.\n0 ",ir,r[ir]);
 		for(j=its;j<=ite;j++) {
 			fprintf(fp,"%.6g 0 0 ",acos(ct[j]));	// first line = theta (radians)
 		}
@@ -177,7 +177,7 @@ void write_merid(char *fn, double **v, long int im)
 	long int i,j;
 
 	fp = fopen(fn,"w");
-	fprintf(fp,"%% [XSHELLS] Meridian slice. first line is cos(theta), first row is r.\n0 ");
+	fprintf(fp,"%% [XSHELLS] Meridian slice #%d (phi=%.1f°). first line is cos(theta), first row is r.\n0 ", im, phi_deg(im));
 		for(j=its; j<=ite; j++) {
 			fprintf(fp,"%.6g ",ct[j]);	// first line = cos(theta)
 		}
@@ -225,15 +225,17 @@ void spher_to_cart(double ct,double p,double *vr,double *vt,double *vp)
 	*vr = vx;	*vt = vy;	*vp = vz;
 }
 
-void write_line(char *fn,double x,double y,double z,double vx,double vy,double vz,int ni, struct PolTor *Blm)
+void write_line(char *fn,double x0,double y0,double z0,double vx,double vy,double vz,int ni, struct PolTor *Blm)
 {
 	double rr,cost,phi;
+	double x,y,z;
 	double bx,by,bz;
 	int i;
 	FILE *fp;
 	
 	fp = fopen(fn,"w");
-	fprintf(fp,"%% [XSHELLS] line profile starting at %f,%f,%f with increment %f,%f,%f\n%% x y z\tr cos(theta) phi\tvx vy vz\n",x,y,z, vx,vy,vz);
+	fprintf(fp,"%% [XSHELLS] line profile starting at %f,%f,%f with increment %f,%f,%f\n%% x y z\tr cos(theta) phi\tvx vy vz\n",x0,y0,z0, vx,vy,vz);
+	x=x0; y=y0; z=z0;
 	for (i=0; i<ni; i++) {
 		rr = sqrt(x*x + y*y + z*z);		cost = z/rr;
 		phi = atan(y/x);	if (x < 0.0) phi += pi;
@@ -243,7 +245,7 @@ void write_line(char *fn,double x,double y,double z,double vx,double vy,double v
 		x+=vx;	y+=vy;	z+=vz;
 	}
 	fclose(fp);
-	printf("> line profile starting at at %.3f,%.3f,%.3f with increment %.4g,%.4g,%.4g written to %s\n",x,y,z, vx,vy,vz,fn);
+	printf("> linear profile from %.3f,%.3f,%.3f to %.3f,%.3f,%.3f written to %s\n",x0,y0,z0, x-vx,y-vy,z-vz,fn);
 }
 
 void write_disc(char *fn,double x0,double y0,double z0, int nphi, struct PolTor *Blm)
@@ -358,14 +360,14 @@ void calc_spec(complex double **HS, double *spl, double *spm)
 
 void usage()
 {
-	printf("\nUsage: xspp <poltor-file-saved-by-xshells> [op1] [op2] [...] command [args [...]]\n");
-	printf("list of available optional ops :\n");
+	printf("\nUsage: xspp <poltor-file-saved-by-xshells> [op1] [op2] [...] command1 [args [...]] [command2 ...]\n");
+	printf("** list of available optional ops :\n");
 	printf(" curl : compute curl of field\n");
 	printf(" rlim <rmin>:<rmax> : render only from rmin to rmax\n");
 	printf(" philim <min>:<max> : render only from min to max azimutal degrees\n");
-	printf(" llim <lmin>:<lmax> : use only spherical harmonic degree from lmin to lmax.\n");
+	printf(" llim <lmin>:<lmax> : use only spherical harmonic degrees from lmin to lmax.\n");
 	printf(" mlim <mmin>:<mmax> : use only spherical harmonic orders from mmin to mmax.\n");
-	printf("list of available commands :\n");
+	printf("** list of available commands :\n");
 	printf(" axi  : write meridional slice of axisymetric component (m=0)\n");
 	printf(" equat  : write equatorial cut of vector field in cylindrical coordinates (r, phi)\n");
 	printf(" merid [angle]  : write meridional slice at phi=angle in degrees (default=0°) of vector field in spherical coordinates\n");
@@ -373,7 +375,7 @@ void usage()
 	printf(" surf [r]  : write surface data at r (0 to 1) or ir (1 to NR-1) of vector field in spherical coordinates\n");
 	printf(" HS  : write full spherical harmonics decomposition\n");
 	printf(" spec  : write spherical harmonic (l and m)-spectra for each shell\n");
-	printf(" line ni x0,y0,z0 vx,vy,vz  : write ni points along line profile starting at (x0,y0,z0) along increment vector (vx,vy,vz)\n");
+	printf(" line ni x0,y0,z0 vx,vy,vz [ni x0,...] : write ni points along line profile starting at (x0,y0,z0) along increment vector (vx,vy,vz)\n");
 	printf(" disc nphi x0,y0,z0 : write disc slice centered at (x0,y0,z0) with nphi azimutal points.\n      if center is outside data domain, then it is taken as a normal vector, and the center is 0\n");
 	printf(" 3D  : write three-dimensional vector in cartesian coordinates on spherical grid.\n");
 }
@@ -381,9 +383,10 @@ void usage()
 int main (int argc, char *argv[])
 {
 	double tmp;
-	long int ic;
+	long int ic, iloop;
 	long int i,im,m,l,lm;
 	int filter_req = 0;
+	char fn[60];
 
     int parse_op(int ic)	// returns number of parsed command line argument
     {
@@ -449,10 +452,6 @@ int main (int argc, char *argv[])
 	printf("  => compiled with: nlat=%d, nphi=%d,  lmax=%d, mmax=%d (mres=%d)\n",NLAT,NPHI,LMAX,MMAX,MRES);
 	if (argc <= 2) { usage(); exit(1); }
 
-// init
-	fftw_plan_mode = FFTW_ESTIMATE;		// fast FFTW init.
-	init_SH(0.);
-
 //load
 	Blm.P = NULL;		// require allocation by load_PolTor
 	load_PolTor(argv[1], &Blm, &jpar);
@@ -460,6 +459,10 @@ int main (int argc, char *argv[])
 		if ((lmax < jpar.lmax)||(mmax < jpar.mmax))
 			printf("  ! warning : data has higher resolution than compile time set up. => truncated.\n");
 	alloc_VectField(&B, irs, ire);
+
+// init
+	fftw_plan_mode = FFTW_ESTIMATE;		// fast FFTW init.
+	init_SH(0.);
 
 // parse optional op...
 	ic = 2;		// current argument count.
@@ -475,7 +478,7 @@ int main (int argc, char *argv[])
 	if (lmax > jpar.lmax) lmax=jpar.lmax;
 	if (mmax*MRES > jpar.mmax*jpar.mres) mmax=(jpar.mmax*jpar.mres)/MRES;
 	if (filter_req) filter_lm(&Blm, lmin, lmax, mmin, mmax);
-	printf("lmin=%d, lmax=%d, mmin=%d, mmax=%d\n",lmin, lmax, mmin*MRES, mmax*MRES);
+	printf("lmin=%d, lmax=%d, mmin*mres=%d, mmax*mres=%d\n",lmin, lmax, mmin*MRES, mmax*MRES);
 
 // write radial grid
 	write_vect("o_r",&r[irs],ire-irs+1);
@@ -484,8 +487,10 @@ int main (int argc, char *argv[])
 	printf("> angular grid cos(theta) written to file : o_cost\n");
 
 // parse commands ...
+    while(argc > ic) {
 	if (strcmp(argv[ic],"axi") == 0)
 	{
+		ic++;
 		for (i=irs; i<=ire; i++) {
 			for (lm=LiM(MRES,1);lm<NLM;lm++) {	// zero out all non-axisymmetric modes.
 				Blm.P[i][lm] = 0.0;	Blm.T[i][lm] = 0.0;
@@ -496,98 +501,113 @@ int main (int argc, char *argv[])
 			SHtor_to_spat(Blm.P[i], (complex double *)B.t[i], (complex double *)B.r[i]);
 			for (l=0;l<NLAT;l++) B.r[i][l] *= -r[i]*st[l];	// stream function
 		}
-		write_merid("o_Vp", B.p, 0);		// write phi component
-		write_merid("o_Vpol", B.r, 0);		// write stream function
-		printf("> axisymmetric component written to files : o_Vp (phi component) and o_Vpol (poloidal stream function)\n");
-		exit(0);
+		write_merid("o_Vp.m0", B.p, 0);		// write phi component
+		write_merid("o_Vpol.m0", B.r, 0);		// write stream function
+		printf("> axisymmetric component written to files : o_Vp.m0 (phi component) and o_Vpol.m0 (poloidal stream function)\n");
+		if (argc > ic+1) printf("  !!! WARNING !!! : no command can be processed after 'axi'\n");
+		exit(0);	// Blm has been modified, no other commands allowed.
 	}
-	if (strcmp(argv[ic],"equat") == 0)
+	else if (strcmp(argv[ic],"equat") == 0)
 	{
+		ic++;
 		if (!(NLAT%2)) runerr("equatorial cut not supported for even NLAT");
 		PolTor_to_spat(&Blm, &B, irs, ire, BC);
 		write_equat("o_equat",&B);
 		printf("> equatorial slice written to file : o_equat (cylindrical vector components)\n");
-		exit(0);
 	}
-	if (strcmp(argv[ic],"surf") == 0)
+	else if (strcmp(argv[ic],"surf") == 0)
 	{
 		double rr = 1.0;
 		ic++;
-		if (argc > ic) sscanf(argv[ic],"%lf",&rr);
+		if (argc > ic) {
+			if (sscanf(argv[ic],"%lf",&rr)) ic++;
+		}
 		i = r_to_idx(rr);
 		if ((i<irs)||(i>ire)) runerr("requested r not available");
 		PolTor_to_spat(&Blm, &B, i, i, BC);	// render just one shell.
-		write_shell("o_shell", &B, i);
-		printf("> surface #%d (r=%.4f) written to file : o_shell (spherical vector components)\n",i,r[i]);
-		exit(0);
+		sprintf(fn,"o_shell.%d",i);	write_shell(fn, &B, i);
+		printf("> surface #%d (r=%.4f) written to file : o_shell.%d (spherical vector components)\n",i,r[i],i);
 	}
-	if (strcmp(argv[ic],"merid") == 0)
+	else if (strcmp(argv[ic],"merid") == 0)
 	{
 		double phi = 0.0;
 		ic++;
-		if (argc > ic) sscanf(argv[ic],"%lf",&phi);
+		if (argc > ic) {
+			if (sscanf(argv[ic],"%lf",&phi)) ic++;
+		}
 		PolTor_to_spat(&Blm, &B, irs, ire, BC);
 		im = phi_to_idx(phi);
-		write_merid("o_Vr",B.r,im);	write_merid("o_Vt",B.t,im);	write_merid("o_Vp",B.p,im);
-		printf("> meridional slice #%d (phi=%.1f°) written to files : o_Vr, o_Vt, o_Vp (spherical vector components)\n",im,phi_deg(im));
+		sprintf(fn,"o_Vr.%d",im);	write_merid(fn,B.r,im);
+		sprintf(fn,"o_Vt.%d",im);	write_merid(fn,B.t,im);
+		sprintf(fn,"o_Vp.%d",im);	write_merid(fn,B.p,im);
+		printf("> meridional slice #%d (phi=%.1f°) written to files : o_Vr.%d, o_Vt.%d, o_Vp.%d (spherical vector components)\n",im,phi_deg(im),im,im,im);
 		for (i=irs;i<=ire;i++) {
 			for(l=0;l<NLAT;l++) {
 				B.p[i][im*NLAT +l] = B.r[i][im*NLAT +l]*ct[l] - B.t[i][im*NLAT +l]*st[l];	// z
 				B.r[i][im*NLAT +l] = B.r[i][im*NLAT +l]*st[l] + B.t[i][im*NLAT +l]*ct[l];	// s
 			}
 		}
-		write_merid("o_Vs",B.r,im);	write_merid("o_Vz",B.p,im);
-		printf("  and files o_Vs, o_Vp, o_Vz (cylindrical vector components)\n",i,phi_deg(i));
-		exit(0);
+		sprintf(fn,"o_Vs.%d",im);	write_merid(fn,B.r,im);
+		sprintf(fn,"o_Vz.%d",im);	write_merid(fn,B.p,im);
+		printf("  and files o_Vs.%d, o_Vp.%d, o_Vz.%d (cylindrical vector components)\n",im,im,im);
 	}
-	if (strcmp(argv[ic],"HS") == 0)
+	else if (strcmp(argv[ic],"HS") == 0)
 	{
+		ic++;
 		write_HS("o_Plm",Blm.P);	write_HS("o_Tlm",Blm.T);
 		printf("> spherical harmonics decomposition written to files : o_Plm, o_Tlm (poloidal/toroidal components)\n");
-		exit(0);
 	}
-	if (strcmp(argv[ic],"spec") == 0)
+	else if (strcmp(argv[ic],"spec") == 0)
 	{
+		ic++;
 		write_Spec_l("o_Plr",Blm.P);	write_Spec_l("o_Tlr",Blm.T);
 		write_Spec_m("o_Pmr",Blm.P);	write_Spec_m("o_Tmr",Blm.T);
 		printf("> spherical harmonics spectrum written to files : o_Plr, o_Tlr, o_Pmr, o_Tmr (poloidal/toroidal, l/m, at each r)\n");
 		calc_spec(Blm.P, lspec, mspec);		write_vect("o_Pl",lspec, lmax+1);	write_vect("o_Pm",mspec, mmax+1);
 		calc_spec(Blm.T, lspec, mspec);		write_vect("o_Tl",lspec, lmax+1);	write_vect("o_Tm",mspec, mmax+1);
 		printf("     o_Pl, o_Tl, o_Pm, o_Tm (poloidal/toroidal, l/m summed over r)\n");
-		exit(0);
 	}
-	if (strcmp(argv[ic],"line") == 0)
+	else if (strcmp(argv[ic],"line") == 0)
 	{
 		double x,y,z, vx,vy,vz;
 		long int ni;
+		static int iline = 0;
 		ic++;
 		if (ic+2 >= argc) runerr("line definition is missing...\n");
 		sscanf(argv[ic],"%lf",&x);	ni = x;
 		sscanf(argv[ic+1],"%lf,%lf,%lf",&x, &y, &z);
 		sscanf(argv[ic+2],"%lf,%lf,%lf",&vx, &vy, &vz);
-		write_line("o_line",x,y,z,vx,vy,vz,ni,&Blm);
-		exit(0);
+		sprintf(fn,"o_line.%d",iline);	iline++;
+		write_line(fn,x,y,z,vx,vy,vz,ni,&Blm);
+		ic+=3;
 	}
-	if (strcmp(argv[ic],"disc") == 0)
+	else if (strcmp(argv[ic],"disc") == 0)
 	{
 		double x,y,z;
 		long int nphi;
+		static int idisc = 0;
 		ic++;
 		if (ic+1 >= argc) runerr("disc definition is missing...\n");
 		sscanf(argv[ic],"%lf",&x);	nphi = x;
 		sscanf(argv[ic+1],"%lf,%lf,%lf",&x, &y, &z);
-		write_disc("o_disc",x,y,z,nphi,&Blm);
-		exit(0);
+		sprintf(fn,"o_disc.%d",idisc);	idisc++;
+		write_disc(fn,x,y,z,nphi,&Blm);
+		ic+=2;
 	}
-	if (strcmp(argv[ic],"3D") == 0)
+	else if (strcmp(argv[ic],"3D") == 0)
 	{
+		ic++;
 		PolTor_to_spat(&Blm, &B, irs, ire, BC);		//output o_X, o_Y, o_Z, o_Vx, o_Vy, o_Vz for direct use with matlab ?
 		exit(0);
 	}
+	else {
+		printf("!!! warning: command #%d \"%s\" was not understood !!!\n",iloop,argv[ic]);
+		exit(1);
+	}
+	iloop ++;
+    }
 
-
-	printf("!!! warning: command \"%s\" was not understood !!!\n",argv[ic]);
-	exit(1);
+	exit(0);
 
 /*
 	fp = fopen("Pprof","w");

@@ -19,8 +19,15 @@
 # include "SHT.h"
 #endif
 
+#if MMAX == 0
+  #undef MRES
+  #define MRES 1
+#endif
+
 #ifndef MRES
-# define MRES 1
+	int _mres_ = -1;	// if no MRES is defined, use run-time MRES instead.
+	int _nlm_ = 0;
+	#define MRES _mres_
 #endif
 
 /** ACCESS TO SPHERICAL HARMONICS COMPONENTS **
@@ -28,6 +35,7 @@
   LM(l,m) : macro returning array index for given l and m.
   LiM(l,im) : macro returning array index for given l and im.
   LM_LOOP( action ) : macro that performs "action" for every (l,m), with l and lm set, but neither m nor im.
+  el[NLM], l2[NLM], l_2[NLM] : floating point arrays containing l, l*(l+1) and 1/(l*(l+1))
 **/
 // NLM : total number of Spherical Harmonic coefficients.
 #define NLM ( (MMAX+1)*(LMAX+1) - MRES*(MMAX*(MMAX+1))/2 )
@@ -85,10 +93,6 @@
 #if NPHI <= 2*MMAX
 	#error "NPHI and MMAX must conform to the sampling condition NPHI > 2*MMAX !"
 #endif
-#if MRES == 0
-	#error "MRES cannot be 0 !"
-#endif
-
 
 
 struct DtDp {		// theta and phi derivatives stored together.
@@ -97,7 +101,11 @@ struct DtDp {		// theta and phi derivatives stored together.
 
 const double pi = M_PI;
 double ct[NLAT], st[NLAT], st_1[NLAT];	// cos(theta), sin(theta), 1/sin(theta);
-double el[NLM], l2[NLM], l_2[NLM];		// l, l(l+1) and 1/(l(l+1))
+#if MRES != _mres_
+	double el[NLM], l2[NLM], l_2[NLM];	// l, l(l+1) and 1/(l(l+1))
+#else
+	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
+#endif
 
 long int tm[MMAX+1];	// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 
@@ -273,7 +281,7 @@ double SH_to_point(complex double *Qlm, double cost, double phi)
 	return vr;
 }
 
-double SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost, double phi,
+void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost, double phi,
 					   double *vr, double *vt, double *vp)
 {
 	double yl[LMAX+1];
@@ -289,8 +297,8 @@ double SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *
 		gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, cost, &yl[m], &dtyl[m]);
 		for (l=m; l<=LMAX; l++) {
 			*vr += yl[l] * creal( Qlm[l] );
-			vst += (-sint *dtyl[l]) * creal( Slm[l] );
-			vtt += (-sint *dtyl[l]) * creal( Tlm[l] );
+			vst += dtyl[l] * creal( Slm[l] );
+			vtt += dtyl[l] * creal( Tlm[l] );
 		}
 	for (im=1; im<=MMAX; im++) {
 		m = im*MRES;
@@ -299,14 +307,14 @@ double SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *
 		Ql = &Qlm[LiM(0,im)];	Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
 		for (l=m; l<=LMAX; l++) {
 			*vr += yl[l] * creal( Ql[l]*eimp );
-			vst += (-sint *dtyl[l]) * creal(Sl[l]*eimp);
-			vtt += (-sint *dtyl[l]) * creal(Tl[l]*eimp);
-			vsp += (yl[l] *m/sint) * creal(I*Sl[l]*eimp);
-			vtp += (yl[l] *m/sint) * creal(I*Tl[l]*eimp);
+			vst += dtyl[l] * creal(Sl[l]*eimp);
+			vtt += dtyl[l] * creal(Tl[l]*eimp);
+			vsp += (yl[l] *m) * creal(I*Sl[l]*eimp);
+			vtp += (yl[l] *m) * creal(I*Tl[l]*eimp);
 		}
 	}
-	*vt = vtp + vst;	// Bt = I.m/sint *T  + dS/dt
-	*vp = vsp - vtt;	// Bp = I.m/sint *S  - dT/dt
+	*vt = vtp/sint + (-sint*vst);	// Bt = I.m/sint *T  + dS/dt
+	*vp = vsp/sint - (-sint*vtt);	// Bp = I.m/sint *S  - dT/dt
 }
 
 
@@ -318,6 +326,12 @@ void runerr(const char * error_text)
 {
 	printf("*** Run-time error : %s\n",error_text);
 	exit(1);
+}
+
+// compute number of modes for spherical harmonic description.
+inline long int nlm_calc(long int lmax, long int mmax, long int mres)
+{
+	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );
 }
 
 void EqualSpaceNodes(double *x, double *w, int n)
@@ -451,6 +465,7 @@ void init_SH(double eps)
 	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
+	if (MRES <= 0) runerr("[init_SH] MRES must be > 0");
 
 #ifdef SHT_EQUAL
 	printf("          => using Equaly Spaced Nodes\n");
@@ -572,6 +587,13 @@ void init_SH(double eps)
  #endif
 
 // Additional arrays :
+#if MRES == _mres_
+	_nlm_ = nlm_calc(LMAX, MMAX, MRES);	// store "precomputed" NLM
+	#undef NLM
+	#define NLM _nlm_
+	el = (double *) fftw_malloc(3*NLM * sizeof(double));	// NLM defined at runtime.
+	l2 = el + NLM;	l_2 = el + 2*NLM;
+#endif
 	it = 0;
 	for (im=0;im<=MMAX;im++) {
 		for (l=im*MRES;l<=LMAX;l++) {
