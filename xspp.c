@@ -17,10 +17,10 @@
 #include <gsl/gsl_sf_legendre.h>
 
 // parameters for SHT.c
-#define NLAT 361
+#define NLAT 360
 #define LMAX 240
-#define NPHI 32 
-#define MMAX 8
+#define NPHI 20 
+#define MMAX 5
 //#define MRES 4
 
 long int mmin=0, mmax=MMAX;
@@ -232,19 +232,20 @@ void write_line(char *fn,double x0,double y0,double z0,double vx,double vy,doubl
 {
 	double rr,cost,phi;
 	double x,y,z;
-	double bx,by,bz;
+	double br,bt,bp, bx,by,bz;
 	int i;
 	FILE *fp;
 	
 	fp = fopen(fn,"w");
-	fprintf(fp,"%% [XSHELLS] line profile starting at %f,%f,%f with increment %f,%f,%f\n%% x y z\tr cos(theta) phi\tvx vy vz\n",x0,y0,z0, vx,vy,vz);
+	fprintf(fp,"%% [XSHELLS] line profile starting at %f,%f,%f with increment %f,%f,%f\n%% x y z\tr cos(theta) phi\tvx vy vz\tvr vt vp\n",x0,y0,z0, vx,vy,vz);
 	x=x0; y=y0; z=z0;
 	for (i=0; i<ni; i++) {
 		rr = sqrt(x*x + y*y + z*z);		cost = z/rr;
 		phi = atan(y/x);	if (x < 0.0) phi += pi;
-		PolTor_to_point_interp(Blm, rr, cost, phi, &bx, &by, &bz);
+		PolTor_to_point_interp(Blm, rr, cost, phi, &br, &bt, &bp);
+		bx = br;	by = bt;	bz = bp;
 		spher_to_cart(cost, phi, &bx, &by, &bz);
-		fprintf(fp,"%.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g\n",x,y,z, rr, cost, phi, bx,by,bz);
+		fprintf(fp,"%.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g\n",x,y,z, rr, cost, phi, bx,by,bz, br,bt,bp);
 		x+=vx;	y+=vy;	z+=vz;
 	}
 	fclose(fp);

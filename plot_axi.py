@@ -27,7 +27,7 @@ if len(sys.argv) > 2 :
 #Up
 #print 'loading',sys.argv[1]
 #a=load(sys.argv[1])
-a=load('o_Vp',comments='%')
+a=load('o_Vp.m0',comments='%')
 s = a.shape
 
 ct = a[0,1:s[1]]
@@ -41,7 +41,7 @@ y = r*matrix(ct)
 #Poloidal scalar
 #print 'loading',sys.argv[2]
 #b = load(sys.argv[2])
-b = load('o_Vpol',comments='%')
+b = load('o_Vpol.m0',comments='%')
 b = b[ir0:s[0],1:s[1]]
 
 #convert Up to angular velocity

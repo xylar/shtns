@@ -6,9 +6,16 @@ import sys              # acces a la ligne de commande.
 ir0=1
 rg=0.35
 
+arg0 = 1
 argn = len(sys.argv)
 
-for i in range(1, argn):
+ang = 0
+if (sys.argv[arg0] == '-ang'):
+	print 'data divided by s (ie: velocity to angular velocity)'
+	arg0 = arg0 + 1
+	ang = 1
+
+for i in range(arg0, argn):
 	print 'loading',sys.argv[i]
 	a=load(sys.argv[i],comments='%')
 	s = a.shape
@@ -22,9 +29,10 @@ for i in range(1, argn):
 	y = r*matrix(ct)
 
 	#convert Up to angular velocity
-	#a=a/array(x)
-	#a[:,s[1]-2] = a[:,s[1]-3]	#remove nan
-	#a[:,0] = a[:,1]			#remove nan
+	if (ang==1):
+		a=a/array(x)
+		a[:,s[1]-2] = a[:,s[1]-3]	#remove nan
+		a[:,0] = a[:,1]			#remove nan
 
 	m=amax(abs(a))
 	print 'max value=',m

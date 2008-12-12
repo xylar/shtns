@@ -191,6 +191,10 @@ inline void fft_m0_r2c(double *Br, complex double *BrF)		//in-place only
 	}	//	*/
 }
 
+/**
+	SHT FUNCTIONS
+**/
+
 // run-time truncation at LMAX and MMAX
 #ifndef LTR
   #define LTR LMAX
@@ -325,9 +329,9 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 }
 
 
-/*
+/**
 	INITIALIZATION FUNCTIONS
-*/
+**/
 
 void runerr(const char * error_text)
 {
@@ -338,7 +342,17 @@ void runerr(const char * error_text)
 // compute number of modes for spherical harmonic description.
 inline long int nlm_calc(long int lmax, long int mmax, long int mres)
 {
-	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );
+	if (mmax*mres > lmax) mmax = lmax/mres;
+	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
+/*
+	long int im,l,lm;
+	lm=0;
+	for (im=0; im<=mmax; im++) {	// perform the loop : this gives the exact result !
+		for (l=im*mres; l<=lmax; l++)	lm++;
+//		if (im*mres <= lmax) lm += lmax+1-im*mres;
+	}
+	return lm;
+*/
 }
 
 void EqualSpaceNodes(double *x, double *w, int n)
