@@ -29,7 +29,7 @@ long int lmin=0, lmax=LMAX;
 #define LTR lmax
 #define MTR mmax
 // SHT on equal spaced grid + polar points.
-#define SHT_EQUAL
+#define SHT_POLES
 #include "SHT.c"
 
 // number of radial grid points.

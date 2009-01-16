@@ -18,11 +18,11 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
-#define NLAT_2 100
-#define LMAX 60
+#define NLAT_2 10
+#define LMAX 12
 #define NPHI 16
 #define MMAX 5
-#define MRES 1
+#define MRES 2
 
 #define _SH_DEBUG_
 //#define _SHT_EO_
@@ -69,9 +69,12 @@ int main()
 	clock_t tcpu;
 
 	srand( time(NULL) );	// initialise les nombres.
-	init_SH( POLAR_OPT_THR );
-	write_mx("yl1",ylm[1],NLAT_2,LMAX);
-	write_mx("dyl1",&dylm[1][0].t,NLAT_2,2*LMAX);
+	init_SH_dct( POLAR_OPT_THR );
+	
+	if (MMAX > 0) {
+		write_mx("yl1",ylm[1],NLAT_2,LMAX);
+//		write_mx("dyl1",&dylm[1][0].t,NLAT_2,2*LMAX);
+	}
 
 	t1 = 1.0+2.0*I;
 	t2 = 1.0-I;
@@ -159,6 +162,8 @@ int main()
 	printf("  => max error = %g    rms error = %g\n",tmax,sqrt(n2/NLM));
 	write_vect("Qlm",Slm,NLM*2);
 
+//#DEFINE TEST_VECT_SHT
+#ifdef TEST_VECT_SHT
 	printf(":: performing %d vector SHT\n", SHT_ITER);
 	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
@@ -211,5 +216,6 @@ int main()
 	}
 	printf("  Toroidal => max error = %g    rms error = %g\n",tmax,sqrt(n2/NLM));
 	write_vect("Tlm",Tlm,NLM*2);
+#endif
 }
 

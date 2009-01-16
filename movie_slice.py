@@ -25,7 +25,7 @@ for f in files[i-1:] :
 		print 'error from xspp again, abort.'
 		exit()
 
-	a=load('o_Vp',comments='%')
+	a=load('o_Vp.m0',comments='%')
 	s = a.shape
 
 	ct = a[0,1:s[1]]

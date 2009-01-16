@@ -31,6 +31,8 @@
 // compute and print some debugging information...
 #define _SH_DEBUG_
 
+#else
+ #define NLAT (2*NLAT_2)
 #endif
 
 
@@ -465,7 +467,7 @@ void init_SH(double eps)
 	}
 /* GAUSS QUADRATURE TO COMPUTE DIRECT TRANSFORM MATRIX (analysis) */
 	Zlm = (double *) fftw_malloc(sizeof(double)* NLAT);
-	idct = fftw_plan_r2r_1d( NLAT, Zlm, Zlm, FFTW_REDFT01, FFTW_ESTIMATE );	// quick and dirty dfts.
+//	idct = fftw_plan_r2r_1d( NLAT, Zlm, Zlm, FFTW_REDFT01, FFTW_ESTIMATE );	// quick and dirty dfts.
 	ylmt = (double *) fftw_malloc(sizeof(double)* NG*(LMAX+1));
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
@@ -487,16 +489,18 @@ void init_SH(double eps)
 			}
 			for (k=LMAX+1;k<NLAT;k++)
 				Zlm[k] = 0.0;
+/*
 			printf("\n      idct ::");
 			fftw_execute(idct);
 			// Zlm(theta) = iDCT( Zlm[k] )
 			for (it=0;it<NLAT;it++)
 				printf(" %.3f",Zlm[it]);
 			printf("\n");
+*/
 		}
 	}
 	fftw_free(ylmt);
-	fftw_destroy_plan(idct);
+//	fftw_destroy_plan(idct);
 	fftw_free(Zlm);
 
 	planFFT();		// initialize fftw

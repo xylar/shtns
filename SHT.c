@@ -19,10 +19,12 @@
 # include "SHT.h"
 #endif
 
+/*
 #if MMAX == 0
   #undef MRES
   #define MRES 1
 #endif
+*/
 
 #ifndef MRES
 	int _mres_ = -1;	// if no MRES is defined, use run-time MRES instead.
@@ -115,6 +117,7 @@ double* zlm[MMAX+1];		// matrix for direct transform (analysis)
 struct DtDp* dzlm[MMAX+1];
 
 fftw_plan ifft, fft;	// plans for FFTW.
+fftw_plan idct, dct;
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
 /*
@@ -215,6 +218,35 @@ void spat_to_SH(complex double *BrF, complex double *Qlm)
 #endif
 }
 
+/*
+/////////////////////////////////////////////////////
+//   Scalar Spherical Harmonics Transform
+// input  : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+// output : Slm = spherical harmonics coefficients : complex double array of size NLM
+void spat_to_SH(complex double *ShF, complex double *Slm)
+{
+	complex double *Sl;		// virtual pointers for given im
+	double *zl;
+	long int k,im,m,l;
+
+	fftw_execute_dft_r2c(fft,(double *) ShF, ShF);
+	fftw_execute_r2r(dct,(double *) ShF, (double *) ShF);		// DCT
+
+	for (im=0; im<=MMAX; im++) {
+		m=im*MRES;
+		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
+		zl = zlm[im];
+		for (l=m; l<=LMAX; l++) {		// l has parity of m
+			Sl[l] = 0.0;
+			for (k=0; k<=l; k++) {
+				Sl[l]   += ShF[k]   * zl[k];
+			}
+			zl += NLAT;
+		}
+		ShF += NLAT;
+	}
+}
+*/
 
 /////////////////////////////////////////////////////
 //   Scalar inverse Spherical Harmonics Transform
@@ -377,7 +409,6 @@ void EqualSpaceNodes(double *x, double *w, int n)
 	printf("          ! warning : only synthesis (inverse transform) supported so far for equaly spaced grid !\n");
 }
 
-
 // Generates the abscissa and weights for a Gauss-Legendre quadrature.
 // Newton method from initial Guess to find the zeros of the Legendre Polynome
 // x = abscissa, w = weights, n points.
@@ -440,6 +471,9 @@ void planFFT()
 	int nfft = NPHI;
 	int ncplx = NPHI/2 +1;
 	int nreal;
+	int ndct = NLAT;
+	fftw_r2r_kind r2r_kind;
+	fftw_iodim dims, hdims[2];
 	
 	nreal = 2*ncplx;
 	
@@ -461,6 +495,25 @@ void planFFT()
 	fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, NLAT, 1, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
 	if (fft == NULL)
 		runerr("[FFTW] fft planning failed !");
+
+/* LATITUDINAL DCT (THETA) */
+/*	r2r_kind = FFTW_REDFT10;
+	dct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+	dct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+	r2r_kind = FFTW_REDFT01;
+	idct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+	idct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+*/
+	dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
+	hdims[0].n = MMAX+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
+	hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
+	r2r_kind = FFTW_REDFT10;
+	dct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
+	r2r_kind = FFTW_REDFT01;
+	idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
+	if ((dct == NULL)||(idct == NULL))
+		runerr("[FFTW] dct planning failed !");
+//	dct_norm = 1.0/(2*NLAT);
 
 //	fft_norm = 1.0/nfft;
 	fftw_free(ShF);
@@ -488,8 +541,8 @@ void init_SH(double eps)
 	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
 	if (MRES <= 0) runerr("[init_SH] MRES must be > 0");
 
-#ifdef SHT_EQUAL
-	printf("          => using Equaly Spaced Nodes\n");
+#ifdef SHT_POLES
+	printf("          => using Equaly Spaced Nodes including poles\n");
 	EqualSpaceNodes(ct,wg,NLAT);		// equaly-spaced points and weights.
 #else
 	printf("          => using Gauss Nodes\n");
@@ -622,5 +675,165 @@ void init_SH(double eps)
 			it++;
 		}
 	}
-	l_2[0] = 0.0;	// undefined for l=0 => replace by 0.
+	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.
+}
+
+void init_SH_dct(double eps)
+{
+	double theta[NLAT], Zlm[NLAT], dZlm[NLAT];		// equally spaced theta points.
+	double tg[NLAT], xg[NLAT], wg[NLAT];	// gauss points and weights.
+	double *yg, *dyg;			// temp storage for Plm(xg)
+	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
+	double iylm_fft_norm = 2.0*M_PI/NPHI;	// normation FFT pour zlm
+	double t,tsum;
+	long int it,im,m,l;
+
+	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
+	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
+	if (NLAT <= LMAX) runerr("[init_SH] NLAT should be at least LMAX+1");
+	if (MRES <= 0) runerr("[init_SH] MRES must be > 0");
+	if (MRES % 2) runerr("[init_SH] MRES odd not yet supported with DCT acceleration");
+	
+	printf("          => using Equaly Spaced Nodes with DCT acceleration\n");
+	for (it=0; it<NLAT; it++) {	// Chebychev points : equaly spaced but skipping poles.
+		t = pi*(it+0.5)/NLAT;
+		theta[it] = t;
+		ct[it] = cos(t);
+		st[it] = sin(t);
+		st_1[it] = 1.0/sin(t);
+	}
+
+#ifdef _SH_DEBUG_
+	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
+	printf("          DCT nodes :");
+	for (it=0;it<NLAT_2; it++)
+		printf(" %g",ct[it]);
+	printf("\n");
+#endif
+
+// Allocate legendre functions lookup tables.
+	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
+	dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
+	zlm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
+	dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
+	for (im=0; im<MMAX; im++) {
+		m = im*MRES;
+		ylm[im+1] = ylm[im] + NLAT_2*(LMAX+1 -m);
+		dylm[im+1] = dylm[im] + NLAT_2*(LMAX+1 -m);
+		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m);
+		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -m);
+	}
+
+// Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT_2 points required.
+// for synthesis (inverse transform)
+	for (im=0; im<=MMAX; im++) {
+		m = im*MRES;
+		for (it=0; it<NLAT_2; it++) {
+			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
+			for (l=m; l<=LMAX; l++) {
+				dylm[im][it*(LMAX-m+1) + (l-m)].t = -st[it] * dtylm[l-m];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
+				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
+				if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
+			}
+		}
+	}
+	
+// for analysis (decomposition, direct transform) : use gauss-legendre quadrature for dct components
+	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : xg = ]1,-1[ = cos(theta)
+	for (it=0; it<NLAT; it++) tg[it] = acos(xg[it]);
+	idct = fftw_plan_r2r_1d( NLAT, Zlm, Zlm, FFTW_REDFT01, FFTW_ESTIMATE );	// quick and dirty idft.
+// we need the legendre functions lookup tables for gauss points also !
+	yg = (double *) malloc( sizeof(double) * 2*(LMAX+1)*NLAT);
+	dyg = yg + (LMAX+1)*NLAT;
+
+	void calc_Zlm_dct(int l,int m)
+	{
+		double tsum;
+		int k,it;
+		for (k=0; k<NLAT; k++) {
+			for (it=0, tsum=0.0; it<NLAT; it++)
+				tsum += wg[it] * yg[it*(LMAX+1) + (l-m)] * cos(tg[it]*k);
+			Zlm[k] = tsum * iylm_fft_norm/NLAT;
+		}
+		k=0;	Zlm[k] *= 0.5;		// special case k=0
+		// print infos
+		printf("\n => l=%d Zlm ::\n",l);
+		for (k=0; k<NLAT; k++) printf("%f ",Zlm[k]);
+		
+		// prepare idct :
+		k=0;	Zlm[k] *= 2;
+		fftw_execute(idct);
+	}
+
+	// zlm in DCT space
+	for (im=0; im<=MMAX; im++) {
+		m = im*MRES;
+		for (it=0; it<NLAT; it++)	// compute Plm's at gauss nodes.
+			gsl_sf_legendre_sphPlm_deriv_array( LMAX, m, xg[it], &yg[it*(LMAX+1)], &dyg[it*(LMAX+1)] );
+		for (l=m;l<LMAX;l+=2) {
+			calc_Zlm_dct(l,m);
+			for (it=0; it<NLAT; it++)
+				zlm[im][(l-m)*NLAT_2 + it*2]    =  Zlm[it];
+			calc_Zlm_dct(l+1,m);
+			for (it=0; it<NLAT; it++)
+				zlm[im][(l-m)*NLAT_2 + it*2 +1]    =  Zlm[it];
+		}
+		if (l==LMAX) {
+			calc_Zlm_dct(l,m);
+			for (it=0; it<NLAT_2; it++)
+				zlm[im][(l-m)*NLAT_2 + it]    =  Zlm[it];
+		}
+/*
+		for (l=m;l<=LMAX;l++) {
+			calc_Zlm_dct(l,m);
+			for (it=0; it<NLAT; it++)
+				zlm[im][(l-m)*NLAT + it]    =  Zlm[it];
+		}
+*/	}
+
+	free(yg);
+	fftw_destroy_plan(idct);
+
+// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
+	for (im=0;im<=MMAX;im++) {
+		m = im*MRES;
+		tm[im] = NLAT_2;
+		for (l=m;l<=LMAX;l++) {
+			it=0;
+			while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }
+			if (tm[im] > it) tm[im] = it;
+		}
+	}
+	if (eps > 0.0) {
+		printf("          polar optimization threshold = %e\n",eps);
+#ifdef _SH_DEBUG_
+		printf("          tm[im]=");
+		for (im=0;im<=MMAX;im++)
+			printf(" %d",tm[im]);
+		printf("\n");
+#endif
+	}
+
+ #if NPHI > 1
+	planFFT();		// initialize fftw
+ #else
+	printf("          => no fft required for NPHI=1.\n");
+ #endif
+
+// Additional arrays :
+#if MRES == _mres_
+	_nlm_ = nlm_calc(LMAX, MMAX, MRES);	// store "precomputed" NLM
+	#undef NLM
+	#define NLM _nlm_
+	el = (double *) fftw_malloc(3*NLM * sizeof(double));	// NLM defined at runtime.
+	l2 = el + NLM;	l_2 = el + 2*NLM;
+#endif
+	it = 0;
+	for (im=0;im<=MMAX;im++) {
+		for (l=im*MRES;l<=LMAX;l++) {
+			el[it] = l;	l2[it] = l*(l+1.0);	l_2[it] = 1.0/(l*(l+1.0));
+			it++;
+		}
+	}
+	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.
 }
