@@ -18,11 +18,11 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
-#define NLAT_2 10
-#define LMAX 12
-#define NPHI 16
-#define MMAX 5
-#define MRES 2
+#define NLAT_2 260
+#define LMAX 512
+#define NPHI 128
+#define MMAX 32
+#define MRES 5
 
 #define _SH_DEBUG_
 //#define _SHT_EO_
@@ -31,8 +31,9 @@ double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // polar optimization threshold
 #define POLAR_OPT_THR 1e-6
+//#define POLAR_OPT_THR 0
 // number of SH iterations
-#define SHT_ITER 1000
+#define SHT_ITER 100
 	
 void write_vect(char *fn, double *vec, int N)
 {
@@ -157,12 +158,12 @@ int main()
 			t = cabs(Slm[i]);
 		}
 		n2 += t*t;
-		if (t>tmax) tmax = t;
+		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("  => max error = %g    rms error = %g\n",tmax,sqrt(n2/NLM));
+	printf("  => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Qlm",Slm,NLM*2);
 
-//#DEFINE TEST_VECT_SHT
+#define TEST_VECT_SHT
 #ifdef TEST_VECT_SHT
 	printf(":: performing %d vector SHT\n", SHT_ITER);
 	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
@@ -196,9 +197,9 @@ int main()
 			t = cabs(Slm[i]); 
 		}
 		n2 += t*t;
-		if (t>tmax) tmax = t;
+		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("  Spheroidal => max error = %g    rms error = %g\n",tmax,sqrt(n2/NLM));
+	printf("  Spheroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Slm",Slm,NLM*2);
 
 // compute error :
@@ -212,9 +213,9 @@ int main()
 			t = cabs(Tlm[i]); 
 		}
 		n2 += t*t;
-		if (t>tmax) tmax = t;
+		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("  Toroidal => max error = %g    rms error = %g\n",tmax,sqrt(n2/NLM));
+	printf("  Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Tlm",Tlm,NLM*2);
 #endif
 }
