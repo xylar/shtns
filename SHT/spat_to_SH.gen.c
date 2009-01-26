@@ -12,10 +12,15 @@
 #Q void spat_to_SH(complex double *BrF, complex double *Qlm)
 #V void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
 # {
+  #if NPHI > 1
 QB	complex double reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 VB	complex double teo[2*NLAT_2], peo[2*NLAT_2];	// theta and phi even and odd parts
+  #else
+QB	double reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
+VB	double teo[2*NLAT_2], peo[2*NLAT_2];	// theta and phi even and odd parts
+  #endif
 Q	complex double *Ql;		// virtual pointers for given im
-V	complex double *Sl, *Tl;		// virtual pointers for given im
+V	complex double *Sl, *Tl;	// virtual pointers for given im
 Q	double *zl;
 V	struct DtDp *dzl;
 	long int i,im,m,l;
@@ -39,12 +44,36 @@ Q	fftw_execute_dft_r2c(fft,(double *) BrF, BrF);
 V	fftw_execute_dft_r2c(fft,(double *) BtF, BtF);
 V	fftw_execute_dft_r2c(fft,(double *) BpF, BpF);
  #else
-Q	fft_m0_r2c((double *) BrF, BrF);
-V	fft_m0_r2c((double *) BtF, BtF);	fft_m0_r2c((double *) BpF, BpF);
+Q	//fft_m0_r2c((double *) BrF, BrF);
+V	//fft_m0_r2c((double *) BtF, BtF);	fft_m0_r2c((double *) BpF, BpF);
+Q	fft_m0_r2eo((double *) BrF, reo);
+V	fft_m0_r2eo((double *) BtF, teo);	fft_m0_r2eo((double *) BpF, peo);
  #endif
-
-	im = 0;		// dzl.p = 0.0 : and evrything is REAL
-		m=im*MRES;
+	im = 0;	m=0;	// dzl.p = 0.0 : and evrything is REAL
+/*  #ifdef SHT_DCT
+Q		fftw_execute_r2r(dctm0,(double *) BrF, (double *) BrF);		// DCT
+		l=0;
+Q		Ql = Qlm;		// virtual pointer for l=0 and im
+V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
+Q		zl = zlm_dct[im];
+		while (l<LTR) {		// l has parity of m
+Q			Ql[l] = 0.0;	Ql[l+1] = 0.0;
+			for (k=l; k<=NLAT; k+=2) {		// for m=0, zl coeff with k<l are zeros.
+Q				(double) Ql[l]   += (double) BrF[k]   * zl[k];
+Q				(double) Ql[l+1] += (double) BrF[k+1] * zl[k+1];
+			}
+			l+=2;
+Q			zl += NLAT;
+		}
+		if ((LTR & 1) == 0) {	// if (l == LTR)  <=>  if ((LTR & 1) == 0) for m=0
+Q			Ql[l] = 0.0;
+			for (k=l; k<=NLAT; k+=2) {		// for m=0, DCT coeff with k<l are zeros.
+Q				(double) Ql[l]   += (double) BrF[k]   * zl[k];
+			}
+		}
+Q		BrF += NLAT;
+  #else	*/
+  #if NPHI > 1
  B		for (i=0;i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
 QB			(double) reo[2*i]   = (double) BrF[i] + (double) BrF[NLAT-(i+1)];
 QB			(double) reo[2*i+1] = (double) BrF[i] - (double) BrF[NLAT-(i+1)];
@@ -58,9 +87,10 @@ QB			(double) reo[2*i] = (double) BrF[i];	(double) reo[2*i+1] = 0.0;
 VB			(double) teo[2*i] = (double) BtF[i];	(double) teo[2*i+1] = 0.0;
 VB			(double) peo[2*i] = (double) BpF[i];	(double) peo[2*i+1] = 0.0;
  B		}
+  #endif
 		l=m;
-Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
-V		Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];		// virtual pointer for l=0 and im
+Q		Ql = Qlm;		// virtual pointer for l=0 and im
+V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
 Q		zl = zlm[im];
 V		dzl = dzlm[im];
 QB		BrF += NLAT;
@@ -71,10 +101,10 @@ QO			Ql[l+1] = 0.0;
 VE			Sl[l] = 0.0;	Tl[l+1] = 0.0;
 VO			Tl[l] = 0.0;	Sl[l+1] = 0.0;
 			for (i=0; i < NLAT_2; i++) {
-QE				(double) Ql[l] += (double) re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				(double) Ql[l+1] += (double) ro * zl[2*i+1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-VE				(double) Sl[l]   += dzl[2*i].t * (double) to;
-VO				(double) Tl[l]   -= dzl[2*i].t * (double) po;
+QE				(double) Ql[l]   += zl[2*i]   * (double) re;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+QO				(double) Ql[l+1] += zl[2*i+1] * (double) ro;	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+VE				(double) Sl[l]   += dzl[2*i].t   * (double) to;
+VO				(double) Tl[l]   -= dzl[2*i].t   * (double) po;
 VO				(double) Sl[l+1] += dzl[2*i+1].t * (double) te;
 VE				(double) Tl[l+1] -= dzl[2*i+1].t * (double) pe;
 			}
@@ -101,6 +131,7 @@ VE				(double) Sl[l]   += dzl[2*i].t * (double) to;
 VO				(double) Tl[l]   -= dzl[2*i].t * (double) po;
 			}
 		}
+//  #endif
 	for (im=1;im<=MTR;im++) {
 		m=im*MRES;
  B		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.

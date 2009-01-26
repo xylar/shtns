@@ -22,6 +22,15 @@
 Q	complex double fe, fo;		// even and odd parts
 S	complex double se, so, dse, dso;	// spheroidal even and odd parts
 T	complex double te, to, dte, dto;	// toroidal ...
+  #if NPHI > 1
+Q	#define BR0 BrF
+V	#define BT0 BtF
+V	#define BP0 BpF
+  #else
+Q	#define BR0 ((double *)BrF)
+V	#define BT0 ((double *)BtF)
+V	#define BP0 ((double *)BpF)
+  #endif
 Q	complex double *Ql;
 S	complex double *Sl;
 T	complex double *Tl;
@@ -31,6 +40,25 @@ V	struct DtDp *dyl;
 
 	im = 0;		// zonal part : d/dphi = 0;
 		m = im*MRES;
+	/*#ifdef SHT_DCT
+Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
+Q		yl = ylm_dct[im];
+		for (it=0; it<NLAT; it++)
+Q			BrF[it] = 0.0;		// zero out array (includes DCT padding)
+		for (l=m; l<LTR; l+=2) {
+			for (it=0; it<=l; it+=2) {
+Q				(double) BrF[it]   += yl[it] *   (double) Ql[l];
+Q				(double) BrF[it+1] += yl[it+1] * (double) Ql[l+1];
+			}
+Q			yl += (l+2 - (m&1));
+		}
+		if (l==LTR) {
+			for (it=0; it<=l; it+=2) {
+Q				(double) BrF[it] += yl[it] * (double) Ql[l];
+			}
+		}
+		fftw_execute_r2r(idctm0,(double *) BrF, (double *) BrF);		// iDCT
+	#else*/
 Q		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 S		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 T		Tl = &Tlm[LiM(0,im)];
@@ -56,24 +84,25 @@ QE				(double) fe += yl[l] * (double) Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l
 TO				(double) dto += dyl[l].t * Tl[l];
 SE				(double) dso += dyl[l].t * Sl[l];
 			}
-Q			BrF[i] = fe + fo;
-V			BtF[i] = 0.0
+Q			BR0[i] = fe + fo;
+V			BT0[i] = 0.0
 S				+ (dse+dso)			// Bt = dS/dt
 V				;
-V			BpF[i] = 0.0
+V			BP0[i] = 0.0
 T		 		- (dte+dto)			// Bp = - dT/dt
 V				;
 			i++;
-QB			BrF[NLAT-i] = fe - fo;
-VB			BtF[NLAT-i] = 0.0
+QB			BR0[NLAT-i] = fe - fo;
+VB			BT0[NLAT-i] = 0.0
 SB		 		+ (dse-dso)
 VB				;
-VB			BpF[NLAT-i] = 0.0
+VB			BP0[NLAT-i] = 0.0
 TB				- (dte-dto)
 VB				;
 Q			yl  += (LMAX-m+1);
 V			dyl += (LMAX-m+1);
 		}
+	//#endif
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	for (im=1; im<=MTR; im++) {
@@ -162,7 +191,7 @@ Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
 V	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
  #else
-Q	ifft_m0_c2r(BrF, (double *) BrF);
-V	ifft_m0_c2r(BtF, (double *) BtF);	ifft_m0_c2r(BpF, (double *) BpF);
+Q	//ifft_m0_c2r(BrF, (double *) BrF);
+V	//ifft_m0_c2r(BtF, (double *) BtF);	ifft_m0_c2r(BpF, (double *) BpF);
  #endif
 # }

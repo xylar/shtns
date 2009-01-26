@@ -11,6 +11,8 @@
 #include <gsl/gsl_sf_legendre.h>
 
 #include <time.h>
+// cycle counter from FFTW
+#include "cycle.h"
 
 
 complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
@@ -18,22 +20,302 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
-#define NLAT_2 260
-#define LMAX 512
-#define NPHI 128
-#define MMAX 32
-#define MRES 5
+#define NLAT_2 5
+#define LMAX 6
+#define NPHI 16
+#define MMAX 5
+#define MRES 1
 
 #define _SH_DEBUG_
 //#define _SHT_EO_
 //#define SHT_EQUAL	/* SHT on equal spaced grid + polar points. */
+#define SHT_DCT
+//#define SHT_DCT_IT_OUT
 #include "SHT.c"
 
 // polar optimization threshold
 #define POLAR_OPT_THR 1e-6
 //#define POLAR_OPT_THR 0
 // number of SH iterations
-#define SHT_ITER 100
+#define SHT_ITER 1000
+
+void spat_to_SHm(long int im, complex double *BrF, complex double *Qlm)
+{
+	complex double reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
+	complex double *Ql;		// virtual pointers for given im
+	double *zl;
+	long int i,m,l;
+
+// defines how to access even and odd parts of data
+	#define re	reo[2*i]
+	#define ro	reo[2*i+1]
+
+	BrF += im*NLAT;
+	if (im == 0) {		// dzl.p = 0.0 : and evrything is REAL
+		m=im*MRES;
+ 		for (i=0;i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
+			(double) reo[2*i]   = (double) BrF[i] + (double) BrF[NLAT-(i+1)];
+			(double) reo[2*i+1] = (double) BrF[i] - (double) BrF[NLAT-(i+1)];
+ 		}
+ 		if (i < NLAT_2) {		// NLAT is odd : special equator handling
+			(double) reo[2*i] = (double) BrF[i];	(double) reo[2*i+1] = 0.0;
+ 		}
+		l=m;
+		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
+		zl = zlm[im];
+		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+			Ql[l] = 0.0;
+			Ql[l+1] = 0.0;
+			for (i=0; i < NLAT_2; i++) {
+				(double) Ql[l] += (double) re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+				(double) Ql[l+1] += (double) ro * zl[2*i+1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+			}
+			l+=2;
+			zl += 2*NLAT_2;
+		}
+		if (l==LMAX) {
+			Ql[l] = 0.0;
+			for (i=0;i<NLAT_2;i++) {
+				(double) Ql[l] += zl[i] * (double) re;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+			}
+		} else if (l==LTR) {
+			Ql[l] = 0.0;
+			for (i=0; i < NLAT_2; i++) {
+				(double) Ql[l] += (double) re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+			}
+		}
+	} else {
+		m=im*MRES;
+ 		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
+			reo[2*i]   = BrF[i] + BrF[NLAT-(i+1)];
+			reo[2*i+1] = BrF[i] - BrF[NLAT-(i+1)];
+ 		}
+ 		if (i<NLAT_2) {		// NLAT is odd : special equator handling
+			reo[2*i] = BrF[i];		reo[2*i+1] = 0.0;
+ 		}
+		l=m;
+		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
+		zl = zlm[im];
+		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+			Ql[l] = 0.0;
+			Ql[l+1] = 0.0;
+			for (i=tm[im]; i < NLAT_2; i++) {	// tm[im] : polar optimization
+				Ql[l]   += re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+				Ql[l+1] += ro * zl[2*i+1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+			}
+			l+=2;
+			zl += 2*NLAT_2;
+		}
+		if (l==LMAX) {
+			Ql[l] = 0.0;	// Qlm[LiM(l,im)] = 0.0;
+			for (i=tm[im];i<NLAT_2;i++) {	// polar optimization
+				Ql[l] += zl[i] * re;	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+			}
+		} else if (l==LTR) {
+			Ql[l] = 0.0;
+			for (i=tm[im]; i < NLAT_2; i++) {	// tm[im] : polar optimization
+				Ql[l]   += re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+			}
+		}
+	}
+	#undef re
+	#undef ro
+}
+
+void spat_to_SHm_dct(long int im, complex double *ShF, complex double *Slm)
+{
+	complex double *Sl;		// virtual pointers for given im
+	double *zl;
+	long int k,m,l;
+
+  #if NPHI > 1
+	if (MRES & 1) {		// odd m's are present
+		if (im & 1) {
+			for (k=0; k<NLAT; k++)	ShF[im*NLAT + k] *= st[k];	// corection beforce DCT
+		}
+	}
+  #endif
+	ShF += im*NLAT;
+	fftw_execute_r2r(dctm,(double *) ShF, (double *) ShF);		// DCT
+
+	if (im == 0) {
+		m=0;
+		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
+		zl = zlm_dct[im];
+		for (l=m; l<LMAX; l+=2) {		// l has parity of m
+			Sl[l] = 0.0;	Sl[l+1] = 0.0;
+			for (k=l; k<=NLAT; k+=2) {		// for m=0, zl coeff with k<l are zeros.
+				(double) Sl[l]   += (double) ShF[k]   * zl[k];
+				(double) Sl[l+1] += (double) ShF[k+1] * zl[k+1];
+			}
+			zl += NLAT;
+		}
+		if ((LMAX & 1) == 0) {	// if (l == LMAX)  <=>  if ((LMAX & 1) == 0) for m=0
+			Sl[l] = 0.0;
+			for (k=l; k<=NLAT; k+=2) {		// for m=0, DCT coeff with k<l are zeros.
+				(double) Sl[l]   += (double) ShF[k]   * zl[k];
+			}
+		}
+	} else {
+		m=im*MRES;
+		Sl = &Slm[LiM(0,im)];		// virtual pointer for l=0 and im
+		zl = zlm_dct[im];
+		for (l=m; l<LMAX; l+=2) {		// l has parity of m
+			Sl[l] = 0.0;	Sl[l+1] = 0.0;
+			for (k=0; k<=NLAT; k+=2) {
+				Sl[l]   += ShF[k]   * zl[k];
+				Sl[l+1] += ShF[k+1] * zl[k+1];
+			}
+			zl += NLAT;
+		}
+		if (l == LMAX) {
+			Sl[l] = 0.0;
+			for (k=0; k<=NLAT; k+=2) {
+				Sl[l]   += ShF[k]   * zl[k];
+			}
+		}
+	}
+}
+
+
+void SHm_to_spat(long int im, complex double *Qlm, complex double *BrF)
+{
+	complex double fe, fo;		// even and odd parts
+	complex double *Ql;
+	double *yl;
+	long int i,m,l;
+
+	m = im*MRES;
+	BrF += im*NLAT;
+	if (im == 0) {
+		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
+		i=0;
+		yl  = ylm[im] + i*(LMAX-m+1) -m;
+		while (i < NLAT_2) {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			fe = 0.0;	fo = 0.0;
+			while (l<LTR) {	// compute even and odd parts
+				(double) fe += yl[l] * (double) Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+				(double) fo += yl[l+1] * (double) Ql[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
+				l+=2;
+			}
+			if (l==LTR) {
+				(double) fe += yl[l] * (double) Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+			}
+			BrF[i] = fe + fo;
+			i++;
+			BrF[NLAT-i] = fe - fo;
+			yl  += (LMAX-m+1);
+		}
+	} else {
+		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
+		i=0;
+		while (i<tm[im]) {	// polar optimization
+			BrF[i] = 0.0;
+			BrF[NLAT-tm[im] + i] = 0.0;	// south pole zeroes <=> BrF[im*NLAT + NLAT-(i+1)] = 0.0;
+			i++;
+		}
+		yl  = ylm[im] + i*(LMAX-m+1) -m;
+		while (i < NLAT_2) {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+			l=m;
+			fe = 0.0;	fo = 0.0;
+			while (l<LTR) {	// compute even and odd parts
+				fe  += yl[l] * Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+				fo  += yl[l+1] * Ql[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
+				l+=2;
+			}
+			if (l==LTR) {
+				fe  += yl[l] * Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+			}
+			BrF[i] = fe + fo;
+			i++;
+			BrF[NLAT-i] = fe - fo;
+			yl  += (LMAX-m+1);
+		}
+	}
+}
+
+void SHm_to_spat_dct(long int im, complex double *Qlm, complex double *BrF)
+{
+	complex double *Sl;
+	double *yl;
+	long int it,m,l;
+
+	BrF += NLAT*im;
+	if (im == 0) {
+		m=0;
+		Sl = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
+		yl = ylm_dct[im];
+		for (it=0; it<NLAT; it++)
+			BrF[it] = 0.0;		// zero out array (includes DCT padding)
+		for (l=m; l<LMAX; l+=2) {
+			for (it=0; it<=l; it+=2) {
+				(double) BrF[it]   += yl[it] *   (double) Sl[l];
+				(double) BrF[it+1] += yl[it+1] * (double) Sl[l+1];
+			}
+			yl += (l+2 - (m&1));
+		}
+		if (l==LMAX) {
+			for (it=0; it<=l; it+=2)
+				(double) BrF[it] += Sl[l] * (double) yl[it];
+		}
+	} else {
+		m=im*MRES;
+		Sl = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
+
+#ifdef SHT_DCT_IT_OUT
+		yl = ykm_dct[im] -m;
+		it = 0;
+		while (it < m) {
+			BrF[it] = 0.0;	BrF[it+1] = 0.0;
+			for (l=m; l<LMAX; l+=2) {
+				BrF[it]   += Sl[l]   * yl[l];
+				BrF[it+1] += Sl[l+1] * yl[l+1];
+			}
+			it+=2;
+			yl += (LMAX-m+1);
+		}
+		while (it < LMAX) {
+			BrF[it] = 0.0;	BrF[it+1] = 0.0;
+			for (l=it; l<LMAX; l+=2) {
+				BrF[it]   += Sl[l]   * yl[l];
+				BrF[it+1] += Sl[l+1] * yl[l+1];
+			}
+			it+=2;
+			yl += (LMAX-m+1);
+		}
+		while (it < NLAT) {
+			BrF[it] = 0.0;	BrF[it+1] = 0.0;
+			it+=2;
+		}
+#else
+		yl = ylm_dct[im];
+		for (it=0; it<NLAT; it++)
+			BrF[it] = 0.0;		// zero out array (includes DCT padding)
+		for (l=m; l<LMAX; l+=2) {
+			for (it=0; it<=l; it+=2) {
+				BrF[it]   += Sl[l]   * yl[it];
+				BrF[it+1] += Sl[l+1] * yl[it+1];
+			}
+			yl += (l+2 - (m&1));
+		}
+		if (l==LMAX) {
+			for (it=0; it<=l; it+=2)
+				BrF[it] += Sl[l] * yl[it];
+		}
+#endif
+	}
+	fftw_execute_r2r(idctm,(double *) BrF, (double *) BrF);		// iDCT
+  #if NPHI>1
+	if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
+		if (im & 1) {
+			for (it=0; it<NLAT; it++)
+				BrF[it] *= st[it];
+		}
+	}
+  #endif
+}
+
 	
 void write_vect(char *fn, double *vec, int N)
 {
@@ -68,9 +350,10 @@ int main()
 	double t,tmax,n2;
 	int i,im,m,l,jj;
 	clock_t tcpu;
+	ticks tik0, tik1;
 
 	srand( time(NULL) );	// initialise les nombres.
-	init_SH_dct( POLAR_OPT_THR );
+	init_SH( POLAR_OPT_THR );
 	
 	if (MMAX > 0) {
 		write_mx("yl1",ylm[1],NLAT_2,LMAX);
@@ -104,8 +387,9 @@ int main()
 	for (i=0;i<NLM;i++) {
 		Slm[i] = 0.0;
 	}
-	Slm[LiM(1,0)] = Y10_ct;
-	SH_to_spat(Slm,ShF);
+//	Slm[LiM(1,1)] = 1;
+	Slm[LiM(4,1)] = 1.0;
+	SH_to_spat_dct(Slm,ShF);
 	write_mx("spat",Sh,NPHI,NLAT);
 
 // spat_to_SH
@@ -114,7 +398,7 @@ int main()
 			Sh[im*NLAT+i] = ct[i];
 		}
 	}*/
-	spat_to_SH(ShF,Slm);
+	spat_to_SH_dct(ShF,Slm);
 	write_vect("ylm",Slm,NLM*2);		// should be sqrt(4pi/3) if l=1, zero if l!=1.
 //	return(1);
 
@@ -132,7 +416,52 @@ int main()
 // 	Slm[LM(10,4)] = -4.0-I;
 // 	Slm[LM(55,12)] = 5.0-2.0*I;
 
-	printf(":: performing %d scalar SHT with NL evaluation\n", SHT_ITER);
+#ifdef SHT_DCT
+
+/// TEST m by m and compare DCT to normal.
+	for (im=0; im <= MMAX; im++) {
+		m = im*MRES;
+		tcpu = clock();
+		tik0 = getticks();
+		for (jj=0; jj<SHT_ITER; jj++)	SHm_to_spat(im, Slm, ShF);
+		tik1 = getticks();
+		tcpu = clock() - tcpu;
+		printf("m=%d - iSHT x%d time : %d, ticks : %.0f\n", m, SHT_ITER, ((int )tcpu)/SHT_ITER, elapsed(tik1,tik0)/SHT_ITER);
+
+		tcpu = clock();
+		tik0 = getticks();
+		for (jj=0; jj<SHT_ITER; jj++)	SHm_to_spat_dct(im, Slm, ShF);
+		tik1 = getticks();
+		tcpu = clock() - tcpu;
+		printf("m=%d - iSHT_dct x%d time : %d, ticks : %.0f\n", m, SHT_ITER, ((int )tcpu)/SHT_ITER, elapsed(tik1,tik0)/SHT_ITER);
+
+		tcpu = clock();
+		tik0 = getticks();
+		for (jj=0; jj<SHT_ITER; jj++)	spat_to_SHm(im, ShF, Slm);
+		tik1 = getticks();
+		tcpu = clock() - tcpu;
+		printf("m=%d - SHT x%d time : %d, ticks : %.0f\n", m, SHT_ITER, ((int )tcpu)/SHT_ITER, elapsed(tik1,tik0)/SHT_ITER);
+
+		tcpu = clock();
+		tik0 = getticks();
+		for (jj=0; jj<SHT_ITER; jj++)	spat_to_SHm_dct(im, ShF, Slm);
+		tik1 = getticks();
+		tcpu = clock() - tcpu;
+		printf("m=%d - SHT_dct x%d time : %d, ticks : %.0f\n\n", m, SHT_ITER, ((int )tcpu)/SHT_ITER, elapsed(tik1,tik0)/SHT_ITER);
+	}
+
+#endif
+
+// test case...
+	t = 1.0 / (RAND_MAX/2);
+	for (i=0;i<NLM;i++) {
+		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		Slm[i] = Slm0[i];
+	}
+
+/// REGULAR
+	printf("[REG] :: performing %d scalar SHT with NL evaluation\n", SHT_ITER);
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
@@ -145,7 +474,7 @@ int main()
 		spat_to_SH(ShF,Slm);
 	}
 	tcpu = clock() - tcpu;
-	printf("2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
+	printf("  2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
 
 // compute error :
 	tmax = 0;	n2 = 0;
@@ -161,7 +490,44 @@ int main()
 		if (t>tmax) { tmax = t; jj = i; }
 	}
 	printf("  => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
-	write_vect("Qlm",Slm,NLM*2);
+	write_vect("Qlm.reg",Slm,NLM*2);
+
+// restore test case...
+	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];
+/// DCT
+	printf("[DCT] :: performing %d scalar SHT with NL evaluation\n", SHT_ITER);
+#ifdef SHT_DCT_IT_OUT
+	printf("         (IT_OUT variant : not working yet...)\n");
+#endif
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+// synthese (inverse legendre)
+		SH_to_spat_dct(Slm,ShF);
+		SH_to_spat_dct(Slm,ThF);
+		for (i=0; i< NLAT*NPHI; i++) {
+			ThF[i] *= ShF[i];
+		}
+// analyse (direct legendre)
+		spat_to_SH_dct(ShF,Slm);
+	}
+	tcpu = clock() - tcpu;
+	printf("  2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
+
+// compute error :
+	tmax = 0;	n2 = 0;
+	for (i=0;i<NLM;i++) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			Slm[i] = creal(Slm[i]-Slm0[i]);
+			t = fabs(creal(Slm[i]));
+		} else {
+			Slm[i] -= Slm0[i];
+			t = cabs(Slm[i]);
+		}
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	printf("  => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	write_vect("Qlm.dct",Slm,NLM*2);
 
 #define TEST_VECT_SHT
 #ifdef TEST_VECT_SHT
