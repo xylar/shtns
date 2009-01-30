@@ -385,12 +385,21 @@ int main()
 
 // SH_to_spat
 	for (i=0;i<NLM;i++) {
-		Slm[i] = 0.0;
+		Slm[i] = 0.0;	Tlm[i] = 0.0;
 	}
 //	Slm[LiM(1,1)] = 1;
-	Slm[LiM(4,1)] = 1.0;
-	SH_to_spat_dct(Slm,ShF);
+	Tlm[LiM(4,1)] = 1.0;
+	SH_to_spat(Slm,ShF);
 	write_mx("spat",Sh,NPHI,NLAT);
+	SH_to_spat_dct(Slm,ShF);
+	write_mx("spat_dct",Sh,NPHI,NLAT);
+
+	SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+	write_mx("spatt",Sh,NPHI,NLAT);
+	write_mx("spatp",Th,NPHI,NLAT);
+	SHsphtor_to_spat_dct(Slm,Tlm,ShF,ThF);
+	write_mx("spatt_dct",Sh,NPHI,NLAT);
+	write_mx("spatp_dct",Th,NPHI,NLAT);
 
 // spat_to_SH
 /*	for (im=0;im<NPHI;im++) {
@@ -477,7 +486,7 @@ int main()
 	printf("  2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
 
 // compute error :
-	tmax = 0;	n2 = 0;
+	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
 		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
 			Slm[i] = creal(Slm[i]-Slm0[i]);
@@ -514,7 +523,7 @@ int main()
 	printf("  2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
 
 // compute error :
-	tmax = 0;	n2 = 0;
+	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
 		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
 			Slm[i] = creal(Slm[i]-Slm0[i]);
@@ -541,19 +550,21 @@ int main()
 	for (jj=0; jj< SHT_ITER; jj++) {
 #ifndef _SHT_EO_
 // synthese (inverse legendre)
-		SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+		SHsphtor_to_spat_dct(Slm,Tlm,ShF,ThF);
 // analyse (direct legendre)
 		spat_to_SHsphtor(ShF,ThF,Slm,Tlm);
 #else
-		SHsphtor_to_spat(Slm,Slm,ShF,ThF);
+		SHsphtor_to_spat_dct(Slm,Slm,ShF,ThF);
 		spat_to_SHsphtor(ShF,ThF,Slm,Slm);
 #endif
 	}
 	tcpu = clock() - tcpu;
 	printf("iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
 
+//	write_vect("dylm0", dylm_dct[0]
+
 // compute error :
-	tmax = 0;	n2 = 0;
+	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
 		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
 			Slm[i] = creal(Slm[i]-Slm0[i]);
@@ -569,7 +580,7 @@ int main()
 	write_vect("Slm",Slm,NLM*2);
 
 // compute error :
-	tmax = 0;	n2 = 0;
+	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
 		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
 			Tlm[i] = creal(Tlm[i]- Tlm0[i]);
@@ -583,6 +594,7 @@ int main()
 	}
 	printf("  Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Tlm",Tlm,NLM*2);
+
 #endif
 }
 

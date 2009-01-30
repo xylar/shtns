@@ -426,6 +426,8 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 #endif
 }
 
+#include "SHT/dct_SH_to_spat.gen.c"
+
 void SHsph_to_spat(complex double *Slm, complex double *BtF, complex double *BpF)
 {
 #include "SHT/SHs_to_spat.c"
@@ -925,6 +927,7 @@ void dry_SHm_to_spat_dct(long int im, complex double *Sl, complex double *BrF, d
 		}
 	} else {
 		m=im*MRES;
+	#ifdef SHT_DCT_IT_OUT
 		it = 0;
 		while (it < m) {
 			BrF[it] = 0.0;	BrF[it+1] = 0.0;
@@ -948,7 +951,7 @@ void dry_SHm_to_spat_dct(long int im, complex double *Sl, complex double *BrF, d
 			BrF[it] = 0.0;	BrF[it+1] = 0.0;
 			it+=2;
 		}
-/*
+	#else
 		for (it=0; it<NLAT; it++)
 			BrF[it] = 0.0;		// zero out array (includes DCT padding)
 		for (l=m; l<LMAX; l+=2) {
@@ -962,7 +965,7 @@ void dry_SHm_to_spat_dct(long int im, complex double *Sl, complex double *BrF, d
 			for (it=0; it<=l; it+=2)
 				BrF[it] += Sl[l] * yl[it];
 		}
-*/
+	#endif
 	}
 	fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
   #if NPHI>1
@@ -981,10 +984,11 @@ void init_SH(double eps)
 	double tg[NLAT_2], xg[NLAT], wg[NLAT], sg[NLAT_2], sg_1[NLAT_2], sg_2[NLAT_2];	// gauss points and weights.
 	double *cktg;		// temp storage for cos(k*tg);
 	double *yk, *yg, *dygt, *dygp;		// temp storage for Plm(xg)
+	struct DtDp *dyg;
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
 	double iylm_fft_norm = 2.0*M_PI/NPHI;	// normation FFT pour zlm
 	double t,tsum;
-	long int it,im,m,l;
+	long int it,im,m,l, lm, dlm;
 
 	long int time_sht()	// this sub-routine performs timings to compare the "dct" algorithm to the "non-dct" one.
 	{
@@ -1078,23 +1082,29 @@ void init_SH(double eps)
 		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m);
 		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -m);
 	}
-	for(im=0, it=0; im<=MMAX; im++) {	// how much memory to allocate for ylm dct
+	for(im=0, lm=0, dlm=0; im<=MMAX; im++) {	// how much memory to allocate for ylm dct
 		m = im*MRES;
-		for (l=m;l<=LMAX;l+=2) it += (l+2 - (m&1));
+		for (l=m;l<=LMAX;l+=2) {
+			lm += (l+2 - (m&1));
+			dlm += l+3;	//(l+1 + (m&1));
+		}
 	}
 #ifdef _SH_DEBUG_
 	printf("          Memory used for Ylm and Zlm matrices = %.3f Mb\n",6.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
-	printf("          Memory used for Ylm_dct matrices = %.3f Mb\n",3.0*sizeof(double)*it/(1024.*1024.));
+	printf("          Memory used for Ylm_dct matrices = %.3f Mb\n",sizeof(double)*(lm + 2*dlm)/(1024.*1024.));
 #endif
-	ylm_dct[0] = (double *) fftw_malloc(sizeof(double)* it);
-	dylm_dct[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* it);
+	ylm_dct[0] = (double *) fftw_malloc(sizeof(double)* lm);
+	dylm_dct[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* dlm);
 	zlm_dct[0] = (double *) fftw_malloc( sizeof(double)* NLM*(NLAT+1) );	// quantite a revoir...
 	ykm_dct[0] = (double *) fftw_malloc(sizeof(double)* NLM*(LMAX+1));
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
-		for (l=m, it=0; l<=LMAX; l+=2) it += (l+2 - (m&1));
-		ylm_dct[im+1] = ylm_dct[im] + it;
-		dylm_dct[im+1] = dylm_dct[im] + it;
+		for (l=m, lm=0, dlm=0; l<=LMAX; l+=2) {
+			lm += (l+2 - (m&1));
+			dlm += l+3;	//(l+1 + (m&1));
+		}
+		ylm_dct[im+1] = ylm_dct[im] + lm;
+		dylm_dct[im+1] = dylm_dct[im] + dlm;
 		zlm_dct[im+1] = zlm_dct[im] + ((LMAX-m+2)/2)*NLAT;
 		ykm_dct[im+1] = ykm_dct[im] + (LMAX+1)*(LMAX+1-m);
 	}
@@ -1116,6 +1126,7 @@ void init_SH(double eps)
 		}
 	// go to DCT space
 		yg = ylm_dct[im];
+		dyg = dylm_dct[im];
 		yk = ykm_dct[im];
 		for (it=0;it<=LMAX;it++) {
 			for(l=m; l<=LMAX; l++)
@@ -1123,23 +1134,55 @@ void init_SH(double eps)
 		}
 		for (l=m; l<=LMAX; l++) {
 			if (m & 1) {	// m odd
-				for (it=0; it<NLAT_2; it++) Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)] / st[it];	// P[l-1](x)
+				for (it=0; it<NLAT_2; it++) {
+					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)] / st[it];	// P[l-1](x)
+					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t;
+					dZp[it] = dylm[im][it*(LMAX-m+1) + (l-m)].p;
+				}
 			} else {	// m even
-				for (it=0; it<NLAT_2; it++) Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)];		// P[l](x)
+				for (it=0; it<NLAT_2; it++) {
+					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)];		// P[l](x)
+					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t / st[it];
+					dZp[it] = dylm[im][it*(LMAX-m+1) + (l-m)].p / st[it];
+				}
 			}
-			for (it=NLAT_2; it<NLAT; it++) Z[it] = -(((l-m)&1)*2 - 1)* Z[NLAT-it-1];	// reconstruct even/odd part
+			if ((l-m)&1) {	// odd
+				for (it=NLAT_2; it<NLAT; it++) {
+					Z[it]   = - Z[NLAT-it-1];	// reconstruct even/odd part
+					dZt[it] =   dZt[NLAT-it-1];
+					dZp[it] = - dZp[NLAT-it-1];
+				}
+			} else {	// even
+				for (it=NLAT_2; it<NLAT; it++) {
+					Z[it] =     Z[NLAT-it-1];	// reconstruct even/odd part
+					dZt[it] = - dZt[NLAT-it-1];
+					dZp[it] =   dZp[NLAT-it-1];
+				}
+			}
 			fftw_execute(dct);
+			fftw_execute_r2r(dct, dZt, dZt);
+			fftw_execute_r2r(dct, dZp, dZp);
 #ifdef _SH_DEBUG_
 			if (LMAX <= 12) {
 				printf("\nl=%d, m=%d ::\t", l,m);
 				for(it=0;it<NLAT;it++) printf("%f ",Z[it]);
+				printf("\n     dZt ::\t", l,m);
+				for(it=0;it<NLAT;it++) printf("%f ",dZt[it]);
+				printf("\n     dZp ::\t", l,m);
+				for(it=0;it<NLAT;it++) printf("%f ",dZp[it]);
 			}
 #endif
 			for (it=(l-m)&1; it<=l; it+=2) {
 				yg[it] = Z[it]/(2*NLAT);	// store non-zero coeffs.
+				dyg[it].p = dZp[it]/(2*NLAT);
 				yk[it*(LMAX+1-m) + (l-m)] = Z[it]/(2*NLAT);		// and transpose
 			}
-			if ((l-m)&1)  yg += (l+1 - (m&1));	// l-m odd : go to next line of storage.
+			for (it=(l+1-m)&1; it<=l; it+=2)
+				dyg[it].t = dZt[it]/(2*NLAT);	// store non-zero coeffs.
+			if ((l-m)&1) {
+				yg += (l+1 - (m&1));	// l-m odd : go to next line of storage.
+				dyg += l+2;	//(l + (m&1));
+			}
 		}
 	}
 
@@ -1173,7 +1216,7 @@ void init_SH(double eps)
 			}
 			Z[k] = sum * iylm_fft_norm/NLAT_2;
 			dZp[k] = dpsum * iylm_fft_norm/(NLAT_2 *l*(l+1));
-			if (l==0) { dZp[k] == 0.0; }
+			if (l==0) { dZp[k] = 0.0; }
 		}
 		for (k=k1; k<NLAT; k+=2) {
 			dtsum = 0.0;
@@ -1187,7 +1230,13 @@ void init_SH(double eps)
 		if (LMAX <= 12) {
 			printf("\nl=%d, m=%d ::\t",l,m);
 			for (k=0; k<NLAT; k++) printf("%f ",Z[k]);
+			printf("\n       dZt ::\t");
+			for (k=0; k<NLAT; k++) printf("%f ",dZt[k]);
+			printf("\n       dZp ::\t");
+			for (k=0; k<NLAT; k++) printf("%f ",dZp[k]);
 		}
+		for (k=0, sum=0.0; k<l; k++) if (Z[k]*Z[k] > sum) sum = Z[k]*Z[k];
+		printf("\nmax Z[k] for k<l is : %g",sqrt(sum));
 #endif
 		if (k0==0) {
 			for (k=0;k<NLAT;k++) zlm_dct[m/MRES][((l-m)>>1)*NLAT +k] = 0.0;

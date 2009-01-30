@@ -4,42 +4,10 @@
 	#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 + Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
-+ BUG: xspp disc seems ok for n = z, and n.z=0. others seem ok but not sure...
 
 *** Optimizations ***
 
-+ OpenMP parallelization : 8 threads on r2d2 cluster gives a x 5.45 speedup compared to 1 thread (Navier-Stokes only)
-     code is validated: exactly same result with 8 threads or without OpenMP.
-
-- mask
-- try blas ?
-- time different implementations and chose the fastest...
-- use blas ???
-
-? grid : try full NR*NLM matrices, loops are more efficient but what about cache ???
-? wouldn't it be better to store Tlm and Plm with m contiguous for each l ???
 ? (- use "alloca()" to allocate temp memory on the stack with variable lengths) // ultrafast but not ANSI
-
-*** Features ***
-+ velocity field computation
-+ inner core differential rotation
-+ linear mode : linearized MHD equation
-+ no_j0xb0 mode : do not include j0xb0 in MHD equation (like D. Jault 2008 study)
-
-- **** Boundary condition handling should be improved !!! ****
-- BACKGROUND boundary-condition should be added
-
-- compute spectrum and use them...
--+ boundary conditions dependence should be checked and improved.
--   ghost point could be mapped with a pointer !!! (or not)
-
-- euler explicit (order 1), better suited for fast waves.
-- variable time-step
-- penalization method for complex geometry.
-
-? conducting outer shell
-? insulating inner core
-
 
 *** SHT.c
 - SHT : implement even and odd l sub-cases.
@@ -57,3 +25,5 @@
 	only 10% performance increase ! I would have expected more...
 + NLAT odd is now allowed
 	special treatment in SHT function. (but could be improved : point NLAT_2 has only even component)
+
+- Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
