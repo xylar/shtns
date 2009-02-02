@@ -10,6 +10,9 @@
 ? (- use "alloca()" to allocate temp memory on the stack with variable lengths) // ultrafast but not ANSI
 
 *** SHT.c
+
+for SHsphtor_to_spat, maybe storing .t and .p together is not the best...
+
 - SHT : implement even and odd l sub-cases.
 	should not change array sizes. only SHT function calls may (must) be different.
 -!!!	grid.c should also treat even/odd sub-cases. !!!

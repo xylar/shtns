@@ -59,8 +59,8 @@ Q		zl = zlm_dct[im];
 		while (l<LTR) {		// l has parity of m
 Q			Ql[l] = 0.0;	Ql[l+1] = 0.0;
 			for (k=l; k<=NLAT; k+=2) {		// for m=0, zl coeff with k<l are zeros.
-Q				(double) Ql[l]   += (double) BrF[k]   * zl[k];
-Q				(double) Ql[l+1] += (double) BrF[k+1] * zl[k+1];
+Q				(double) Ql[l]   += ((double *)BrF)[k]   * zl[k];
+Q				(double) Ql[l+1] += ((double *)BrF)[k+1] * zl[k+1];
 			}
 			l+=2;
 Q			zl += NLAT;
@@ -68,7 +68,7 @@ Q			zl += NLAT;
 		if ((LTR & 1) == 0) {	// if (l == LTR)  <=>  if ((LTR & 1) == 0) for m=0
 Q			Ql[l] = 0.0;
 			for (k=l; k<=NLAT; k+=2) {		// for m=0, DCT coeff with k<l are zeros.
-Q				(double) Ql[l]   += (double) BrF[k]   * zl[k];
+Q				(double) Ql[l]   += ((double *)BrF)[k]   * zl[k];
 			}
 		}
 Q		BrF += NLAT;

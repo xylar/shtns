@@ -20,10 +20,10 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
-#define NLAT_2 5
-#define LMAX 6
-#define NPHI 16
-#define MMAX 5
+#define NLAT_2 256
+#define LMAX 340
+#define NPHI 32
+#define MMAX 10
 #define MRES 1
 
 #define _SH_DEBUG_
@@ -451,12 +451,12 @@ int main()
 		tcpu = clock() - tcpu;
 		printf("m=%d - SHT x%d time : %d, ticks : %.0f\n", m, SHT_ITER, ((int )tcpu)/SHT_ITER, elapsed(tik1,tik0)/SHT_ITER);
 
-		tcpu = clock();
+/*		tcpu = clock();
 		tik0 = getticks();
 		for (jj=0; jj<SHT_ITER; jj++)	spat_to_SHm_dct(im, ShF, Slm);
 		tik1 = getticks();
 		tcpu = clock() - tcpu;
-		printf("m=%d - SHT_dct x%d time : %d, ticks : %.0f\n\n", m, SHT_ITER, ((int )tcpu)/SHT_ITER, elapsed(tik1,tik0)/SHT_ITER);
+		printf("m=%d - SHT_dct x%d time : %d, ticks : %.0f\n\n", m, SHT_ITER, ((int )tcpu)/SHT_ITER, elapsed(tik1,tik0)/SHT_ITER);*/
 	}
 
 #endif
@@ -475,7 +475,7 @@ int main()
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
 		SH_to_spat(Slm,ShF);
-		SH_to_spat(Slm,ThF);
+		SH_to_spat(Tlm,ThF);
 		for (i=0; i< NLAT*NPHI; i++) {
 			ThF[i] *= ShF[i];
 		}
@@ -512,12 +512,12 @@ int main()
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
 		SH_to_spat_dct(Slm,ShF);
-		SH_to_spat_dct(Slm,ThF);
+		SH_to_spat_dct(Tlm,ThF);
 		for (i=0; i< NLAT*NPHI; i++) {
 			ThF[i] *= ShF[i];
 		}
 // analyse (direct legendre)
-		spat_to_SH_dct(ShF,Slm);
+		spat_to_SH(ShF,Slm);
 	}
 	tcpu = clock() - tcpu;
 	printf("  2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
@@ -540,7 +540,62 @@ int main()
 
 #define TEST_VECT_SHT
 #ifdef TEST_VECT_SHT
-	printf(":: performing %d vector SHT\n", SHT_ITER);
+	printf("[REG] :: performing %d vector SHT\n", SHT_ITER);
+	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
+	}
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+#ifndef _SHT_EO_
+// synthese (inverse legendre)
+		SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+// analyse (direct legendre)
+		spat_to_SHsphtor(ShF,ThF,Slm,Tlm);
+#else
+		SHsphtor_to_spat(Slm,Slm,ShF,ThF);
+		spat_to_SHsphtor(ShF,ThF,Slm,Slm);
+#endif
+	}
+	tcpu = clock() - tcpu;
+	printf("iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
+
+//	write_vect("dylm0", dylm_dct[0]
+
+// compute error :
+	tmax = 0;	n2 = 0;		jj=0;
+	for (i=0;i<NLM;i++) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			Slm[i] = creal(Slm[i]-Slm0[i]);
+			t = fabs(creal(Slm[i]));
+		} else {
+			Slm[i] -= Slm0[i];
+			t = cabs(Slm[i]); 
+		}
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	printf("  Spheroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	write_vect("Slm",Slm,NLM*2);
+
+// compute error :
+	tmax = 0;	n2 = 0;		jj=0;
+	for (i=0;i<NLM;i++) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			Tlm[i] = creal(Tlm[i]- Tlm0[i]);
+			t = fabs(creal(Tlm[i]));
+		} else {
+			Tlm[i] -= Tlm0[i];
+			t = cabs(Tlm[i]); 
+		}
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	printf("  Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	write_vect("Tlm",Tlm,NLM*2);
+
+	printf("[DCT] :: performing %d vector SHT\n", SHT_ITER);
 	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	for (i=0;i<NLM;i++) {

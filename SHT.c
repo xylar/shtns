@@ -249,8 +249,13 @@ void spat_to_SH_dct(complex double *BrF, complex double *Qlm)
 	complex double *Sl;		// virtual pointers for given im
 	double *zl;
 	long int k,im,m,l;
+  #if NPHI > 1
+  #else
+  #endif
 
   #if NPHI > 1
+	#define BR0 BrF
+
 	fftw_execute_dft_r2c(fft,(double *) BrF, BrF);
 	if (MRES & 1) {		// odd m's are present
 		for (im=1; im<=MMAX; im+=2) {
@@ -258,7 +263,8 @@ void spat_to_SH_dct(complex double *BrF, complex double *Qlm)
 		}
 	}
   #else
-	fft_m0_r2c((double *) BrF, BrF);
+	#define BR0 ((double *)BrF)
+//	fft_m0_r2c((double *) BrF, BrF);
   #endif
 	fftw_execute_r2r(dct,(double *) BrF, (double *) BrF);		// DCT
 
@@ -268,15 +274,15 @@ void spat_to_SH_dct(complex double *BrF, complex double *Qlm)
 		for (l=m; l<LMAX; l+=2) {		// l has parity of m
 			Sl[l] = 0.0;	Sl[l+1] = 0.0;
 			for (k=l; k<NLAT; k+=2) {		// for m=0, zl coeff with k<l are zeros.
-				(double) Sl[l]   += (double) BrF[k]   * zl[k];
-				(double) Sl[l+1] += (double) BrF[k+1] * zl[k+1];
+				(double) Sl[l]   += (double) BR0[k]   * zl[k];
+				(double) Sl[l+1] += (double) BR0[k+1] * zl[k+1];
 			}
 			zl += NLAT;
 		}
 		if ((LMAX & 1) == 0) {	// if (l == LMAX)  <=>  if ((LMAX & 1) == 0) for m=0
 			Sl[l] = 0.0;
 			for (k=l; k<NLAT; k+=2) {		// for m=0, DCT coeff with k<l are zeros.
-				(double) Sl[l]   += (double) BrF[k]   * zl[k];
+				(double) Sl[l]   += (double) BR0[k]   * zl[k];
 			}
 		}
 		BrF += NLAT;
@@ -318,93 +324,8 @@ void SH_to_spat(complex double *Qlm, complex double *BrF)
 
 void SH_to_spat_dct(complex double *Qlm, complex double *BrF)
 {
-	complex double *Sl;
-	double *yl;
-	long int it,im,m,l;
-
-	im=0;	m=0;
-		Sl = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
-		yl = ylm_dct[im];
-		for (it=0; it<NLAT; it++)
-			BrF[it] = 0.0;		// zero out array (includes DCT padding)
-		for (l=m; l<LMAX; l+=2) {
-			for (it=0; it<=l; it+=2) {
-				(double) BrF[it]   += yl[it] *   (double) Sl[l];
-				(double) BrF[it+1] += yl[it+1] * (double) Sl[l+1];
-			}
-			yl += (l+2 - (m&1));
-		}
-		if (l==LMAX) {
-			for (it=0; it<=l; it+=2)
-				(double) BrF[it] += Sl[l] * (double) yl[it];
-		}
-		BrF += NLAT;
-	for (im=1;im<=MMAX;im++) {
-		m=im*MRES;
-		Sl = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
-//	#define SHT_DCT_IT_OUT
-	#ifdef SHT_DCT_IT_OUT
-		yl = ykm_dct[im] -m;
-		it = 0;
-		while (it < m) {
-			BrF[it] = 0.0;	BrF[it+1] = 0.0;
-			for (l=m; l<LMAX; l+=2) {
-				BrF[it]   += Sl[l]   * yl[l];
-				BrF[it+1] += Sl[l+1] * yl[l+1];
-			}
-			it+=2;
-			yl += (LMAX-m+1);
-		}
-		while (it < LMAX) {
-			BrF[it] = 0.0;	BrF[it+1] = 0.0;
-			for (l=it; l<LMAX; l+=2) {
-				BrF[it]   += Sl[l]   * yl[l];
-				BrF[it+1] += Sl[l+1] * yl[l+1];
-			}
-			it+=2;
-			yl += (LMAX-m+1);
-		}
-		while (it < NLAT) {
-			BrF[it] = 0.0;	BrF[it+1] = 0.0;
-			it+=2;
-		}
-	#else
-		yl = ylm_dct[im];
-		for (it=0; it<NLAT; it++)
-			BrF[it] = 0.0;		// zero out array (includes DCT padding)
-		for (l=m; l<LMAX; l+=2) {
-			for (it=0; it<=l; it+=2) {
-				BrF[it]   += Sl[l]   * yl[it];
-				BrF[it+1] += Sl[l+1] * yl[it+1];
-			}
-			yl += (l+2 - (m&1));
-		}
-		if (l==LMAX) {
-			for (it=0; it<=l; it+=2)
-				BrF[it] += Sl[l] * yl[it];
-		}
-	#endif
-		BrF += NLAT;
-	}
-	for (it=0; it < NLAT*(NPHI/2 -MMAX); it++) {	// FFT padding for high m's
-		BrF[it] = 0.0;
-	}
-
-	BrF -= NLAT*(MMAX+1);		// restore original pointer
-	fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
-  #if NPHI>1
-	if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
-		for (im=1; im<=MMAX; im+=2) {
-			for (it=0; it<NLAT; it++)
-				BrF[im*NLAT + it] *= st[it];
-		}
-	}
-	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
-  #else
-	ifft_m0_c2r(BrF, (double *) BrF);
-  #endif
+  #include "SHT/dct_SH_to_spat.c"
 }
-
 
 //void SH_to_grad_spat(complex double *Slm, complex double *BtF, complex double *BpF)
 // "grad_spat" and "sph_to_spat" are the same : so we alias them.
@@ -426,7 +347,10 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 #endif
 }
 
-#include "SHT/dct_SH_to_spat.gen.c"
+void SHsphtor_to_spat_dct(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF)
+{
+  #include "SHT/dct_SHst_to_spat.c"
+}
 
 void SHsph_to_spat(complex double *Slm, complex double *BtF, complex double *BpF)
 {
@@ -656,21 +580,31 @@ void planFFT()
 	idct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 	idct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 */
+
 	dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
 	hdims[0].n = MMAX+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
 	hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
+  #if NPHI > 1
 	r2r_kind = FFTW_REDFT10;
 	dct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
 	r2r_kind = FFTW_REDFT01;
 	idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
 	if ((dct == NULL)||(idct == NULL))
 		runerr("[FFTW] dct planning failed !");
-
 /// M=0 DCT
 	r2r_kind = FFTW_REDFT10;
-	dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+	dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
 	if (dctm0 == NULL)
 		runerr("[FFTW] dctm0 planning failed !");
+  #else
+	r2r_kind = FFTW_REDFT10;
+	dct = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
+	dctm0 = dct;
+	r2r_kind = FFTW_REDFT01;
+	idct = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
+	if ((dct == NULL)||(idct == NULL))
+		runerr("[FFTW] dct planning failed !");
+  #endif
 
 /// TIME SHT SPECIAL
 	hdims[0].n = 1;
@@ -908,23 +842,26 @@ void dry_SHm_to_spat(long int im, complex double *Ql, complex double *BrF, doubl
 
 void dry_SHm_to_spat_dct(long int im, complex double *Sl, complex double *BrF, double *yl)
 {
+//		double *Br0;
 	long int it,m,l;
 
 	if (im == 0) {
+//		Br0 = BrF;
 		m=0;
 		for (it=0; it<NLAT; it++)
 			BrF[it] = 0.0;		// zero out array (includes DCT padding)
 		for (l=m; l<LMAX; l+=2) {
 			for (it=0; it<=l; it+=2) {
-				(double) BrF[it]   += yl[it] *   (double) Sl[l];
-				(double) BrF[it+1] += yl[it+1] * (double) Sl[l+1];
+				BrF[it]   += yl[it] *   (double) Sl[l];
+				BrF[it+1] += yl[it+1] * (double) Sl[l+1];
 			}
 			yl += (l+2 - (m&1));
 		}
 		if (l==LMAX) {
 			for (it=0; it<=l; it+=2)
-				(double) BrF[it] += Sl[l] * (double) yl[it];
+				BrF[it] += Sl[l] * (double) yl[it];
 		}
+		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
 	} else {
 		m=im*MRES;
 	#ifdef SHT_DCT_IT_OUT
@@ -966,16 +903,14 @@ void dry_SHm_to_spat_dct(long int im, complex double *Sl, complex double *BrF, d
 				BrF[it] += Sl[l] * yl[it];
 		}
 	#endif
-	}
-	fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
-  #if NPHI>1
-	if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
-		if (im & 1) {
-			for (it=0; it<NLAT; it++)
-				BrF[it] *= st[it];
+		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
+		if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
+			if (im & 1) {
+				for (it=0; it<NLAT; it++)
+					BrF[it] *= st[it];
+			}
 		}
 	}
-  #endif
 }
 
 void init_SH(double eps)
@@ -997,6 +932,10 @@ void init_SH(double eps)
 		long int im, jj, jmax, mmax_dct;
 		double tdct[MMAX+1], treg[MMAX+1];
 		ticks t0, t1;
+
+		#ifdef _SH_DEBUG_
+		printf("timings  REG    DCT    gain\n");
+		#endif
 
 		Slm = (complex double *) fftw_malloc(sizeof(complex double)* 10*NLAT);	// alloc more so that there is no caching artifacts.
 		ShF = (complex double *) fftw_malloc(sizeof(complex double)* 10*NLAT);
@@ -1086,7 +1025,7 @@ void init_SH(double eps)
 		m = im*MRES;
 		for (l=m;l<=LMAX;l+=2) {
 			lm += (l+2 - (m&1));
-			dlm += l+3;	//(l+1 + (m&1));
+			dlm += l+2;	//(l+1 + (m&1));
 		}
 	}
 #ifdef _SH_DEBUG_
@@ -1101,7 +1040,7 @@ void init_SH(double eps)
 		m = im*MRES;
 		for (l=m, lm=0, dlm=0; l<=LMAX; l+=2) {
 			lm += (l+2 - (m&1));
-			dlm += l+3;	//(l+1 + (m&1));
+			dlm += l+2;	//(l+1 + (m&1));
 		}
 		ylm_dct[im+1] = ylm_dct[im] + lm;
 		dylm_dct[im+1] = dylm_dct[im] + dlm;
@@ -1181,7 +1120,7 @@ void init_SH(double eps)
 				dyg[it].t = dZt[it]/(2*NLAT);	// store non-zero coeffs.
 			if ((l-m)&1) {
 				yg += (l+1 - (m&1));	// l-m odd : go to next line of storage.
-				dyg += l+2;	//(l + (m&1));
+				dyg += l+1;	//(l + (m&1));
 			}
 		}
 	}
@@ -1236,7 +1175,7 @@ void init_SH(double eps)
 			for (k=0; k<NLAT; k++) printf("%f ",dZp[k]);
 		}
 		for (k=0, sum=0.0; k<l; k++) if (Z[k]*Z[k] > sum) sum = Z[k]*Z[k];
-		printf("\nmax Z[k] for k<l is : %g",sqrt(sum));
+//		printf("\nmax Z[k] for k<l is : %g",sqrt(sum));
 #endif
 		if (k0==0) {
 			for (k=0;k<NLAT;k++) zlm_dct[m/MRES][((l-m)>>1)*NLAT +k] = 0.0;
@@ -1324,7 +1263,6 @@ void init_SH(double eps)
 #endif
 	}
 
-	printf("timings  REG    DCT    gain\n");
 	m = time_sht();
 
 	planFFT();		// initialize fftw

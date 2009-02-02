@@ -6,7 +6,7 @@
 # to keep or remove the line depending on the function to build.
 # tags :
 # Q : line for scalar transform
-# V : line for vector transform (spheroidal and toroidal)
+# V : line for vector transform (both spheroidal and toroidal)
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
@@ -173,17 +173,10 @@ Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
 	for (i=0; i < NLAT*(NPHI/2 -MTR); i++) {	// padding for high m's
-	//for(im=MTR+1; im<=NPHI/2; im++) {	// padding for high m's
-	//	for (i=0;i<NLAT;i++) {
 Q			BrF[i] = 0.0;
 V			BtF[i] = 0.0;	BpF[i] = 0.0;
-	//	}
-Q	//	BrF += NLAT;
-V	//	BtF += NLAT;	BpF += NLAT;
 	}
 
-Q	//BrF -= NLAT*(NPHI/2+1);		// restore original pointer
-V	//BtF -= NLAT*(NPHI/2+1);	BpF -= NLAT*(NPHI/2+1);		// restore original pointers
 Q	BrF -= NLAT*(MTR+1);		// restore original pointer
 V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);		// restore original pointers
  #if NPHI>1
