@@ -58,21 +58,21 @@ V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
 Q		zl = zlm_dct[im];
 		while (l<LTR) {		// l has parity of m
 Q			Ql[l] = 0.0;	Ql[l+1] = 0.0;
-			for (k=l; k<=NLAT; k+=2) {		// for m=0, zl coeff with k<l are zeros.
-Q				(double) Ql[l]   += ((double *)BrF)[k]   * zl[k];
-Q				(double) Ql[l+1] += ((double *)BrF)[k+1] * zl[k+1];
+			for (i=l; i<=NLAT; i+=2) {		// for m=0, zl coeff with i<l are zeros.
+Q				(double) Ql[l]   += ((double *)BrF)[i]   * zl[i];
+Q				(double) Ql[l+1] += ((double *)BrF)[i+1] * zl[i+1];
 			}
 			l+=2;
 Q			zl += NLAT;
 		}
 		if ((LTR & 1) == 0) {	// if (l == LTR)  <=>  if ((LTR & 1) == 0) for m=0
 Q			Ql[l] = 0.0;
-			for (k=l; k<=NLAT; k+=2) {		// for m=0, DCT coeff with k<l are zeros.
-Q				(double) Ql[l]   += ((double *)BrF)[k]   * zl[k];
+			for (i=l; i<=NLAT; i+=2) {		// for m=0, DCT coeff with it<l are zeros.
+Q				(double) Ql[l]   += ((double *)BrF)[i]   * zl[i];
 			}
 		}
 Q		BrF += NLAT;
-  #else	*/
+  #else*/
   #if NPHI > 1
  B		for (i=0;i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
 QB			(double) reo[2*i]   = (double) BrF[i] + (double) BrF[NLAT-(i+1)];
