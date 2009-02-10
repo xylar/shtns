@@ -20,10 +20,10 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
-#define NLAT_2 192
-#define LMAX 381
+#define NLAT_2 5
+#define LMAX 7
 #define NPHI 32
-#define MMAX 10
+#define MMAX 7
 #define MRES 1
 
 #define _SH_DEBUG_
@@ -37,7 +37,7 @@ double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 #define POLAR_OPT_THR 1e-6
 //#define POLAR_OPT_THR 0
 // number of SH iterations
-#define SHT_ITER 100
+#define SHT_ITER 1
 
 void spat_to_SHm(long int im, complex double *BrF, complex double *Qlm)
 {

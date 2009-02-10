@@ -23,6 +23,8 @@ Q	complex double *Ql;
 S	complex double *Sl;
 T	complex double *Tl;
 Q	double *yl;
+Q	complex double re,ro;
+V	complex double te,to, pe,po;
 V	struct DtDp *dyl;
   #if NPHI > 1
 Q	#define BR0 BrF
@@ -56,7 +58,7 @@ S				BT0[k+1] += dyl[k+1].t * (double) Sl[l];
 T				BP0[k+1] -= dyl[k+1].t * (double) Tl[l];
 			}
 Q			yl += l+2;	//(l+2 - (m&1));
-V			dyl += l+2;	//(l+1 + (m&1));
+V			dyl += l+2;
 		}
 		if (l==LTR) {
 			for (k=0; k<=l; k+=2) {
@@ -74,13 +76,68 @@ Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
 S		Sl = &Slm[LiM(0,im)];
 T		Tl = &Tlm[LiM(0,im)];
 
+  #define ALT
+  #ifdef ALT
+Q		yl = ykm_dct[im] -m;
+V		dyl = dykm_dct[im] -m;
+		k=0;
+		while (k<LTR) {
+Q			l = (k < m) ? m : k+(m&1);
+V			l = (k < m) ? m : k-(m&1);
+Q			re = 0.0;	ro = 0.0;
+V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;			
+			while(l<LTR) {
+Q				re += yl[l]   * Ql[l];
+Q				ro += yl[l+1] * Ql[l+1];
+V				te += 
+T					  dyl[l].p   * (I*Tl[l])
+S					+ dyl[l+1].t   * Sl[l+1]
+V					;
+V				po +=
+S					  dyl[l+1].p * (I*Sl[l+1])
+T					- dyl[l].t * Tl[l]
+V					;
+V				pe += 
+S					  dyl[l].p   * (I*Sl[l])
+T					- dyl[l+1].t   * Tl[l+1]
+V					;
+V				to += 
+T					  dyl[l+1].p * (I*Tl[l+1])
+S					+ dyl[l].t * Sl[l]
+V					;
+				l+=2;
+			}
+			if (l==LTR) {
+Q				re += yl[l]   * Ql[l];
+T				te += dyl[l].p   * (I*Tl[l]);
+S				pe += dyl[l].p   * (I*Sl[l]);
+S				to += dyl[l].t * Sl[l];
+T				po -= dyl[l].t * Tl[l];
+			}
+Q			BrF[k] = re;	BrF[k+1] = ro;
+V			BtF[k] = te;	BtF[k+1] = to;
+V			BpF[k] = pe;	BpF[k+1] = po;
+			k+=2;
+Q			yl+=LMAX+1-m;
+V			dyl+=LMAX+1-m;
+		}
+Q		if ( ((LTR&1)==0) && ((m&1)==0) ) {	// k=LTR
+Q			BrF[k] = yl[k]   * Ql[k];
+Q			k++;
+Q		}
+		while (k<NLAT) {
+Q			BrF[k] = 0.0;
+V			BtF[k] = 0.0;	BpF[k] = 0.0;
+			k++;
+		}
+  #else
 Q		yl = ylm_dct[im];
 V		dyl = dylm_dct[im];
 		for (k=0; k<NLAT; k++) {
-Q			BrF[k] = 0.0;		// zero out array (includes DCT padding)
-V			BtF[k] = 0.0;	BpF[k] = 0.0;	// zero out array (includes DCT padding)
+Q			BR0[k] = 0.0;		// zero out array (includes DCT padding)
+V			BT0[k] = 0.0;	BP0[k] = 0.0;	// zero out array (includes DCT padding)
 		}
-		for (l=m; l<LTR; l+=2) {
+		for (l=m; l<LTR; l+=2) {	// l has same parity as m
 			for(k=0; k<=l; k+=2) {
 Q				BrF[k]   += yl[k]   * Ql[l];
 Q				BrF[k+1] += yl[k+1] * Ql[l+1];
@@ -101,12 +158,12 @@ S					  dyl[k+1].p * (I*Sl[l+1])
 T					- dyl[k+1].t * Tl[l]
 V					;
 			}
-V			if (k<=l+1) {
+V			if ( l&1 ) {	//	k=l+1
 S				BtF[k]   += dyl[k].t   * Sl[l+1];
 T				BpF[k]   -= dyl[k].t   * Tl[l+1];
 V			}
-Q			yl += (l+2 - (m&1));
-V			dyl += l+2;	//(l+1 + (m&1));
+Q			yl += l+2;	//(l+2)&(-2); //(l+2 - (m&1));
+V			dyl += l+2;
 		}
 		if (l==LTR) {
 			for (k=0; k<=l; k+=2) {
@@ -117,6 +174,7 @@ S				BtF[k+1] += dyl[k+1].t * Sl[l];
 T				BpF[k+1] -= dyl[k+1].t * Tl[l];
 			}
 		}
+  #endif
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
