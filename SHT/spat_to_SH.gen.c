@@ -101,34 +101,38 @@ QO			Ql[l+1] = 0.0;
 VE			Sl[l] = 0.0;	Tl[l+1] = 0.0;
 VO			Tl[l] = 0.0;	Sl[l+1] = 0.0;
 			for (i=0; i < NLAT_2; i++) {
-QE				(double) Ql[l]   += zl[2*i]   * (double) re;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				(double) Ql[l+1] += zl[2*i+1] * (double) ro;	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-VE				(double) Sl[l]   += dzl[2*i].t   * (double) to;
-VO				(double) Tl[l]   -= dzl[2*i].t   * (double) po;
-VO				(double) Sl[l+1] += dzl[2*i+1].t * (double) te;
-VE				(double) Tl[l+1] -= dzl[2*i+1].t * (double) pe;
+QE				(double) Ql[l]   += zl[0] * (double) re;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+QO				(double) Ql[l+1] += zl[1] * (double) ro;	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+VE				(double) Sl[l]   += dzl[0].t * (double) to;
+VO				(double) Tl[l]   -= dzl[0].t * (double) po;
+VO				(double) Sl[l+1] += dzl[1].t * (double) te;
+VE				(double) Tl[l+1] -= dzl[1].t * (double) pe;
+Q				zl +=2;
+V				dzl +=2;
 			}
 			l+=2;
-Q			zl += 2*NLAT_2;
-V			dzl += 2*NLAT_2;
 		}
 		if (l==LMAX) {
 QE			Ql[l] = 0.0;
 VE			Sl[l] = 0.0;
 VO			Tl[l] = 0.0;
 			for (i=0;i<NLAT_2;i++) {
-QE				(double) Ql[l] += zl[i] * (double) re;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				(double) Sl[l] += dzl[i].t * (double) to;
-VO				(double) Tl[l] -= dzl[i].t * (double) po;
+QE				(double) Ql[l] += zl[0] * (double) re;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+VE				(double) Sl[l] += dzl[0].t * (double) to;
+VO				(double) Tl[l] -= dzl[0].t * (double) po;
+Q				zl ++;
+V				dzl ++;
 			}
 		} else if (l==LTR) {
 QE			Ql[l] = 0.0;
 VE			Sl[l] = 0.0;
 VO			Tl[l] = 0.0;
 			for (i=0; i < NLAT_2; i++) {
-QE				(double) Ql[l] += (double) re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				(double) Sl[l]   += dzl[2*i].t * (double) to;
-VO				(double) Tl[l]   -= dzl[2*i].t * (double) po;
+QE				(double) Ql[l] += (double) re * zl[0];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+VE				(double) Sl[l]   += dzl[0].t * (double) to;
+VO				(double) Tl[l]   -= dzl[0].t * (double) po;
+Q				zl +=2;
+V				dzl +=2;
 			}
 		}
 //  #endif
@@ -155,39 +159,49 @@ V		dzl = dzlm[im];
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+Q			zl += 2*tm[im];
+V			dzl += 2*tm[im];
 QE			Ql[l] = 0.0;
 QO			Ql[l+1] = 0.0;
 VE			Sl[l] = 0.0;	Tl[l+1] = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
 VO			Tl[l] = 0.0;	Sl[l+1] = 0.0;
 			for (i=tm[im]; i < NLAT_2; i++) {	// tm[im] : polar optimization
-QE				Ql[l]   += re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				Ql[l+1] += ro * zl[2*i+1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-VE				Sl[l]   += dzl[2*i].t *to - dzl[2*i].p *pe*I;		// ref: these E. Dormy p 72.
-VO				Tl[l]   -= dzl[2*i].t *po + dzl[2*i].p *te*I;
-VO				Sl[l+1] += dzl[2*i+1].t *te - dzl[2*i+1].p *po*I;
-VE				Tl[l+1] -= dzl[2*i+1].t *pe + dzl[2*i+1].p *to*I;
+QE				Ql[l]   += re * zl[0];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+QO				Ql[l+1] += ro * zl[1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+VE				Sl[l]   += dzl[0].t *to - dzl[0].p *pe*I;		// ref: these E. Dormy p 72.
+VO				Tl[l]   -= dzl[0].t *po + dzl[0].p *te*I;
+VO				Sl[l+1] += dzl[1].t *te - dzl[1].p *po*I;
+VE				Tl[l+1] -= dzl[1].t *pe + dzl[1].p *to*I;
+Q				zl +=2;
+V				dzl +=2;
 			}
 			l+=2;
-Q			zl += 2*NLAT_2;
-V			dzl += 2*NLAT_2;
 		}
 		if (l==LMAX) {
+Q			zl += tm[im];
+V			dzl += tm[im];
 QE			Ql[l] = 0.0;	// Qlm[LiM(l,im)] = 0.0;
 VE			Sl[l] = 0.0;
 VO			Tl[l] = 0.0;
 			for (i=tm[im];i<NLAT_2;i++) {	// polar optimization
-QE				Ql[l] += zl[i] * re;	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				Sl[l] += dzl[i].t *to - dzl[i].p *pe*I;
-VO				Tl[l] -= dzl[i].t *po + dzl[i].p *te*I;
+QE				Ql[l] += zl[0] * re;	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+VE				Sl[l] += dzl[0].t *to - dzl[0].p *pe*I;
+VO				Tl[l] -= dzl[0].t *po + dzl[0].p *te*I;
+Q				zl++;
+V				dzl++;
 			}
 		} else if (l==LTR) {
+Q			zl += 2*tm[im];
+V			dzl += 2*tm[im];
 QE			Ql[l] = 0.0;
 VE			Sl[l] = 0.0;
 VO			Tl[l] = 0.0;
 			for (i=tm[im]; i < NLAT_2; i++) {	// tm[im] : polar optimization
-QE				Ql[l]   += re * zl[2*i];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				Sl[l]   += dzl[2*i].t *to - dzl[2*i].p *pe*I;		// ref: these E. Dormy p 72.
-VO				Tl[l]   -= dzl[2*i].t *po + dzl[2*i].p *te*I;
+QE				Ql[l]   += re * zl[0];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+VE				Sl[l]   += dzl[0].t *to - dzl[0].p *pe*I;		// ref: these E. Dormy p 72.
+VO				Tl[l]   -= dzl[0].t *po + dzl[0].p *te*I;
+Q				zl +=2;
+V				dzl +=2;
 			}
 		}
 	}

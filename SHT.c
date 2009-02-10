@@ -1121,7 +1121,7 @@ void init_SH(double eps)
 			for (it=(l-m)&1; it<=l; it+=2) {
 				yg[it] = Z[it]/(2*NLAT);	// store non-zero coeffs.
 				dyg[it].p = dZp[it]/(2*NLAT);
-				yk[(it/2)*(LMAX+1-m) + (l-m)] = Z[it]/(2*NLAT);		// and transpose
+				yk[(it/2)*(LMAX+1-m) + (l-m)] = Z[it]/(2*NLAT);	// and transpose
 				dyk[(it/2)*(LMAX+1-m) + (l-m)].p = dZp[it]/(2*NLAT);
 			}
 			for (it=(l+1-m)&1; it<=l; it+=2) {
@@ -1131,6 +1131,22 @@ void init_SH(double eps)
 			if ((l-m)&1) {
 				yg += l+1;	//(l+1 - (m&1));	// l-m odd : go to next line of storage.
 				dyg += l+1;
+			}
+		}
+		// Compact the transposed coefficients for improved cache efficiency.
+		yg = ykm_dct[im];
+		dyg = dykm_dct[im];
+		for (it=0; it<= LMAX; it+=2) {
+			l = (it < m) ? m : it+(m&1);
+			while (l<=LMAX) {
+				yg[0] = yk[(it/2)*(LMAX+1-m) + (l-m)];
+				l++;	yg++;
+			}
+			l = (it < m) ? m : it-(m&1);
+			while (l<=LMAX) {
+				dyg[0].t = dyk[(it/2)*(LMAX+1-m) + (l-m)].t;
+				dyg[0].p = dyk[(it/2)*(LMAX+1-m) + (l-m)].p;
+				l++;	dyg++;
 			}
 		}
 	}

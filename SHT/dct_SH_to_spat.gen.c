@@ -23,14 +23,16 @@ Q	complex double *Ql;
 S	complex double *Sl;
 T	complex double *Tl;
 Q	double *yl;
-Q	complex double re,ro;
-V	complex double te,to, pe,po;
 V	struct DtDp *dyl;
   #if NPHI > 1
+Q	complex double re,ro;
+V	complex double te,to, pe,po;
 Q	#define BR0 BrF
 V	#define BT0 BtF
 V	#define BP0 BpF
   #else
+Q	double re,ro;
+V	double te,to, pe,po;
 Q	#define BR0 ((double *)BrF)
 V	#define BT0 ((double *)BtF)
 V	#define BP0 ((double *)BpF)
@@ -41,7 +43,50 @@ V	#define BP0 ((double *)BpF)
 Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
 S		Sl = &Slm[LiM(0,im)];
 T		Tl = &Tlm[LiM(0,im)];
-
+  #define ALT0
+  #ifdef ALT0
+Q		yl = ykm_dct[im];
+V		dyl = dykm_dct[im];
+		k=0;
+		while (k<LTR) {
+			l = k;
+Q			re = 0.0;	ro = 0.0;
+V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;
+			while(l<LTR) {
+QE				re += yl[0] * (double) Ql[l];
+QO				ro += yl[1] * (double) Ql[l+1];
+SO				te += dyl[1].t * (double) Sl[l+1];
+TO				po -= dyl[0].t * (double) Tl[l];
+TE				pe -= dyl[1].t * (double) Tl[l+1];
+SE				to += dyl[0].t * (double) Sl[l];
+				l+=2;
+Q				yl+=2;
+V				dyl+=2;
+			}
+			if (l==LTR) {
+QE				re += yl[0]   * (double) Ql[l];
+SE				to += dyl[0].t * (double) Sl[l];
+TO				po -= dyl[0].t * (double) Tl[l];
+Q				yl++;
+V				dyl++;
+			}
+Q			BR0[k] = re;	BR0[k+1] = ro;
+V			BT0[k] = te;	BT0[k+1] = to;
+V			BP0[k] = pe;	BP0[k+1] = po;
+			k+=2;
+Q			yl+= (LMAX-LTR);
+V			dyl+= (LMAX-LTR);
+		}
+QE		if ((LTR&1)==0) {	// k=LTR
+QE			BR0[k] = yl[0] * Ql[k];
+QE			k++;
+QE		}
+		while (k<NLAT) {
+Q			BR0[k] = 0.0;
+V			BT0[k] = 0.0;	BP0[k] = 0.0;
+			k++;
+		}
+  #else
 Q		yl = ylm_dct[im];
 V		dyl = dylm_dct[im];
 		for (k=0; k<NLAT; k++) {
@@ -67,6 +112,8 @@ S				BT0[k+1] += dyl[k+1].t * (double) Sl[l];
 T				BP0[k+1] -= dyl[k+1].t * (double) Tl[l];
 			}
 		}
+  #endif
+
   #if NPHI > 1
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
@@ -75,56 +122,64 @@ V		BtF += NLAT;	BpF += NLAT;
 Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
 S		Sl = &Slm[LiM(0,im)];
 T		Tl = &Tlm[LiM(0,im)];
-
   #define ALT
   #ifdef ALT
-Q		yl = ykm_dct[im] -m;
-V		dyl = dykm_dct[im] -m;
+Q		yl = ykm_dct[im];
+V		dyl = dykm_dct[im];
 		k=0;
 		while (k<LTR) {
 Q			l = (k < m) ? m : k+(m&1);
 V			l = (k < m) ? m : k-(m&1);
 Q			re = 0.0;	ro = 0.0;
-V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;			
+V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;
 			while(l<LTR) {
-Q				re += yl[l]   * Ql[l];
-Q				ro += yl[l+1] * Ql[l+1];
-V				te += 
-T					  dyl[l].p   * (I*Tl[l])
-S					+ dyl[l+1].t   * Sl[l+1]
-V					;
-V				po +=
-S					  dyl[l+1].p * (I*Sl[l+1])
-T					- dyl[l].t * Tl[l]
-V					;
-V				pe += 
-S					  dyl[l].p   * (I*Sl[l])
-T					- dyl[l+1].t   * Tl[l+1]
-V					;
-V				to += 
-T					  dyl[l+1].p * (I*Tl[l+1])
-S					+ dyl[l].t * Sl[l]
-V					;
+QE				re += yl[0] * Ql[l];
+QO				ro += yl[1] * Ql[l+1];
+VO				te +=
+TO					  dyl[0].p * (I*Tl[l])
+SO					+ dyl[1].t * Sl[l+1]
+VO					;
+VO				po +=
+SO					  dyl[1].p * (I*Sl[l+1])
+TO					- dyl[0].t * Tl[l]
+VO					;
+VE				pe += 
+SE					  dyl[0].p * (I*Sl[l])
+TE					- dyl[1].t * Tl[l+1]
+VE					;
+VE				to += 
+TE					  dyl[1].p * (I*Tl[l+1])
+SE					+ dyl[0].t * Sl[l]
+VE					;
 				l+=2;
+Q				yl+=2;
+V				dyl+=2;
 			}
 			if (l==LTR) {
-Q				re += yl[l]   * Ql[l];
-T				te += dyl[l].p   * (I*Tl[l]);
-S				pe += dyl[l].p   * (I*Sl[l]);
-S				to += dyl[l].t * Sl[l];
-T				po -= dyl[l].t * Tl[l];
+QE				re += yl[0]   * Ql[l];
+TO				te += dyl[0].p * (I*Tl[l]);
+SE				pe += dyl[0].p * (I*Sl[l]);
+SE				to += dyl[0].t * Sl[l];
+TO				po -= dyl[0].t * Tl[l];
+Q				yl++;
+V				dyl++;
 			}
 Q			BrF[k] = re;	BrF[k+1] = ro;
 V			BtF[k] = te;	BtF[k+1] = to;
 V			BpF[k] = pe;	BpF[k+1] = po;
 			k+=2;
-Q			yl+=LMAX+1-m;
-V			dyl+=LMAX+1-m;
+Q			yl+= (LMAX-LTR);
+V			dyl+= (LMAX-LTR);
 		}
-Q		if ( ((LTR&1)==0) && ((m&1)==0) ) {	// k=LTR
-Q			BrF[k] = yl[k]   * Ql[k];
-Q			k++;
-Q		}
+QE		if ( ((LTR&1)==0) && ((m&1)==0) ) {	// k=LTR, m even
+QE			BrF[k] = yl[0] * Ql[k];
+QE			k++;
+QE		}
+V		if ( ((LTR&1)==0) && ((m&1)==1) ) {	// k=LTR, m odd
+SO			BtF[k] =   dyl[1].t * Sl[k];
+TE			BpF[k] = - dyl[1].t * Tl[k];
+V			k++;
+V		}
 		while (k<NLAT) {
 Q			BrF[k] = 0.0;
 V			BtF[k] = 0.0;	BpF[k] = 0.0;

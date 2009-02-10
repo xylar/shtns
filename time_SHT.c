@@ -21,7 +21,7 @@ double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
 #define NLAT_2 5
-#define LMAX 7
+#define LMAX 8
 #define NPHI 32
 #define MMAX 7
 #define MRES 1
