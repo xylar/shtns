@@ -22,6 +22,7 @@ VB	double teo[2*NLAT_2], peo[2*NLAT_2];	// theta and phi even and odd parts
 Q	complex double *Ql;		// virtual pointers for given im
 V	complex double *Sl, *Tl;	// virtual pointers for given im
 Q	double *zl;
+V	double *dzl0;
 V	struct DtDp *dzl;
 	long int i,im,m,l;
 
@@ -92,7 +93,7 @@ VB			(double) peo[2*i] = (double) BpF[i];	(double) peo[2*i+1] = 0.0;
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
 V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
 Q		zl = zlm[im];
-V		dzl = dzlm[im];
+V		dzl0 = (double *) dzlm[im];		// only theta derivative (d/dphi = 0 for m=0)
 QB		BrF += NLAT;
 VB		BtF += NLAT;	BpF += NLAT;
 		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
@@ -103,12 +104,12 @@ VO			Tl[l] = 0.0;	Sl[l+1] = 0.0;
 			for (i=0; i < NLAT_2; i++) {
 QE				(double) Ql[l]   += zl[0] * (double) re;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 QO				(double) Ql[l+1] += zl[1] * (double) ro;	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-VE				(double) Sl[l]   += dzl[0].t * (double) to;
-VO				(double) Tl[l]   -= dzl[0].t * (double) po;
-VO				(double) Sl[l+1] += dzl[1].t * (double) te;
-VE				(double) Tl[l+1] -= dzl[1].t * (double) pe;
+VE				(double) Sl[l]   += dzl0[0] * (double) to;
+VO				(double) Tl[l]   -= dzl0[0] * (double) po;
+VO				(double) Sl[l+1] += dzl0[1] * (double) te;
+VE				(double) Tl[l+1] -= dzl0[1] * (double) pe;
 Q				zl +=2;
-V				dzl +=2;
+V				dzl0 +=2;
 			}
 			l+=2;
 		}
@@ -118,10 +119,10 @@ VE			Sl[l] = 0.0;
 VO			Tl[l] = 0.0;
 			for (i=0;i<NLAT_2;i++) {
 QE				(double) Ql[l] += zl[0] * (double) re;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				(double) Sl[l] += dzl[0].t * (double) to;
-VO				(double) Tl[l] -= dzl[0].t * (double) po;
+VE				(double) Sl[l] += dzl0[0] * (double) to;
+VO				(double) Tl[l] -= dzl0[0] * (double) po;
 Q				zl ++;
-V				dzl ++;
+V				dzl0 ++;
 			}
 		} else if (l==LTR) {
 QE			Ql[l] = 0.0;
@@ -129,10 +130,10 @@ VE			Sl[l] = 0.0;
 VO			Tl[l] = 0.0;
 			for (i=0; i < NLAT_2; i++) {
 QE				(double) Ql[l] += (double) re * zl[0];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				(double) Sl[l]   += dzl[0].t * (double) to;
-VO				(double) Tl[l]   -= dzl[0].t * (double) po;
+VE				(double) Sl[l]   += dzl0[0] * (double) to;
+VO				(double) Tl[l]   -= dzl0[0] * (double) po;
 Q				zl +=2;
-V				dzl +=2;
+V				dzl0 +=2;
 			}
 		}
 //  #endif

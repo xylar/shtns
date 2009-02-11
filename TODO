@@ -9,6 +9,10 @@
 
 ? (- use "alloca()" to allocate temp memory on the stack with variable lengths) // ultrafast but not ANSI
 
+- Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
+
++ cache optimization have been performed for m=0 and are quite impressive at high LMAX.
+
 *** SHT.c
 
 for SHsphtor_to_spat, maybe storing .t and .p together is not the best...
@@ -29,4 +33,6 @@ for SHsphtor_to_spat, maybe storing .t and .p together is not the best...
 + NLAT odd is now allowed
 	special treatment in SHT function. (but could be improved : point NLAT_2 has only even component)
 
-- Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
+
+*** NOTES :
+DCT SHT is ok for LMAX=1300 and NLAT_2=1024. changeset 70:f901295a7862

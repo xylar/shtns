@@ -23,8 +23,9 @@ Q	complex double *Ql;
 S	complex double *Sl;
 T	complex double *Tl;
 Q	double *yl;
-V	struct DtDp *dyl;
+V	double *dyl0;
   #if NPHI > 1
+V	struct DtDp *dyl;
 Q	complex double re,ro;
 V	complex double te,to, pe,po;
 Q	#define BR0 BrF
@@ -46,36 +47,36 @@ T		Tl = &Tlm[LiM(0,im)];
   #define ALT0
   #ifdef ALT0
 Q		yl = ykm_dct[im];
-V		dyl = dykm_dct[im];
+V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
 		while (k<LTR) {
 			l = k;
 Q			re = 0.0;	ro = 0.0;
 V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;
 			while(l<LTR) {
-QE				re += yl[0] * (double) Ql[l];
-QO				ro += yl[1] * (double) Ql[l+1];
-SO				te += dyl[1].t * (double) Sl[l+1];
-TO				po -= dyl[0].t * (double) Tl[l];
-TE				pe -= dyl[1].t * (double) Tl[l+1];
-SE				to += dyl[0].t * (double) Sl[l];
+QE				re += yl[0]  * (double) Ql[l];
+QO				ro += yl[1]  * (double) Ql[l+1];
+SE				to += dyl0[0] * (double) Sl[l];
+SO				te += dyl0[1] * (double) Sl[l+1];
+TO				po -= dyl0[0] * (double) Tl[l];
+TE				pe -= dyl0[1] * (double) Tl[l+1];
 				l+=2;
 Q				yl+=2;
-V				dyl+=2;
+V				dyl0+=2;
 			}
 			if (l==LTR) {
-QE				re += yl[0]   * (double) Ql[l];
-SE				to += dyl[0].t * (double) Sl[l];
-TO				po -= dyl[0].t * (double) Tl[l];
+QE				re += yl[0]  * (double) Ql[l];
+SE				to += dyl0[0] * (double) Sl[l];
+TO				po -= dyl0[0] * (double) Tl[l];
 Q				yl++;
-V				dyl++;
+V				dyl0++;
 			}
 Q			BR0[k] = re;	BR0[k+1] = ro;
 V			BT0[k] = te;	BT0[k+1] = to;
 V			BP0[k] = pe;	BP0[k+1] = po;
 			k+=2;
 Q			yl+= (LMAX-LTR);
-V			dyl+= (LMAX-LTR);
+V			dyl0+= (LMAX-LTR);
 		}
 QE		if ((LTR&1)==0) {	// k=LTR
 QE			BR0[k] = yl[0] * Ql[k];
@@ -88,28 +89,28 @@ V			BT0[k] = 0.0;	BP0[k] = 0.0;
 		}
   #else
 Q		yl = ylm_dct[im];
-V		dyl = dylm_dct[im];
+V		dyl0 = (double *) dylm_dct[im];
 		for (k=0; k<NLAT; k++) {
 Q			BR0[k] = 0.0;		// zero out array (includes DCT padding)
 V			BT0[k] = 0.0;	BP0[k] = 0.0;	// zero out array (includes DCT padding)
 		}
 		for (l=m; l<LTR; l+=2) {
 			for (k=0; k<=l; k+=2) {
-Q				BR0[k]   += yl[k]   * (double) Ql[l];
-Q				BR0[k+1] += yl[k+1] * (double) Ql[l+1];
-S				BT0[k]   += dyl[k].t   * (double) Sl[l+1];
-T				BP0[k]   -= dyl[k].t   * (double) Tl[l+1];
-S				BT0[k+1] += dyl[k+1].t * (double) Sl[l];
-T				BP0[k+1] -= dyl[k+1].t * (double) Tl[l];
+QE				BR0[k]   += yl[k]   * (double) Ql[l];
+QO				BR0[k+1] += yl[k+1] * (double) Ql[l+1];
+SO				BT0[k]   += dyl0[k]   * (double) Sl[l+1];
+TE				BP0[k]   -= dyl0[k]   * (double) Tl[l+1];
+SE				BT0[k+1] += dyl0[k+1] * (double) Sl[l];
+TO				BP0[k+1] -= dyl0[k+1] * (double) Tl[l];
 			}
 Q			yl += l+2;	//(l+2 - (m&1));
-V			dyl += l+2;
+V			dyl0 += l+2;
 		}
 		if (l==LTR) {
 			for (k=0; k<=l; k+=2) {
-Q				BR0[k]   += yl[k]   * (double) Ql[l];
-S				BT0[k+1] += dyl[k+1].t * (double) Sl[l];
-T				BP0[k+1] -= dyl[k+1].t * (double) Tl[l];
+QE				BR0[k]   += yl[k]   * (double) Ql[l];
+SE				BT0[k+1] += dyl0[k+1] * (double) Sl[l];
+TO				BP0[k+1] -= dyl0[k+1] * (double) Tl[l];
 			}
 		}
   #endif
@@ -194,39 +195,39 @@ V			BT0[k] = 0.0;	BP0[k] = 0.0;	// zero out array (includes DCT padding)
 		}
 		for (l=m; l<LTR; l+=2) {	// l has same parity as m
 			for(k=0; k<=l; k+=2) {
-Q				BrF[k]   += yl[k]   * Ql[l];
-Q				BrF[k+1] += yl[k+1] * Ql[l+1];
-V				BtF[k]   += 
-T					  dyl[k].p   * (I*Tl[l])
-S					+ dyl[k].t   * Sl[l+1]
-V					;
-V				BpF[k]   += 
-S					  dyl[k].p   * (I*Sl[l])
-T					- dyl[k].t   * Tl[l+1]
-V					;
-V				BtF[k+1] += 
-T					  dyl[k+1].p * (I*Tl[l+1])
-S					+ dyl[k+1].t * Sl[l]
-V					;
-V				BpF[k+1] +=
-S					  dyl[k+1].p * (I*Sl[l+1])
-T					- dyl[k+1].t * Tl[l]
-V					;
+QE				BrF[k]   += yl[k]   * Ql[l];
+QO				BrF[k+1] += yl[k+1] * Ql[l+1];
+VO				BtF[k]   += 
+TO					  dyl[k].p   * (I*Tl[l])
+SO					+ dyl[k].t   * Sl[l+1]
+VO					;
+VE				BpF[k]   += 
+SE					  dyl[k].p   * (I*Sl[l])
+TE					- dyl[k].t   * Tl[l+1]
+VE					;
+VE				BtF[k+1] += 
+TE					  dyl[k+1].p * (I*Tl[l+1])
+SE					+ dyl[k+1].t * Sl[l]
+VE					;
+VO				BpF[k+1] +=
+SO					  dyl[k+1].p * (I*Sl[l+1])
+TO					- dyl[k+1].t * Tl[l]
+VO					;
 			}
 V			if ( l&1 ) {	//	k=l+1
-S				BtF[k]   += dyl[k].t   * Sl[l+1];
-T				BpF[k]   -= dyl[k].t   * Tl[l+1];
+SO				BtF[k]   += dyl[k].t   * Sl[l+1];
+TE				BpF[k]   -= dyl[k].t   * Tl[l+1];
 V			}
 Q			yl += l+2;	//(l+2)&(-2); //(l+2 - (m&1));
 V			dyl += l+2;
 		}
 		if (l==LTR) {
 			for (k=0; k<=l; k+=2) {
-Q				BrF[k]   += yl[k]   * Ql[l];
-T				BtF[k]   += dyl[k].p   * (I*Tl[l]);
-S				BpF[k]   += dyl[k].p   * (I*Sl[l]);
-S				BtF[k+1] += dyl[k+1].t * Sl[l];
-T				BpF[k+1] -= dyl[k+1].t * Tl[l];
+QE				BrF[k]   += yl[k]   * Ql[l];
+TO				BtF[k]   += dyl[k].p   * (I*Tl[l]);
+SE				BpF[k]   += dyl[k].p   * (I*Sl[l]);
+SE				BtF[k+1] += dyl[k+1].t * Sl[l];
+TO				BpF[k+1] -= dyl[k+1].t * Tl[l];
 			}
 		}
   #endif

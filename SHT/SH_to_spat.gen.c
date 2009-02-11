@@ -35,6 +35,7 @@ Q	complex double *Ql;
 S	complex double *Sl;
 T	complex double *Tl;
 Q	double *yl;
+V	double *dyl0;	// for m=0
 V	struct DtDp *dyl;
 	long int i,im,m,l;
 
@@ -63,8 +64,8 @@ Q		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 S		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 T		Tl = &Tlm[LiM(0,im)];
 		i=0;
-Q		yl  = ylm[im] + i*(LMAX-m+1);
-V		dyl = dylm[im] + i*(LMAX-m+1);
+Q		yl  = ylm[im];
+V		dyl0 = (double *) dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
 		while (i < NLAT_2) {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 Q			fe = 0.0;	fo = 0.0;
@@ -73,20 +74,20 @@ T			dte = 0.0;	dto = 0.0;
 			while (l<LTR) {	// compute even and odd parts
 QE				(double) fe += yl[0] * (double) Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 QO				(double) fo += yl[1] * (double) Ql[l+1];	// fo += ylm[im][i*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
-TO				(double) dto += dyl[0].t * (double) Tl[l];	// m=0 : everything is real.
-SE				(double) dso += dyl[0].t * (double) Sl[l];
-TE				(double) dte += dyl[1].t * (double) Tl[l+1];
-SO				(double) dse += dyl[1].t * (double) Sl[l+1];
+TO				(double) dto += dyl0[0] * (double) Tl[l];	// m=0 : everything is real.
+SE				(double) dso += dyl0[0] * (double) Sl[l];
+TE				(double) dte += dyl0[1] * (double) Tl[l+1];
+SO				(double) dse += dyl0[1] * (double) Sl[l+1];
 				l+=2;
 Q				yl+=2;
-V				dyl+=2;
+V				dyl0+=2;
 			}
 			if (l==LTR) {
 QE				(double) fe += yl[0] * (double) Ql[l];		// fe += ylm[im][i*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-TO				(double) dto += dyl[0].t * Tl[l];
-SE				(double) dso += dyl[0].t * Sl[l];
+TO				(double) dto += dyl0[0] * Tl[l];
+SE				(double) dso += dyl0[0] * Sl[l];
 Q				yl++;
-V				dyl++;
+V				dyl0++;
 			}
 Q			BR0[i] = fe + fo;
 V			BT0[i] = 0.0
@@ -104,7 +105,7 @@ VB			BP0[NLAT-i] = 0.0
 TB				- (dte-dto)
 VB				;
 Q			yl  += (LMAX-LTR);
-V			dyl += (LMAX-LTR);
+V			dyl0 += (LMAX-LTR);
 		}
 	//#endif
 Q		BrF += NLAT;

@@ -626,6 +626,53 @@ void planFFT()
 //	printf("       done.\n");
 }
 
+// Perform some optimization on the SHT matrices.
+void OptimizeMatrices(double eps)
+{
+	double *yg;
+	int im,m,l,it;
+
+/// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
+	for (im=0;im<=MMAX;im++) {
+		m = im*MRES;
+		tm[im] = NLAT_2;
+		for (l=m;l<=LMAX;l++) {
+			it=0;
+			while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }
+			if (tm[im] > it) tm[im] = it;
+		}
+	}
+	if (eps > 0.0) {
+		printf("          polar optimization threshold = %e\n",eps);
+#ifdef _SH_DEBUG_
+		printf("          tm[im]=");
+		for (im=0;im<=MMAX;im++)
+			printf(" %d",tm[im]);
+		printf("\n");
+#endif
+	}
+
+/// Compression of dylm and dzlm for m=0, as .p is 0
+	im=0;	m=0;
+		yg = (double *) dylm[im];
+		for (it=0; it<NLAT_2; it++) {
+			for (l=m; l<=LMAX; l++)
+				yg[it*(LMAX-m+1) + (l-m)] = dylm[im][it*(LMAX-m+1) + (l-m)].t;
+		}
+		yg = (double *) dzlm[im];
+		for (l=m; l<=LMAX; l+=2) {
+			for (it=0; it<NLAT_2; it++) {
+				yg[(l-m)*NLAT_2 + it*2] = dzlm[im][(l-m)*NLAT_2 + it*2].t;
+				yg[(l-m)*NLAT_2 + it*2+1] = dzlm[im][(l-m)*NLAT_2 + it*2+1].t;
+			}
+		}
+		if (l==LMAX) {		// last l is stored right away, without interleaving.
+			for (it=0; it<NLAT_2; it++) {
+				yg[(l-m)*NLAT_2 + it] = dzlm[im][(l-m)*NLAT_2 + it].t;
+			}
+		}
+}
+
 /** initialize SH transform.
 input : eps = polar optimization threshold : polar coefficients below that threshold are neglected (for high ms).
         eps is the value under wich the polar values of the Legendre Polynomials Plm are neglected, leading to increased performance (a few percent).
@@ -637,6 +684,7 @@ void init_SH(double eps)
 	double wg[NLAT];	// gauss points and weights.
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
 	double iylm_fft_norm = 2.0*M_PI/NPHI;	// normation FFT pour zlm
+	double *dyl;
 	double t,tmax;
 	long int it,im,m,l;
 
@@ -745,25 +793,7 @@ void init_SH(double eps)
 		}
 	}
 
-// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
-	for (im=0;im<=MMAX;im++) {
-		m = im*MRES;
-		tm[im] = NLAT_2;
-		for (l=m;l<=LMAX;l++) {
-			it=0;
-			while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }
-			if (tm[im] > it) tm[im] = it;
-		}
-	}
-	if (eps > 0.0) {
-		printf("          polar optimization threshold = %e\n",eps);
-#ifdef _SH_DEBUG_
-		printf("          tm[im]=");
-		for (im=0;im<=MMAX;im++)
-			printf(" %d",tm[im]);
-		printf("\n");
-#endif
-	}
+	OptimizeMatrices(eps);
 
  #if NPHI > 1
 	planFFT();		// initialize fftw
@@ -1037,7 +1067,7 @@ void init_SH(double eps)
 	dylm_dct[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* dlm);
 	zlm_dct[0] = (double *) fftw_malloc( sizeof(double)* NLM*(NLAT+1) );	// quantite a revoir...
 	ykm_dct[0] = (double *) fftw_malloc(sizeof(double)* NLM*(LMAX+1));
-	dykm_dct[0] = (double *) fftw_malloc(sizeof(struct DtDp)* NLM*(LMAX+1));
+	dykm_dct[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*(LMAX+1));
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
 		for (l=m, lm=0, dlm=0; l<=LMAX; l+=2) {
@@ -1133,7 +1163,7 @@ void init_SH(double eps)
 				dyg += l+1;
 			}
 		}
-		// Compact the transposed coefficients for improved cache efficiency.
+		// Compact the coefficients for improved cache efficiency.
 		yg = ykm_dct[im];
 		dyg = dykm_dct[im];
 		for (it=0; it<= LMAX; it+=2) {
@@ -1147,6 +1177,25 @@ void init_SH(double eps)
 				dyg[0].t = dyk[(it/2)*(LMAX+1-m) + (l-m)].t;
 				dyg[0].p = dyk[(it/2)*(LMAX+1-m) + (l-m)].p;
 				l++;	dyg++;
+			}
+		}
+		if (im == 0) {		// compact m=0 dylm because .p = 0 :
+			dyg = dykm_dct[im];
+			yg = (double *) dykm_dct[im];
+			for (it=0; it< LMAX; it+=2) {
+				for (l=it; l<=LMAX; l++) {
+					yg[0] = dyg[0].t;
+					yg++;	dyg++;
+				}
+			}
+			dyg = dylm_dct[im];
+			yg = (double *) dylm_dct[im];
+			for (l=0; l<=LMAX; l+=2) {
+				for (it=0; it<=l; it+=2) {
+					yg[it] = dyg[it].t;
+					yg[it+1] = dyg[it+1].t;
+				}
+				yg += l+2;	dyg += l+2;
 			}
 		}
 	}
@@ -1269,25 +1318,7 @@ void init_SH(double eps)
 	free(yg);	free(cktg);
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 
-/// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
-	for (im=0;im<=MMAX;im++) {
-		m = im*MRES;
-		tm[im] = NLAT_2;
-		for (l=m;l<=LMAX;l++) {
-			it=0;
-			while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }
-			if (tm[im] > it) tm[im] = it;
-		}
-	}
-	if (eps > 0.0) {
-		printf("          polar optimization threshold = %e\n",eps);
-#ifdef _SH_DEBUG_
-		printf("          tm[im]=");
-		for (im=0;im<=MMAX;im++)
-			printf(" %d",tm[im]);
-		printf("\n");
-#endif
-	}
+	OptimizeMatrices(eps);
 
 	m = time_sht();
 
