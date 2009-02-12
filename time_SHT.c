@@ -20,10 +20,10 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
-#define NLAT_2 5
-#define LMAX 8
-#define NPHI 32
-#define MMAX 7
+#define NLAT_2 12
+#define LMAX 22
+#define NPHI 4
+#define MMAX 1
 #define MRES 1
 
 #define _SH_DEBUG_
@@ -122,6 +122,7 @@ void spat_to_SHm(long int im, complex double *BrF, complex double *Qlm)
 	#undef ro
 }
 
+#ifdef SHT_DCT
 void spat_to_SHm_dct(long int im, complex double *ShF, complex double *Slm)
 {
 	complex double *Sl;		// virtual pointers for given im
@@ -176,6 +177,7 @@ void spat_to_SHm_dct(long int im, complex double *ShF, complex double *Slm)
 		}
 	}
 }
+#endif
 
 
 void SHm_to_spat(long int im, complex double *Qlm, complex double *BrF)
@@ -235,6 +237,7 @@ void SHm_to_spat(long int im, complex double *Qlm, complex double *BrF)
 	}
 }
 
+#ifdef SHT_DCT
 void SHm_to_spat_dct(long int im, complex double *Qlm, complex double *BrF)
 {
 	complex double *Sl;
@@ -315,7 +318,7 @@ void SHm_to_spat_dct(long int im, complex double *Qlm, complex double *BrF)
 	}
   #endif
 }
-
+#endif
 	
 void write_vect(char *fn, double *vec, int N)
 {
@@ -388,27 +391,35 @@ int main()
 		Slm[i] = 0.0;	Tlm[i] = 0.0;
 	}
 //	Slm[LiM(1,1)] = 1;
-	Tlm[LiM(4,1)] = 1.0;
+	Slm[LiM(1,0)] = Y10_ct;
 	SH_to_spat(Slm,ShF);
 	write_mx("spat",Sh,NPHI,NLAT);
+#ifdef SHT_DCT
 	SH_to_spat_dct(Slm,ShF);
 	write_mx("spat_dct",Sh,NPHI,NLAT);
-
+#endif
 	SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
 	write_mx("spatt",Sh,NPHI,NLAT);
 	write_mx("spatp",Th,NPHI,NLAT);
+#ifdef SHT_DCT
 	SHsphtor_to_spat_dct(Slm,Tlm,ShF,ThF);
 	write_mx("spatt_dct",Sh,NPHI,NLAT);
 	write_mx("spatp_dct",Th,NPHI,NLAT);
+#endif
 
 // spat_to_SH
-/*	for (im=0;im<NPHI;im++) {
+	for (im=0;im<NPHI;im++) {
 		for (i=0;i<NLAT;i++) {
 			Sh[im*NLAT+i] = ct[i];
 		}
-	}*/
+	}
+#ifdef SHT_DCT
 	spat_to_SH_dct(ShF,Slm);
-	write_vect("ylm",Slm,NLM*2);		// should be sqrt(4pi/3) if l=1, zero if l!=1.
+	write_vect("ylm_dct",Slm,NLM*2);		// should be sqrt(4pi/3) if l=1, zero if l!=1.
+#else
+	spat_to_SH(ShF,Slm);
+	write_vect("ylm",Slm,NLM*2);
+#endif
 //	return(1);
 
 // test case...
@@ -504,6 +515,7 @@ int main()
 // restore test case...
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];
 /// DCT
+#ifdef SHT_DCT
 	printf("[DCT] :: performing %d scalar SHT with NL evaluation\n", SHT_ITER);
 #ifdef SHT_DCT_IT_OUT
 	printf("         (IT_OUT variant : not working yet...)\n");
@@ -537,12 +549,16 @@ int main()
 	}
 	printf("  => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Qlm.dct",Slm,NLM*2);
+#endif
 
 #define TEST_VECT_SHT
 #ifdef TEST_VECT_SHT
 	printf("[REG] :: performing %d vector SHT\n", SHT_ITER);
 	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	for (i=0;i<NLM;i++) {
+		Tlm0[i] = 0.0;	// zero out Slm.
+	}
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
 	}
@@ -594,7 +610,7 @@ int main()
 	}
 	printf("  Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Tlm",Tlm,NLM*2);
-
+#ifdef SHT_DCT
 	printf("[DCT] :: performing %d vector SHT\n", SHT_ITER);
 	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
@@ -649,6 +665,7 @@ int main()
 	}
 	printf("  Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Tlm",Tlm,NLM*2);
+#endif
 
 #endif
 }

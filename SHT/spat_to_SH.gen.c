@@ -27,28 +27,32 @@ V	struct DtDp *dzl;
 	long int i,im,m,l;
 
 // defines how to access even and odd parts of data
-Q1	#define re	BrF[i]
-Q1	#define ro	BrF[i]
 QB	#define re	reo[2*i]
 QB	#define ro	reo[2*i+1]
-V1	#define te	BtF[i]
-V1	#define to	BtF[i]
 VB	#define te	teo[2*i]
 VB	#define to	teo[2*i+1]
-V1	#define pe	BpF[i]
-V1	#define po	BpF[i]
 VB	#define pe	peo[2*i]
 VB	#define po	peo[2*i+1]
 
  #if NPHI > 1
+Q1	#define re	BrF[i]
+Q1	#define ro	BrF[i]
+V1	#define te	BtF[i]
+V1	#define to	BtF[i]
+V1	#define pe	BpF[i]
+V1	#define po	BpF[i]
 Q	fftw_execute_dft_r2c(fft,(double *) BrF, BrF);
 V	fftw_execute_dft_r2c(fft,(double *) BtF, BtF);
 V	fftw_execute_dft_r2c(fft,(double *) BpF, BpF);
  #else
-Q	//fft_m0_r2c((double *) BrF, BrF);
-V	//fft_m0_r2c((double *) BtF, BtF);	fft_m0_r2c((double *) BpF, BpF);
-Q	fft_m0_r2eo((double *) BrF, reo);
-V	fft_m0_r2eo((double *) BtF, teo);	fft_m0_r2eo((double *) BpF, peo);
+Q1	#define re	((double *)BrF)[i]
+Q1	#define ro	((double *)BrF)[i]
+V1	#define te	((double *)BtF)[i]
+V1	#define to	((double *)BtF)[i]
+V1	#define pe	((double *)BpF)[i]
+V1	#define po	((double *)BpF)[i]
+QB	fft_m0_r2eo((double *) BrF, reo);
+VB	fft_m0_r2eo((double *) BtF, teo);	fft_m0_r2eo((double *) BpF, peo);
  #endif
 	im = 0;	m=0;	// dzl.p = 0.0 : and evrything is REAL
 /*  #ifdef SHT_DCT
