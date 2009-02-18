@@ -192,8 +192,5 @@ V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);		// restore original pointers
 Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
 V	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
- #else
-Q	//ifft_m0_c2r(BrF, (double *) BrF);
-V	//ifft_m0_c2r(BtF, (double *) BtF);	ifft_m0_c2r(BpF, (double *) BpF);
  #endif
 # }

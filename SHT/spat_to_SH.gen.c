@@ -59,8 +59,7 @@ VB	fft_m0_r2eo((double *) BtF, teo);	fft_m0_r2eo((double *) BpF, peo);
 Q		fftw_execute_r2r(dctm0,(double *) BrF, (double *) BrF);		// DCT
 		l=0;
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
-V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
-Q		zl = zlm_dct[im];
+Q		zl = zlm_dct0;
 		while (l<LTR) {		// l has parity of m
 Q			Ql[l] = 0.0;	Ql[l+1] = 0.0;
 			for (i=l; i<=NLAT; i+=2) {		// for m=0, zl coeff with i<l are zeros.
