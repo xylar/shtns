@@ -44,6 +44,7 @@ V1	#define po	BpF[i]
 Q	fftw_execute_dft_r2c(fft,(double *) BrF, BrF);
 V	fftw_execute_dft_r2c(fft,(double *) BtF, BtF);
 V	fftw_execute_dft_r2c(fft,(double *) BpF, BpF);
+Q	#define BR0 BrF
  #else
 Q1	#define re	((double *)BrF)[i]
 Q1	#define ro	((double *)BrF)[i]
@@ -51,8 +52,32 @@ V1	#define te	((double *)BtF)[i]
 V1	#define to	((double *)BtF)[i]
 V1	#define pe	((double *)BpF)[i]
 V1	#define po	((double *)BpF)[i]
+Q	#define BR0 ((double *)BrF)
  #endif
+
 	im = 0;	m=0;	// dzl.p = 0.0 : and evrything is REAL
+Q	if (MTR_DCT >= 0) {		// unfortunately, only scalar SHT can be faster with DCT.
+Q		fftw_execute_r2r(dctm0,(double *) BrF, (double *) BrF);		// DCT
+Q		l=0;
+Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
+Q		zl = zlm_dct0;
+Q		while (l<LTR) {		// l has parity of m
+Q			Ql[l] = 0.0;	Ql[l+1] = 0.0;
+Q			for (i=l; i<NLAT; i+=2) {		// for m=0, zl coeff with i<l are zeros.
+Q				(double) Ql[l]   += BR0[i]   * zl[i];
+Q				(double) Ql[l+1] += BR0[i+1] * zl[i+1];
+Q			}
+Q			l+=2;
+Q			zl += NLAT;
+Q		}
+Q		if ((LTR & 1) == 0) {	// if (l == LTR)  <=>  if ((LTR & 1) == 0) for m=0
+Q			Ql[l] = 0.0;
+Q			for (i=l; i<NLAT; i+=2) {		// for m=0, DCT coeff with it<l are zeros.
+Q				(double) Ql[l]   += BR0[i]   * zl[i];
+Q			}
+Q		}
+Q		BrF += NLAT;
+Q	} else {
   #if NPHI > 1
  B		for (i=0;i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
 QB			(double) reo[2*i]   = (double) BrF[i] + (double) BrF[NLAT-(i+1)];
@@ -71,7 +96,7 @@ VB			(double) peo[2*i] = (double) BpF[i];	(double) peo[2*i+1] = 0.0;
 QB	fft_m0_r2eo((double *) BrF, reo);
 VB	fft_m0_r2eo((double *) BtF, teo);	fft_m0_r2eo((double *) BpF, peo);
   #endif
-		l=0;
+		l=m;
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
 V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
 Q		zl = zlm[im];
@@ -118,6 +143,7 @@ Q				zl +=2;
 V				dzl0 +=2;
 			}
 		}
+Q	}
 	for (im=1;im<=MTR;im++) {
 		m=im*MRES;
  B		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.

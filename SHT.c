@@ -50,9 +50,9 @@
 
 // LM_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined. (but NOT m and im)
 //  double-loop version : assumes contiguous l-storage with 1 stride. (not compatible with even/odd packed)
-#define LM_LOOP( action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=LMAX; l++, lm++) { action } }
-//  single-loop + lookup array : no assumption on l-storage is made.
-//#define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { l=el[lm]; { action } }
+//#define LM_LOOP( action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=LMAX; l++, lm++) { action } }
+//  single-loop + lookup array : no assumption on l-storage is made + FASTER !! (cache miss seems better than branch prediction miss...)
+#define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { l=li[lm]; { action } }
 
 
 // half the theta length for even/odd decomposition. (NLAT+1)/2 allows odd NLAT.
@@ -108,8 +108,10 @@ const double pi = M_PI;
 double ct[NLAT], st[NLAT], st_1[NLAT];	// cos(theta), sin(theta), 1/sin(theta);
 #if MRES != _mres_
 	double el[NLM], l2[NLM], l_2[NLM];	// l, l(l+1) and 1/(l(l+1))
+	int li[NLM];
 #else
 	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
+	int *li;
 #endif
 
 int tm[MMAX+1];	// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
@@ -157,6 +159,9 @@ inline void fft_m0_r2eo(double *Br, double *reo)
 #endif
 #ifndef MTR
   #define MTR MMAX
+#endif
+#ifndef MTR_DCT
+  #define MTR_DCT -1
 #endif
 /////////////////////////////////////////////////////
 //   Scalar Spherical Harmonics Transform
@@ -454,8 +459,11 @@ void planFFT()
 */
 
 	dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
-	hdims[0].n = MMAX+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
+	hdims[0].n = MTR_DCT+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
 	hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
+	
+	if (MTR_DCT < 0) hdims[0].n = MMAX+1;		// FIXME to allow testing
+
   #if NPHI > 1
 	r2r_kind = FFTW_REDFT10;
 	dct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
@@ -464,8 +472,17 @@ void planFFT()
 	if ((dct == NULL)||(idct == NULL))
 		runerr("[FFTW] dct planning failed !");
 /// M=0 DCT
+
+ fftw_plan fftw_plan_many_r2r(int rank, const int *n, int howmany,
+                                  double *in, const int *inembed,
+                                  int istride, int idist,
+                                  double *out, const int *onembed,
+                                  int ostride, int odist,
+                                  const fftw_r2r_kind *kind, unsigned flags);
+
+
 	r2r_kind = FFTW_REDFT10;
-	dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
+	dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 	if (dctm0 == NULL)
 		runerr("[FFTW] dctm0 planning failed !");
   #else
@@ -1020,6 +1037,19 @@ void init_SH(double eps)
 		for (k=0, sum=0.0; k<l; k++) if (Z[k]*Z[k] > sum) sum = Z[k]*Z[k];
 //		printf("\nmax Z[k] for k<l is : %g",sqrt(sum));
 #endif
+		if (m == 0) {		// we store zlm in dct space for m=0
+			if (k0==0) {
+				for (k=0;k<NLAT;k++) zlm_dct0[((l-m)>>1)*NLAT +k] = 0.0;
+			}
+			for (k=k0; k<NLAT; k+=2) {
+				if (k == 0) {
+					zlm_dct0[((l-m)>>1)*NLAT +k] = Z[k]*0.5;         // store zlm_dct
+				} else {
+					zlm_dct0[((l-m)>>1)*NLAT +k] = Z[k];             // store zlm_dct
+				}
+			}
+		}
+
 		// prepare idct :
 		fftw_execute_r2r(idct, Z, Z);	fftw_execute_r2r(idct, dZt, dZt);	fftw_execute_r2r(idct, dZp, dZp);
 		if (m & 1) {	// m odd
@@ -1089,11 +1119,13 @@ void init_SH(double eps)
 	#define NLM _nlm_
 	el = (double *) fftw_malloc(3*NLM * sizeof(double));	// NLM defined at runtime.
 	l2 = el + NLM;	l_2 = el + 2*NLM;
+	li = (int *) malloc(NLM * sizeof(int));
 #endif
 	it = 0;
 	for (im=0;im<=MMAX;im++) {
 		for (l=im*MRES;l<=LMAX;l++) {
 			el[it] = l;	l2[it] = l*(l+1.0);	l_2[it] = 1.0/(l*(l+1.0));
+			li[it] = l;
 			it++;
 		}
 	}

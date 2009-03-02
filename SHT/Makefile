@@ -20,7 +20,7 @@ od=-e "s/^\(.\)[1O]/\1/" -e "/^.[BE]/d"
 eo=-e "s/^\(.\)[EOB]/\1/" -e "/^.1/d"
 
 #SH_to_spat
-GSH=SH_to_spat.gen.c
+GSH=hyb_SH_to_spat.gen.c
 ST=SHst_to_spat.c
 Q=SH_to_spat.c
 S=SHs_to_spat.c
@@ -35,7 +35,7 @@ SO=SHos_to_spat.c
 TO=SHot_to_spat.c
 
 #spat_to_SH
-GSP=spat_to_SH.gen.c
+GSP=hyb_spat_to_SH.gen.c
 SC=spat_to_SH.c
 VE=spat_to_SHst.c
 SCE=spat_to_SHe.c

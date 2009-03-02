@@ -82,7 +82,7 @@ QE		if ((LTR&1)==0) {	// k=LTR
 QE			BR0[k] = yl[0] * Ql[k];
 QE			k++;
 QE		}
-		while (k<NLAT) {
+		while (k<NLAT) {	// dct padding
 Q			BR0[k] = 0.0;
 V			BT0[k] = 0.0;	BP0[k] = 0.0;
 			k++;
