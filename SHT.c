@@ -131,7 +131,6 @@ double* zlm_dct0;		// matrix for direct transform (analysis), only m=0
 
 fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dct, dctm0;
-fftw_plan idctm, dctm;	// time_sht special.
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
 
@@ -160,8 +159,9 @@ inline void fft_m0_r2eo(double *Br, double *reo)
 #ifndef MTR
   #define MTR MMAX
 #endif
+int MTR_DCT = -1;
 #ifndef MTR_DCT
-  #define MTR_DCT -1
+//  #define MTR_DCT -1
 #endif
 /////////////////////////////////////////////////////
 //   Scalar Spherical Harmonics Transform
@@ -411,6 +411,45 @@ void GaussNodes(long double *x, long double *w, int n)
 #endif
 }
 
+// initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
+void planDCT()
+{
+	complex double *ShF;
+	double *Sh;
+	int ndct = NLAT;
+	fftw_r2r_kind r2r_kind;
+	fftw_iodim dims, hdims[2];
+	
+#if NPHI > 1
+	if (idct != NULL) fftw_destroy_plan(idct);
+// Allocate dummy Spatial Fields.
+	ShF = (complex double *) fftw_malloc((NPHI/2 +1) * NLAT * sizeof(complex double));
+	Sh = (double *) ShF;
+
+/* LATITUDINAL DCT (THETA) */
+/*	r2r_kind = FFTW_REDFT10;
+	dct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+	dct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+	r2r_kind = FFTW_REDFT01;
+	idct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+	idct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
+*/
+
+	dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
+	hdims[0].n = MTR_DCT+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
+	hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
+	
+//	r2r_kind = FFTW_REDFT10;
+//	dct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
+	r2r_kind = FFTW_REDFT01;
+	idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
+	if (idct == NULL)
+		runerr("[FFTW] dct planning failed !");
+
+	fftw_free(ShF);
+#endif
+}
+
 // initialize FFTs using FFTW. stride = NLAT, (contiguous l)
 void planFFT()
 {
@@ -448,70 +487,41 @@ void planFFT()
 	printf("          => no fft required for NPHI=1.\n");
  #endif
 
-#ifdef SHT_DCT
-/* LATITUDINAL DCT (THETA) */
-/*	r2r_kind = FFTW_REDFT10;
-	dct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
-	dct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
-	r2r_kind = FFTW_REDFT01;
-	idct = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
-	idct2 = fftw_plan_many_r2r(1, &ndct, MMAX+1, Sh+1, &ndct, 2, 2*NLAT, Sh+1, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
-*/
-
-	dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
-	hdims[0].n = MTR_DCT+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
-	hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
-	
-	if (MTR_DCT < 0) hdims[0].n = MMAX+1;		// FIXME to allow testing
-
-  #if NPHI > 1
-	r2r_kind = FFTW_REDFT10;
-	dct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
-	r2r_kind = FFTW_REDFT01;
-	idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
-	if ((dct == NULL)||(idct == NULL))
-		runerr("[FFTW] dct planning failed !");
 /// M=0 DCT
-
- fftw_plan fftw_plan_many_r2r(int rank, const int *n, int howmany,
-                                  double *in, const int *inembed,
-                                  int istride, int idist,
-                                  double *out, const int *onembed,
-                                  int ostride, int odist,
-                                  const fftw_r2r_kind *kind, unsigned flags);
-
-
+#ifdef SHT_DCT
+  #if NPHI > 1
 	r2r_kind = FFTW_REDFT10;
 	dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 	if (dctm0 == NULL)
 		runerr("[FFTW] dctm0 planning failed !");
+	idct = NULL;
   #else
 	r2r_kind = FFTW_REDFT10;
-	dct = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
-	dctm0 = dct;
+	dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
 	r2r_kind = FFTW_REDFT01;
 	idct = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
-	if ((dct == NULL)||(idct == NULL))
+	if ((dctm0 == NULL)||(idct == NULL))
 		runerr("[FFTW] dct planning failed !");
   #endif
-
-/// TIME SHT SPECIAL
-	hdims[0].n = 1;
-	r2r_kind = FFTW_REDFT10;
-	dctm = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
-	r2r_kind = FFTW_REDFT01;
-	idctm = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
-	if ((dctm == NULL)||(idctm == NULL))
-		runerr("[FFTW] dct planning failed !");
-
-/// TIME SHT SPECIAL
-
-//	dct_norm = 1.0/(2*NLAT);
 #endif
 
 //	fft_norm = 1.0/nfft;
 	fftw_free(ShF);
 //	printf("       done.\n");
+}
+
+
+/// SET MTR_DCT and updates fftw_plan for DCT's
+void Set_MTR_DCT(int m)
+{
+	if (m == MTR_DCT) return;
+	if ( m < 0 ) {	// don't use dct
+		MTR_DCT = -1;
+	} else {
+		if (m>MMAX) m=MMAX;
+		MTR_DCT = m;
+		if (MMAX != 0) planDCT();	// no need to replan DCTs for MMAX=0.
+	}
 }
 
 // Perform some optimization on the SHT matrices.
@@ -711,6 +721,63 @@ void init_SH(double eps)
 }
 
 #else
+
+
+/// TIMINGS
+int Find_Optimal_SHT()
+{
+	complex double *ShF, *ThF, *Slm, *Tlm;
+	int m, i;
+	double t, tsum;
+
+	double get_time(int m) {
+		int i;
+		ticks tik0, tik1;
+
+		Set_MTR_DCT(m);
+			SH_to_spat(Tlm,ShF);			// caching...
+			SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+		tik0 = getticks();
+		for (i=0; i<10; i++) {
+			SH_to_spat(Tlm,ShF);
+			SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+		}
+		tik1 = getticks();
+	#ifdef _SH_DEBUG_
+		printf("m=%d - ticks : %.3f\n", m*MRES, elapsed(tik1,tik0)/(10*NLM*NLAT));
+	#endif
+		return elapsed(tik1,tik0);
+	}
+
+	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
+	ThF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
+	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
+	Tlm = (complex double *) malloc(sizeof(complex double)* NLM);
+
+	t = 1.0 / (RAND_MAX/2);		// some random data to play with.
+	for (i=0;i<NLM;i++) {
+		Slm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		Tlm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+	}
+
+	m = -1;
+	tsum = get_time(m);	i = m;
+	for (m=-1; m<=MMAX; m++) {
+		t = get_time(m);
+		if (t < tsum) {	tsum = t;	i = m; }
+	}
+	m=-1;	// recheck m=-1;
+		t = get_time(m);
+		if (t < tsum) { tsum = t;	i = m; }
+		t = get_time(m);	// twice
+		if (t < tsum) { tsum = t;	i = m; }
+
+	free(Tlm);	free(Slm);	fftw_free(ThF);		fftw_free(ShF);
+
+	Set_MTR_DCT(i);
+	return(i);
+}
+
 
 void init_SH(double eps)
 {
@@ -1009,7 +1076,7 @@ void init_SH(double eps)
 		}
 #ifdef _SH_DEBUG_
 		if (max/min > 1.e14) {
-			printf("\nl=%d, m=%d :: min=%g, max=%g, ratio=%g\t",l,m,min,max,max/min);
+//			printf("\nl=%d, m=%d :: min=%g, max=%g, ratio=%g\t",l,m,min,max,max/min);
 		}
 #endif
 		for (k=k1; k<(2*NLAT_2); k+=2) {
@@ -1024,7 +1091,7 @@ void init_SH(double eps)
 		}
 #ifdef _SH_DEBUG_
 		if (max/min > 1.e14) {
-			printf("\nl=%d, m=%d :: (d/dt) min=%g, max=%g, ratio=%g\t",l,m,min,max,max/min);
+//			printf("\nl=%d, m=%d :: (d/dt) min=%g, max=%g, ratio=%g\t",l,m,min,max,max/min);
 		}
 		if (LMAX <= 12) {
 			printf("\nl=%d, m=%d ::\t",l,m);
@@ -1130,5 +1197,9 @@ void init_SH(double eps)
 		}
 	}
 	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.
+
+	printf("finding optimal MTR_DCT ...\r");	fflush(stdout);
+	im = Find_Optimal_SHT();
+	printf("          => optimal MTR_DCT = %d\n", im*MRES);
 }
 #endif

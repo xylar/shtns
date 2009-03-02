@@ -20,10 +20,10 @@ complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
 // parameters for SHT.c
-#define NLAT_2 6
-#define LMAX 10
-#define NPHI 8
-#define MMAX 3
+#define NLAT_2 304
+#define LMAX 400
+#define NPHI 32
+#define MMAX 10
 #define MRES 1
 
 #define _SH_DEBUG_
@@ -37,7 +37,7 @@ double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 #define POLAR_OPT_THR 1e-6
 //#define POLAR_OPT_THR 0
 // number of SH iterations
-#define SHT_ITER 1
+#define SHT_ITER 1000
 
 	
 void write_vect(char *fn, double *vec, int N)
@@ -71,12 +71,14 @@ int main()
 {
 	complex double t1, t2;
 	double t,tmax,n2;
-	int i,im,m,l,jj;
+	int i,im,m,l,jj, m_opt;
 	clock_t tcpu;
 	ticks tik0, tik1;
+	double e0,e1;
 
 	srand( time(NULL) );	// initialise les nombres.
 	init_SH( POLAR_OPT_THR );
+	m_opt = MTR_DCT;
 	
 	if (MMAX > 0) {
 		write_mx("yl1",ylm[1],NLAT_2,LMAX);
@@ -106,6 +108,9 @@ int main()
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) malloc(sizeof(complex double)* NLM);
 
+	printf("test\n");
+	Set_MTR_DCT(MMAX);
+	printf("test\n");
 // SH_to_spat
 	for (i=0;i<NLM;i++) {
 		Slm[i] = 0.0;	Tlm[i] = 0.0;
@@ -149,6 +154,40 @@ int main()
 		Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 		Slm[i] = Slm0[i];
 	}
+
+/*
+/// TIME WITH DIFFERENT MTR_DCT : dichotomy
+	double get_time(int m) {
+		clock_t tcpu;
+		ticks tik0, tik1;
+		Set_MTR_DCT(m);
+		tcpu = clock();
+		tik0 = getticks();
+			for (i=0; i<1000; i++) {
+				SH_to_spat(Slm,ShF);
+//				spat_to_SH(ShF,Slm);
+				SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+//				spat_to_SHsphtor(ShF,ThF,Slm,Tlm);
+			}
+		tik1 = getticks();
+		tcpu = clock() - tcpu;
+		printf("m=%d - ticks : %.0f, tcpu : %d\n", m, elapsed(tik1,tik0), (int) tcpu);
+		return elapsed(tik1,tik0);
+	}
+
+	m = -1;
+	tmax = get_time(m);	jj = m;
+	for (m=-1; m<=MMAX; m++) {
+		t = get_time(m);
+		if (t < tmax) {
+			tmax = t;
+			jj = m;
+		}
+	}
+	get_time(-1);
+	printf("optimal MTR_DCT = %d\n", jj);
+	Set_MTR_DCT(jj);
+*/
 	
 //	Slm[LM(0,0)] = 1.0;
 //	Slm[LM(1,1)] = 3.0;
@@ -167,6 +206,7 @@ int main()
 
 /// REGULAR
 	printf("[REG] :: performing %d scalar SHT with NL evaluation\n", SHT_ITER);
+	Set_MTR_DCT(-1);
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
@@ -205,6 +245,7 @@ int main()
 #ifdef SHT_DCT_IT_OUT
 	printf("         (IT_OUT variant : not working yet...)\n");
 #endif
+	Set_MTR_DCT(MMAX);
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
@@ -234,11 +275,47 @@ int main()
 	}
 	printf("  => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Qlm.dct",Slm,NLM*2);
+
+// restore test case...
+	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];
+/// OPT
+	printf("[OPT] :: performing %d scalar SHT with NL evaluation\n", SHT_ITER);
+	Set_MTR_DCT(m_opt);
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+// synthese (inverse legendre)
+		SH_to_spat(Slm,ShF);
+		SH_to_spat(Tlm,ThF);
+		for (i=0; i< NLAT*NPHI; i++) {
+			ThF[i] *= ShF[i];
+		}
+// analyse (direct legendre)
+		spat_to_SH(ShF,Slm);
+	}
+	tcpu = clock() - tcpu;
+	printf("  2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
+
+// compute error :
+	tmax = 0;	n2 = 0;		jj=0;
+	for (i=0;i<NLM;i++) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			Slm[i] = creal(Slm[i]-Slm0[i]);
+			t = fabs(creal(Slm[i]));
+		} else {
+			Slm[i] -= Slm0[i];
+			t = cabs(Slm[i]);
+		}
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	printf("  => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	write_vect("Qlm.dct",Slm,NLM*2);
 #endif
 
 #define TEST_VECT_SHT
 #ifdef TEST_VECT_SHT
-	printf("[REG] :: performing %d vector SHT\n", SHT_ITER);
+	printf("\n[REG] :: performing %d vector SHT\n", SHT_ITER);
+	Set_MTR_DCT(-1);
 	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	for (i=0;i<NLM;i++) {
@@ -297,6 +374,7 @@ int main()
 	write_vect("Tlm",Tlm,NLM*2);
 #ifdef SHT_DCT
 	printf("[DCT] :: performing %d vector SHT\n", SHT_ITER);
+	Set_MTR_DCT(MMAX);
 	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 	for (i=0;i<NLM;i++) {
@@ -351,6 +429,62 @@ int main()
 	printf("  Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 	write_vect("Tlm",Tlm,NLM*2);
 #endif
+
+	printf("[OPT] :: performing %d vector SHT\n", SHT_ITER);
+	Set_MTR_DCT(m_opt);
+	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	Tlm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
+	}
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+#ifndef _SHT_EO_
+// synthese (inverse legendre)
+		SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+// analyse (direct legendre)
+		spat_to_SHsphtor(ShF,ThF,Slm,Tlm);
+#else
+		SHsphtor_to_spat(Slm,Slm,ShF,ThF);
+		spat_to_SHsphtor(ShF,ThF,Slm,Slm);
+#endif
+	}
+	tcpu = clock() - tcpu;
+	printf("iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
+
+//	write_vect("dylm0", dylm_dct[0]
+
+// compute error :
+	tmax = 0;	n2 = 0;		jj=0;
+	for (i=0;i<NLM;i++) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			Slm[i] = creal(Slm[i]-Slm0[i]);
+			t = fabs(creal(Slm[i]));
+		} else {
+			Slm[i] -= Slm0[i];
+			t = cabs(Slm[i]); 
+		}
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	printf("  Spheroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	write_vect("Slm",Slm,NLM*2);
+
+// compute error :
+	tmax = 0;	n2 = 0;		jj=0;
+	for (i=0;i<NLM;i++) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			Tlm[i] = creal(Tlm[i]- Tlm0[i]);
+			t = fabs(creal(Tlm[i]));
+		} else {
+			Tlm[i] -= Tlm0[i];
+			t = cabs(Tlm[i]); 
+		}
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	printf("  Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	write_vect("Tlm",Tlm,NLM*2);
 
 #endif
 }
