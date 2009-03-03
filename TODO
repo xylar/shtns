@@ -19,10 +19,9 @@
 
 *** SHT.c
 
++ other optimization : NLAT and NPHI should be checked for fftw-friendliness.
+
 - SHT e/o does not work in DCT space. (ok in Gauss version as of r72)
-- implement spat_to_SH using DCT for m=0.
-- implement hybrid algoritm with cutoff MTR_DCT (which is chosen at runtime)
-- memory allocation for ylm_dct's should be cleaned up. (precompute sizes and use temp array)
 
 for SHsphtor_to_spat, maybe storing .t and .p together is not the best... => I think it is.
 

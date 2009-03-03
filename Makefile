@@ -19,7 +19,7 @@ cmdp = gcc -O3 -fopenmp -ffast-math
 
 
 NTH=8 #number of threads for parallel version (can be overwritten with command line)
-shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/dct_SH_to_spat.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/dct_SH_to_spat.gen.c SHT/Makefile
+shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 ini = xshells.h
 
 default : xshells
@@ -28,8 +28,6 @@ SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) SH_to_spat.c -C SHT
 SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 	$(MAKE) spat_to_SH.c -C SHT
-SHT/dct_SH_to_spat.c : SHT/dct_SH_to_spat.gen.c SHT/Makefile
-	$(MAKE) dct_SH_to_spat.c -C SHT
 
 xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
 	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells

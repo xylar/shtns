@@ -64,16 +64,17 @@ Q		zl = zlm_dct0;
 Q		while (l<LTR) {		// l has parity of m
 Q			Ql[l] = 0.0;	Ql[l+1] = 0.0;
 Q			for (i=l; i<NLAT; i+=2) {		// for m=0, zl coeff with i<l are zeros.
-Q				(double) Ql[l]   += BR0[i]   * zl[i];
-Q				(double) Ql[l+1] += BR0[i+1] * zl[i+1];
+Q				(double) Ql[l]   += BR0[i]   * zl[0];
+Q				(double) Ql[l+1] += BR0[i+1] * zl[1];
+Q				zl+=2;
 Q			}
 Q			l+=2;
-Q			zl += NLAT;
 Q		}
 Q		if ((LTR & 1) == 0) {	// if (l == LTR)  <=>  if ((LTR & 1) == 0) for m=0
 Q			Ql[l] = 0.0;
 Q			for (i=l; i<NLAT; i+=2) {		// for m=0, DCT coeff with it<l are zeros.
-Q				(double) Ql[l]   += BR0[i]   * zl[i];
+Q				(double) Ql[l]   += BR0[i]   * zl[0];
+Q				zl+=2;
 Q			}
 Q		}
 Q		BrF += NLAT;
