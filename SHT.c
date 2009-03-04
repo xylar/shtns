@@ -575,16 +575,16 @@ void OptimizeMatrices(double eps)
 	int im,m,l,it;
 
 /// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
-	for (im=0;im<=MMAX;im++) {
-		m = im*MRES;
-		tm[im] = NLAT_2;
-		for (l=m;l<=LMAX;l++) {
-			it=0;
-			while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }
-			if (tm[im] > it) tm[im] = it;
-		}
-	}
 	if (eps > 0.0) {
+		for (im=0;im<=MMAX;im++) {
+			m = im*MRES;
+			tm[im] = NLAT_2;
+			for (l=m;l<=LMAX;l++) {
+				it=0;
+				while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }
+				if (tm[im] > it) tm[im] = it;
+			}
+		}
 		printf("          polar optimization threshold = %e\n",eps);
 #ifdef _SH_DEBUG_
 		printf("          tm[im]=");
@@ -592,16 +592,19 @@ void OptimizeMatrices(double eps)
 			printf(" %d",tm[im]);
 		printf("\n");
 #endif
+	} else {
+		for (im=0;im<=MMAX;im++)	tm[im] = 0;
 	}
 
 /// Compression of dylm and dzlm for m=0, as .p is 0
 	im=0;	m=0;
-		yg = (double *) dylm[im];
-		for (it=0; it<NLAT_2; it++) {
-			for (l=m; l<=LMAX; l++)
-				yg[it*(LMAX-m+1) + (l-m)] = dylm[im][it*(LMAX-m+1) + (l-m)].t;
-		}
-		yg = (double *) dzlm[im];
+	yg = (double *) dylm[im];
+	for (it=0; it<NLAT_2; it++) {
+		for (l=m; l<=LMAX; l++)
+			yg[it*(LMAX-m+1) + (l-m)] = dylm[im][it*(LMAX-m+1) + (l-m)].t;
+	}
+	yg = (double *) dzlm[im];
+	if (yg != NULL) {	// for sht_reg_poles there is no dzlm defined.
 		for (l=m; l<LMAX; l+=2) {
 			for (it=0; it<NLAT_2; it++) {
 				yg[(l-m)*NLAT_2 + it*2] = dzlm[im][(l-m)*NLAT_2 + it*2].t;
@@ -613,6 +616,7 @@ void OptimizeMatrices(double eps)
 				yg[(l-m)*NLAT_2 + it] = dzlm[im][(l-m)*NLAT_2 + it].t;
 			}
 		}
+	}
 }
 
 /** initialize SH transform.
@@ -1142,10 +1146,12 @@ void init_SH(enum shtns_type flags, double eps)
 	}
 	if (flags == sht_reg_poles)
 	{
+		MTR_DCT = -1;		// we do not use DCT !!!
 		fftw_free(dzlm[0]);	fftw_free(zlm[0]);	// no inverse transform.
-		MTR_DCT = -1;
+		dzlm[0] = NULL;		zlm[0] = NULL;		// mark as unused.
 		EqualPolarGrid();
 		init_SH_synth();
+		OptimizeMatrices(eps);
 	}
 
 // Additional arrays :
