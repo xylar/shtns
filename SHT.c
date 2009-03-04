@@ -396,7 +396,7 @@ void EqualPolarGrid()
 		st[j] = sinl(f*j);
 		st_1[j] = 1.0/sinl(f*j);
 	}
-	printf("          ! warning : only synthesis (inverse transform) supported so far for this grid !\n");
+	printf("       !! Warning : only synthesis (inverse transform) supported so far for this grid !\n");
 }
 
 
@@ -419,10 +419,10 @@ void planFFT()
 	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
 	Sh = (double *) ShF;
 
-	printf("[FFTW] Mmax=%d, Nphi=%d\n",MMAX,NPHI);
+	printf("          using FFTW : Mmax=%d, Nphi=%d\n",MMAX,NPHI);
 
 	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
-	if (NPHI < 3*MMAX) printf("       ! Warning : 2/3 rule for anti-aliasing not met !\n");
+	if (NPHI < 3*MMAX) printf("       !! Warning : 2/3 rule for anti-aliasing not met !\n");
 	
 // IFFT : unnormalized.
 	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
@@ -585,7 +585,7 @@ void OptimizeMatrices(double eps)
 				if (tm[im] > it) tm[im] = it;
 			}
 		}
-		printf("          polar optimization threshold = %e\n",eps);
+		printf("          + polar optimization threshold = %.1e\n",eps);
 #ifdef _SH_DEBUG_
 		printf("          tm[im]=");
 		for (im=0;im<=MMAX;im++)
@@ -1096,10 +1096,11 @@ void init_SH(enum shtns_type flags, double eps)
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if ((NLAT_2)*2 <= LMAX) runerr("[init_SH] NLAT_2*2 should be at least LMAX+1");
 	if (MRES <= 0) runerr("[init_SH] MRES must be > 0");
-	if (2*NLAT <= 3*LMAX) printf("          ! Warning : anti-aliasing condition in theta direction not met.\n");
 
 	planFFT();		// initialize fftw
 	zlm_dct0 = NULL;	// used as a flag.
+
+	if (2*NLAT <= 3*LMAX) printf("       !! Warning : anti-aliasing condition in theta direction not met.\n");
 
 // Allocate legendre functions lookup tables.
 	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
@@ -1128,7 +1129,7 @@ void init_SH(enum shtns_type flags, double eps)
 		OptimizeMatrices(eps);
 		printf("finding optimal MTR_DCT ...\r");	fflush(stdout);
 		t = Find_Optimal_SHT();
-		printf("          => optimal MTR_DCT = %d\n", MTR_DCT*MRES);
+		printf("          + optimal MTR_DCT = %d\n", MTR_DCT*MRES);
 		if ( (flags == sht_auto)&&( (MTR_DCT == -1)||(t > MIN_PERF_IMPROVE_DCT) ) ) {	// switch to gauss grid : better precision.
 			flags = sht_gauss;
 			fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);	fftw_free(ykm_dct[0]);		// free now useless arrays.
