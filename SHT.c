@@ -60,11 +60,17 @@ enum shtns_type {
 #define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
 #define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 
-// LM_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined. (but NOT m and im)
+//LM_LOOP : loop avor all lm's and perform "action". only lm is defined, neither l nor m.
+#define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { action }
+
+// LM_L_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined. (but NOT m and im)
 //  double-loop version : assumes contiguous l-storage with 1 stride. (not compatible with even/odd packed)
-//#define LM_LOOP( action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=LMAX; l++, lm++) { action } }
+//#define LM_L_LOOP( action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=LMAX; l++, lm++) { action } }
 //  single-loop + lookup array : no assumption on l-storage is made + FASTER !! (cache miss seems better than branch prediction miss...)
-#define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { l=li[lm]; { action } }
+#define LM_L_LOOP( action ) for (lm=0; lm<NLM; lm++) { l=li[lm]; { action } }
+
+// LM_LTR_LOOP : loop over all (l,im) for l<=Ltr and perform "action"  : l and lm are defined. (but NOT m and im)
+#define LM_LTR_LOOP( Ltr, action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=Ltr; l++, lm++) { action } lm+=(LMAX-Ltr); }
 
 
 // half the theta length for even/odd decomposition. (NLAT+1)/2 allows odd NLAT.
@@ -168,11 +174,11 @@ inline void fft_m0_r2eo(double *Br, double *reo)
 #ifndef MTR
   #define MTR MMAX
 #endif
+
 /////////////////////////////////////////////////////
 //   Scalar Spherical Harmonics Transform
 // input  : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
 // output : Slm = spherical harmonics coefficients : complex double array of size NLM
-
 void spat_to_SH(complex double *BrF, complex double *Qlm)
 {
 	#ifndef _SHT_EO_
@@ -186,7 +192,6 @@ void spat_to_SH(complex double *BrF, complex double *Qlm)
 //   Scalar inverse Spherical Harmonics Transform
 // input  : Qlm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
 // output : BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
-
 void SH_to_spat(complex double *Qlm, complex double *BrF)
 {
 	#ifndef _SHT_EO_
@@ -295,6 +300,73 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	*vp = vsp/sint - (-sint*vtt);	// Bp = I.m/sint *S  - dT/dt
 }
 
+/**
+	SHT FUNCTIONS with variable LTR truncation.
+**/
+
+#undef LTR
+
+void spat_to_SH_l(complex double *BrF, complex double *Qlm, int LTR)
+{
+	#ifndef _SHT_EO_
+		#include "SHT/spat_to_SH.c"
+	#else
+		#include "SHT/spat_to_SHo.c"
+	#endif
+}
+
+/////////////////////////////////////////////////////
+//   Scalar inverse Spherical Harmonics Transform
+// input  : Qlm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
+// output : BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+
+void SH_to_spat_l(complex double *Qlm, complex double *BrF, int LTR)
+{
+	#ifndef _SHT_EO_
+		#include "SHT/SH_to_spat.c"
+	#else
+		#include "SHT/SHo_to_spat.c"
+	#endif
+}
+
+//void SH_to_grad_spat(complex double *Slm, complex double *BtF, complex double *BpF)
+// "grad_spat" and "sph_to_spat" are the same : so we alias them.
+//#include "SHT/S_to_spat.c"
+#define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat(S, Gt, Gp, ltr)
+
+/////////////////////////////////////////////////////
+//   Spheroidal/Toroidal to (theta,phi) components inverse Spherical Harmonics Transform
+// input  : Slm,Tlm = spherical harmonics coefficients of Spheroidal and Toroidal scalars : 
+//          complex double array of size NLM [unmodified]
+// output : BtF, BpF = theta, and phi vector components, spatial/fourrier data : 
+//          complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, int LTR)
+{
+#ifndef _SHT_EO_
+  #include "SHT/SHst_to_spat.c"
+#else
+  #include "SHT/SHost_to_spat.c"
+#endif
+}
+
+void SHsph_to_spat_l(complex double *Slm, complex double *BtF, complex double *BpF, int LTR)
+{
+#include "SHT/SHs_to_spat.c"
+}
+
+void SHtor_to_spat_l(complex double *Tlm, complex double *BtF, complex double *BpF, int LTR)
+{
+#include "SHT/SHt_to_spat.c"
+}
+
+void spat_to_SHsphtor_l(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm, int LTR)
+{
+#ifndef _SHT_EO_
+  #include "SHT/spat_to_SHst.c"
+#else
+  #include "SHT/spat_to_SHost.c"
+#endif
+}
 
 /**
 	INITIALIZATION FUNCTIONS

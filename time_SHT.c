@@ -103,6 +103,46 @@ int test_SHT()
 //		write_vect("Qlm.reg",Slm,NLM*2);
 }
 
+int test_SHT_l(int ltr)
+{
+	int jj,i;
+	double tmax,t,n2;
+	clock_t tcpu;
+
+	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+// synthese (inverse legendre)
+		SH_to_spat_l(Slm,ShF,ltr);
+		SH_to_spat_l(Tlm,ThF,ltr);
+		for (i=0; i< NLAT*NPHI; i++) {
+			ThF[i] *= ShF[i];
+		}
+// analyse (direct legendre)
+		spat_to_SH_l(ShF,Slm,ltr);
+	}
+	tcpu = clock() - tcpu;
+	printf("   2iSHT + NL + SHT x%d with L-truncation at %d. time : %d\n", SHT_ITER, ltr, (int )tcpu);
+
+// compute error :
+	tmax = 0;	n2 = 0;		jj=0;
+	for (i=0;i<NLM;i++) {
+		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			Slm[i] = creal(Slm[i]-Slm0[i]);
+			t = fabs(creal(Slm[i]));
+		} else {
+			Slm[i] -= Slm0[i];
+			t = cabs(Slm[i]);
+		}
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	printf("   => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+//		write_vect("Qlm.reg",Slm,NLM*2);
+}
+
+
+
 int test_SHT_vect()
 {
 	int jj,i;
@@ -237,15 +277,22 @@ int main()
 	printf(":: OPTIMAL\n");
 	Set_MTR_DCT(m_opt);
 	test_SHT();
-
 	printf(":: FULL DCT\n");
 	Set_MTR_DCT(MMAX);
 	test_SHT();
-
 	printf(":: NO DCT\n");
 	Set_MTR_DCT(-1);
 	test_SHT();
 
+	printf(":: OPTIMAL with LTR\n");
+	Set_MTR_DCT(m_opt);
+	test_SHT_l(LMAX/2);
+	printf(":: FULL DCT with LTR\n");
+	Set_MTR_DCT(MMAX);
+	test_SHT_l(LMAX/2);
+	printf(":: NO DCT with LTR\n");
+	Set_MTR_DCT(-1);
+	test_SHT_l(LMAX/2);
 
 #define TEST_VECT_SHT
 #ifdef TEST_VECT_SHT
@@ -257,11 +304,9 @@ int main()
 	printf(":: OPTIMAL\n");
 	Set_MTR_DCT(m_opt);
 	test_SHT_vect();
-
 	printf(":: FULL DCT\n");
 	Set_MTR_DCT(MMAX);
 	test_SHT_vect();
-
 	printf(":: NO DCT\n");
 	Set_MTR_DCT(-1);
 	test_SHT_vect();
