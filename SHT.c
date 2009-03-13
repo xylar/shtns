@@ -368,6 +368,8 @@ void spat_to_SHsphtor_l(complex double *BtF, complex double *BpF, complex double
 #endif
 }
 
+#undef MTR
+
 /**
 	INITIALIZATION FUNCTIONS
 **/
@@ -1232,9 +1234,9 @@ void init_SH(enum shtns_type flags, double eps)
 	_nlm_ = nlm_calc(LMAX, MMAX, MRES);	// store "precomputed" NLM
 	#undef NLM
 	#define NLM _nlm_
-	el = (double *) fftw_malloc(3*NLM * sizeof(double));	// NLM defined at runtime.
+	el = (double *) fftw_malloc( 3*NLM*sizeof(double) + NLM*sizeof(int) );	// NLM defined at runtime.
 	l2 = el + NLM;	l_2 = el + 2*NLM;
-	li = (int *) malloc(NLM * sizeof(int));
+	li = (int *) (el + 3*NLM);
 #endif
 	it = 0;
 	for (im=0;im<=MMAX;im++) {

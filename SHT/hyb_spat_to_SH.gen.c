@@ -76,6 +76,11 @@ Q			for (i=l; i<NLAT; i+=2) {		// for m=0, DCT coeff with it<l are zeros.
 Q				(double) Ql[l]   += BR0[i]   * zl[0];
 Q				zl+=2;
 Q			}
+Q			l++;
+Q		}
+Q		while( l<=LMAX ) {
+Q			Ql[l] = 0.0;
+Q			l++;
 Q		}
 Q		BrF += NLAT;
 Q	} else {
@@ -132,7 +137,9 @@ VO				(double) Tl[l] -= dzl0[0] * (double) po;
 Q				zl ++;
 V				dzl0 ++;
 			}
-		} else if (l==LTR) {
+			l++;
+		} else {
+		    if (l==LTR) {
 QE			Ql[l] = 0.0;
 VE			Sl[l] = 0.0;
 VO			Tl[l] = 0.0;
@@ -143,6 +150,13 @@ VO				(double) Tl[l]   -= dzl0[0] * (double) po;
 Q				zl +=2;
 V				dzl0 +=2;
 			}
+			l++;
+		    }
+		    while( l<=LMAX ) {
+Q			Ql[l] = 0.0;
+V			Sl[l] = 0.0;	Tl[l] = 0.0;
+			l++;
+		    }
 		}
 Q	}
 	for (im=1;im<=MTR;im++) {
@@ -199,7 +213,9 @@ VO				Tl[l] -= dzl[0].t *po + dzl[0].p *te*I;
 Q				zl++;
 V				dzl++;
 			}
-		} else if (l==LTR) {
+			l++;
+		} else {
+		    if (l==LTR) {
 Q			zl += 2*tm[im];
 V			dzl += 2*tm[im];
 QE			Ql[l] = 0.0;
@@ -212,6 +228,13 @@ VO				Tl[l]   -= dzl[0].t *po + dzl[0].p *te*I;
 Q				zl +=2;
 V				dzl +=2;
 			}
+			l++;
+		    }
+		    while( l<=LMAX ) {
+Q			Ql[l] = 0.0;
+V			Sl[l] = 0.0;	Tl[l] = 0.0;
+			l++;
+		    }
 		}
 	}
 
