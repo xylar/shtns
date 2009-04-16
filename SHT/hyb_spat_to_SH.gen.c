@@ -12,7 +12,7 @@
 #Q void spat_to_SH(complex double *BrF, complex double *Qlm)
 #V void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
 # {
-  #if NPHI > 1
+  #ifndef SHT_AXISYM
 QB	complex double reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 VB	complex double teo[2*NLAT_2], peo[2*NLAT_2];	// theta and phi even and odd parts
   #else
@@ -34,7 +34,7 @@ VB	#define to	teo[2*i+1]
 VB	#define pe	peo[2*i]
 VB	#define po	peo[2*i+1]
 
- #if NPHI > 1
+ #ifndef SHT_AXISYM
 Q1	#define re	BrF[i]
 Q1	#define ro	BrF[i]
 V1	#define te	BtF[i]
@@ -84,7 +84,7 @@ Q			l++;
 Q		}
 Q		BrF += NLAT;
 Q	} else {
-  #if NPHI > 1
+  #ifndef SHT_AXISYM
  B		for (i=0;i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
 QB			(double) reo[2*i]   = (double) BrF[i] + (double) BrF[NLAT-(i+1)];
 QB			(double) reo[2*i+1] = (double) BrF[i] - (double) BrF[NLAT-(i+1)];

@@ -28,37 +28,33 @@ enum shtns_type {
 	// cycle counter from FFTW
 	#include "cycle.h"
 
-
-// SHT.h : parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
-#ifndef LMAX
-# include "SHT.h"
-#endif
-
-/*
-#if MMAX == 0
-  #undef MRES
+// parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
+int LMAX;		// maximum degree (LMAX) of spherical harmonics.
+int NLAT, NLAT_2;	// number of spatial points in Theta direction (latitude) and half of it (using (NLAT+1)/2 allows odd NLAT.)
+#ifndef SHT_AXISYM
+  int MMAX,MRES;	// maximum order (MMAX*MRES) of spherical harmonics. MRES is the periodicity along the phi axis.
+  int NPHI;		// number of spatial points in Phi direction (longitude)
+#else
+  #define MMAX 0
+  #define NPHI 1
   #define MRES 1
 #endif
-*/
+long int NLM;		// total number of (l,m) spherical harmonics components.
 
-#ifndef MRES
-	int _mres_ = -1;	// if no MRES is defined, use run-time MRES instead.
-	int _nlm_ = 0;
-	#define MRES _mres_
-#endif
 
 /** ACCESS TO SPHERICAL HARMONICS COMPONENTS **
-  NLM : total number of (l,m) components.
   LM(l,m) : macro returning array index for given l and m.
   LiM(l,im) : macro returning array index for given l and im.
   LM_LOOP( action ) : macro that performs "action" for every (l,m), with l and lm set, but neither m nor im.
   el[NLM], l2[NLM], l_2[NLM] : floating point arrays containing l, l*(l+1) and 1/(l*(l+1))
 **/
-// NLM : total number of Spherical Harmonic coefficients.
-#define NLM ( (MMAX+1)*(LMAX+1) - MRES*(MMAX*(MMAX+1))/2 )
 // LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
-#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
-#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
+//#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
+//#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
+#define LiM(l,im) ( lmidx[im] + l )
+#define LM(l,m) ( lmidx[(m)/MRES] + l )
+//#define LiM(l,im) ( lmidx[im] + (l-im*MRES)/2 )
+//#define LM(l,m) ( lmidx[m/MRES] + (l-m)/2 )
 
 //LM_LOOP : loop avor all lm's and perform "action". only lm is defined, neither l nor m.
 #define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { action }
@@ -72,30 +68,6 @@ enum shtns_type {
 // LM_LTR_LOOP : loop over all (l,im) for l<=Ltr and perform "action"  : l and lm are defined. (but NOT m and im)
 #define LM_LTR_LOOP( Ltr, action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=Ltr; l++, lm++) { action } lm+=(LMAX-Ltr); }
 
-
-// half the theta length for even/odd decomposition. (NLAT+1)/2 allows odd NLAT.
-#ifndef NLAT
- #ifndef NLAT_2
-  #error "NLAT or NLAT_2 must be defined"
- #endif
- #ifndef _SHT_EO_
- #define NLAT (2*NLAT_2)
- #else
-  #define NLAT NLAT_2
- #endif
-#endif
-
-#ifndef NLAT_2
- #ifndef NLAT
-  #error "NLAT or NLAT_2 must be defined"
- #endif
- #ifndef _SHT_EO_
-  #define NLAT_2 ((NLAT+1)/2)
- #else
-  #define NLAT_2 NLAT
- #endif
-#endif
-
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
 #endif
@@ -106,42 +78,26 @@ enum shtns_type {
 // Y10_ct = spherical harmonic representation of cos(theta) (l=1,m=0)
 #define Y10_ct sqrt(4.*M_PI/3.)
 
-// TEST FOR PARAMETERS AT COMPILE TIME
-#if NLAT_2 <= LMAX/2
-	#error "NLAT_2 must be greater than LMAX/2 !"
-#endif
-#if LMAX < MMAX*MRES
-	#error "MMAX*MRES should not exceed LMAX !"
-#endif
-#if NPHI <= 2*MMAX
-	#error "NPHI and MMAX must conform to the sampling condition NPHI > 2*MMAX !"
-#endif
-
-
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };
 
 const double pi = M_PI;
-double ct[NLAT], st[NLAT], st_1[NLAT];	// cos(theta), sin(theta), 1/sin(theta);
-#if MRES != _mres_
-	double el[NLM], l2[NLM], l_2[NLM];	// l, l(l+1) and 1/(l(l+1))
-	int li[NLM];
-#else
-	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
-	int *li;
-#endif
+double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
+double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
+int *li;
 
 int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
-int tm[MMAX+1];	// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+int *lmidx;		// (virtual) index in SH array of given im.
 
-double* ylm[MMAX+1];		// matrix for inverse transform (synthesis)
-struct DtDp* dylm[MMAX+1];	// theta and phi derivative of Ylm matrix
-double* zlm[MMAX+1];		// matrix for direct transform (analysis)
-struct DtDp* dzlm[MMAX+1];
+double** ylm;		// matrix for inverse transform (synthesis)
+struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
+double** zlm;		// matrix for direct transform (analysis)
+struct DtDp** dzlm;
 
-double* ykm_dct[MMAX+1];	// matrix for inverse transform (synthesis) using dct.
-struct DtDp* dykm_dct[MMAX+1];	// theta and phi derivative of Ylm matrix
+double** ykm_dct;	// matrix for inverse transform (synthesis) using dct.
+struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix
 double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
 
 fftw_plan ifft, fft;	// plans for FFTW.
@@ -380,21 +336,56 @@ void runerr(const char * error_text)
 	exit(1);
 }
 
+void alloc_SHTarrays()
+{
+	long int im,m;
+
+	ct = (double *) fftw_malloc(sizeof(double) * NLAT*3);
+	st = ct + NLAT;		st_1 = ct + 2*NLAT;
+	tm = (int *) fftw_malloc(sizeof(int) * (MMAX+1)*2);
+	lmidx =  tm + (MMAX+1);
+	ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );
+	zlm = ylm + (MMAX+1);		ykm_dct = ylm + (MMAX+1)*2;
+	dylm = (struct DtDp **) fftw_malloc( sizeof(struct DtDp *) * (MMAX+1)*3);
+	dzlm = dylm + (MMAX+1);		dykm_dct = dylm + (MMAX+1)*2;
+
+	el = (double *) fftw_malloc( 3*NLM*sizeof(double) + NLM*sizeof(int) );	// NLM defined at runtime.
+	l2 = el + NLM;	l_2 = el + 2*NLM;
+	li = (int *) (el + 3*NLM);
+
+// Allocate legendre functions lookup tables.
+	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
+	dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
+	zlm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
+	dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
+	for (im=0; im<MMAX; im++) {
+		m = im*MRES;
+		ylm[im+1] = ylm[im] + NLAT_2*(LMAX+1 -m);
+		dylm[im+1] = dylm[im] + NLAT_2*(LMAX+1 -m);
+		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m);
+		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -m);
+	}
+#ifdef _SH_DEBUG_
+	printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
+#endif
+}
+
 // compute number of modes for spherical harmonic description.
 inline long int nlm_calc(long int lmax, long int mmax, long int mres)
 {
 	if (mmax*mres > lmax) mmax = lmax/mres;
 	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
+}
+
 /*
+long int nlm_calc_eo(long int lmax, long int mmax, long int mres) {
 	long int im,l,lm;
-	lm=0;
-	for (im=0; im<=mmax; im++) {	// perform the loop : this gives the exact result !
-		for (l=im*mres; l<=lmax; l++)	lm++;
-//		if (im*mres <= lmax) lm += lmax+1-im*mres;
+	for (im=0, lm=0; im<=mmax; im++) {
+		if (im*mres <= lmax) lm += (lmax+2-im*mres)/2;
 	}
 	return lm;
-*/
 }
+*/
 
 // Generates the abscissa and weights for a Gauss-Legendre quadrature.
 // Newton method from initial Guess to find the zeros of the Legendre Polynome
@@ -477,16 +468,15 @@ void EqualPolarGrid()
 // initialize FFTs using FFTW. stride = NLAT, (contiguous l)
 void planFFT()
 {
-#if NPHI > 1
+#ifndef SHT_AXISYM
 	complex double *ShF;
 	double *Sh;
-	int nfft = NPHI;
-	int ncplx = NPHI/2 +1;
-	int nreal;
-	int ndct = NLAT;
+	int nfft, ncplx, nreal;
 	fftw_r2r_kind r2r_kind;
 	fftw_iodim dims, hdims[2];
 	
+	nfft = NPHI;
+	ncplx = NPHI/2 +1;
 	nreal = 2*ncplx;
 	
 // Allocate dummy Spatial Fields.
@@ -497,6 +487,7 @@ void planFFT()
 
 	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
 	if (NPHI < 3*MMAX) printf("       !! Warning : 2/3 rule for anti-aliasing not met !\n");
+	if ((MMAX == 0)&&(NPHI < 2)) runerr("[FFTW] compile with SHT_AXISYM defined to have NPHI=1 and MMAX=0");
 	
 // IFFT : unnormalized.
 	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
@@ -522,11 +513,11 @@ void planDCT()
 {
 	complex double *ShF;
 	double *Sh;
-	int ndct = NLAT;
+	int ndct;
 	fftw_r2r_kind r2r_kind;
 	fftw_iodim dims, hdims[2];
 	
-#if NPHI > 1
+#ifndef SHT_AXISYM
 	if (idct != NULL) fftw_destroy_plan(idct);
 // Allocate dummy Spatial Fields.
 	ShF = (complex double *) fftw_malloc((NPHI/2 +1) * NLAT * sizeof(complex double));
@@ -544,6 +535,7 @@ void planDCT()
 		runerr("[FFTW] dct planning failed !");
 
 	if (dctm0 == NULL) {
+		ndct = NLAT;
 		r2r_kind = FFTW_REDFT10;
 		dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 		if (dctm0 == NULL)
@@ -1161,36 +1153,31 @@ void init_SH_dct()
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
 
-void init_SH(enum shtns_type flags, double eps)
+void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat_2, int nphi)
 {
 	double t;
-	int im,m,l,it;
+	int im,m,l,lm;
+
+	// copy to global variables.
+#ifdef SHT_AXISYM
+	if ((mmax != MMAX)||(nphi != NPHI)) runerr("[init_SH] axisymmetric version : only mmax=0 and nphi=1 allowed");
+#else
+	MMAX = mmax;	MRES = mres;	NPHI = nphi;
+#endif
+	LMAX = lmax;	NLAT_2 = nlat_2;
+	NLAT = nlat_2 * 2;
+	NLM = nlm_calc(LMAX,MMAX,MRES);
 
 	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if ((NLAT_2)*2 <= LMAX) runerr("[init_SH] NLAT_2*2 should be at least LMAX+1");
 	if (MRES <= 0) runerr("[init_SH] MRES must be > 0");
 
+	alloc_SHTarrays();	// allocate dynamic arrays
 	planFFT();		// initialize fftw
 	zlm_dct0 = NULL;	// used as a flag.
 
 	if (2*NLAT <= 3*LMAX) printf("       !! Warning : anti-aliasing condition in theta direction not met.\n");
-
-// Allocate legendre functions lookup tables.
-	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
-	dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
-	zlm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
-	dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
-	for (im=0; im<MMAX; im++) {
-		m = im*MRES;
-		ylm[im+1] = ylm[im] + NLAT_2*(LMAX+1 -m);
-		dylm[im+1] = dylm[im] + NLAT_2*(LMAX+1 -m);
-		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m);
-		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -m);
-	}
-#ifdef _SH_DEBUG_
-	printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
-#endif
 
 	if (flags == sht_reg_dct) {	// pure dct.
 		init_SH_dct();
@@ -1229,21 +1216,14 @@ void init_SH(enum shtns_type flags, double eps)
 		OptimizeMatrices(eps);
 	}
 
-// Additional arrays :
-#if MRES == _mres_
-	_nlm_ = nlm_calc(LMAX, MMAX, MRES);	// store "precomputed" NLM
-	#undef NLM
-	#define NLM _nlm_
-	el = (double *) fftw_malloc( 3*NLM*sizeof(double) + NLM*sizeof(int) );	// NLM defined at runtime.
-	l2 = el + NLM;	l_2 = el + 2*NLM;
-	li = (int *) (el + 3*NLM);
-#endif
-	it = 0;
-	for (im=0;im<=MMAX;im++) {
+// Additional arrays init :
+	for (im=0, lm=0; im<=MMAX; im++) {
+		m = im*MRES;
+		lmidx[im] = lm -m;		// virtual pointer for l=0
 		for (l=im*MRES;l<=LMAX;l++) {
-			el[it] = l;	l2[it] = l*(l+1.0);	l_2[it] = 1.0/(l*(l+1.0));
-			li[it] = l;
-			it++;
+			el[lm] = l;	l2[lm] = l*(l+1.0);	l_2[lm] = 1.0/(l*(l+1.0));
+			li[lm] = l;
+			lm++;
 		}
 	}
 	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.

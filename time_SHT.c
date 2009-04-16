@@ -19,14 +19,15 @@ complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
 complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
-// parameters for SHT.c
+/*// parameters for SHT.c
 #define NLAT_2 128
 #define LMAX 150
 #define NPHI 64
 #define MMAX 21
 #define MRES 5
-
+*/
 #define _SH_DEBUG_
+//#define SHT_AXISYM
 //#define _SHT_EO_
 //#define SHT_EQUAL	/* SHT on equal spaced grid + polar points. */
 #include "SHT.c"
@@ -211,7 +212,8 @@ int main()
 	double e0,e1;
 
 	srand( time(NULL) );	// initialise les nombres.
-	init_SH( sht_auto, POLAR_OPT_THR );
+	//                          ... lmax,mmax,mres, nlat/2, nphi );
+	init_SH( sht_auto, POLAR_OPT_THR, 300, 21, 5,  256, 64 );
 	m_opt = MTR_DCT;
 	
 	if (MMAX > 0) {

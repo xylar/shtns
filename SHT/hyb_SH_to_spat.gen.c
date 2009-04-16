@@ -27,7 +27,7 @@ S	complex double *Sl;
 T	complex double *Tl;
 Q	double *yl;
 V	double *dyl0;
-  #if NPHI > 1
+  #ifndef SHT_AXISYM
 V	struct DtDp *dyl;
 Q	complex double re,ro;
 V	complex double te,to, pe,po;
@@ -137,7 +137,7 @@ Q			yl  += (LMAX-LTR);
 V			dyl0 += (LMAX-LTR);
 		}
 	}
-  #if NPHI > 1
+  #ifndef SHT_AXISYM
 	im=1;
 Q	BrF += NLAT;
 V	BtF += NLAT;	BpF += NLAT;
@@ -294,7 +294,7 @@ V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);	// restore original pointer
 Q		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
-  #if NPHI>1
+  #ifndef SHT_AXISYM
 		if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
 Q			for (im=1; im<=MTR_DCT; im+=2) {	// odd m's
 Q				for (k=0; k<NLAT; k++) BrF[im*NLAT + k] *= st[k];
@@ -317,7 +317,7 @@ V			BT0[k] *= st[k];	BP0[k] *= st[k];
 V		}
   #endif
 	}
-  #if NPHI>1
+  #ifndef SHT_AXISYM
 Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
 V	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
