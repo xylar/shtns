@@ -1160,7 +1160,7 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 
 	// copy to global variables.
 #ifdef SHT_AXISYM
-	if ((mmax != MMAX)||(nphi != NPHI)) runerr("[init_SH] axisymmetric version : only mmax=0 and nphi=1 allowed");
+	if ((mmax != MMAX)||(nphi != NPHI)) runerr("[init_SH] axisymmetric version : only Mmax=0 and Nphi=1 allowed");
 #else
 	MMAX = mmax;	MRES = mres;	NPHI = nphi;
 #endif
@@ -1179,6 +1179,7 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 
 	if (2*NLAT <= 3*LMAX) printf("       !! Warning : anti-aliasing condition in theta direction not met.\n");
 
+#ifndef SHT_NO_DCT
 	if (flags == sht_reg_dct) {	// pure dct.
 		init_SH_dct();
 		OptimizeMatrices(0.0);
@@ -1201,6 +1202,9 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 		}
 	}
 	if (flags == sht_gauss)
+#else
+	if ((flags == sht_gauss)||(flags == sht_auto)||(flags == sht_reg_fast)||(flags == sht_reg_dct))
+#endif
 	{
 		MTR_DCT = -1;		// we do not use DCT !!!
 		init_SH_gauss();

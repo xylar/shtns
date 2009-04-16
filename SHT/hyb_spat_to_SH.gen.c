@@ -56,6 +56,7 @@ Q	#define BR0 ((double *)BrF)
  #endif
 
 	im = 0;	m=0;	// dzl.p = 0.0 : and evrything is REAL
+  #ifndef SHT_NO_DCT
 Q	if (MTR_DCT >= 0) {		// unfortunately, only scalar SHT can be faster with DCT.
 Q		fftw_execute_r2r(dctm0,(double *) BrF, (double *) BrF);		// DCT
 Q		l=0;
@@ -78,12 +79,15 @@ Q				zl+=2;
 Q			}
 Q			l++;
 Q		}
+Q  #ifndef NO_LTR
 Q		while( l<=LMAX ) {
 Q			Ql[l] = 0.0;
 Q			l++;
 Q		}
+Q  #endif
 Q		BrF += NLAT;
 Q	} else {
+  #endif
   #ifndef SHT_AXISYM
  B		for (i=0;i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
 QB			(double) reo[2*i]   = (double) BrF[i] + (double) BrF[NLAT-(i+1)];
@@ -138,6 +142,7 @@ Q				zl ++;
 V				dzl0 ++;
 			}
 			l++;
+  #ifndef NO_LTR
 		} else {
 		    if (l==LTR) {
 QE			Ql[l] = 0.0;
@@ -157,8 +162,12 @@ Q			Ql[l] = 0.0;
 V			Sl[l] = 0.0;	Tl[l] = 0.0;
 			l++;
 		    }
+  #endif
 		}
+  #ifndef SHT_NO_DCT
 Q	}
+  #endif
+  #ifndef SHT_AXISYM
 	for (im=1;im<=MTR;im++) {
 		m=im*MRES;
  B		for (i=tm[im];i<NLAT/2;i++) {	// compute symmetric and antisymmetric parts.
@@ -214,6 +223,7 @@ Q				zl++;
 V				dzl++;
 			}
 			l++;
+    #ifndef NO_LTR
 		} else {
 		    if (l==LTR) {
 Q			zl += 2*tm[im];
@@ -235,9 +245,10 @@ Q			Ql[l] = 0.0;
 V			Sl[l] = 0.0;	Tl[l] = 0.0;
 			l++;
 		    }
+    #endif
 		}
 	}
-
+  #endif
 Q	#undef re
 Q	#undef ro
 V	#undef te

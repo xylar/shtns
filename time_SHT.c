@@ -28,6 +28,7 @@ double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 */
 #define _SH_DEBUG_
 //#define SHT_AXISYM
+//#define SHT_NO_DCT
 //#define _SHT_EO_
 //#define SHT_EQUAL	/* SHT on equal spaced grid + polar points. */
 #include "SHT.c"
@@ -128,6 +129,7 @@ int test_SHT_l(int ltr)
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
+	    if (li[i] <= ltr) {
 		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
 			Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
@@ -137,6 +139,7 @@ int test_SHT_l(int ltr)
 		}
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
+	    }
 	}
 	printf("   => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 //		write_vect("Qlm.reg",Slm,NLM*2);

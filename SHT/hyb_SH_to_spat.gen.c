@@ -49,6 +49,7 @@ V	#define BP0 ((double *)BpF)
 Q		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 S		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 T		Tl = &Tlm[LiM(0,im)];
+  #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {	// dct for m=0.
 Q		yl = ykm_dct[im];
 V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
@@ -92,6 +93,7 @@ V			BT0[k] = 0.0;	BP0[k] = 0.0;
 			k++;
 		}
 	} else {
+  #endif
 		k=0;
 Q		yl  = ylm[im];
 V		dyl0 = (double *) dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
@@ -136,11 +138,15 @@ VB				;
 Q			yl  += (LMAX-LTR);
 V			dyl0 += (LMAX-LTR);
 		}
+  #ifndef SHT_NO_DCT
 	}
+  #endif
+
   #ifndef SHT_AXISYM
 	im=1;
 Q	BrF += NLAT;
 V	BtF += NLAT;	BpF += NLAT;
+    #ifndef SHT_NO_DCT
 	while(im<=MTR_DCT) {		// dct for im <= MTR_DCT
 		m=im*MRES;
 Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
@@ -211,6 +217,7 @@ V			BtF[k] = 0.0;	BpF[k] = 0.0;
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
+    #endif
 	while(im<=MTR) {	// regular for MTR_DCT < im <= MTR
 		m = im*MRES;
 Q		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
@@ -290,11 +297,12 @@ V			BtF[k] = 0.0;	BpF[k] = 0.0;
 Q	BrF -= NLAT*(MTR+1);		// restore original pointer
 V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);	// restore original pointer
   #endif
+  #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {
 Q		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
-  #ifndef SHT_AXISYM
+    #ifndef SHT_AXISYM
 		if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
 Q			for (im=1; im<=MTR_DCT; im+=2) {	// odd m's
 Q				for (k=0; k<NLAT; k++) BrF[im*NLAT + k] *= st[k];
@@ -311,12 +319,13 @@ V					BtF[im*NLAT + k] *= st[k];	BpF[im*NLAT + k] *= st[k];
 V				}
 V			}
 		}
-  #else
+    #else
 V		for (k=0; k<NLAT; k++) {
 V			BT0[k] *= st[k];	BP0[k] *= st[k];
 V		}
-  #endif
+    #endif
 	}
+  #endif
   #ifndef SHT_AXISYM
 Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
