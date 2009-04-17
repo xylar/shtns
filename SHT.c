@@ -53,8 +53,8 @@ long int NLM;		// total number of (l,m) spherical harmonics components.
 //#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 #define LiM(l,im) ( lmidx[im] + l )
 #define LM(l,m) ( lmidx[(m)/MRES] + l )
-//#define LiM(l,im) ( lmidx[im] + (l-im*MRES)/2 )
-//#define LM(l,m) ( lmidx[m/MRES] + (l-m)/2 )
+//#define LiM(l,im) ( lmidx[im] + (l-(im)*MRES)/2 )
+//#define LM(l,m) ( lmidx[(m)/MRES] + ((l-(m))/2 )
 
 //LM_LOOP : loop avor all lm's and perform "action". only lm is defined, neither l nor m.
 #define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { action }
@@ -87,9 +87,8 @@ double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
 double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 int *li;
 
-int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
-int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 int *lmidx;		// (virtual) index in SH array of given im.
+int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 
 double** ylm;		// matrix for inverse transform (synthesis)
 struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
@@ -104,6 +103,7 @@ fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dctm0;
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
+int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
 
 /// reorganization for NPHI=1
 inline void fft_m0_r2eo(double *Br, double *reo)
@@ -123,13 +123,10 @@ inline void fft_m0_r2eo(double *Br, double *reo)
 	SHT FUNCTIONS
 **/
 
-// run-time truncation at LMAX and MMAX
-#ifndef LTR
-  #define LTR LMAX
-#endif
-#ifndef MTR
-  #define MTR MMAX
-#endif
+// truncation at LMAX and MMAX
+#define LTR LMAX
+#define MTR MMAX
+#undef SHT_VAR_LTR
 
 /////////////////////////////////////////////////////
 //   Scalar Spherical Harmonics Transform
@@ -260,7 +257,9 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	SHT FUNCTIONS with variable LTR truncation.
 **/
 
+// truncation at function parameter LTR
 #undef LTR
+#define SHT_VAR_LTR
 
 void spat_to_SH_l(complex double *BrF, complex double *Qlm, int LTR)
 {
@@ -325,6 +324,7 @@ void spat_to_SHsphtor_l(complex double *BtF, complex double *BpF, complex double
 }
 
 #undef MTR
+#undef SHT_VAR_LTR
 
 /**
 	INITIALIZATION FUNCTIONS

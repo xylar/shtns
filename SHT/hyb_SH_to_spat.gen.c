@@ -46,9 +46,9 @@ V	#define BP0 ((double *)BpF)
 	long int k,im,m,l;
 
 	im=0;	m=0;
-Q		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
-S		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
-T		Tl = &Tlm[LiM(0,im)];
+Q		Ql = Qlm;
+S		Sl = Slm;
+T		Tl = Tlm;
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {	// dct for m=0.
 Q		yl = ykm_dct[im];

@@ -60,7 +60,7 @@ Q	#define BR0 ((double *)BrF)
 Q	if (MTR_DCT >= 0) {		// unfortunately, only scalar SHT can be faster with DCT.
 Q		fftw_execute_r2r(dctm0,(double *) BrF, (double *) BrF);		// DCT
 Q		l=0;
-Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
+Q		Ql = Qlm;		// virtual pointer for l=0 and im
 Q		zl = zlm_dct0;
 Q		while (l<LTR) {		// l has parity of m
 Q			Ql[l] = 0.0;	Ql[l+1] = 0.0;
@@ -79,7 +79,7 @@ Q				zl+=2;
 Q			}
 Q			l++;
 Q		}
-Q  #ifndef NO_LTR
+Q  #ifdef SHT_VAR_LTR
 Q		while( l<=LMAX ) {
 Q			Ql[l] = 0.0;
 Q			l++;
@@ -142,7 +142,7 @@ Q				zl ++;
 V				dzl0 ++;
 			}
 			l++;
-  #ifndef NO_LTR
+  #ifdef SHT_VAR_LTR
 		} else {
 		    if (l==LTR) {
 QE			Ql[l] = 0.0;
@@ -223,7 +223,7 @@ Q				zl++;
 V				dzl++;
 			}
 			l++;
-    #ifndef NO_LTR
+    #ifdef SHT_VAR_LTR
 		} else {
 		    if (l==LTR) {
 Q			zl += 2*tm[im];
