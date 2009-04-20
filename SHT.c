@@ -9,6 +9,7 @@
 //#define SHT_DEBUG
 //#define SHT_AXISYM
 //#define SHT_NO_DCT
+#define SHT_NLAT_EVEN
 //#define _SHT_EO_
 ///
 
@@ -37,23 +38,12 @@ enum shtns_type {
 // Minimum performance improve for DCT in sht_auto mode.
 #define MIN_PERF_IMPROVE_DCT 0.95
 
-#include <complex.h>
-#include <math.h>
-// FFTW la derivee d/dx = ik	(pas de moins !)
-#include <fftw3.h>
-// GSL for Legendre functions
-#include <gsl/gsl_errno.h>
-#include <gsl/gsl_sf_legendre.h>
-
-	// cycle counter from FFTW
-	#include "cycle.h"
-
 // parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
-int LMAX;		// maximum degree (LMAX) of spherical harmonics.
-int NLAT, NLAT_2;	// number of spatial points in Theta direction (latitude) and half of it (using (NLAT+1)/2 allows odd NLAT.)
+long int LMAX;		// maximum degree (LMAX) of spherical harmonics.
+long int NLAT, NLAT_2;	// number of spatial points in Theta direction (latitude) and half of it (using (NLAT+1)/2 allows odd NLAT.)
 #ifndef SHT_AXISYM
-  int MMAX,MRES;	// maximum order (MMAX*MRES) of spherical harmonics. MRES is the periodicity along the phi axis.
-  int NPHI;		// number of spatial points in Phi direction (longitude)
+  long int MMAX,MRES;	// maximum order (MMAX*MRES) of spherical harmonics. MRES is the periodicity along the phi axis.
+  long int NPHI;		// number of spatial points in Phi direction (longitude)
 #else
   #define MMAX 0
   #define NPHI 1
@@ -74,11 +64,11 @@ double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
 double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 int *li;
 
-int *lmidx;		// (virtual) index in SH array of given im.
+long int *lmidx;		// (virtual) index in SH array of given im.
 // LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
 #define LiM(l,im) ( lmidx[im] + l )
 
-int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+long int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
 struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
 double** zlm;		// matrix for direct transform (analysis)
@@ -92,7 +82,7 @@ fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dctm0;
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
-int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
+long int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
 
 /// reorganization for NPHI=1
 inline void fft_m0_r2eo(double *Br, double *reo)
@@ -102,10 +92,12 @@ inline void fft_m0_r2eo(double *Br, double *reo)
 			reo[2*i]   = Br[i] + Br[NLAT-(i+1)];
 			reo[2*i+1] = Br[i] - Br[NLAT-(i+1)];
 		}
+	#ifndef SHT_NLAT_EVEN
 //		if (i < NLAT_2) {	// NLAT is odd : special equator handling
 		if (NLAT & 1) {		// NLAT is odd : special equator handling
 			reo[2*i] = Br[i];	reo[2*i+1] = 0.0;
 		}
+	#endif
 }
 
 /**
@@ -331,7 +323,7 @@ void alloc_SHTarrays()
 
 	ct = (double *) fftw_malloc(sizeof(double) * NLAT*3);
 	st = ct + NLAT;		st_1 = ct + 2*NLAT;
-	tm = (int *) fftw_malloc(sizeof(int) * (MMAX+1)*2);
+	tm = (long int *) fftw_malloc(sizeof(long int) * (MMAX+1)*2);
 	lmidx =  tm + (MMAX+1);
 	ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );
 	zlm = ylm + (MMAX+1);		ykm_dct = ylm + (MMAX+1)*2;
@@ -1164,6 +1156,9 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
 	if ((NLAT_2)*2 <= LMAX) runerr("[init_SH] NLAT_2*2 should be at least LMAX+1");
 	if (MRES <= 0) runerr("[init_SH] MRES must be > 0");
+#ifdef SHT_NLAT_EVEN
+	if (NLAT & 1) runerr("[init_SH] NLAT must be even.");
+#endif
 
 	alloc_SHTarrays();	// allocate dynamic arrays
 	planFFT();		// initialize fftw

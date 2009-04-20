@@ -4,11 +4,11 @@ Definition file for SHTns.
 
 /// GLOBAL VARIABLES : these are set by the call to init_SH. ///
 
-extern int LMAX;	// maximum degree (LMAX) of spherical harmonics.
-extern int NLAT;	// number of spatial points in Theta direction (latitude).
+extern long int LMAX;	// maximum degree (LMAX) of spherical harmonics.
+extern long int NLAT;	// number of spatial points in Theta direction (latitude).
 #ifndef SHT_AXISYM
-  extern int MMAX,MRES;	// maximum order (MMAX*MRES) of spherical harmonics. MRES is the periodicity along the phi coord.
-  extern int NPHI;	// number of spatial points in Phi direction (longitude)
+  extern long int MMAX,MRES;	// maximum order (MMAX*MRES) of spherical harmonics. MRES is the periodicity along the phi coord.
+  extern long int NPHI;	// number of spatial points in Phi direction (longitude)
 #else
   #define MMAX 0
   #define NPHI 1
@@ -19,7 +19,8 @@ extern long int NLM;	// total number of (l,m) spherical harmonics components.
 extern double *ct, *st, *st_1;	// cos(theta), sin(theta), 1/sin(theta);
 extern double *el, *l2, *l_2;	// l, l(l+1) and 1/(l(l+1))
 extern int *li;
-extern int *lmidx;		// (virtual) index in SH array of given im.
+
+extern long int *lmidx;		// (virtual) index in SH array of given im.
 
 /// MACROS ///
 

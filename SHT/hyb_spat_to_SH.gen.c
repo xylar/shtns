@@ -97,11 +97,13 @@ VB			(double) teo[2*i+1] = (double) BtF[i] - (double) BtF[NLAT-(i+1)];
 VB			(double) peo[2*i]   = (double) BpF[i] + (double) BpF[NLAT-(i+1)];
 VB			(double) peo[2*i+1] = (double) BpF[i] - (double) BpF[NLAT-(i+1)];
  B		}
+    #ifndef SHT_NLAT_EVEN
  B		if (NLAT & 1) {		// NLAT is odd : special equator handling
 QB			(double) reo[2*i] = (double) BrF[i];	(double) reo[2*i+1] = 0.0;
 VB			(double) teo[2*i] = (double) BtF[i];	(double) teo[2*i+1] = 0.0;
 VB			(double) peo[2*i] = (double) BpF[i];	(double) peo[2*i+1] = 0.0;
  B		}
+    #endif
   #else
 QB	fft_m0_r2eo((double *) BrF, reo);
 VB	fft_m0_r2eo((double *) BtF, teo);	fft_m0_r2eo((double *) BpF, peo);
@@ -178,11 +180,13 @@ VB			teo[2*i+1] = BtF[i] - BtF[NLAT-(i+1)];
 VB			peo[2*i]   = BpF[i] + BpF[NLAT-(i+1)];
 VB			peo[2*i+1] = BpF[i] - BpF[NLAT-(i+1)];
  B		}
+    #ifndef SHT_NLAT_EVEN
  B		if (NLAT & 1) {		// NLAT is odd : special equator handling
 QB			reo[2*i] = BrF[i];		reo[2*i+1] = 0.0;
 VB			teo[2*i] = BtF[i];		teo[2*i+1] = 0.0;
 VB			peo[2*i] = BpF[i];		peo[2*i+1] = 0.0;
  B		}
+    #endif
 		l=m;
 Q		Ql = &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
 V		Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];		// virtual pointer for l=0 and im
