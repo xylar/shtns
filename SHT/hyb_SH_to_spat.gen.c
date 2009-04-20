@@ -290,10 +290,12 @@ V			dyl += (LMAX-LTR);
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
+  #ifndef SHT_AXISYM
 	for (k=0; k < NLAT*(NPHI/2 -MTR); k++) {	// padding for high m's
 Q			BrF[k] = 0.0;
 V			BtF[k] = 0.0;	BpF[k] = 0.0;
 	}
+  #endif
 Q	BrF -= NLAT*(MTR+1);		// restore original pointer
 V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);	// restore original pointer
   #endif

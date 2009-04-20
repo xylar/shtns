@@ -5,6 +5,26 @@
 //////////////////////////////////////////////
 */
 
+/// FLAGS ///
+//#define SHT_DEBUG
+//#define SHT_AXISYM
+//#define SHT_NO_DCT
+//#define _SHT_EO_
+///
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <complex.h>
+#include <math.h>
+// FFTW la derivee d/dx = ik	(pas de moins !)
+#include <fftw3.h>
+// GSL for Legendre functions
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_sf_legendre.h>
+
+// cycle counter from FFTW
+#include "cycle.h"
+
 // supported types of sht's
 enum shtns_type {
 	sht_gauss,	// use gaussian grid and quadrature. highest accuracy.
@@ -42,54 +62,23 @@ int NLAT, NLAT_2;	// number of spatial points in Theta direction (latitude) and 
 long int NLM;		// total number of (l,m) spherical harmonics components.
 
 
-/** ACCESS TO SPHERICAL HARMONICS COMPONENTS **
-  LM(l,m) : macro returning array index for given l and m.
-  LiM(l,im) : macro returning array index for given l and im.
-  LM_LOOP( action ) : macro that performs "action" for every (l,m), with l and lm set, but neither m nor im.
-  el[NLM], l2[NLM], l_2[NLM] : floating point arrays containing l, l*(l+1) and 1/(l*(l+1))
-**/
-// LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
-//#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
-//#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
-#define LiM(l,im) ( lmidx[im] + l )
-#define LM(l,m) ( lmidx[(m)/MRES] + l )
-//#define LiM(l,im) ( lmidx[im] + (l-(im)*MRES)/2 )
-//#define LM(l,m) ( lmidx[(m)/MRES] + ((l-(m))/2 )
-
-//LM_LOOP : loop avor all lm's and perform "action". only lm is defined, neither l nor m.
-#define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { action }
-
-// LM_L_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined. (but NOT m and im)
-//  double-loop version : assumes contiguous l-storage with 1 stride. (not compatible with even/odd packed)
-//#define LM_L_LOOP( action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=LMAX; l++, lm++) { action } }
-//  single-loop + lookup array : no assumption on l-storage is made + FASTER !! (cache miss seems better than branch prediction miss...)
-#define LM_L_LOOP( action ) for (lm=0; lm<NLM; lm++) { l=li[lm]; { action } }
-
-// LM_LTR_LOOP : loop over all (l,im) for l<=Ltr and perform "action"  : l and lm are defined. (but NOT m and im)
-#define LM_LTR_LOOP( Ltr, action ) for (im=0, lm=0; im<=MMAX; im++) { for (l=im*MRES; l<=Ltr; l++, lm++) { action } lm+=(LMAX-Ltr); }
-
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
 #endif
-
-// useful values for some basic spherical harmonic representations
-// Y00_1 = 1/Y00 = spherical harmonic representation of 1 (l=0,m=0)
-#define Y00_1 sqrt(4.*M_PI)
-// Y10_ct = spherical harmonic representation of cos(theta) (l=1,m=0)
-#define Y10_ct sqrt(4.*M_PI/3.)
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };
 
-const double pi = M_PI;
 double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
 double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 int *li;
 
 int *lmidx;		// (virtual) index in SH array of given im.
-int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+// LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
+#define LiM(l,im) ( lmidx[im] + l )
 
+int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
 struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
 double** zlm;		// matrix for direct transform (analysis)
@@ -365,7 +354,7 @@ void alloc_SHTarrays()
 		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m);
 		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -m);
 	}
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 	printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
 #endif
 }
@@ -433,7 +422,7 @@ void GaussNodes(long double *x, long double *w, int n)
 		if (x[i] == x[i-1]) runerr("bad gauss points\n");
 	}
 
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 // test integral to compute :
 	z = 0;
 	for (i=0;i<m;i++) {
@@ -513,7 +502,7 @@ void planDCT()
 {
 	complex double *ShF;
 	double *Sh;
-	int ndct;
+	int ndct = NLAT;
 	fftw_r2r_kind r2r_kind;
 	fftw_iodim dims, hdims[2];
 	
@@ -535,7 +524,6 @@ void planDCT()
 		runerr("[FFTW] dct planning failed !");
 
 	if (dctm0 == NULL) {
-		ndct = NLAT;
 		r2r_kind = FFTW_REDFT10;
 		dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
 		if (dctm0 == NULL)
@@ -574,6 +562,10 @@ void Set_MTR_DCT(int m)
 	}
 }
 
+int Get_MTR_DCT() {
+	return MTR_DCT;
+}
+
 /// TIMINGS
 double Find_Optimal_SHT()
 {
@@ -594,7 +586,7 @@ double Find_Optimal_SHT()
 			SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
 		}
 		tik1 = getticks();
-	#ifdef _SH_DEBUG_
+	#ifdef SHT_DEBUG
 		printf("m=%d - ticks : %.3f\n", m*MRES, elapsed(tik1,tik0)/(10*NLM*NLAT));
 	#endif
 		return elapsed(tik1,tik0);
@@ -652,7 +644,7 @@ void OptimizeMatrices(double eps)
 			}
 		}
 		printf("          + polar optimization threshold = %.1e\n",eps);
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 		printf("          tm[im]=");
 		for (im=0;im<=MMAX;im++)
 			printf(" %d",tm[im]);
@@ -742,7 +734,7 @@ void init_SH_gauss()
 		st_1[it] = 1.0/sqrtl(1.0 - xg[it]*xg[it]);
 	}
 
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
 // TEST if gauss points are ok.
 	tmax = 0.0;
@@ -818,7 +810,7 @@ void init_SH_dct()
 		st[it] = sinl(th);
 		st_1[it] = 1.0/sinl(th);
 	}
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
 	if (NLAT_2 < 100) {
 		printf("          DCT nodes :");
@@ -845,7 +837,7 @@ void init_SH_dct()
 		it += (2*NLAT_2 -l);
 	}
 
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 	printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
 #endif
 	ykm_dct[0] = (double *) fftw_malloc(sizeof(double)* sk);
@@ -921,7 +913,7 @@ void init_SH_dct()
 			fftw_execute(dct);
 			fftw_execute_r2r(dct, dZt, dZt);
 			fftw_execute_r2r(dct, dZp, dZp);
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 			if (LMAX <= 12) {
 				printf("\nl=%d, m=%d ::\t", l,m);
 				for(it=0;it<2*NLAT_2;it++) printf("%f ",Z[it]);
@@ -994,7 +986,7 @@ void init_SH_dct()
 			T0 = T1;	T1 = T2;
 		}
 	}
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 	for (it=0, tsum=0.0; it<NLAT_2; it++) {
 		t = fabsl(xg[it]*xg[it] + sg[it]*sg[it] -1.0);
 		if (t > tsum) tsum=t;
@@ -1040,7 +1032,7 @@ void init_SH_dct()
 			dZp[k] = dpsum * iylm_fft_norm/(NLAT_2 *l*(l+1));
 			if (l==0) { dZp[k] = 0.0; }
 		}
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 		if (max/min > 1.e14) {
 //			printf("\nl=%d, m=%d :: min=%g, max=%g, ratio=%g\t",l,m,min,max,max/min);
 		}
@@ -1055,7 +1047,7 @@ void init_SH_dct()
 			dZt[k] = dtsum * iylm_fft_norm/(NLAT_2 *l*(l+1));
 			if (l==0) { dZt[k] = 0.0; }
 		}
-#ifdef _SH_DEBUG_
+#ifdef SHT_DEBUG
 		if (max/min > 1.e14) {
 //			printf("\nl=%d, m=%d :: (d/dt) min=%g, max=%g, ratio=%g\t",l,m,min,max,max/min);
 		}
@@ -1153,7 +1145,7 @@ void init_SH_dct()
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
 
-void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat_2, int nphi)
+void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
 {
 	double t;
 	int im,m,l,lm;
@@ -1164,8 +1156,8 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 #else
 	MMAX = mmax;	MRES = mres;	NPHI = nphi;
 #endif
-	LMAX = lmax;	NLAT_2 = nlat_2;
-	NLAT = nlat_2 * 2;
+	LMAX = lmax;	NLAT_2 = (nlat+1)/2;
+	NLAT = nlat;
 	NLM = nlm_calc(LMAX,MMAX,MRES);
 
 	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);

@@ -14,24 +14,11 @@
 // cycle counter from FFTW
 #include "cycle.h"
 
+#include "SHT.h"
 
 complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
 complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
-
-/*// parameters for SHT.c
-#define NLAT_2 128
-#define LMAX 150
-#define NPHI 64
-#define MMAX 21
-#define MRES 5
-*/
-#define _SH_DEBUG_
-//#define SHT_AXISYM
-//#define SHT_NO_DCT
-//#define _SHT_EO_
-//#define SHT_EQUAL	/* SHT on equal spaced grid + polar points. */
-#include "SHT.c"
 
 // polar optimization threshold
 #define POLAR_OPT_THR 1e-6
@@ -215,14 +202,13 @@ int main()
 	double e0,e1;
 
 	srand( time(NULL) );	// initialise les nombres.
-	//                          ... lmax,mmax,mres, nlat/2, nphi );
-	init_SH( sht_auto, POLAR_OPT_THR, 300, 21, 5,  256, 64 );
-	m_opt = MTR_DCT;
-	
-	if (MMAX > 0) {
-		write_mx("yl1",ylm[1],NLAT_2,LMAX);
-//		write_mx("dyl1",&dylm[1][0].t,NLAT_2,2*LMAX);
-	}
+#ifndef SHT_AXISYM
+	//                          ... lmax,mmax,mres, nlat, nphi );
+	init_SH( sht_auto, POLAR_OPT_THR, 150, 21, 5,  256, 64 );
+#else
+	init_SH( sht_auto, POLAR_OPT_THR, 300, 0, 1,  512, 1 );
+#endif
+	m_opt = Get_MTR_DCT();
 
 	t1 = 1.0+2.0*I;
 	t2 = 1.0-I;

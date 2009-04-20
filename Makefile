@@ -1,7 +1,6 @@
 # le compilateur :
 ## generic gcc
 cmd = gcc -O3 -ffast-math
-cmdp = gcc -O3 -fopenmp -ffast-math
 ## profiling
 #cmd = gcc -O3 -p -fno-inline
 ## recent gcc with native support
@@ -12,41 +11,36 @@ cmdp = gcc -O3 -fopenmp -ffast-math
 #cmd = gcc -O3 -march=core2 -mfpmath=sse
 ## icare 64bits opteron
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
-#cmdp = cc -fast -xarch=amd64 -xopenmp=parallel -I/users/nschaeff/include -L/users/nschaeff/lib
 ## r2d2
 #cmd = gcc -march=core2 -O3 -ffast-math -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
-#cmdp = gcc -march=core2 -O3 -fopenmp -ffast-math -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
 
 
-NTH=8 #number of threads for parallel version (can be overwritten with command line)
 shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/Makefile
-ini = xshells.h
 
-default : xshells
+default : SHT.o
 
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) SH_to_spat.c -C SHT
 SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 	$(MAKE) spat_to_SH.c -C SHT
 
-xshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
-	$(cmd) xshells.c -lfftw3 -lgsl -lgslcblas -lm -o xshells
-pxshells : xshells.c SHT.h grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles) $(ini)
-	$(cmdp) xshells.c -D_NTH_=$(NTH) -lfftw3 -lgsl -lgslcblas -lm -o pxshells
+SHT.o : SHT.c Makefile $(shtfiles)
+	$(cmd) -c SHT.c -o SHT.o
 
-xspp : xspp.c grid.c xshells_fields.c xshells_io.c Makefile $(shtfiles)
-	$(cmd) xspp.c -lfftw3 -lgsl -lgslcblas -lm -o xspp
+SHTg.o : SHT.c Makefile $(shtfiles)
+	$(cmd) -c -DSHT_NO_DCT SHT.c -o SHTg.o
 
-sphere : sphere.c SHT.c SHT.h Makefile
-	$(cmd) sphere.c -lfftw3 -lgsl -lgslcblas -lm -o sphere
-time_SHT : time_SHT.c SHT.h Makefile $(shtfiles)
-	$(cmd) time_SHT.c -lfftw3 -lgsl -lgslcblas -lm -o time_SHT
-sphere2 : sphere2.c SHTfast.c SHT.h Makefile
-	$(cmd) sphere2.c -lfftw3 -lgsl -lgslcblas -lm -o sphere2
-sphshell : sphshell.c SHT.c SHT.h grid.c Makefile
-	$(cmd) sphshell.c -lfftw3 -lgsl -lgslcblas -lm -o sphshell
-dyncin : dyncin.c SHT.c SHT.h grid.c Makefile
-	$(cmd) dyncin.c -lfftw3 -lgsl -lgslcblas -lm -o dyncin
+SHTaxi.o : SHT.c Makefile $(shtfiles)
+	$(cmd) -c -DSHT_AXISYM SHT.c -o SHTaxi.o
+
+time_SHT : time_SHT.c SHT.o Makefile
+	$(cmd) time_SHT.c SHT.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHT
+
+time_SHTg : time_SHT.c SHTg.o Makefile
+	$(cmd) time_SHT.c SHTg.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHTg
+
+time_SHTaxi : time_SHT.c SHTaxi.o Makefile
+	$(cmd) -DSHT_AXISYM time_SHT.c SHTaxi.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHTaxi
 
 
 #fftw compiling options :
