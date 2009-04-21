@@ -204,9 +204,9 @@ int main()
 	srand( time(NULL) );	// initialise les nombres.
 #ifndef SHT_AXISYM
 	//                          ... lmax,mmax,mres, nlat, nphi );
-	init_SH( sht_auto, POLAR_OPT_THR, 150, 21, 5,  256, 64 );
+	init_SH( sht_auto, POLAR_OPT_THR, 340, 21, 5,  512, 64 );
 #else
-	init_SH( sht_auto, POLAR_OPT_THR, 300, 0, 1,  512, 1 );
+	init_SH( sht_auto, POLAR_OPT_THR, 681, 0, 1,  1024, 1 );
 #endif
 	m_opt = Get_MTR_DCT();
 

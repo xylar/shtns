@@ -43,7 +43,10 @@ Q	#define BR0 ((double *)BrF)
 V	#define BT0 ((double *)BtF)
 V	#define BP0 ((double *)BpF)
   #endif
+	long int llim;
 	long int k,im,m,l;
+
+	llim = LTR;	// copy LTR to a local variable for faster access (inner loop limit)
 
 	im=0;	m=0;
 Q		Ql = Qlm;
@@ -54,11 +57,11 @@ T		Tl = Tlm;
 Q		yl = ykm_dct[im];
 V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
-		while (k<LTR) {
+		while (k<llim) {
 			l = k;
 Q			re = 0.0;	ro = 0.0;
 V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;
-			while(l<LTR) {
+			while(l<llim) {
 QE				re += yl[0]  * (double) Ql[l];
 QO				ro += yl[1]  * (double) Ql[l+1];
 SE				to += dyl0[0] * (double) Sl[l];
@@ -69,7 +72,7 @@ TE				pe -= dyl0[1] * (double) Tl[l+1];
 Q				yl+=2;
 V				dyl0+=2;
 			}
-			if (l==LTR) {
+			if (l==llim) {
 QE				re += yl[0]  * (double) Ql[l];
 SE				to += dyl0[0] * (double) Sl[l];
 TO				po -= dyl0[0] * (double) Tl[l];
@@ -83,7 +86,7 @@ V			BP0[k] = pe;	BP0[k+1] = po;
 Q			yl+= (LMAX-LTR);
 V			dyl0+= (LMAX-LTR);
 		}
-QE		if ((LTR&1)==0) {	// k=LTR
+QE		if ((llim&1)==0) {	// k=LTR
 QE			BR0[k] = yl[0] * Ql[k];
 QE			k++;
 QE		}
@@ -102,7 +105,7 @@ V		dyl0 = (double *) dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
 Q			re = 0.0;	ro = 0.0;
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
-			while (l<LTR) {	// compute even and odd parts
+			while (l<llim) {	// compute even and odd parts
 QE				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 QO				ro += yl[1] * (double) Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
 TO				po += dyl0[0] * (double) Tl[l];	// m=0 : everything is real.
@@ -113,7 +116,7 @@ SO				te += dyl0[1] * (double) Sl[l+1];
 Q				yl+=2;
 V				dyl0+=2;
 			}
-			if (l==LTR) {
+			if (l==llim) {
 QE				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 TO				po += dyl0[0] * (double) Tl[l];
 SE				to += dyl0[0] * (double) Sl[l];
@@ -155,12 +158,12 @@ T		Tl = &Tlm[LiM(0,im)];
 Q		yl = ykm_dct[im];
 V		dyl = dykm_dct[im];
 		k=0;
-		while (k<LTR) {
+		while (k<llim) {
 Q			l = (k < m) ? m : k+(m&1);
 V			l = (k < m) ? m : k-(m&1);
 Q			re = 0.0;	ro = 0.0;
 V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;
-			while(l<LTR) {
+			while(l<llim) {
 QE				re += yl[0] * Ql[l];
 QO				ro += yl[1] * Ql[l+1];
 VO				te +=
@@ -183,7 +186,7 @@ VE					;
 Q				yl+=2;
 V				dyl+=2;
 			}
-			if (l==LTR) {
+			if (l==llim) {
 QE				re += yl[0]   * Ql[l];
 TO				te += dyl[0].p * (I*Tl[l]);
 SE				pe += dyl[0].p * (I*Sl[l]);
@@ -199,11 +202,11 @@ V			BpF[k] = pe;	BpF[k+1] = po;
 Q			yl+= (LMAX-LTR);
 V			dyl+= (LMAX-LTR);
 		}
-QE		if ( ((LTR&1)==0) && ((m&1)==0) ) {	// k=LTR, m even
+QE		if ( ((llim&1)==0) && ((m&1)==0) ) {	// k=LTR, m even
 QE			BrF[k] = yl[0] * Ql[k];
 QE			k++;
 QE		}
-V		if ( ((LTR&1)==0) && ((m&1)==1) ) {	// k=LTR, m odd
+V		if ( ((llim&1)==0) && ((m&1)==1) ) {	// k=LTR, m odd
 SO			BtF[k] =   dyl[1].t * Sl[k];
 TE			BpF[k] = - dyl[1].t * Tl[k];
 V			k++;
@@ -240,7 +243,7 @@ V		dyl = dylm[im] + k*(LMAX-m+1);
 Q			re = 0.0;	ro = 0.0;
 S			dte = 0.0;	dto = 0.0;	pe = 0.0;	po = 0.0;
 T			dpe = 0.0;	dpo = 0.0;	te = 0.0;	to = 0.0;
-			while (l<LTR) {	// compute even and odd parts
+			while (l<llim) {	// compute even and odd parts
 QE				re  += yl[0] * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 QO				ro  += yl[1] * Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
 TO				dpo += dyl[0].t * Tl[l];
@@ -255,7 +258,7 @@ SO				po  += dyl[1].p * Sl[l+1];
 Q				yl+=2;
 V				dyl+=2;
 			}
-			if (l==LTR) {
+			if (l==llim) {
 QE				re  += yl[0] * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 TO				dpo += dyl[0].t * Tl[l];
 TO				te  += dyl[0].p * Tl[l];
