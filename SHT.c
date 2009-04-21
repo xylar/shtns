@@ -39,18 +39,18 @@ enum shtns_type {
 #define MIN_PERF_IMPROVE_DCT 0.95
 
 // parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
-long int LMAX;		// maximum degree (LMAX) of spherical harmonics.
+long int LMAX = -1;	// maximum degree (LMAX) of spherical harmonics.
 long int NLAT, NLAT_2;	// number of spatial points in Theta direction (latitude) and half of it (using (NLAT+1)/2 allows odd NLAT.)
 #ifndef SHT_AXISYM
   long int MMAX,MRES;	// maximum order (MMAX*MRES) of spherical harmonics. MRES is the periodicity along the phi axis.
-  long int NPHI;		// number of spatial points in Phi direction (longitude)
+  long int NPHI;	// number of spatial points in Phi direction (longitude)
 #else
   #define MMAX 0
   #define NPHI 1
   #define MRES 1
 #endif
-long int NLM;		// total number of (l,m) spherical harmonics components.
-
+long int NLM = 0;	// total number of (l,m) spherical harmonics components.
+long int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
 
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
@@ -81,8 +81,6 @@ double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
 fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dctm0;
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
-
-long int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
 
 /// reorganization for NPHI=1
 inline void fft_m0_r2eo(double *Br, double *reo)
@@ -352,7 +350,7 @@ void alloc_SHTarrays()
 }
 
 // compute number of modes for spherical harmonic description.
-inline long int nlm_calc(long int lmax, long int mmax, long int mres)
+long int nlm_calc(long int lmax, long int mmax, long int mres)
 {
 	if (mmax*mres > lmax) mmax = lmax/mres;
 	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
@@ -430,7 +428,7 @@ void EqualPolarGrid()
 	long double f;
 	long double pi = M_PI;
 
-	printf("          => using Equaly Spaced Nodes including poles\n");
+	printf("        => using Equaly Spaced Nodes including poles\n");
 // cos theta of latidunal points (equaly spaced in theta)
 #ifndef _SHT_EO_
 	f = pi/(NLAT-1.0);
@@ -464,7 +462,7 @@ void planFFT()
 	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
 	Sh = (double *) ShF;
 
-	printf("          using FFTW : Mmax=%d, Nphi=%d\n",MMAX,NPHI);
+	printf("        using FFTW : Mmax=%d, Nphi=%d\n",MMAX,NPHI);
 
 	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
 	if (NPHI < 3*MMAX) printf("       !! Warning : 2/3 rule for anti-aliasing not met !\n");
@@ -484,7 +482,7 @@ void planFFT()
 	fftw_free(ShF);
 //	printf("       done.\n");
 #else
-	printf("          => no fft required for NPHI=1.\n");
+	printf("        => no fft required for NPHI=1.\n");
 #endif
 	dctm0 = NULL;	idct = NULL;		// set dct plans to uninitialized.
 }
@@ -718,7 +716,7 @@ void init_SH_gauss()
 	iylm_fft_norm *= 2.0;	// normation must be multiplied by 2.
 #endif
 
-	printf("          => using Gauss Nodes\n");
+	printf("        => using Gauss Nodes\n");
 	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
 		ct[it] = xg[it];
@@ -792,10 +790,10 @@ void init_SH_dct()
 #ifdef _SHT_EO_
 	iylm_fft_norm *= 2.0;	// normation must be multiplied by 2.
 #endif
-	if ((NLAT_2)*2 <= LMAX+1) runerr("[init_SH] NLAT_2*2 should be at least LMAX+2 (DCT)");
-	if (NLAT & 1) runerr("[init_SH] NLAT must be even (DCT)");
+	if ((NLAT_2)*2 <= LMAX+1) runerr("[SHTns] NLAT_2*2 should be at least LMAX+2 (DCT)");
+	if (NLAT & 1) runerr("[SHTns] NLAT must be even (DCT)");
 	
-	printf("          => using Equaly Spaced Nodes with DCT acceleration\n");
+	printf("        => using Equaly Spaced Nodes with DCT acceleration\n");
 	for (it=0; it<NLAT; it++) {	// Chebychev points : equaly spaced but skipping poles.
 		long double th = M_PI*(it+0.5)/NLAT;
 		ct[it] = cosl(th);
@@ -1137,6 +1135,10 @@ void init_SH_dct()
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
 
+#ifndef _HGID_
+  #define _HGID_ "unknown"
+#endif
+
 void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
 {
 	double t;
@@ -1144,7 +1146,7 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 
 	// copy to global variables.
 #ifdef SHT_AXISYM
-	if ((mmax != MMAX)||(nphi != NPHI)) runerr("[init_SH] axisymmetric version : only Mmax=0 and Nphi=1 allowed");
+	if ((mmax != MMAX)||(nphi != NPHI)) runerr("[SHTns] axisymmetric version : only Mmax=0 and Nphi=1 allowed");
 #else
 	MMAX = mmax;	MRES = mres;	NPHI = nphi;
 #endif
@@ -1152,19 +1154,20 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 	NLAT = nlat;
 	NLM = nlm_calc(LMAX,MMAX,MRES);
 
-	printf("[init_SH] Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
-	if (MMAX*MRES > LMAX) runerr("[init_SH] MMAX*MRES should not exceed LMAX");
-	if ((NLAT_2)*2 <= LMAX) runerr("[init_SH] NLAT_2*2 should be at least LMAX+1");
-	if (MRES <= 0) runerr("[init_SH] MRES must be > 0");
+	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
+	printf("        Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
+	if (MMAX*MRES > LMAX) runerr("[SHTns] MMAX*MRES should not exceed LMAX");
+	if ((NLAT_2)*2 <= LMAX) runerr("[SHTns] NLAT_2*2 should be at least LMAX+1");
+	if (MRES <= 0) runerr("[SHTns] MRES must be > 0");
 #ifdef SHT_NLAT_EVEN
-	if (NLAT & 1) runerr("[init_SH] NLAT must be even.");
+	if (NLAT & 1) runerr("[SHTns] NLAT must be even.");
 #endif
 
 	alloc_SHTarrays();	// allocate dynamic arrays
 	planFFT();		// initialize fftw
 	zlm_dct0 = NULL;	// used as a flag.
 
-	if (2*NLAT <= 3*LMAX) printf("       !! Warning : anti-aliasing condition in theta direction not met.\n");
+	if (2*NLAT <= 3*LMAX) printf("     !! Warning : anti-aliasing condition in theta direction not met.\n");
 
 #ifndef SHT_NO_DCT
 	if (flags == sht_reg_dct) {	// pure dct.
@@ -1178,14 +1181,14 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 		OptimizeMatrices(eps);
 		printf("finding optimal MTR_DCT ...\r");	fflush(stdout);
 		t = Find_Optimal_SHT();
-		printf("          + optimal MTR_DCT = %d\n", MTR_DCT*MRES);
+		printf("        + optimal MTR_DCT = %d\n", MTR_DCT*MRES);
 		if ( (flags == sht_auto)&&( (MTR_DCT == -1)||(t > MIN_PERF_IMPROVE_DCT) ) ) {	// switch to gauss grid : better precision.
 			flags = sht_gauss;
 			fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);	fftw_free(ykm_dct[0]);		// free now useless arrays.
 			zlm_dct0 = NULL;
 			if (idct != NULL) fftw_destroy_plan(idct);	// free unused dct plans
 			if (dctm0 != NULL) fftw_destroy_plan(dctm0);
-			printf("          => switching back to Gauss Grid for better precision\n");
+			printf("        => switching back to Gauss Grid for better precision\n");
 		}
 	}
 	if (flags == sht_gauss)
@@ -1199,6 +1202,7 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 	}
 	if (flags == sht_reg_poles)
 	{
+		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init
 		MTR_DCT = -1;		// we do not use DCT !!!
 		fftw_free(dzlm[0]);	fftw_free(zlm[0]);	// no inverse transform.
 		dzlm[0] = NULL;		zlm[0] = NULL;		// mark as unused.

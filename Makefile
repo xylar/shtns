@@ -1,6 +1,9 @@
-# le compilateur :
+## "version" identification string
+HGID=`hg id -ti`
+
+## compiler :
 ## generic gcc
-cmd = gcc -O3 -ffast-math
+cmd = gcc -O3 -ffast-math -D_HGID_="\"$(HGID)\"" -D_GNU_SOURCE
 ## profiling
 #cmd = gcc -O3 -p -fno-inline
 ## recent gcc with native support
@@ -13,7 +16,6 @@ cmd = gcc -O3 -ffast-math
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 ## r2d2
 #cmd = gcc -march=core2 -O3 -ffast-math -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
-
 
 shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 

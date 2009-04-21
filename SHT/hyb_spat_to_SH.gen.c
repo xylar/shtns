@@ -15,14 +15,12 @@
   #ifndef SHT_AXISYM
 QB	complex double reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 VB	complex double teo[2*NLAT_2], peo[2*NLAT_2];	// theta and phi even and odd parts
-Q	complex double q0,q1;
-V	complex double s0,s1,t0,t1;
   #else
 QB	double reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 VB	double teo[2*NLAT_2], peo[2*NLAT_2];	// theta and phi even and odd parts
-Q	double q0,q1;
-V	double s0,s1,t0,t1;
   #endif
+Q	complex double q0,q1;
+V	complex double s0,s1,t0,t1;
 Q	complex double *Ql;		// virtual pointers for given im
 V	complex double *Sl, *Tl;	// virtual pointers for given im
 Q	double *zl;

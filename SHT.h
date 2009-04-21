@@ -62,6 +62,7 @@ enum shtns_type {
 
 // initialize everything.
 void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi);
+long int nlm_calc(long int lmax, long int mmax, long int mres);
 void Set_MTR_DCT(int m);
 int Get_MTR_DCT();
 
