@@ -466,7 +466,7 @@ void planFFT()
 
 	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
 	if (NPHI < 3*MMAX) printf("       !! Warning : 2/3 rule for anti-aliasing not met !\n");
-	if ((MMAX == 0)&&(NPHI < 2)) runerr("[FFTW] compile with SHT_AXISYM defined to have NPHI=1 and MMAX=0");
+	if (NPHI < 2) runerr("[FFTW] compile with SHT_AXISYM defined to have NPHI=1 and MMAX=0");
 	
 // IFFT : unnormalized.
 	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
@@ -633,7 +633,7 @@ void OptimizeMatrices(double eps)
 				if (tm[im] > it) tm[im] = it;
 			}
 		}
-		printf("          + polar optimization threshold = %.1e\n",eps);
+		printf("        + polar optimization threshold = %.1e\n",eps);
 #ifdef SHT_DEBUG
 		printf("          tm[im]=");
 		for (im=0;im<=MMAX;im++)

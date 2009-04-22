@@ -40,3 +40,6 @@ for SHsphtor_to_spat, maybe storing .t and .p together is not the best... => I t
 
 *** NOTES :
 DCT SHT is ok for LMAX=1300 and NLAT_2=1024. changeset 70:f901295a7862
+
+Run-time setup for everything.
+DCT is about 25% faster than GAUSS for xshells dj_ref case (axisym).

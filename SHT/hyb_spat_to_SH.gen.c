@@ -55,7 +55,7 @@ V1	#define te	((double *)BtF)[i]
 V1	#define to	((double *)BtF)[i]
 V1	#define pe	((double *)BpF)[i]
 V1	#define po	((double *)BpF)[i]
-Q	#define BR0 ((double *)BrF)
+Q	#define BR0	((double *)BrF)
  #endif
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
