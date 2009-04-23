@@ -24,7 +24,7 @@ double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 #define POLAR_OPT_THR 1e-6
 //#define POLAR_OPT_THR 0
 // number of SH iterations
-#define SHT_ITER 100
+#define SHT_ITER 500
 
 	
 void write_vect(char *fn, double *vec, int N)
@@ -204,7 +204,7 @@ int main()
 	srand( time(NULL) );	// initialise les nombres.
 #ifndef SHT_AXISYM
 	//                          ... lmax,mmax,mres, nlat, nphi );
-	init_SH( sht_auto, POLAR_OPT_THR, 340, 21, 5,  512, 64 );
+	init_SH( sht_auto, POLAR_OPT_THR, 340, 0, 5,  512, 2 );
 #else
 	init_SH( sht_auto, POLAR_OPT_THR, 681, 0, 1,  1024, 1 );
 #endif

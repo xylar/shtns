@@ -302,38 +302,55 @@ V			BtF[k] = 0.0;	BpF[k] = 0.0;
 Q	BrF -= NLAT*(MTR+1);		// restore original pointer
 V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);	// restore original pointer
   #endif
+    if (NPHI>1) {
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {
 Q		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
-    #ifndef SHT_AXISYM
+V		for (k=0; k<NLAT; k++) {	// m=0
+V			((double *)BtF)[2*k] *= st[k];		((double *)BpF)[2*k] *= st[k];
+V		}
 		if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
 Q			for (im=1; im<=MTR_DCT; im+=2) {	// odd m's
 Q				for (k=0; k<NLAT; k++) BrF[im*NLAT + k] *= st[k];
 Q			}
-V			for (im=0; im<=MTR_DCT; im+=2) {	//even m's
+V			for (im=2; im<=MTR_DCT; im+=2) {	//even m's
 V				for (k=0; k<NLAT; k++) {
 V					BtF[im*NLAT + k] *= st[k];	BpF[im*NLAT + k] *= st[k];
 V				}
 V			}
-		} else {	// only even m's
-V			for (im=0; im<=MTR_DCT; im++) {
+V		} else {	// only even m's
+V			for (im=1; im<=MTR_DCT; im++) {
 V				for (k=0; k<NLAT; k++) {
 V					BtF[im*NLAT + k] *= st[k];	BpF[im*NLAT + k] *= st[k];
 V				}
 V			}
 		}
-    #else
-V		for (k=0; k<NLAT; k++) {
-V			BT0[k] *= st[k];	BP0[k] *= st[k];
-V		}
-    #endif
 	}
   #endif
-  #ifndef SHT_AXISYM
 Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
 V	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
+    } else {
+	for (k=1; k<NLAT; k++) {	// compress complex to real
+Q		((double *)BrF)[k] = (double) BrF[k];
+V		((double *)BtF)[k] = (double) BtF[k];
+V		((double *)BpF)[k] = (double) BpF[k];
+	}
+  #ifndef SHT_NO_DCT
+	if (MTR_DCT >= 0) {
+Q		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
+V		fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
+V		fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
+V		for (k=0; k<NLAT; k++) {
+V			((double *)BtF)[k] *= st[k];	((double *)BpF)[k] *= st[k];
+V		}
+	}
   #endif
+    }
+
+Q	#undef BR0
+V	#undef BT0
+V	#undef BP0
 # }

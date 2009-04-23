@@ -87,8 +87,8 @@ inline void fft_m0_r2eo(double *Br, double *reo)
 {
 	long int i;
 		for (i=0; i<NLAT/2; i++) {	// compute symmetric and antisymmetric parts.
-			reo[2*i]   = Br[i] + Br[NLAT-(i+1)];
-			reo[2*i+1] = Br[i] - Br[NLAT-(i+1)];
+			reo[2*i]   = Br[i] + Br[NLAT-1-i];
+			reo[2*i+1] = Br[i] - Br[NLAT-1-i];
 		}
 	#ifndef SHT_NLAT_EVEN
 //		if (i < NLAT_2) {	// NLAT is odd : special equator handling
@@ -447,13 +447,13 @@ void EqualPolarGrid()
 // initialize FFTs using FFTW. stride = NLAT, (contiguous l)
 void planFFT()
 {
-#ifndef SHT_AXISYM
 	complex double *ShF;
 	double *Sh;
 	int nfft, ncplx, nreal;
 	fftw_r2r_kind r2r_kind;
 	fftw_iodim dims, hdims[2];
-	
+
+    if (NPHI>1) {
 	nfft = NPHI;
 	ncplx = NPHI/2 +1;
 	nreal = 2*ncplx;
@@ -466,7 +466,7 @@ void planFFT()
 
 	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
 	if (NPHI < 3*MMAX) printf("       !! Warning : 2/3 rule for anti-aliasing not met !\n");
-	if (NPHI < 2) runerr("[FFTW] compile with SHT_AXISYM defined to have NPHI=1 and MMAX=0");
+//	if (NPHI < 2) runerr("[FFTW] compile with SHT_AXISYM defined to have NPHI=1 and MMAX=0");
 	
 // IFFT : unnormalized.
 	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
@@ -481,9 +481,9 @@ void planFFT()
 //	fft_norm = 1.0/nfft;
 	fftw_free(ShF);
 //	printf("       done.\n");
-#else
-	printf("        => no fft required for NPHI=1.\n");
-#endif
+    } else {
+	printf("        => no fft for NPHI=1.\n");
+    }
 	dctm0 = NULL;	idct = NULL;		// set dct plans to uninitialized.
 }
 
@@ -496,7 +496,7 @@ void planDCT()
 	fftw_r2r_kind r2r_kind;
 	fftw_iodim dims, hdims[2];
 	
-#ifndef SHT_AXISYM
+    if (NPHI>1) {
 	if (idct != NULL) fftw_destroy_plan(idct);
 // Allocate dummy Spatial Fields.
 	ShF = (complex double *) fftw_malloc((NPHI/2 +1) * NLAT * sizeof(complex double));
@@ -520,7 +520,7 @@ void planDCT()
 			runerr("[FFTW] dctm0 planning failed !");
 	}
 	fftw_free(ShF);
-#else
+    } else {
 	if ((dctm0 == NULL)||(idct == NULL)) {
 		ShF = (complex double *) fftw_malloc((NPHI/2 +1) * NLAT * sizeof(complex double));
 		Sh = (double *) ShF;
@@ -536,7 +536,7 @@ void planDCT()
 		if ((dctm0 == NULL)||(idct == NULL))
 			runerr("[FFTW] dct planning failed !");
 	}
-#endif
+    }
 }
 
 /// SET MTR_DCT and updates fftw_plan for DCT's
