@@ -204,7 +204,7 @@ int main()
 	srand( time(NULL) );	// initialise les nombres.
 #ifndef SHT_AXISYM
 	//                          ... lmax,mmax,mres, nlat, nphi );
-	init_SH( sht_auto, POLAR_OPT_THR, 340, 0, 5,  512, 2 );
+	init_SH( sht_auto, POLAR_OPT_THR, 340, 5, 5,  512, 16 );
 #else
 	init_SH( sht_auto, POLAR_OPT_THR, 681, 0, 1,  1024, 1 );
 #endif

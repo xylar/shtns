@@ -1,21 +1,24 @@
 ## "version" identification string
 HGID=`hg id -ti`
 
+## global options for gcc
+go= -O3 -ffast-math -D_GNU_SOURCE -D_HGID_="\"$(HGID)\""
+
 ## compiler :
 ## generic gcc
-cmd = gcc -O3 -ffast-math -D_HGID_="\"$(HGID)\"" -D_GNU_SOURCE
+cmd = gcc $(go)
 ## profiling
-#cmd = gcc -O3 -p -fno-inline
+#cmd = gcc $(go) -p -fno-inline
 ## recent gcc with native support
-#cmd = gcc -O3 -march=native -mfpmath=sse
+#cmd = gcc $(go) -march=native -mfpmath=sse
 ## gcc k8 (lgitl3)
-#cmd = gcc -O3 -march=k8
+#cmd = gcc $(go) -march=k8
 ## gcc core2 (calcul1&2)
-#cmd = gcc -O3 -march=core2 -mfpmath=sse
+#cmd = gcc $(go) -march=core2 -mfpmath=sse
 ## icare 64bits opteron
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 ## r2d2
-#cmd = gcc -march=core2 -O3 -ffast-math -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
+#cmd = gcc $(go) -march=core2 -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
 
 shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 

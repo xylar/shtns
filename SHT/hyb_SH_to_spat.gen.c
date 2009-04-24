@@ -57,11 +57,11 @@ T		Tl = Tlm;
 Q		yl = ykm_dct[im];
 V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
-		while (k<llim) {
+		do {
 			l = k;
 Q			re = 0.0;	ro = 0.0;
 V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;
-			while(l<llim) {
+			do {
 QE				re += yl[0]  * (double) Ql[l];
 QO				ro += yl[1]  * (double) Ql[l+1];
 SE				to += dyl0[0] * (double) Sl[l];
@@ -71,7 +71,7 @@ TE				pe -= dyl0[1] * (double) Tl[l+1];
 				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
-			}
+			} while(l<llim);
 			if (l==llim) {
 QE				re += yl[0]  * (double) Ql[l];
 SE				to += dyl0[0] * (double) Sl[l];
@@ -85,8 +85,8 @@ V			BP0[k] = pe;	BP0[k+1] = po;
 			k+=2;
 Q			yl+= (LMAX-LTR);
 V			dyl0+= (LMAX-LTR);
-		}
-QE		if ((llim&1)==0) {	// k=LTR
+		} while (k<llim);
+QE		if (k == llim) {	// k=LTR
 QE			BR0[k] = yl[0] * Ql[k];
 QE			k++;
 QE		}
@@ -100,12 +100,12 @@ V			BT0[k] = 0.0;	BP0[k] = 0.0;
 		k=0;
 Q		yl  = ylm[im];
 V		dyl0 = (double *) dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
-		while (k < NLAT_2) {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+		do {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=0;
 Q			re = 0.0;	ro = 0.0;
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
-			while (l<llim) {	// compute even and odd parts
+			do {	// compute even and odd parts
 QE				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 QO				ro += yl[1] * (double) Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
 TO				po += dyl0[0] * (double) Tl[l];	// m=0 : everything is real.
@@ -115,7 +115,7 @@ SO				te += dyl0[1] * (double) Sl[l+1];
 				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
-			}
+			} while (l<llim);
 			if (l==llim) {
 QE				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 TO				po += dyl0[0] * (double) Tl[l];
@@ -140,7 +140,7 @@ TB				- (pe-po)
 VB				;
 Q			yl  += (LMAX-LTR);
 V			dyl0 += (LMAX-LTR);
-		}
+		} while (k < NLAT_2);
   #ifndef SHT_NO_DCT
 	}
   #endif
@@ -158,7 +158,7 @@ T		Tl = &Tlm[LiM(0,im)];
 Q		yl = ykm_dct[im];
 V		dyl = dykm_dct[im];
 		k=0;
-		while (k<llim) {
+		do {
 Q			l = (k < m) ? m : k+(m&1);
 V			l = (k < m) ? m : k-(m&1);
 Q			re = 0.0;	ro = 0.0;
@@ -201,12 +201,12 @@ V			BpF[k] = pe;	BpF[k+1] = po;
 			k+=2;
 Q			yl+= (LMAX-LTR);
 V			dyl+= (LMAX-LTR);
-		}
-QE		if ( ((llim&1)==0) && ((m&1)==0) ) {	// k=LTR, m even
+		} while (k<llim);
+QE		if ( (k==llim) && ((m&1)==0) ) {	// k=LTR, m even
 QE			BrF[k] = yl[0] * Ql[k];
 QE			k++;
 QE		}
-V		if ( ((llim&1)==0) && ((m&1)==1) ) {	// k=LTR, m odd
+V		if ( (k==llim) && ((m&1)==1) ) {	// k=LTR, m odd
 SO			BtF[k] =   dyl[1].t * Sl[k];
 TE			BpF[k] = - dyl[1].t * Tl[k];
 V			k++;
@@ -238,7 +238,7 @@ VB			BpF[NLAT-tm[im] + k] = 0.0;	// south pole zeroes
 		}
 Q		yl  = ylm[im] + k*(LMAX-m+1);
 V		dyl = dylm[im] + k*(LMAX-m+1);
-		while (k < NLAT_2) {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+		do {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 Q			re = 0.0;	ro = 0.0;
 S			dte = 0.0;	dto = 0.0;	pe = 0.0;	po = 0.0;
@@ -288,7 +288,7 @@ TB					- (dpe-dpo)
 VB					;
 Q			yl  += (LMAX-LTR);
 V			dyl += (LMAX-LTR);
-		}
+		} while (k < NLAT_2);
 		im++;
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
@@ -308,23 +308,26 @@ V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);	// restore original pointer
 Q		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
-V		for (k=0; k<NLAT; k++) {	// m=0
+V		k=0;	do {		// m=0
 V			((double *)BtF)[2*k] *= st[k];		((double *)BpF)[2*k] *= st[k];
-V		}
+V			k++;
+V		} while(k<NLAT);
 		if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
 Q			for (im=1; im<=MTR_DCT; im+=2) {	// odd m's
-Q				for (k=0; k<NLAT; k++) BrF[im*NLAT + k] *= st[k];
+Q				k=0;	do {	BrF[im*NLAT + k] *= st[k];	k++;	} while(k<NLAT);
 Q			}
 V			for (im=2; im<=MTR_DCT; im+=2) {	//even m's
-V				for (k=0; k<NLAT; k++) {
+V				k=0;	do {
 V					BtF[im*NLAT + k] *= st[k];	BpF[im*NLAT + k] *= st[k];
-V				}
+V					k++;
+V				} while(k<NLAT);
 V			}
 V		} else {	// only even m's
 V			for (im=1; im<=MTR_DCT; im++) {
-V				for (k=0; k<NLAT; k++) {
+V				k=0;	do {
 V					BtF[im*NLAT + k] *= st[k];	BpF[im*NLAT + k] *= st[k];
-V				}
+V					k++;
+V				} while(k<NLAT);
 V			}
 		}
 	}
@@ -333,19 +336,21 @@ Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
 V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
 V	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
     } else {
-	for (k=1; k<NLAT; k++) {	// compress complex to real
+	k=1;	do {	// compress complex to real
 Q		((double *)BrF)[k] = (double) BrF[k];
 V		((double *)BtF)[k] = (double) BtF[k];
 V		((double *)BpF)[k] = (double) BpF[k];
-	}
+		k++;
+	} while(k<NLAT);
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {
 Q		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
 V		fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
-V		for (k=0; k<NLAT; k++) {
+V		k=0;	do {
 V			((double *)BtF)[k] *= st[k];	((double *)BpF)[k] *= st[k];
-V		}
+V			k++;
+V		} while (k<NLAT);
 	}
   #endif
     }

@@ -82,21 +82,7 @@ fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dctm0;
 unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
 
-/// reorganization for NPHI=1
-inline void fft_m0_r2eo(double *Br, double *reo)
-{
-	long int i;
-		for (i=0; i<NLAT/2; i++) {	// compute symmetric and antisymmetric parts.
-			reo[2*i]   = Br[i] + Br[NLAT-1-i];
-			reo[2*i+1] = Br[i] - Br[NLAT-1-i];
-		}
-	#ifndef SHT_NLAT_EVEN
-//		if (i < NLAT_2) {	// NLAT is odd : special equator handling
-		if (NLAT & 1) {		// NLAT is odd : special equator handling
-			reo[2*i] = Br[i];	reo[2*i+1] = 0.0;
-		}
-	#endif
-}
+#define SSE __attribute__((aligned (16)))
 
 /**
 	SHT FUNCTIONS
