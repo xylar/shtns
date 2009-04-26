@@ -543,13 +543,8 @@ int Get_MTR_DCT() {
 }
 
 /// TIMINGS
-double Find_Optimal_SHT()
-{
-	complex double *ShF, *ThF, *Slm, *Tlm;
-	int m, i;
-	double t, tsum, tsum0;
-
-	double get_time(int m) {
+	double get_time(int m, complex double *ShF, complex double *ThF, complex double *Slm, complex double *Tlm)
+	{
 		int i;
 		ticks tik0, tik1;
 
@@ -568,6 +563,12 @@ double Find_Optimal_SHT()
 		return elapsed(tik1,tik0);
 	}
 
+double Find_Optimal_SHT()
+{
+	complex double *ShF, *ThF, *Slm, *Tlm;
+	int m, i;
+	double t, tsum, tsum0;
+
 	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	ThF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
@@ -580,18 +581,18 @@ double Find_Optimal_SHT()
 	}
 
 	m = -1;
-	tsum0 = get_time(m);
+	tsum0 = get_time(m, ShF, ThF, Slm, Tlm);
 	tsum=tsum0;	i = m;
 	for (m=-1; m<=MMAX; m++) {
-		t = get_time(m);
+		t = get_time(m, ShF, ThF, Slm, Tlm);
 		if ((m==-1)&&(t<tsum0)) tsum0 = t;
 		if (t < tsum) {	tsum = t;	i = m; }
 	}
 	m=-1;	// recheck m=-1;
-		t = get_time(m);
+		t = get_time(m, ShF, ThF, Slm, Tlm);
 		if (t<tsum0) tsum0 = t;
 		if (t < tsum) { tsum = t;	i = m; }
-		t = get_time(m);	// twice
+		t = get_time(m, ShF, ThF, Slm, Tlm);	// twice
 		if (t<tsum0) tsum0 = t;
 		if (t < tsum) { tsum = t;	i = m; }
 
@@ -987,7 +988,31 @@ void init_SH_dct()
 	dygp = yg + 2*(LMAX+1)*NLAT_2;
 	yk = yg + 3*(LMAX+1)*NLAT_2;		// temp for zlm_dct0
 
-	inline void calc_Zlm_dct(int l,int m)
+	// zlm in DCT space
+	for (im=0; im<=MMAX; im++) {
+		m = im*MRES;
+		printf("computing weights m=%d\r",m);	fflush(stdout);
+		for (it=0; it<NLAT_2; it++) {	// compute Plm's at gauss nodes.
+			gsl_sf_legendre_sphPlm_deriv_array( LMAX, m, xg[it], &yg[it*(LMAX+1)], &dygt[it*(LMAX+1)] );
+			if (m & 1) {	// m odd
+				for (l=m; l<=LMAX; l++) {
+					dygp[it*(LMAX+1) + (l-m)] = m * yg[it*(LMAX+1) + (l-m)] / sg[it];
+					yg[it*(LMAX+1) + (l-m)] /= sg[it];	// Plm/sin(t) = P[l-1](cost)
+					dygt[it*(LMAX+1) + (l-m)] *= -sg[it];	// -(dPlm/dx)*sin(t) = dPlm/dt = P[l](cost)
+				}
+			} else {	// m even
+				for (l=m; l<=LMAX; l++) {
+					// Plm = P[l](cost)
+					dygt[it*(LMAX+1) + (l-m)] *= -1.;	// -dPlm/dx = P[l-1](cost) = 1/sint.dPlm/dt
+//					dygp[it*(LMAX+1) + (l-m)] = m * yg[it*(LMAX+1) + (l-m)] * sg_2[it];	// P[l-2](cost)
+					dygp[it*(LMAX+1) + (l-m)] = m * yg[it*(LMAX+1) + (l-m)] /(sg[it]*sg[it]);	// P[l-2](cost)
+//					dygp[it*(LMAX+1) + (l-m)] = m * yg[it*(LMAX+1) + (l-m)];	// P[l](cost)
+				}
+			}
+		}
+
+		for (l=m; l<=LMAX; l++) {
+/// calc_Zlm_dct(l,m)
 	{
 		int k0,k1, k,it;
 		long double sum, dtsum, dpsum;
@@ -1059,50 +1084,26 @@ void init_SH_dct()
 			for (it=0; it<NLAT; it++) { dZt[it] *= st[it];		dZp[it] *= st[it]; }
 		}
 	}
-
-	// zlm in DCT space
-	for (im=0; im<=MMAX; im++) {
-		m = im*MRES;
-		printf("computing weights m=%d\r",m);	fflush(stdout);
-		for (it=0; it<NLAT_2; it++) {	// compute Plm's at gauss nodes.
-			gsl_sf_legendre_sphPlm_deriv_array( LMAX, m, xg[it], &yg[it*(LMAX+1)], &dygt[it*(LMAX+1)] );
-			if (m & 1) {	// m odd
-				for (l=m; l<=LMAX; l++) {
-					dygp[it*(LMAX+1) + (l-m)] = m * yg[it*(LMAX+1) + (l-m)] / sg[it];
-					yg[it*(LMAX+1) + (l-m)] /= sg[it];	// Plm/sin(t) = P[l-1](cost)
-					dygt[it*(LMAX+1) + (l-m)] *= -sg[it];	// -(dPlm/dx)*sin(t) = dPlm/dt = P[l](cost)
+			if (((l-m)&1) == 0) {	// l-m even
+				if (l == LMAX) {
+					for (it=0; it<NLAT_2; it++) {
+						zlm[im][(l-m)*NLAT_2 + it] =  Z[it];
+						dzlm[im][(l-m)*NLAT_2 + it].p = dZp[it];
+						dzlm[im][(l-m)*NLAT_2 + it].t = dZt[it];
+					}
+				} else {
+					for (it=0; it<NLAT_2; it++) {
+						zlm[im][(l-m)*NLAT_2 + it*2] = Z[it];
+						dzlm[im][(l-m)*NLAT_2 + it*2].p = dZp[it];
+						dzlm[im][(l-m)*NLAT_2 + it*2].t = dZt[it];
+					}
 				}
-			} else {	// m even
-				for (l=m; l<=LMAX; l++) {
-					// Plm = P[l](cost)
-					dygt[it*(LMAX+1) + (l-m)] *= -1.;	// -dPlm/dx = P[l-1](cost) = 1/sint.dPlm/dt
-//					dygp[it*(LMAX+1) + (l-m)] = m * yg[it*(LMAX+1) + (l-m)] * sg_2[it];	// P[l-2](cost)
-					dygp[it*(LMAX+1) + (l-m)] = m * yg[it*(LMAX+1) + (l-m)] /(sg[it]*sg[it]);	// P[l-2](cost)
-//					dygp[it*(LMAX+1) + (l-m)] = m * yg[it*(LMAX+1) + (l-m)];	// P[l](cost)
+			} else {	// l-m odd
+				for (it=0; it<NLAT_2; it++) {
+					zlm[im][(l-m-1)*NLAT_2 + it*2 +1] = Z[it];
+					dzlm[im][(l-m-1)*NLAT_2 + it*2 +1].p = dZp[it];
+					dzlm[im][(l-m-1)*NLAT_2 + it*2 +1].t = dZt[it];
 				}
-			}
-		}
-
-		for (l=m;l<LMAX;l+=2) {
-			calc_Zlm_dct(l,m);
-			for (it=0; it<NLAT_2; it++) {
-				zlm[im][(l-m)*NLAT_2 + it*2] = Z[it];
-				dzlm[im][(l-m)*NLAT_2 + it*2].p = dZp[it];
-				dzlm[im][(l-m)*NLAT_2 + it*2].t = dZt[it];
-			}
-			calc_Zlm_dct(l+1,m);
-			for (it=0; it<NLAT_2; it++) {
-				zlm[im][(l-m)*NLAT_2 + it*2 +1] = Z[it];
-				dzlm[im][(l-m)*NLAT_2 + it*2 +1].p = dZp[it];
-				dzlm[im][(l-m)*NLAT_2 + it*2 +1].t = dZt[it];
-			}
-		}
-		if (l==LMAX) {
-			calc_Zlm_dct(l,m);
-			for (it=0; it<NLAT_2; it++) {
-				zlm[im][(l-m)*NLAT_2 + it] =  Z[it];
-				dzlm[im][(l-m)*NLAT_2 + it].p = dZp[it];
-				dzlm[im][(l-m)*NLAT_2 + it].t = dZt[it];
 			}
 		}
 	}
