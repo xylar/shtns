@@ -44,11 +44,12 @@ extern long int *lmidx;		// (virtual) index in SH array of given im.
   #define M_PI 3.1415926535897932384626433832795
 #endif
 
-// useful values for some basic spherical harmonic representations
+// useful values for some basic spherical harmonic representations (orthonormal)
 // Y00_1 = 1/Y00 = spherical harmonic representation of 1 (l=0,m=0)
 #define Y00_1 sqrt(4.*M_PI)
 // Y10_ct = spherical harmonic representation of cos(theta) (l=1,m=0)
 #define Y10_ct sqrt(4.*M_PI/3.)
+#define Y11_st sqrt(2.*M_PI/3.)
 
 enum shtns_type {
 	sht_gauss,	// use gaussian grid and quadrature. highest accuracy.
@@ -79,7 +80,7 @@ void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *
 double SH_to_point(complex double *Qlm, double cost, double phi);
 void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost, double phi,
 					   double *vr, double *vt, double *vp);
-					   
+
 void spat_to_SH_l(complex double *BrF, complex double *Qlm, int LTR);
 void SH_to_spat_l(complex double *Qlm, complex double *BrF, int LTR);
 
