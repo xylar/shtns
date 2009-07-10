@@ -14,16 +14,20 @@
 extern long int LMAX;	///< maximum degree (LMAX) of spherical harmonics.
 extern long int NLAT;	///< number of spatial points in Theta direction (latitude).
 #ifndef SHT_AXISYM
-  extern long int MRES;	///< \c 2.pi/MRES is the periodicity along the phi coord. (MRES=1 means no assumed periodicity)
-  extern long int MMAX; ///< maximum number of azimutal modes. \c (MMAX*MRES) is the maximum order of spherical harmonics. 
-  extern long int NPHI;	///< number of spatial points in Phi direction (longitude)
+  extern long int MRES;	///< \c 2.pi/MRES is the periodicity along the phi coord. (MRES=1 means no assumed periodicity).
+  extern long int MMAX;	///< maximum number of azimutal modes. \c (MMAX*MRES) is the maximum order of spherical harmonics. 
+  extern long int NPHI;	///< number of spatial points in Phi direction (longitude).
 #else
   #define MMAX 0
   #define NPHI 1
   #define MRES 1
 #endif
-extern long int NLM;	///< total number of (l,m) spherical harmonics components.
+extern long int NLM;	///< total number of (l,m) spherical harmonics components (complex double).
 //@}
+
+/// total number of 'doubles' required for a spatial field (includes FFTW padding).
+/// only the first NLAT*NPHI are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat_data
+#define NSPAT_ALLOC (NLAT*(NPHI/2+1)*2)
 
 /*! \name physical space coordinates arrays
  * functions of the co-latitude theta for latitudinal grid points [0..NLAT-1]
@@ -57,8 +61,10 @@ extern long int *lmidx;
 /// LM(l,m) : macro returning array index for given l and m.
 #define LM(l,m) ( lmidx[(m)/MRES] + l )
 /// LM_LOOP( action ) : macro that performs "action" for every (l,m), with lm set, but neither l, m nor im.
+/// \c lm must be a declared int and is the loop counter and the SH array index. more info : \ref spec_data
 #define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { action }
-/// LM_L_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined. (but NOT m and im)
+/// LM_L_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined (but NOT m and im).
+/// \c lm and \c m must be declared int's. \c lm is the loop counter and SH array index, while \c l is the SH degree. more info : \ref spec_data
 #define LM_L_LOOP( action ) for (lm=0; lm<NLM; lm++) { l=li[lm]; { action } }
 //@}
 

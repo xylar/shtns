@@ -1,0 +1,84 @@
+Run "make docs" to generate documentation with doxygen.
+
+
+/** \mainpage SHTns : Spherical Harmonic Transform for numerical simulations.
+ * 
+ * SHTns is a library for Spherical Harmonic Transform written in C, aimed at 
+ * numerical simulation (fluid flows, mhd, ...) in spherical geometries.
+ * 
+ * As such, it contains both scalar and vector transforms, backward and forward, flexible truncations, gauss nodes or regular nodes.
+ *
+ * Using DCT acceleration and other classical optimizations, it is intended to be <b>very fast</b>.
+ * 
+ * It uses the <a href="http://www.gnu.org/software/gsl/">GSL</a> and <a href="http://www.fftw.org/">FFTW</a> libraries and is
+ * distributed under the GPL License.
+ * 
+ * \see SHT.h for the definitions of variables, macros and functions.
+ * \see The organisation of data used by SHTns is described in \ref data
+ * 
+ * \author SHTns is written by Nathanael Schaeffer (LGIT,CNRS)
+*/
+
+
+
+/** \page compil Compiling SHTns
+
+type \c make to compile SHTns. It will produce the object file SHT.o
+
+\section cflags Compilation flags and options
+
+*/
+
+
+
+/** \page data Data structures used by SHTns 
+
+\section spat_data Spatial Data
+
+<b>Spatial data is stored as double precision floating point values (64 bit) in a contiguous array with the latitudinal coordinate varying fastest.</b>
+
+The angular coordinates on a spherical shell are the co-latitude \f$ \theta \f$ and the longitude \f$ \phi \f$.
+
+A field \e A (or one of its component in case of a vector field) is discretized on an ordered grid, which consists of
+\li \ref NPHI equally spaced nodes in longitude, spanning the range of angle between 0 and \f$2\pi\f$/\ref MRES,
+\li \ref NLAT gauss nodes or equally spaced nodes (depending on \ref shtns_type) in latitude, spanning angles from 0 to \f$ \pi \f$.
+
+Identifying a grid point with its indices \c it and \c ip in latitudinal and longitudinal direction respectively, one has :
+\li \f$ \theta \f$ = \c acos(ct[it])
+\li \f$ \phi \f$ = \c ip * 2\f$\pi\f$/(NPHI*MRES)
+\li \f$ A(\theta,\phi) \f$ = \c A[ip*NLAT + it]
+
+\subsection Allocation
+One must be careful when allocating spatial data, as the Fourier transform requires some aditional space.\n Precisely, the number
+of required \c double is \ref NSPAT_ALLOC = NLAT*(NPHI/2+1)*2. The first NLAT*NPHI values are the spatial data.
+
+In addition, spatial data must be allocated using the \c fftw_malloc function, for example using :
+\code A = fftw_malloc( NSPAT_ALLOC * sizeof(double) );\endcode
+
+\section spec_data Spectral Data (Spherical Harmonics representation)
+
+<b>The collection of Alm (spherical harmonics coefficient of degree \e l and order \e m) is stored in an array of \c complex \c double floating point values with \e l varying fastest.</b>
+
+The field \em A is decomposed on the basis of spherical harmonics Ylm (degree \e l, order \e m) :
+\f[ A(\theta,\phi) = \sum_{l,m} A_l^m Y_l^m(\theta,\phi)\f]
+The series is truncated at degree \ref LMAX and order \ref MMAX*\ref MRES, 
+and only order that are multiple of \ref MRES are described.
+
+The \ref NLM coefficients Alm are stored in a one-dimensional array, grouped by \e m.\n
+The details of the storage may depend on the algorithm, and to access a particular coefficient, you should always use the following macros :
+\li \ref LM(l,m) gives the index in the array for coefficient of degree \e l and order \e m.
+\li \ref LiM(l,im) gives the index in the array for coefficient of degree \e l and order \e im*MRES.
+
+Hence \c Alm[LM(l,m)] is the SH coefficient of degree \e l and order \e m.
+
+\note There is no test on bounds, so that LM(l,m) with \e l or \e m that is not described, will give undefined result
+(in particular for an \e m that is not a multiple of \c MRES)
+
+To perform loops on all coefficients, use the macros \ref LM_LOOP and \ref LM_L_LOOP
+in combination of the arrays \ref li, \ref el and \ref l2 which give the degree \e l and functions of it for any array index.
+
+\subsection Allocation
+Allocation for a SH description is simply done with :
+\code Alm = malloc( NLM * sizeof(complex double) );\endcode
+
+*/

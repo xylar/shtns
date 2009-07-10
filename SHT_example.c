@@ -34,18 +34,20 @@ int main()
 //	init_SH(shtns_type, eps,         lmax, mmax, mres, nlat, nphi);
 	init_SH( sht_gauss, POLAR_OPT_THR, 340, 3,    5,   512,  12 );
 
-	Sh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
-	Th = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
+// allocate spatial fields.
+	Sh = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double));
+	Th = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double));
 
-	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
-	Tlm = (complex double *) malloc(sizeof(complex double)* NLM);
+// allocate SH representations.
+	Slm = (complex double *) malloc( NLM * sizeof(complex double));
+	Tlm = (complex double *) malloc( NLM * sizeof(complex double));
 
 
 // SH_to_spat
 	LM_LOOP( Slm[lm]=0.0;  Tlm[lm] = 0.0; )		/* this is the same as :
-													for (lm=0;lm<NLM;lm++) {
-														Slm[lm] = 0.0;	Tlm[lm] = 0.0;
-													} */
+						for (lm=0;lm<NLM;lm++) {
+							Slm[lm] = 0.0;	Tlm[lm] = 0.0;
+						} */
 
 	Slm[LM(1,1)] = 1;				// access to SH coefficient
 	Slm[LiM(1,0)] = Y10_ct;

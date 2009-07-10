@@ -1,21 +1,9 @@
-/** \mainpage SHTns : Spherical Harmonic Transform for numerical simulations.
- * 
- * SHTns is a library for Spherical Harmonic Transform written in C, aimed at 
- * numerical simulation (fluid flows, mhd, ...) in spherical geometries.
- * 
- * As such, it contains both scalar and vector transforms, backward and forward, flexible truncations, gauss nodes or regular nodes.
- *
- * Using DCT acceleration and other classical optimizations, it is intended to be <b>very fast</b>.
- * 
- * It uses the <a href="http://www.gnu.org/software/gsl/">GSL</a> and <a href="http://www.fftw.org/">FFTW</a> libraries and is
- * distributed under the GPL License.
- * 
- * \see SHT.h for the definitions of variables, macros and functions.
- * 
- * \author SHTns is written by Nathanael Schaeffer (LGIT,CNRS)
-*/
+/********************************************************************
+ * SHTns : Spherical Harmonic Transform for numerical simulations.  *
+ *    written by Nathanael Schaeffer / LGIT,CNRS                    *
+ ********************************************************************/
 
-/// \file SHT.c main source file.
+/// \file SHT.c main source file for SHTns.
 
 /// FLAGS ///
 //#define SHT_DEBUG
