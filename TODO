@@ -7,6 +7,8 @@
 
 *** Optimizations ***
 
+#pragma vector aligned
+
 ? (- use "alloca()" to allocate temp memory on the stack with variable lengths) // ultrafast but not ANSI
 
 - Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
@@ -18,6 +20,10 @@
      LM loop with li[lm] array access seems faster... (at least for 4 arrays access).
 
 *** SHT.c
+
+- CHECK for accuracy with MTR_DCT, default to gauss if not good enough.
+- Implement l even/odd sub-transforms.
+- Implement sperate m sub-transforms.
 
 + other optimization : NLAT and NPHI should be checked for fftw-friendliness.
 

@@ -10,7 +10,7 @@
 //#define SHT_AXISYM
 //#define SHT_NO_DCT
 #define SHT_NLAT_EVEN
-//#define _SHT_EO_
+//#define SHT_EO
 ///
 
 #include <stdio.h>
@@ -34,6 +34,53 @@ enum shtns_type {
 	sht_reg_dct,	// use pure dct algorithm, on a regular grid.
 	sht_reg_poles	// use a synthesis only algo including poles, not suitable for computations.
 };
+/*
+struct SHTdef {
+	long int nlm;
+	long int lmax,nlat,nlat_2;
+	long int mmax,mres,nphi;
+	long int mtr_dct;
+
+	double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
+	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
+	int *li;
+
+	long int *lmidx;		// (virtual) index in SH array of given im.
+	long int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+
+	double** ylm;		// matrix for inverse transform (synthesis)
+	double** zlm;		// matrix for direct transform (analysis)
+	double** ykm_dct;	// matrix for inverse transform (synthesis) using dct.
+	double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
+
+	fftw_plan ifft, fft;	// plans for FFTW.
+	fftw_plan idct, dctm0;
+}
+
+struct VSHTdef {
+	long int nlm;
+	long int lmax,nlat,nlat_2;
+	long int mmax,mres,nphi;
+	long int mtr_dct;
+
+	double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
+	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
+	int *li;
+
+	long int *lmidx;		// (virtual) index in SH array of given im.
+	long int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+
+	struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
+	struct DtDp** dzlm;
+	struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix
+
+	fftw_plan ifft, fft;	// plans for FFTW.
+	fftw_plan idct;
+
+	spat_to_SH
+	SH_to_spat
+}
+*/
 
 // Minimum performance improve for DCT in sht_auto mode.
 #define MIN_PERF_IMPROVE_DCT 0.95
@@ -543,7 +590,7 @@ int Get_MTR_DCT() {
 }
 
 /// TIMINGS
-	double get_time(int m, complex double *ShF, complex double *ThF, complex double *Slm, complex double *Tlm)
+	double get_time(int m, int nloop, complex double *ShF, complex double *ThF, complex double *Slm, complex double *Tlm)
 	{
 		int i;
 		ticks tik0, tik1;
@@ -552,13 +599,13 @@ int Get_MTR_DCT() {
 			SH_to_spat(Tlm,ShF);			// caching...
 			SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
 		tik0 = getticks();
-		for (i=0; i<10; i++) {
+		for (i=0; i<nloop; i++) {
 			SH_to_spat(Tlm,ShF);
 			SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
 		}
 		tik1 = getticks();
 	#ifdef SHT_DEBUG
-		printf("m=%d - ticks : %.3f\n", m*MRES, elapsed(tik1,tik0)/(10*NLM*NLAT));
+		printf("m=%d - ticks : %.3f\n", m*MRES, elapsed(tik1,tik0)/(nloop*NLM*NLAT));
 	#endif
 		return elapsed(tik1,tik0);
 	}
@@ -566,13 +613,13 @@ int Get_MTR_DCT() {
 double Find_Optimal_SHT()
 {
 	complex double *ShF, *ThF, *Slm, *Tlm;
-	int m, i;
+	int m, i, minc, nloop;
 	double t, tsum, tsum0;
 
 	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	ThF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
-	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
-	Tlm = (complex double *) malloc(sizeof(complex double)* NLM);
+	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 
 	t = 1.0 / (RAND_MAX/2);		// some random data to play with.
 	for (i=0;i<NLM;i++) {
@@ -580,19 +627,29 @@ double Find_Optimal_SHT()
 		Tlm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 	}
 
+        minc = MMAX/20 + 1;             // don't test every single m.
+        nloop = 10;                     // number of loops to get time.
+        if (NLM*NLAT > 1024*1024)
+                nloop = 1 + (10*1024*1024)/(NLM*NLAT);          // don't use too many loops for large transforms.
+#ifdef SHT_DEBUG
+	printf("\nminc = %d, nloop = %d\n",minc,nloop);
+#endif
+
 	m = -1;
-	tsum0 = get_time(m, ShF, ThF, Slm, Tlm);
+	tsum0 = get_time(m, nloop, ShF, ThF, Slm, Tlm);
 	tsum=tsum0;	i = m;
-	for (m=-1; m<=MMAX; m++) {
-		t = get_time(m, ShF, ThF, Slm, Tlm);
+	t = get_time(m, nloop, ShF, ThF, Slm, Tlm);
+	if (t<tsum0) tsum0 = t;		// recheck m=-1
+	for (m=0; m<=MMAX; m+=minc) {
+		t = get_time(m, nloop, ShF, ThF, Slm, Tlm);
 		if ((m==-1)&&(t<tsum0)) tsum0 = t;
 		if (t < tsum) {	tsum = t;	i = m; }
 	}
 	m=-1;	// recheck m=-1;
-		t = get_time(m, ShF, ThF, Slm, Tlm);
+		t = get_time(m, nloop, ShF, ThF, Slm, Tlm);
 		if (t<tsum0) tsum0 = t;
 		if (t < tsum) { tsum = t;	i = m; }
-		t = get_time(m, ShF, ThF, Slm, Tlm);	// twice
+		t = get_time(m, nloop, ShF, ThF, Slm, Tlm);	// twice
 		if (t<tsum0) tsum0 = t;
 		if (t < tsum) { tsum = t;	i = m; }
 
@@ -1120,6 +1177,35 @@ void init_SH_dct()
 
 	free(yg);	free(cktg);
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
+}
+
+double SHT_error()
+{
+	complex double *Tlm0, *Slm0, *Tlm, *Slm, *ShF, *ThF;
+	double t;
+	long int i;
+	
+	srand( time(NULL) );	// init random numbers.
+	
+	Tlm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Slm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	ShF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double) );
+	ThF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double) );
+		
+	t = 1.0 / (RAND_MAX/2);
+	for (i=0;i<NLM;i++) {		// random state
+		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+	}
+
+	SH_to_spat(Slm0,ShF);		// scalar SHT
+	spat_to_SH(ShF, Slm);
+	
+	SHsphtor_to_spat(Slm0, Tlm0, ShF, ThF);		// vector SHT
+	spat_to_SHsphtor(ShF, ThF, Slm0, Tlm0);
+
 }
 
 #ifndef _HGID_

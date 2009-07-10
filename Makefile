@@ -47,6 +47,9 @@ time_SHTg : time_SHT.c SHTg.o Makefile
 time_SHTaxi : time_SHT.c SHTaxi.o Makefile
 	$(cmd) -DSHT_AXISYM time_SHT.c SHTaxi.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHTaxi
 
+SHT_example : SHT_example.c SHT.o Makefile
+	$(cmd) SHT_example.c SHT.o -lfftw3 -lgsl -lgslcblas -lm -o SHT_example
+
 
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000
