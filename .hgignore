@@ -6,6 +6,7 @@ syntax: glob
 o_*
 poltor*
 SHT/*spat.c
+doc/*
 
 # switch to regexp syntax.
 syntax: regexp

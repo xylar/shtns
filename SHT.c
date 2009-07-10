@@ -1,9 +1,21 @@
-/**
-///////////////////////////////////////////////
-// SHT : Spherical Harmonic Transform
-//   requires SHT.h for size parameters.
-//////////////////////////////////////////////
+/** \mainpage SHTns : Spherical Harmonic Transform for numerical simulations.
+ * 
+ * SHTns is a library for Spherical Harmonic Transform written in C, aimed at 
+ * numerical simulation (fluid flows, mhd, ...) in spherical geometries.
+ * 
+ * As such, it contains both scalar and vector transforms, backward and forward, flexible truncations, gauss nodes or regular nodes.
+ *
+ * Using DCT acceleration and other classical optimizations, it is intended to be <b>very fast</b>.
+ * 
+ * It uses the <a href="http://www.gnu.org/software/gsl/">GSL</a> and <a href="http://www.fftw.org/">FFTW</a> libraries and is
+ * distributed under the GPL License.
+ * 
+ * \see SHT.h for the definitions of variables, macros and functions.
+ * 
+ * \author SHTns is written by Nathanael Schaeffer (LGIT,CNRS)
 */
+
+/// \file SHT.c main source file.
 
 /// FLAGS ///
 //#define SHT_DEBUG
@@ -26,7 +38,7 @@
 // cycle counter from FFTW
 #include "cycle.h"
 
-// supported types of sht's
+/// supported types of sht's
 enum shtns_type {
 	sht_gauss,	// use gaussian grid and quadrature. highest accuracy.
 	sht_auto,	// use a regular grid if dct is faster with goog accuracy, otherwise defaults to gauss.
@@ -103,6 +115,7 @@ long int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
 # define M_PI 3.1415926535897932384626433832795
 #endif
 
+
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };
@@ -131,9 +144,9 @@ unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mod
 
 #define SSE __attribute__((aligned (16)))
 
-/**
+/*
 	SHT FUNCTIONS
-**/
+*/
 
 // truncation at LMAX and MMAX
 #define LTR LMAX
@@ -141,9 +154,9 @@ unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mod
 #undef SHT_VAR_LTR
 
 /////////////////////////////////////////////////////
-//   Scalar Spherical Harmonics Transform
-// input  : ShF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
-// output : Slm = spherical harmonics coefficients : complex double array of size NLM
+///   Scalar Spherical Harmonics Transform : spatial field BrF is converted to SH representation Qlm.
+/// \param[in] BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+/// \param[out] Qlm = spherical harmonics coefficients : complex double array of size NLM
 void spat_to_SH(complex double *BrF, complex double *Qlm)
 {
 	#ifndef _SHT_EO_
@@ -154,9 +167,9 @@ void spat_to_SH(complex double *BrF, complex double *Qlm)
 }
 
 /////////////////////////////////////////////////////
-//   Scalar inverse Spherical Harmonics Transform
-// input  : Qlm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
-// output : BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+///   Backward Scalar Spherical Harmonics Transform : SH representation Qlm is converted to spatial field BrF.
+/// \param[in] Qlm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
+/// \param[out] BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
 void SH_to_spat(complex double *Qlm, complex double *BrF)
 {
 	#ifndef _SHT_EO_
@@ -172,11 +185,9 @@ void SH_to_spat(complex double *Qlm, complex double *BrF)
 #define SH_to_grad_spat(S,Gt,Gp) SHsph_to_spat(S, Gt, Gp)
 
 /////////////////////////////////////////////////////
-//   Spheroidal/Toroidal to (theta,phi) components inverse Spherical Harmonics Transform
-// input  : Slm,Tlm = spherical harmonics coefficients of Spheroidal and Toroidal scalars : 
-//          complex double array of size NLM [unmodified]
-// output : BtF, BpF = theta, and phi vector components, spatial/fourrier data : 
-//          complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+/// Backward Vector Spherical Harmonics Transform : Spheroidal/Toroidal to (theta,phi) vector components.
+/// \param[in] Slm/Tlm : SH array of Spheroidal/Toroidal scalar. complex size NLM
+/// \param[out] BtF/BpF : theta/phi components of vector field. complex size NLAT*(NPHI/2+1)
 void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF)
 {
 #ifndef _SHT_EO_
@@ -196,6 +207,10 @@ void SHtor_to_spat(complex double *Tlm, complex double *BtF, complex double *BpF
 #include "SHT/SHt_to_spat.c"
 }
 
+/////////////////////////////////////////////////////
+/// Forward Vector Spherical Harmonics Transform : (theta,phi) vector field components to Spheroidal/Toroidal scalars.
+/// \param[in] BtF/BpF : theta/phi components of vector field. complex size NLAT*(NPHI/2+1)
+/// \param[out] Slm/Tlm : SH array of Spheroidal/Toroidal scalar. complex size NLM
 void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
 {
 #ifndef _SHT_EO_
@@ -205,6 +220,7 @@ void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *
 #endif
 }
 
+/// Evaluate scalar SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
 double SH_to_point(complex double *Qlm, double cost, double phi)
 {
 	double yl[LMAX+1];
@@ -229,6 +245,7 @@ double SH_to_point(complex double *Qlm, double cost, double phi)
 	return vr;
 }
 
+/// Evaluate vector SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
 void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost, double phi,
 					   double *vr, double *vt, double *vp)
 {
@@ -265,14 +282,15 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	*vp = vsp/sint - (-sint*vtt);	// Bp = I.m/sint *S  - dT/dt
 }
 
-/**
+/*
 	SHT FUNCTIONS with variable LTR truncation.
-**/
+*/
 
 // truncation at function parameter LTR
 #undef LTR
 #define SHT_VAR_LTR
 
+/// spatial field BrF is converted to SH representation Qlm with maximum degree LTR
 void spat_to_SH_l(complex double *BrF, complex double *Qlm, int LTR)
 {
 	#ifndef _SHT_EO_
@@ -338,9 +356,9 @@ void spat_to_SHsphtor_l(complex double *BtF, complex double *BpF, complex double
 #undef MTR
 #undef SHT_VAR_LTR
 
-/**
+/*
 	INITIALIZATION FUNCTIONS
-**/
+*/
 
 void runerr(const char * error_text)
 {
@@ -382,7 +400,8 @@ void alloc_SHTarrays()
 #endif
 }
 
-// compute number of modes for spherical harmonic description.
+/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to init_SH
+/*! \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
 long int nlm_calc(long int lmax, long int mmax, long int mres)
 {
 	if (mmax*mres > lmax) mmax = lmax/mres;
@@ -399,10 +418,10 @@ long int nlm_calc_eo(long int lmax, long int mmax, long int mres) {
 }
 */
 
-// Generates the abscissa and weights for a Gauss-Legendre quadrature.
-// Newton method from initial Guess to find the zeros of the Legendre Polynome
-// x = abscissa, w = weights, n points.
-// Reference:  Numerical Recipes, Cornell press.
+/// Generates the abscissa and weights for a Gauss-Legendre quadrature.
+/// Newton method from initial Guess to find the zeros of the Legendre Polynome
+/// \param x = abscissa, \param w = weights, \param n points.
+/// \note Reference:  Numerical Recipes, Cornell press.
 void GaussNodes(long double *x, long double *w, int n)
 {
 	long double z, z1, p1, p2, p3, pp, eps;
@@ -477,7 +496,7 @@ void EqualPolarGrid()
 }
 
 
-// initialize FFTs using FFTW. stride = NLAT, (contiguous l)
+/// initialize FFTs using FFTW. stride = NLAT, (contiguous l)
 void planFFT()
 {
 	complex double *ShF;
@@ -520,7 +539,7 @@ void planFFT()
 	dctm0 = NULL;	idct = NULL;		// set dct plans to uninitialized.
 }
 
-// initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
+/// initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
 void planDCT()
 {
 	complex double *ShF;
@@ -660,7 +679,7 @@ double Find_Optimal_SHT()
 }
 
 
-// Perform some optimization on the SHT matrices.
+/// Perform some optimization on the SHT matrices.
 void OptimizeMatrices(double eps)
 {
 	double *yg;
@@ -711,11 +730,7 @@ void OptimizeMatrices(double eps)
 	}
 }
 
-/** initialize SH transform.
-input : eps = polar optimization threshold : polar coefficients below that threshold are neglected (for high ms).
-        eps is the value under wich the polar values of the Legendre Polynomials Plm are neglected, leading to increased performance (a few percent).
-	0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive.
-*/
+
 
 void init_SH_synth()
 {
@@ -1212,6 +1227,16 @@ double SHT_error()
   #define _HGID_ "unknown"
 #endif
 
+/*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
+ * <b>This function must be called before any SH transform.</b> and sets all global variables.
+ * \param lmax : maximum SH degree that we want to describe.
+ * \param mmax : number of azimutal wave numbers.
+ * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
+ * \param nlat,nphi : respectively the number of latitudinal and longitudinal grid points.
+ * \param flags allows to choose the type of transform see \ref shtns_type
+ * \param eps : polar optimization threshold : polar values of Legendre Polynomias below that threshold are neglected (for high m), leading to increased performance (a few percents)
+ *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive.
+*/
 void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
 {
 	double t;

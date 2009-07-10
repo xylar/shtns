@@ -51,5 +51,8 @@ SHT_example : SHT_example.c SHT.o Makefile
 	$(cmd) SHT_example.c SHT.o -lfftw3 -lgsl -lgslcblas -lm -o SHT_example
 
 
+docs :
+	doxygen doxygen.conf
+
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000
