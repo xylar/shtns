@@ -51,6 +51,11 @@ SHT_example : SHT_example.c SHT.o Makefile
 	$(cmd) SHT_example.c SHT.o -lfftw3 -lgsl -lgslcblas -lm -o SHT_example
 
 
+SHTf77.o : SHTf77.c SHT.h Makefile
+	gcc -c SHTf77.c
+SHT_fort_ex : SHT_example.f SHT.o SHTf77.o Makefile
+	gfortran -fdefault-real-8 SHT_example.f SHT.o SHTf77.o -lfftw3 -lgsl -lgslcblas -lm -lc -o SHT_fort_ex
+
 docs :
 	doxygen doxygen.conf
 

@@ -6,13 +6,6 @@
 #include <stdlib.h>
 #include <complex.h>
 #include <math.h>
-// FFTW la derivee d/dx = ik	(pas de moins !)
-#include <fftw3.h>
-// GSL for Legendre functions
-#include <gsl/gsl_errno.h>
-#include <gsl/gsl_sf_legendre.h>
-
-
 
 #include "SHT.h"
 
