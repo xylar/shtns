@@ -1274,7 +1274,7 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 			zlm_dct0 = NULL;
 			if (idct != NULL) fftw_destroy_plan(idct);	// free unused dct plans
 			if (dctm0 != NULL) fftw_destroy_plan(dctm0);
-			printf("        => switching back to Gauss Grid for better precision\n");
+			printf("        => switching back to Gauss Grid for higher accuracy.\n");
 		}
 	}
 	if (flags == sht_gauss)

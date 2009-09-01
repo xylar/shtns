@@ -12,11 +12,15 @@ Run "make docs" to generate documentation with doxygen.
  * 
  * It uses the <a href="http://www.gnu.org/software/gsl/">GSL</a> and <a href="http://www.fftw.org/">FFTW</a> libraries and is
  * distributed under the GPL License.
+ *
+ * There is also a simple Fortran interface.
  * 
  * \see SHT.h for the definitions of variables, macros and functions.
- * \see The organisation of data used by SHTns is described in \ref data
+ * \see The organisation of data used by SHTns is described in \ref data.
+ * \see The description of \ref opt.
+ * \see SHTf77.c for the fortran interface.
  * 
- * \author SHTns is written by Nathanael Schaeffer (LGIT,CNRS)
+ * \author SHTns is written by Nathanael Schaeffer (LGIT, CNRS)
 */
 
 
@@ -27,11 +31,17 @@ type \c make to compile SHTns. It will produce the object file SHT.o
 
 \section cflags Compilation flags and options
 
+These symbol can be defined at compile time :
+\li \c SHT_NO_DCT : disables DCT at compile time (smaller, simpler and maybe faster code for gauss SHT)
+\li \c SHT_AXISYM : axysimmetric version of SHTns (m=0 only), which is supposed to be a little faster than setting MMAX=0 at runtime.
+\li \c SHT_NLAT_EVEN : only NLAT even is supported (removes some code and conditional jumps, so it runs (slightly) faster)
+\li \c SHT_DEBUG : prints additional debug information.
+
 */
 
 
 
-/** \page data Data structures used by SHTns 
+/** \page data Data structures and grids used by SHTns 
 
 \section spat_data Spatial Data
 
@@ -80,5 +90,93 @@ in combination of the arrays \ref li, \ref el and \ref l2 which give the degree 
 \subsection Allocation
 Allocation for a SH description is simply done with :
 \code Alm = malloc( NLM * sizeof(complex double) );\endcode
+
+*/
+
+
+/** \page norm Normalization used in SHTns
+
+The spherical harmonics used in SHTns use the same normalization as the GSL, which is :
+
+\f[ Y_l^m(\theta, \phi) = \sqrt{\frac{2l+1}{4\pi}} \sqrt{\frac{(l-m)!}{(l+m)!}} \, P_l^m(\cos \theta) \, \exp(im\phi) \f]
+
+Function \ref SH_to_point gives an explicit implementation of the reverse SH transform (analysis).
+
+A few useful examples :
+\li a constant unit value on the sphere is represented by the coefficient \f$ c_0^0 = \sqrt{4\pi} \f$.
+\li \f$ \cos \theta \f$ is represented by the coefficient \f$ c_1^0 = \sqrt{4\pi/3} \f$.
+\li \f$ \cos \theta \, \sin \phi \f$ is represented by \f$ c_1^1 =  -\sqrt{2\pi/3} \f$.
+
+The corresponding defined constants \ref Y00_1, \ref Y10_ct and \ref Y11_st will help to build simple
+spectral fields.
+
+*/
+
+/** \page opt Optimizations implemented in SHTns
+
+SHTns is an implementation of the Spherical Harmonic Transform which aims at beiing accurate and fast,
+with direct numerical simulations in mind. As such, the following optimizations are implemented :
+
+\section opt_fft Use the Fast-Fourier Transform
+
+Any serious SHT should use the FFT, as it improves accuracy and speed.
+SHTns uses the FFTW library for the fast Fourier transform, a portable, 
+flexible and blazingly fast FFT implementation.
+
+\section opt_mirror Take advantage of mirror symmetry
+
+This is also a classical optimization. Due to the defined symmetry of spherical harmonics with respect
+to a reflexion about the equator, one can reduce by a factor 2 the operation count of both direct and reverse
+transforms.
+
+\section opt_polar Polar optimization
+
+A less common, but still classic optimization : high m's spherical harmonics have their magnitude descrease exponentially
+when aproaching the poles. SHTns use a threshold below which the SH is take to be zero.
+You can choose this threshold, with the \c eps parameter of the \ref init_SH function, trading some accuracy for more speed.
+Around 5% to 15% speed increase are typical values for a SHT with a large \ref MMAX.
+
+\section opt_cache Cache optimizations
+
+Cache optimizations have been carried out throughout the code.
+This means ordering coefficients and stripping out systematic zeros.
+
+\section opt_dct Discrete Cosine Transform optimization
+
+This is a non-trivial optimization mostly efficient on small m's,
+which can decrease the operation count.
+
+It can be noticed that Spherical Harmonics are polynomials 
+of order \f$ l \f$ in \f$ \cos \theta \f$ (multiplied by \f$ \sin \theta \f$ for odd m's).
+Thus, going to DCT space and summing there can help to further reduce the number of operations.
+
+Using a DCT requires a regular grid instead of the usual Gauss grid, and this
+means doubling the number of grid points to keep an equally accurate quadrature (Tchebychev quadrature), reducing
+the performance gain from DCT to zero, when not performing worse.
+
+However, we managed using a Gauss-Legendre quadrature together with an equally spaced grid,
+using only one more grid-point as the classical Gauss-Legendre quadrature.
+This allows SHTns to efficiently use the DCT optimization, but also to use regular grids with
+almost half the grid points.
+
+To put it another way, SHTns performs a Gauss-Legendre quadrature on a regular grid.
+This do work well but ther is a significant loss of accuracy due to round-off errors
+(as an example, relative errors with DCT are around \c 1.e-11 instead of \c 1.e-13 without)
+If you can live with it, the DCT-based algorithm performs much faster on small m's :
+twice as fast for axisymmetric transforms, and between 1.5 and 1.2 times faster on non-axisymmetric ones.
+
+Note also that the DCT algorithm, while beeing usually faster, requires significantly larger init time. It
+is then suitable for performing many transforms (as in a direct numerical simulations).
+
+<b>Warning : this is still at the research stage (beta), you should use with caution and test before production use.</b>
+
+\section opt_runtime Runtime tuning of algorithm
+
+The default mode used by SHTns is to measure performance of the different algorithms, and choose
+the one that performs best.
+However, there are situation where either the Gauss-Legendre algorithm or a regular grid is required, and you
+can choose to do so using the adequate \ref shtns_type when calling \ref init_SH.
+
+
 
 */

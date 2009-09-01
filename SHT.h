@@ -73,12 +73,12 @@ extern long int *lmidx;
 #endif
 
 // useful values for some basic spherical harmonic representations
-/// Y00_1 = \f$ 1/Y00 = \sqrt{4 \pi} \f$ spherical harmonic representation of 1 (l=0,m=0)
+/// Y00_1 = \f$ 1/Y_0^0 = \sqrt{4 \pi} \f$ spherical harmonic representation of 1 (l=0,m=0)
 #define Y00_1 sqrt(4.*M_PI)
-/// Y10_ct = \f$ 1/Y10 = \sqrt{4 \pi /3} \f$ spherical harmonic representation of cos(theta) (l=1,m=0)
+/// Y10_ct = \f$ \cos\theta/Y_1^0 = \sqrt{4 \pi /3} \f$ spherical harmonic representation of cos(theta) (l=1,m=0)
 #define Y10_ct sqrt(4.*M_PI/3.)
-/// Y11_st = \f$ 1/Y11 = \sqrt{2 \pi /3} \f$ spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
-#define Y11_st sqrt(2.*M_PI/3.)
+/// Y11_st = \f$ \sin\theta\cos\phi/(Y_1^1 + Y_1^{-1}) = \sqrt{2 \pi /3} \f$ spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
+#define Y11_st -sqrt(2.*M_PI/3.)
 
 /// different SHT types and algorithms
 enum shtns_type {

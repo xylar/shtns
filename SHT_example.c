@@ -23,9 +23,10 @@ int main()
 	complex double *Slm, *Tlm;	// spherical harmonics l,m space
 	double *Sh, *Th;		// real space : theta,phi
 	long int i,im,lm;
+	double t;
 
 //	init_SH(shtns_type, eps,         lmax, mmax, mres, nlat, nphi);
-	init_SH( sht_gauss, POLAR_OPT_THR, 340, 3,    5,   512,  12 );
+	init_SH( sht_gauss, POLAR_OPT_THR, 11, 3,    1,   16,  12 );
 
 // allocate spatial fields.
 	Sh = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double));
@@ -42,9 +43,13 @@ int main()
 							Slm[lm] = 0.0;	Tlm[lm] = 0.0;
 						} */
 
-	Slm[LM(1,1)] = 1;				// access to SH coefficient
-	Slm[LiM(1,0)] = Y10_ct;
+	Slm[LM(1,1)] = Y11_st;				// access to SH coefficient
+//	Slm[LiM(1,0)] = Y10_ct;
 	SH_to_spat(Slm,Sh);
+
+// compute value of SH expansion at a given physical point.
+	t = SH_to_point(Slm, ct[NLAT/3], 2.*M_PI/(MRES*NPHI));
+	printf("check if SH_to_point coincides with SH_to_spat : %f = %f\n",t,Sh[NLAT/3 + NLAT]);
 
 	write_mx("spat",Sh,NPHI,NLAT);
 	SHsphtor_to_spat(Slm,Tlm,Sh,Th);		// vector transform
