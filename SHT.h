@@ -82,11 +82,12 @@ extern long int *lmidx;
 
 /// different SHT types and algorithms
 enum shtns_type {
-	sht_gauss,	///< use gaussian grid and quadrature. highest accuracy.
+	sht_gauss,	///< use <b>gaussian grid</b> and quadrature. highest accuracy.
 	sht_auto,	///< use a regular grid if dct is faster with goog accuracy, otherwise defaults to gauss.
-	sht_reg_fast,	///< use fastest algorithm, on a regular grid, mixing dct and regular quadrature.
-	sht_reg_dct,	///< use pure dct algorithm, on a regular grid.
-	sht_reg_poles	///< use a synthesis only algo including poles, not suitable for computations.
+	sht_reg_fast,	///< use fastest algorithm, on a <b>regular grid</b>, mixing dct and regular quadrature.
+	sht_reg_dct,	///< use pure dct algorithm, on a <b>regular grid</b>.
+	sht_quick_init, ///< gauss grid, with minimum initialization time (useful for pre/post-processing)
+	sht_reg_poles	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. \ref NLAT odd is supported even if \link compil SHT_NLAT_EVEN \endlink is defined, useful for vizualisation.
 };
 
 // FUNCTIONS //

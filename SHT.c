@@ -5,13 +5,13 @@
 
 /// \file SHT.c main source file for SHTns.
 
-/// FLAGS ///
+/* FLAGS */
 //#define SHT_DEBUG
 //#define SHT_AXISYM
 //#define SHT_NO_DCT
 #define SHT_NLAT_EVEN
 //#define SHT_EO
-///
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,14 +26,16 @@
 // cycle counter from FFTW
 #include "cycle.h"
 
-/// supported types of sht's
+// supported types of sht's
 enum shtns_type {
 	sht_gauss,	// use gaussian grid and quadrature. highest accuracy.
 	sht_auto,	// use a regular grid if dct is faster with goog accuracy, otherwise defaults to gauss.
 	sht_reg_fast,	// use fastest algorithm, on a regular grid, mixing dct and regular quadrature.
 	sht_reg_dct,	// use pure dct algorithm, on a regular grid.
+	sht_quick_init,	// gauss grid, with minimum init time (useful for pre/post-processing).
 	sht_reg_poles	// use a synthesis only algo including poles, not suitable for computations.
 };
+
 /*
 struct SHTdef {
 	long int nlm;
@@ -1246,7 +1248,7 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 	if ((NLAT_2)*2 <= LMAX) runerr("[SHTns] NLAT_2*2 should be at least LMAX+1");
 	if (MRES <= 0) runerr("[SHTns] MRES must be > 0");
 #ifdef SHT_NLAT_EVEN
-	if (NLAT & 1) runerr("[SHTns] NLAT must be even.");
+	if ((NLAT & 1)&&(flags != sht_reg_poles)) runerr("[SHTns] NLAT must be even.");
 #endif
 
 	alloc_SHTarrays();	// allocate dynamic arrays
@@ -1294,6 +1296,13 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 		dzlm[0] = NULL;		zlm[0] = NULL;		// mark as unused.
 		EqualPolarGrid();
 		init_SH_synth();
+		OptimizeMatrices(eps);
+	}
+	if (flags == sht_quick_init)
+	{
+		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init
+		MTR_DCT = -1;		// we do not use DCT !!!
+		init_SH_gauss();
 		OptimizeMatrices(eps);
 	}
 

@@ -32,10 +32,10 @@ type \c make to compile SHTns. It will produce the object file SHT.o
 \section cflags Compilation flags and options
 
 These symbol can be defined at compile time :
-\li \c SHT_NO_DCT : disables DCT at compile time (smaller, simpler and maybe faster code for gauss SHT)
-\li \c SHT_AXISYM : axysimmetric version of SHTns (m=0 only), which is supposed to be a little faster than setting MMAX=0 at runtime.
-\li \c SHT_NLAT_EVEN : only NLAT even is supported (removes some code and conditional jumps, so it runs (slightly) faster)
-\li \c SHT_DEBUG : prints additional debug information.
+ - \c SHT_NO_DCT : disables DCT at compile time (smaller, simpler and maybe faster code for gauss SHT)
+ - \c SHT_AXISYM : axysimmetric version of SHTns (m=0 only), which is supposed to be a little faster than setting MMAX=0 at runtime.
+ - \c SHT_NLAT_EVEN : only \ref NLAT \b even is supported for analysis (spatial to SH). This is the default, it removes some code and conditional jumps, so it runs (slightly) faster.
+ - \c SHT_DEBUG : prints additional debug information.
 
 */
 
@@ -50,13 +50,13 @@ These symbol can be defined at compile time :
 The angular coordinates on a spherical shell are the co-latitude \f$ \theta \f$ and the longitude \f$ \phi \f$.
 
 A field \e A (or one of its component in case of a vector field) is discretized on an ordered grid, which consists of
-\li \ref NPHI equally spaced nodes in longitude, spanning the range of angle between 0 and \f$2\pi\f$/\ref MRES,
-\li \ref NLAT gauss nodes or equally spaced nodes (depending on \ref shtns_type) in latitude, spanning angles from 0 to \f$ \pi \f$.
+ - \ref NPHI equally spaced nodes in longitude, spanning the range of angle between 0 and \f$2\pi\f$/\ref MRES,
+ - \ref NLAT gauss nodes or equally spaced nodes (depending on \ref shtns_type) in latitude, spanning angles from 0 to \f$ \pi \f$.
 
 Identifying a grid point with its indices \c it and \c ip in latitudinal and longitudinal direction respectively, one has :
-\li \f$ \theta \f$ = \c acos(ct[it])
-\li \f$ \phi \f$ = \c ip * 2\f$\pi\f$/(NPHI*MRES)
-\li \f$ A(\theta,\phi) \f$ = \c A[ip*NLAT + it]
+ - \f$ \theta \f$ = \c acos(ct[it])
+ - \f$ \phi \f$ = \c ip * 2\f$\pi\f$/(NPHI*MRES)
+ - \f$ A(\theta,\phi) \f$ = \c A[ip*NLAT + it]
 
 \subsection Allocation
 One must be careful when allocating spatial data, as the Fourier transform requires some aditional space.\n Precisely, the number
@@ -76,8 +76,8 @@ and only order that are multiple of \ref MRES are described.
 
 The \ref NLM coefficients Alm are stored in a one-dimensional array, grouped by \e m.\n
 The details of the storage may depend on the algorithm, and to access a particular coefficient, you should always use the following macros :
-\li \ref LM(l,m) gives the index in the array for coefficient of degree \e l and order \e m.
-\li \ref LiM(l,im) gives the index in the array for coefficient of degree \e l and order \e im*MRES.
+ - \ref LM(l,m) gives the index in the array for coefficient of degree \e l and order \e m.
+ - \ref LiM(l,im) gives the index in the array for coefficient of degree \e l and order \e im*MRES.
 
 Hence \c Alm[LM(l,m)] is the SH coefficient of degree \e l and order \e m.
 
@@ -103,9 +103,9 @@ The spherical harmonics used in SHTns use the same normalization as the GSL, whi
 Function \ref SH_to_point gives an explicit implementation of the reverse SH transform (analysis).
 
 A few useful examples :
-\li a constant unit value on the sphere is represented by the coefficient \f$ c_0^0 = \sqrt{4\pi} \f$.
-\li \f$ \cos \theta \f$ is represented by the coefficient \f$ c_1^0 = \sqrt{4\pi/3} \f$.
-\li \f$ \cos \theta \, \sin \phi \f$ is represented by \f$ c_1^1 =  -\sqrt{2\pi/3} \f$.
+ - a constant unit value on the sphere is represented by the coefficient \f$ c_0^0 = \sqrt{4\pi} \f$.
+ - \f$ \cos \theta \f$ is represented by the coefficient \f$ c_1^0 = \sqrt{4\pi/3} \f$.
+ - \f$ \cos \theta \, \sin \phi \f$ is represented by \f$ c_1^1 =  -\sqrt{2\pi/3} \f$.
 
 The corresponding defined constants \ref Y00_1, \ref Y10_ct and \ref Y11_st will help to build simple
 spectral fields.
