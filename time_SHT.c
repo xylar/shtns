@@ -1,10 +1,13 @@
-// base flow. Cartesien spectral.
+/// \file time_SHT.c This program performs some spherical harmonic transforms, and displays timings and accuracy.
+/// \c make \c time_SHT to compile, and then run.
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <complex.h>
 #include <math.h>
 #include <time.h>
+#include <fftw3.h>
+
 // cycle counter from FFTW
 #include "cycle.h"
 
@@ -14,11 +17,8 @@ complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
 complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
-// polar optimization threshold
-#define POLAR_OPT_THR 1e-6
-//#define POLAR_OPT_THR 0
 // number of SH iterations
-#define SHT_ITER 50
+long int SHT_ITER = 50;		// do 50 iterations by default
 
 	
 void write_vect(char *fn, double *vec, int N)
@@ -50,7 +50,7 @@ void write_mx(char *fn, double *mx, int N1, int N2)
 
 int test_SHT()
 {
-	int jj,i;
+	long int jj,i, nlm_cplx;
 	double tmax,t,n2;
 	clock_t tcpu;
 
@@ -69,10 +69,11 @@ int test_SHT()
 	tcpu = clock() - tcpu;
 	printf("   2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
 
+	nlm_cplx = (MMAX*2 == NPHI) ? LiM(MRES*MMAX,MMAX) : NLM;
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
-		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+		if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
 			Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
 		} else {
@@ -188,23 +189,57 @@ int test_SHT_vect()
 	return (int) tcpu;
 }
 
-
-int main()
+void usage()
 {
+	printf("\nUsage: time_SHT lmax [options] \n");
+	printf("        where lmax is the maxiumum spherical harmonic degree.\n");
+	printf("** available options :\n");
+	printf(" -mmax=<mmax> : defines the maximum spherical harmonic order <mmax>\n");
+	printf(" -nphi=<nphi> : defines the number of azimutal (longitude) point\n");
+	printf(" -nlat=<nlat> : defines the number of grid points in theta (latitude)\n");
+	printf(" -mres=<mres> : the azimutal periodicity (1 for no symmetry; 2 for two-fold symmetry, ...)\n");
+	printf(" -polaropt=<thr> : set the threshold for polar optimization. 0 for no polar optimization, 1.e-6 for agressive.\n");
+	printf(" -iter=<n> : set the number of back-and-forth transforms to compute timings and errors.\n");
+	printf(" -gauss : force gauss grid\n");
+}
+
+int main(int argc, char *argv[])
+{
+	int lmax,mmax,mres,nlat,nphi;
 	complex double t1, t2;
 	double t,tmax,n2;
 	int i,im,m,l,jj, m_opt;
 	clock_t tcpu;
 	ticks tik0, tik1;
 	double e0,e1;
+	double polaropt = 1.e-6;		// an aggressive default for polar optimization.
+	enum shtns_type shtmode = sht_auto;		// default to "auto" (fastest) mode.
+	char name[20];
 
 	srand( time(NULL) );	// initialise les nombres.
-#ifndef SHT_AXISYM
-	//                          ... lmax,mmax,mres, nlat, nphi );
-	init_SH( sht_auto, POLAR_OPT_THR, 340, 3, 5,  512, 12 );
-#else
-	init_SH( sht_auto, POLAR_OPT_THR, 681, 0, 1,  1024, 1 );
-#endif
+
+	printf("time_SHT performs some spherical harmonic transforms, and displays timings and accuracy.\n");
+	if (argc < 2) {
+		usage();	exit(1);
+	}
+
+//	first argument is lmax, and is mandatory.
+	sscanf(argv[1],"%lf",&t);	lmax=t;
+	mmax=lmax;	mres=1;	nlat=lmax+2+(lmax&1);	nphi=(mmax+1)*2;		//defaults
+
+	for (i=2; i<argc; i++) {		// parse command line
+		sscanf(argv[i],"-%[^=]=%lf",name,&t);
+		if (strcmp(name,"mmax") == 0) mmax = t;
+		if (strcmp(name,"mres") == 0) mres = t;
+		if (strcmp(name,"nlat") == 0) nlat = t;
+		if (strcmp(name,"nphi") == 0) nphi = t;
+		if (strcmp(name,"polaropt") == 0) polaropt = t;
+		if (strcmp(name,"iter") == 0) SHT_ITER = t;
+		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
+		if (strcmp(name,"reg") == 0) shtmode = sht_reg_fast;	// force regular grid.
+	}
+
+	init_SH(shtmode, polaropt, lmax, mmax, mres, nlat, nphi);
 	m_opt = Get_MTR_DCT();
 
 	t1 = 1.0+2.0*I;

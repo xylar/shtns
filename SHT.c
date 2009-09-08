@@ -26,6 +26,11 @@
 // cycle counter from FFTW
 #include "cycle.h"
 
+/// Minimum performance improve for DCT in sht_auto mode. If not atained, we switch back to gauss.
+#define MIN_PERF_IMPROVE_DCT 0.95
+/// Try to enforce at least this accuracy for DCT in sht_auto mode.
+#define MIN_ACCURACY_DCT 1.e-8
+
 // supported types of sht's
 enum shtns_type {
 	sht_gauss,	// use gaussian grid and quadrature. highest accuracy.
@@ -84,8 +89,6 @@ struct VSHTdef {
 }
 */
 
-// Minimum performance improve for DCT in sht_auto mode.
-#define MIN_PERF_IMPROVE_DCT 0.95
 
 // parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
 long int LMAX = -1;	// maximum degree (LMAX) of spherical harmonics.
@@ -100,6 +103,9 @@ long int NLAT, NLAT_2;	// number of spatial points in Theta direction (latitude)
 #endif
 long int NLM = 0;	// total number of (l,m) spherical harmonics components.
 long int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
+
+// number of double that have to be allocated for a spatial field (includes reserved space)
+#define NSPAT_ALLOC (NLAT*(NPHI/2+1)*2)
 
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
@@ -451,7 +457,7 @@ void GaussNodes(long double *x, long double *w, int n)
 
 // as we started with initial guesses, we should check if the gauss points are actually unique.
 	for (i=m-1; i>0; i--) {
-		if (x[i] == x[i-1]) runerr("bad gauss points\n");
+		if (x[i] == x[i-1]) runerr("bad gauss points");
 	}
 
 #ifdef SHT_DEBUG
@@ -482,7 +488,7 @@ void EqualPolarGrid()
 		st[j] = sinl(f*j);
 		st_1[j] = 1.0/sinl(f*j);
 	}
-	printf("       !! Warning : only synthesis (inverse transform) supported so far for this grid !\n");
+	printf("     !! Warning : only synthesis (inverse transform) supported so far for this grid !\n");
 }
 
 
@@ -507,7 +513,7 @@ void planFFT()
 	printf("        using FFTW : Mmax=%d, Nphi=%d\n",MMAX,NPHI);
 
 	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
-	if (NPHI < 3*MMAX) printf("       !! Warning : 2/3 rule for anti-aliasing not met !\n");
+	if (NPHI < 3*MMAX) printf("     !! Warning : 2/3 rule for anti-aliasing not met !\n");
 //	if (NPHI < 2) runerr("[FFTW] compile with SHT_AXISYM defined to have NPHI=1 and MMAX=0");
 	
 // IFFT : unnormalized.
@@ -1184,11 +1190,13 @@ void init_SH_dct()
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
 
+/// return the max error for a back-and-forth SHT transform.
+/// \param[in] disp : 1 = print more informations about accuracy, 0 = silent.
 double SHT_error()
 {
 	complex double *Tlm0, *Slm0, *Tlm, *Slm, *ShF, *ThF;
-	double t;
-	long int i;
+	double t, tmax, n2,  err;
+	long int i, jj, nlm_cplx;
 	
 	srand( time(NULL) );	// init random numbers.
 	
@@ -1196,21 +1204,56 @@ double SHT_error()
 	Slm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	ShF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double) );
-	ThF = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double) );
-		
+	ShF = (complex double *) fftw_malloc( NSPAT_ALLOC * sizeof(double) );
+	ThF = (complex double *) fftw_malloc( NSPAT_ALLOC * sizeof(double) );
+
+// m = nphi/2 is also real if nphi is even.
+	nlm_cplx = ( MMAX*2 == NPHI ) ? LiM(MRES*MMAX,MMAX) : NLM;
 	t = 1.0 / (RAND_MAX/2);
-	for (i=0;i<NLM;i++) {		// random state
-		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
-		Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+	for (i=0; i<NLM; i++) {
+		if ((i<=LMAX)||(i>=nlm_cplx)) {		// m=0 or m*2=nphi : real random data
+			Slm0[i] = t*((double) (rand() - RAND_MAX/2));
+			Tlm0[i] = t*((double) (rand() - RAND_MAX/2));
+		} else {							// m>0 : complex random data
+			Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+			Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		}
 	}
 
 	SH_to_spat(Slm0,ShF);		// scalar SHT
 	spat_to_SH(ShF, Slm);
-	
-	SHsphtor_to_spat(Slm0, Tlm0, ShF, ThF);		// vector SHT
-	spat_to_SHsphtor(ShF, ThF, Slm0, Tlm0);
+	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
+		t = cabs(Slm[i] - Slm0[i]);
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	err = tmax;
+#ifdef SHT_DEBUG
+	printf("        scalar SH - poloidal   rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
+#endif
 
+	Slm0[0] = 0.0; 	Tlm0[0] = 0.0;		// l=0, m=0 n'a pas de signification sph/tor
+	SHsphtor_to_spat(Slm0, Tlm0, ShF, ThF);		// vector SHT
+	spat_to_SHsphtor(ShF, ThF, Slm, Tlm);
+	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
+		t = cabs(Slm[i] - Slm0[i]);
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	if (tmax > err) err = tmax;
+#ifdef SHT_DEBUG
+	printf("        vector SH - spheroidal rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
+#endif
+	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
+		t = cabs(Tlm[i] - Tlm0[i]);
+		n2 += t*t;
+		if (t>tmax) { tmax = t; jj = i; }
+	}
+	if (tmax > err) err = tmax;
+#ifdef SHT_DEBUG
+	printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
+#endif
+	return(err);		// return max error.
 }
 
 #ifndef _HGID_
@@ -1257,6 +1300,18 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 
 	if (2*NLAT <= 3*LMAX) printf("     !! Warning : anti-aliasing condition in theta direction not met.\n");
 
+// Additional arrays init :
+	for (im=0, lm=0; im<=MMAX; im++) {
+		m = im*MRES;
+		lmidx[im] = lm -m;		// virtual pointer for l=0
+		for (l=im*MRES;l<=LMAX;l++) {
+			el[lm] = l;	l2[lm] = l*(l+1.0);	l_2[lm] = 1.0/(l*(l+1.0));
+			li[lm] = l;
+			lm++;
+		}
+	}
+	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.
+
 #ifndef SHT_NO_DCT
 	if (flags == sht_reg_dct) {	// pure dct.
 		init_SH_dct();
@@ -1269,14 +1324,25 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 		OptimizeMatrices(eps);
 		printf("finding optimal MTR_DCT ...\r");	fflush(stdout);
 		t = Find_Optimal_SHT();
-		printf("        + optimal MTR_DCT = %d\n", MTR_DCT*MRES);
-		if ( (flags == sht_auto)&&( (MTR_DCT == -1)||(t > MIN_PERF_IMPROVE_DCT) ) ) {	// switch to gauss grid : better precision.
-			flags = sht_gauss;
+		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
+		if (t > MIN_PERF_IMPROVE_DCT) {
+			Set_MTR_DCT(-1);		// turn off DCT.
+		} else {
+			t = SHT_error();
+			if (t > MIN_ACCURACY_DCT) {
+				printf("     !! Not enough accuracy (%.3g) => turning off DCT.\n",t);
+				Set_MTR_DCT(-1);		// turn off DCT.
+			}
+		}
+		if (MTR_DCT == -1) {			// free memory used by DCT.
 			fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);	fftw_free(ykm_dct[0]);		// free now useless arrays.
 			zlm_dct0 = NULL;
 			if (idct != NULL) fftw_destroy_plan(idct);	// free unused dct plans
 			if (dctm0 != NULL) fftw_destroy_plan(dctm0);
-			printf("        => switching back to Gauss Grid for higher accuracy.\n");
+			if (flags == sht_auto) {
+				flags = sht_gauss;		// switch to gauss grid, even better accuracy.
+				printf("        => switching back to Gauss Grid for higher accuracy.\n");
+			}
 		}
 	}
 	if (flags == sht_gauss)
@@ -1306,15 +1372,9 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 		OptimizeMatrices(eps);
 	}
 
-// Additional arrays init :
-	for (im=0, lm=0; im<=MMAX; im++) {
-		m = im*MRES;
-		lmidx[im] = lm -m;		// virtual pointer for l=0
-		for (l=im*MRES;l<=LMAX;l++) {
-			el[lm] = l;	l2[lm] = l*(l+1.0);	l_2[lm] = 1.0/(l*(l+1.0));
-			li[lm] = l;
-			lm++;
-		}
+	if ((flags != sht_reg_poles)&&(flags != sht_quick_init)) {
+		t = SHT_error();		// compute SHT accuracy.
+		printf("        + SHT accuracy = %.3g\n",t);
+		if (t > 1.e-3) runerr("bad SHT accuracy");		// stop if something went wrong.
 	}
-	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.
 }

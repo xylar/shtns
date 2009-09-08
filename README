@@ -100,7 +100,7 @@ The spherical harmonics used in SHTns use the same normalization as the GSL, whi
 
 \f[ Y_l^m(\theta, \phi) = \sqrt{\frac{2l+1}{4\pi}} \sqrt{\frac{(l-m)!}{(l+m)!}} \, P_l^m(\cos \theta) \, \exp(im\phi) \f]
 
-Function \ref SH_to_point gives an explicit implementation of the reverse SH transform (analysis).
+Function \ref SH_to_point gives an explicit implementation of the inverse SH transform (synthesis).
 
 A few useful examples :
  - a constant unit value on the sphere is represented by the coefficient \f$ c_0^0 = \sqrt{4\pi} \f$.
@@ -173,7 +173,7 @@ is then suitable for performing many transforms (as in a direct numerical simula
 \section opt_runtime Runtime tuning of algorithm
 
 The default mode used by SHTns is to measure performance of the different algorithms, and choose
-the one that performs best.
+the one that performs best (it will also check that the accuracy is good enough).
 However, there are situation where either the Gauss-Legendre algorithm or a regular grid is required, and you
 can choose to do so using the adequate \ref shtns_type when calling \ref init_SH.
 
