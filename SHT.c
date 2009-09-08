@@ -6,12 +6,13 @@
 /// \file SHT.c main source file for SHTns.
 
 /* FLAGS */
-//#define SHT_DEBUG
 //#define SHT_AXISYM
 //#define SHT_NO_DCT
 #define SHT_NLAT_EVEN
 //#define SHT_EO
 
+/// 0:no output, 1:output info to stdout, 2:more output (debug info)
+#define SHT_VERBOSE 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -391,7 +392,7 @@ void alloc_SHTarrays()
 		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m);
 		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -m);
 	}
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
 #endif
 }
@@ -428,7 +429,9 @@ void GaussNodes(long double *x, long double *w, int n)
 
 #ifdef _SHT_EO_
 	n *=2;
+  #if SHT_VERBOSE > 0
 	printf(" Even/odd separation, n=%d\n",n);
+  #endif
 #endif
 	m = (n+1)/2;
 	for (i=1;i<=m;i++) {
@@ -457,10 +460,10 @@ void GaussNodes(long double *x, long double *w, int n)
 
 // as we started with initial guesses, we should check if the gauss points are actually unique.
 	for (i=m-1; i>0; i--) {
-		if (x[i] == x[i-1]) runerr("bad gauss points");
+		if (x[i] == x[i-1]) runerr("[SHTns] bad gauss points");
 	}
 
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 // test integral to compute :
 	z = 0;
 	for (i=0;i<m;i++) {
@@ -476,7 +479,9 @@ void EqualPolarGrid()
 	long double f;
 	long double pi = M_PI;
 
+#if SHT_VERBOSE > 0
 	printf("        => using Equaly Spaced Nodes including poles\n");
+#endif
 // cos theta of latidunal points (equaly spaced in theta)
 #ifndef _SHT_EO_
 	f = pi/(NLAT-1.0);
@@ -488,7 +493,9 @@ void EqualPolarGrid()
 		st[j] = sinl(f*j);
 		st_1[j] = 1.0/sinl(f*j);
 	}
+#if SHT_VERBOSE > 0
 	printf("     !! Warning : only synthesis (inverse transform) supported so far for this grid !\n");
+#endif
 }
 
 
@@ -501,7 +508,7 @@ void planFFT()
 	fftw_r2r_kind r2r_kind;
 	fftw_iodim dims, hdims[2];
 
-    if (NPHI>1) {
+  if (NPHI>1) {
 	nfft = NPHI;
 	ncplx = NPHI/2 +1;
 	nreal = 2*ncplx;
@@ -509,11 +516,11 @@ void planFFT()
 // Allocate dummy Spatial Fields.
 	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
 	Sh = (double *) ShF;
-
+#if SHT_VERBOSE > 0
 	printf("        using FFTW : Mmax=%d, Nphi=%d\n",MMAX,NPHI);
-
-	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
 	if (NPHI < 3*MMAX) printf("     !! Warning : 2/3 rule for anti-aliasing not met !\n");
+#endif
+	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
 //	if (NPHI < 2) runerr("[FFTW] compile with SHT_AXISYM defined to have NPHI=1 and MMAX=0");
 	
 // IFFT : unnormalized.
@@ -528,10 +535,11 @@ void planFFT()
 
 //	fft_norm = 1.0/nfft;
 	fftw_free(ShF);
-//	printf("       done.\n");
-    } else {
+  } else {
+#if SHT_VERBOSE > 0
 	printf("        => no fft for NPHI=1.\n");
-    }
+#endif
+  }
 	dctm0 = NULL;	idct = NULL;		// set dct plans to uninitialized.
 }
 
@@ -619,7 +627,7 @@ int Get_MTR_DCT() {
 			SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
 		}
 		tik1 = getticks();
-	#ifdef SHT_DEBUG
+	#if SHT_VERBOSE > 1
 		printf("m=%d - ticks : %.3f\n", m*MRES, elapsed(tik1,tik0)/(nloop*NLM*NLAT));
 	#endif
 		return elapsed(tik1,tik0);
@@ -646,7 +654,7 @@ double Find_Optimal_SHT()
         nloop = 10;                     // number of loops to get time.
         if (NLM*NLAT > 1024*1024)
                 nloop = 1 + (10*1024*1024)/(NLM*NLAT);          // don't use too many loops for large transforms.
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	printf("\nminc = %d, nloop = %d\n",minc,nloop);
 #endif
 
@@ -692,8 +700,10 @@ void OptimizeMatrices(double eps)
 				if (tm[im] > it) tm[im] = it;
 			}
 		}
+#if SHT_VERBOSE > 0
 		printf("        + polar optimization threshold = %.1e\n",eps);
-#ifdef SHT_DEBUG
+#endif
+#if SHT_VERBOSE > 1
 		printf("          tm[im]=");
 		for (im=0;im<=MMAX;im++)
 			printf(" %d",tm[im]);
@@ -770,8 +780,9 @@ void init_SH_gauss()
 #ifdef _SHT_EO_
 	iylm_fft_norm *= 2.0;	// normation must be multiplied by 2.
 #endif
-
+#if SHT_VERBOSE > 0
 	printf("        => using Gauss Nodes\n");
+#endif
 	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
 		ct[it] = xg[it];
@@ -779,7 +790,7 @@ void init_SH_gauss()
 		st_1[it] = 1.0/sqrtl(1.0 - xg[it]*xg[it]);
 	}
 
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
 // TEST if gauss points are ok.
 	tmax = 0.0;
@@ -845,17 +856,18 @@ void init_SH_dct()
 #ifdef _SHT_EO_
 	iylm_fft_norm *= 2.0;	// normation must be multiplied by 2.
 #endif
+#if SHT_VERBOSE > 0
+	printf("        => using Equaly Spaced Nodes with DCT acceleration\n");
+#endif
 	if ((NLAT_2)*2 <= LMAX+1) runerr("[SHTns] NLAT_2*2 should be at least LMAX+2 (DCT)");
 	if (NLAT & 1) runerr("[SHTns] NLAT must be even (DCT)");
-	
-	printf("        => using Equaly Spaced Nodes with DCT acceleration\n");
 	for (it=0; it<NLAT; it++) {	// Chebychev points : equaly spaced but skipping poles.
 		long double th = M_PI*(it+0.5)/NLAT;
 		ct[it] = cosl(th);
 		st[it] = sinl(th);
 		st_1[it] = 1.0/sinl(th);
 	}
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
 	if (NLAT_2 < 100) {
 		printf("          DCT nodes :");
@@ -882,7 +894,7 @@ void init_SH_dct()
 		it += (2*NLAT_2 -l);
 	}
 
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
 #endif
 	ykm_dct[0] = (double *) fftw_malloc(sizeof(double)* sk);
@@ -958,7 +970,7 @@ void init_SH_dct()
 			fftw_execute(dct);
 			fftw_execute_r2r(dct, dZt, dZt);
 			fftw_execute_r2r(dct, dZp, dZp);
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 			if (LMAX <= 12) {
 				printf("\nl=%d, m=%d ::\t", l,m);
 				for(it=0;it<2*NLAT_2;it++) printf("%f ",Z[it]);
@@ -1031,7 +1043,7 @@ void init_SH_dct()
 			T0 = T1;	T1 = T2;
 		}
 	}
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	for (it=0, tsum=0.0; it<NLAT_2; it++) {
 		t = fabsl(xg[it]*xg[it] + sg[it]*sg[it] -1.0);
 		if (t > tsum) tsum=t;
@@ -1059,7 +1071,9 @@ void init_SH_dct()
 	// zlm in DCT space
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
+#if SHT_VERBOSE > 0
 		printf("computing weights m=%d\r",m);	fflush(stdout);
+#endif
 		for (it=0; it<NLAT_2; it++) {	// compute Plm's at gauss nodes.
 			gsl_sf_legendre_sphPlm_deriv_array( LMAX, m, xg[it], &yg[it*(LMAX+1)], &dygt[it*(LMAX+1)] );
 			if (m & 1) {	// m odd
@@ -1101,7 +1115,7 @@ void init_SH_dct()
 			dZp[k] = dpsum * iylm_fft_norm/(NLAT_2 *l*(l+1));
 			if (l==0) { dZp[k] = 0.0; }
 		}
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 		if (max/min > 1.e14) {
 //			printf("\nl=%d, m=%d :: min=%g, max=%g, ratio=%g\t",l,m,min,max,max/min);
 		}
@@ -1116,7 +1130,7 @@ void init_SH_dct()
 			dZt[k] = dtsum * iylm_fft_norm/(NLAT_2 *l*(l+1));
 			if (l==0) { dZt[k] = 0.0; }
 		}
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 		if (max/min > 1.e14) {
 //			printf("\nl=%d, m=%d :: (d/dt) min=%g, max=%g, ratio=%g\t",l,m,min,max,max/min);
 		}
@@ -1228,7 +1242,7 @@ double SHT_error()
 		if (t>tmax) { tmax = t; jj = i; }
 	}
 	err = tmax;
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	printf("        scalar SH - poloidal   rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
 #endif
 
@@ -1241,7 +1255,7 @@ double SHT_error()
 		if (t>tmax) { tmax = t; jj = i; }
 	}
 	if (tmax > err) err = tmax;
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	printf("        vector SH - spheroidal rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
 #endif
 	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
@@ -1250,7 +1264,7 @@ double SHT_error()
 		if (t>tmax) { tmax = t; jj = i; }
 	}
 	if (tmax > err) err = tmax;
-#ifdef SHT_DEBUG
+#if SHT_VERBOSE > 1
 	printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
 #endif
 	return(err);		// return max error.
@@ -1284,9 +1298,10 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 	LMAX = lmax;	NLAT_2 = (nlat+1)/2;
 	NLAT = nlat;
 	NLM = nlm_calc(LMAX,MMAX,MRES);
-
+  #if SHT_VERBOSE > 0
 	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
 	printf("        Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
+  #endif
 	if (MMAX*MRES > LMAX) runerr("[SHTns] MMAX*MRES should not exceed LMAX");
 	if ((NLAT_2)*2 <= LMAX) runerr("[SHTns] NLAT_2*2 should be at least LMAX+1");
 	if (MRES <= 0) runerr("[SHTns] MRES must be > 0");
@@ -1297,9 +1312,9 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 	alloc_SHTarrays();	// allocate dynamic arrays
 	planFFT();		// initialize fftw
 	zlm_dct0 = NULL;	// used as a flag.
-
+  #if SHT_VERBOSE > 0
 	if (2*NLAT <= 3*LMAX) printf("     !! Warning : anti-aliasing condition in theta direction not met.\n");
-
+  #endif
 // Additional arrays init :
 	for (im=0, lm=0; im<=MMAX; im++) {
 		m = im*MRES;
@@ -1322,15 +1337,21 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 	{
 		init_SH_dct();
 		OptimizeMatrices(eps);
+  #if SHT_VERBOSE > 0
 		printf("finding optimal MTR_DCT ...\r");	fflush(stdout);
+  #endif
 		t = Find_Optimal_SHT();
+  #if SHT_VERBOSE > 0
 		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
+  #endif
 		if (t > MIN_PERF_IMPROVE_DCT) {
 			Set_MTR_DCT(-1);		// turn off DCT.
 		} else {
 			t = SHT_error();
 			if (t > MIN_ACCURACY_DCT) {
+  #if SHT_VERBOSE > 0
 				printf("     !! Not enough accuracy (%.3g) => turning off DCT.\n",t);
+  #endif
 				Set_MTR_DCT(-1);		// turn off DCT.
 			}
 		}
@@ -1341,7 +1362,9 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 			if (dctm0 != NULL) fftw_destroy_plan(dctm0);
 			if (flags == sht_auto) {
 				flags = sht_gauss;		// switch to gauss grid, even better accuracy.
+  #if SHT_VERBOSE > 0
 				printf("        => switching back to Gauss Grid for higher accuracy.\n");
+  #endif
 			}
 		}
 	}
@@ -1374,7 +1397,9 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 
 	if ((flags != sht_reg_poles)&&(flags != sht_quick_init)) {
 		t = SHT_error();		// compute SHT accuracy.
+  #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);
-		if (t > 1.e-3) runerr("bad SHT accuracy");		// stop if something went wrong.
+  #endif
+		if (t > 1.e-3) runerr("[SHTns] bad SHT accuracy");		// stop if something went wrong.
 	}
 }
