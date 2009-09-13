@@ -26,8 +26,8 @@ int main()
 	long int i,im,lm;
 	double t;
 
-//	init_SH(shtns_type, eps,         lmax, mmax, mres, nlat, nphi);
-	init_SH( sht_gauss, POLAR_OPT_THR, 11, 3,    1,   16,  12 );
+//	shtns_init(shtns_type, eps,         lmax, mmax, mres, nlat, nphi);
+	shtns_init( sht_gauss, POLAR_OPT_THR, 11, 3,    1,   16,  12 );
 
 // allocate spatial fields.
 	Sh = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double));
@@ -64,8 +64,7 @@ int main()
 		}
 	}
 	spat_to_SH(Sh,Slm);
-	write_vect("ylm",Slm,NLM*2);
-
+	write_vect("ylm",(double *) Slm,NLM*2);
 }
 
 

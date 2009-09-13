@@ -42,6 +42,11 @@ enum shtns_type {
 	sht_reg_poles	// use a synthesis only algo including poles, not suitable for computations.
 };
 
+#define SHT_NATIVE_LAYOUT 0
+#define SHT_THETA_CONTIGUOUS 256
+#define SHT_PHI_CONTIGUOUS 256*2
+//#define SHT_CUSTOM_LAYOUT 256*3
+
 /*
 struct SHTdef {
 	long int nlm;
@@ -91,6 +96,7 @@ struct VSHTdef {
 */
 
 
+long int SHT_FFT = 0;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
 // parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
 long int LMAX = -1;	// maximum degree (LMAX) of spherical harmonics.
 long int NLAT, NLAT_2;	// number of spatial points in Theta direction (latitude) and half of it (using (NLAT+1)/2 allows odd NLAT.)
@@ -137,7 +143,7 @@ double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
 
 fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dctm0;
-unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
+unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 
 #define SSE __attribute__((aligned (16)))
 
@@ -152,9 +158,9 @@ unsigned fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mod
 
 /////////////////////////////////////////////////////
 ///   Scalar Spherical Harmonics Transform : spatial field BrF is converted to SH representation Qlm.
-/// \param[in] BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+/// \param[in] Vr = spatial data : double array of size NLAT*(NPHI/2+1)*2
 /// \param[out] Qlm = spherical harmonics coefficients : complex double array of size NLM
-void spat_to_SH(complex double *BrF, complex double *Qlm)
+void spat_to_SH(double *Vr, complex double *Qlm)
 {
 	#ifndef _SHT_EO_
 		#include "SHT/spat_to_SH.c"
@@ -166,8 +172,8 @@ void spat_to_SH(complex double *BrF, complex double *Qlm)
 /////////////////////////////////////////////////////
 ///   Backward Scalar Spherical Harmonics Transform : SH representation Qlm is converted to spatial field BrF.
 /// \param[in] Qlm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
-/// \param[out] BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
-void SH_to_spat(complex double *Qlm, complex double *BrF)
+/// \param[out] Vr = spatial data : double array of size NLAT*(NPHI/2+1)*2
+void SH_to_spat(complex double *Qlm, double *Vr)
 {
 	#ifndef _SHT_EO_
 		#include "SHT/SH_to_spat.c"
@@ -184,8 +190,8 @@ void SH_to_spat(complex double *Qlm, complex double *BrF)
 /////////////////////////////////////////////////////
 /// Backward Vector Spherical Harmonics Transform : Spheroidal/Toroidal to (theta,phi) vector components.
 /// \param[in] Slm/Tlm : SH array of Spheroidal/Toroidal scalar. complex size NLM
-/// \param[out] BtF/BpF : theta/phi components of vector field. complex size NLAT*(NPHI/2+1)
-void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF)
+/// \param[out] Vt/Vp : theta/phi components of vector field. double array of size NLAT*(NPHI/2+1)*2
+void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
 {
 #ifndef _SHT_EO_
   #include "SHT/SHst_to_spat.c"
@@ -194,21 +200,21 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *
 #endif
 }
 
-void SHsph_to_spat(complex double *Slm, complex double *BtF, complex double *BpF)
+void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp)
 {
 #include "SHT/SHs_to_spat.c"
 }
 
-void SHtor_to_spat(complex double *Tlm, complex double *BtF, complex double *BpF)
+void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp)
 {
 #include "SHT/SHt_to_spat.c"
 }
 
 /////////////////////////////////////////////////////
 /// Forward Vector Spherical Harmonics Transform : (theta,phi) vector field components to Spheroidal/Toroidal scalars.
-/// \param[in] BtF/BpF : theta/phi components of vector field. complex size NLAT*(NPHI/2+1)
+/// \param[in] Vt/Vp : theta/phi components of vector field. double array of size NLAT*(NPHI/2+1)*2
 /// \param[out] Slm/Tlm : SH array of Spheroidal/Toroidal scalar. complex size NLM
-void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
+void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
 {
 #ifndef _SHT_EO_
   #include "SHT/spat_to_SHst.c"
@@ -287,8 +293,8 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 #undef LTR
 #define SHT_VAR_LTR
 
-/// spatial field BrF is converted to SH representation Qlm with maximum degree LTR
-void spat_to_SH_l(complex double *BrF, complex double *Qlm, int LTR)
+/// spatial field Vr is converted to SH representation Qlm with maximum degree LTR
+void spat_to_SH_l(double *Vr, complex double *Qlm, int LTR)
 {
 	#ifndef _SHT_EO_
 		#include "SHT/spat_to_SH.c"
@@ -300,9 +306,9 @@ void spat_to_SH_l(complex double *BrF, complex double *Qlm, int LTR)
 /////////////////////////////////////////////////////
 //   Scalar inverse Spherical Harmonics Transform
 // input  : Qlm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
-// output : BrF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+// output : Vr = spatial data : double array of size NLAT*(NPHI/2+1)*2
 
-void SH_to_spat_l(complex double *Qlm, complex double *BrF, int LTR)
+void SH_to_spat_l(complex double *Qlm, double *Vr, int LTR)
 {
 	#ifndef _SHT_EO_
 		#include "SHT/SH_to_spat.c"
@@ -320,9 +326,9 @@ void SH_to_spat_l(complex double *Qlm, complex double *BrF, int LTR)
 //   Spheroidal/Toroidal to (theta,phi) components inverse Spherical Harmonics Transform
 // input  : Slm,Tlm = spherical harmonics coefficients of Spheroidal and Toroidal scalars : 
 //          complex double array of size NLM [unmodified]
-// output : BtF, BpF = theta, and phi vector components, spatial/fourrier data : 
-//          complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
-void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, int LTR)
+// output : Vt, Vp = theta, and phi vector components, spatial data : 
+//          double array of size NLAT*(NPHI/2+1)*2
+void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int LTR)
 {
 #ifndef _SHT_EO_
   #include "SHT/SHst_to_spat.c"
@@ -331,17 +337,17 @@ void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, complex double
 #endif
 }
 
-void SHsph_to_spat_l(complex double *Slm, complex double *BtF, complex double *BpF, int LTR)
+void SHsph_to_spat_l(complex double *Slm, double *Vt, double *Vp, int LTR)
 {
 #include "SHT/SHs_to_spat.c"
 }
 
-void SHtor_to_spat_l(complex double *Tlm, complex double *BtF, complex double *BpF, int LTR)
+void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR)
 {
 #include "SHT/SHt_to_spat.c"
 }
 
-void spat_to_SHsphtor_l(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm, int LTR)
+void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR)
 {
 #ifndef _SHT_EO_
   #include "SHT/spat_to_SHst.c"
@@ -436,9 +442,7 @@ void GaussNodes(long double *x, long double *w, int n)
 	m = (n+1)/2;
 	for (i=1;i<=m;i++) {
 		z = cosl(pi*((long double)i-0.25)/((long double)n+0.5));
-		z1 = z+1.;
-		while ( fabsl(z-z1) > eps )
-		{
+		do {
 			p1 = 1.0;
 			p2 = 0.0;
 			for(j=1;j<=n;j++) {
@@ -448,8 +452,8 @@ void GaussNodes(long double *x, long double *w, int n)
 			}
 			pp = ((long double)n)*(z*p1-p2)/(z*z-1.0);                       // ... and its derivative.
 			z1 = z;
-			z = z1-p1/pp;
-		}
+			z = z-p1/pp;
+		} while ( fabsl(z-z1) > eps );
 		x[i-1] = z;		// Build up the abscissas.
 		w[i-1] = 2.0/((1-z*z)*(pp*pp));		// Build up the weights.
 #ifndef _SHT_EO_
@@ -500,45 +504,62 @@ void EqualPolarGrid()
 
 
 /// initialize FFTs using FFTW. stride = NLAT, (contiguous l)
-void planFFT()
+/// \param[in] theta_inc,phi_inc are the increments to go from one data value to the next in theta and phi direction respectively.
+/// \param[in] phi_embed is the size of array in which the nphi elements are embedded (if phi_embed > (NPHI/2+1)*2, in-place fft may be used)
+void planFFT(int theta_inc, int phi_inc, int phi_embed)
 {
 	complex double *ShF;
 	double *Sh;
 	int nfft, ncplx, nreal;
-	fftw_r2r_kind r2r_kind;
-	fftw_iodim dims, hdims[2];
 
   if (NPHI>1) {
+	SHT_FFT = 1;		// yes, do some fft
 	nfft = NPHI;
 	ncplx = NPHI/2 +1;
-	nreal = 2*ncplx;
-	
-// Allocate dummy Spatial Fields.
-	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
-	Sh = (double *) ShF;
+	nreal = phi_embed;
+	if ((theta_inc != 1)||(phi_inc != NLAT)||(nreal < 2*ncplx)) {
+		SHT_FFT = 2;		// we need to do the fft out-of-place.
+	}
+
 #if SHT_VERBOSE > 0
-	printf("        using FFTW : Mmax=%d, Nphi=%d\n",MMAX,NPHI);
+	printf("        using FFTW : Mmax=%d, Nphi=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,phi_inc,theta_inc,phi_embed);
 	if (NPHI < 3*MMAX) printf("     !! Warning : 2/3 rule for anti-aliasing not met !\n");
+	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
 #endif
 	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
-//	if (NPHI < 2) runerr("[FFTW] compile with SHT_AXISYM defined to have NPHI=1 and MMAX=0");
-	
-// IFFT : unnormalized.
-	ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
-	if (ifft == NULL)
-		runerr("[FFTW] ifft planning failed !");
 
-// FFT : must be normalized.
-	fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, NLAT, 1, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
-	if (fft == NULL)
-		runerr("[FFTW] fft planning failed !");
+// Allocate dummy Spatial Fields.
+	if (SHT_FFT > 1) {
+		ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+		Sh = (double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	} else {
+		ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+		Sh = (double *) ShF;
+	}
+
+// IFFT : unnormalized.  FFT : must be normalized.
+		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, fftw_plan_mode);
+		if (ifft == NULL) runerr("[FFTW] ifft planning failed !");
+		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
+		if (fft == NULL) runerr("[FFTW] fft planning failed !");
+
+#if SHT_VERBOSE > 1
+	printf(" *** fft plan :\n");
+	fftw_print_plan(fft);
+	printf("\n *** ifft plan :\n");
+	fftw_print_plan(ifft);
+	printf("\n");
+#endif
 
 //	fft_norm = 1.0/nfft;
+	if (SHT_FFT > 1) fftw_free(Sh);
 	fftw_free(ShF);
   } else {
+	if (theta_inc != 1) runerr("only contiguous spatial data is supported for NPHI=1\n");
 #if SHT_VERBOSE > 0
 	printf("        => no fft for NPHI=1.\n");
 #endif
+	SHT_FFT = 0;	// no fft.
   }
 	dctm0 = NULL;	idct = NULL;		// set dct plans to uninitialized.
 }
@@ -613,18 +634,18 @@ int Get_MTR_DCT() {
 }
 
 /// TIMINGS
-	double get_time(int m, int nloop, complex double *ShF, complex double *ThF, complex double *Slm, complex double *Tlm)
+	double get_time(int m, int nloop, double *Sh, double *Th, complex double *Slm, complex double *Tlm)
 	{
 		int i;
 		ticks tik0, tik1;
 
 		Set_MTR_DCT(m);
-			SH_to_spat(Tlm,ShF);			// caching...
-			SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+			SH_to_spat(Tlm,Sh);			// caching...
+			SHsphtor_to_spat(Slm,Tlm,Sh,Th);
 		tik0 = getticks();
 		for (i=0; i<nloop; i++) {
-			SH_to_spat(Tlm,ShF);
-			SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+			SH_to_spat(Tlm,Sh);
+			SHsphtor_to_spat(Slm,Tlm,Sh,Th);
 		}
 		tik1 = getticks();
 	#if SHT_VERBOSE > 1
@@ -635,12 +656,13 @@ int Get_MTR_DCT() {
 
 double Find_Optimal_SHT()
 {
-	complex double *ShF, *ThF, *Slm, *Tlm;
+	complex double *Slm, *Tlm;
+	double *Sh, *Th;
 	int m, i, minc, nloop;
 	double t, tsum, tsum0;
 
-	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
-	ThF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
+	Sh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
+	Th = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 
@@ -659,24 +681,24 @@ double Find_Optimal_SHT()
 #endif
 
 	m = -1;
-	tsum0 = get_time(m, nloop, ShF, ThF, Slm, Tlm);
+	tsum0 = get_time(m, nloop, Sh, Th, Slm, Tlm);
 	tsum=tsum0;	i = m;
-	t = get_time(m, nloop, ShF, ThF, Slm, Tlm);
+	t = get_time(m, nloop, Sh, Th, Slm, Tlm);
 	if (t<tsum0) tsum0 = t;		// recheck m=-1
 	for (m=0; m<=MMAX; m+=minc) {
-		t = get_time(m, nloop, ShF, ThF, Slm, Tlm);
+		t = get_time(m, nloop, Sh, Th, Slm, Tlm);
 		if ((m==-1)&&(t<tsum0)) tsum0 = t;
 		if (t < tsum) {	tsum = t;	i = m; }
 	}
 	m=-1;	// recheck m=-1;
-		t = get_time(m, nloop, ShF, ThF, Slm, Tlm);
+		t = get_time(m, nloop, Sh, Th, Slm, Tlm);
 		if (t<tsum0) tsum0 = t;
 		if (t < tsum) { tsum = t;	i = m; }
-		t = get_time(m, nloop, ShF, ThF, Slm, Tlm);	// twice
+		t = get_time(m, nloop, Sh, Th, Slm, Tlm);	// twice
 		if (t<tsum0) tsum0 = t;
 		if (t < tsum) { tsum = t;	i = m; }
 
-	free(Tlm);	free(Slm);	fftw_free(ThF);		fftw_free(ShF);
+	free(Tlm);	free(Slm);	fftw_free(Th);		fftw_free(Sh);
 
 	Set_MTR_DCT(i);
 	return(tsum/tsum0);	// returns ratio of "optimal" time over "no_dct" time
@@ -1208,7 +1230,8 @@ void init_SH_dct()
 /// \param[in] disp : 1 = print more informations about accuracy, 0 = silent.
 double SHT_error()
 {
-	complex double *Tlm0, *Slm0, *Tlm, *Slm, *ShF, *ThF;
+	complex double *Tlm0, *Slm0, *Tlm, *Slm;
+	double *Sh, *Th;
 	double t, tmax, n2,  err;
 	long int i, jj, nlm_cplx;
 	
@@ -1218,8 +1241,8 @@ double SHT_error()
 	Slm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	ShF = (complex double *) fftw_malloc( NSPAT_ALLOC * sizeof(double) );
-	ThF = (complex double *) fftw_malloc( NSPAT_ALLOC * sizeof(double) );
+	Sh = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double) );
+	Th = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double) );
 
 // m = nphi/2 is also real if nphi is even.
 	nlm_cplx = ( MMAX*2 == NPHI ) ? LiM(MRES*MMAX,MMAX) : NLM;
@@ -1234,8 +1257,8 @@ double SHT_error()
 		}
 	}
 
-	SH_to_spat(Slm0,ShF);		// scalar SHT
-	spat_to_SH(ShF, Slm);
+	SH_to_spat(Slm0,Sh);		// scalar SHT
+	spat_to_SH(Sh, Slm);
 	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
 		t = cabs(Slm[i] - Slm0[i]);
 		n2 += t*t;
@@ -1247,8 +1270,8 @@ double SHT_error()
 #endif
 
 	Slm0[0] = 0.0; 	Tlm0[0] = 0.0;		// l=0, m=0 n'a pas de signification sph/tor
-	SHsphtor_to_spat(Slm0, Tlm0, ShF, ThF);		// vector SHT
-	spat_to_SHsphtor(ShF, ThF, Slm, Tlm);
+	SHsphtor_to_spat(Slm0, Tlm0, Sh, Th);		// vector SHT
+	spat_to_SHsphtor(Sh, Th, Slm, Tlm);
 	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
 		t = cabs(Slm[i] - Slm0[i]);
 		n2 += t*t;
@@ -1274,20 +1297,30 @@ double SHT_error()
   #define _HGID_ "unknown"
 #endif
 
+
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
- * <b>This function must be called before any SH transform.</b> and sets all global variables.
+ * <b>This function must be called after shtns_geometry and before any SH transform.</b> and sets all global variables.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
  * \param nlat,nphi : respectively the number of latitudinal and longitudinal grid points.
- * \param flags allows to choose the type of transform see \ref shtns_type
- * \param eps : polar optimization threshold : polar values of Legendre Polynomias below that threshold are neglected (for high m), leading to increased performance (a few percents)
- *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive.
+ * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
+ * \param eps : polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
+ *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
 */
-void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
+void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
 {
 	double t;
 	int im,m,l,lm;
+	int theta_inc, phi_inc, phi_embed;
+
+	switch (flags & 0xFFFF00) {
+		case SHT_NATIVE_LAYOUT : 	theta_inc=1;  phi_inc=nlat;  phi_embed=2*(nphi/2+1);  break;
+		case SHT_THETA_CONTIGUOUS :	theta_inc=1;  phi_inc=nlat;  phi_embed=nphi;  break;
+		default :
+		case SHT_PHI_CONTIGUOUS :	phi_inc=1;  theta_inc=nphi;  phi_embed=nphi;  break;
+	}
+	flags = flags & 255;	// clear higher bits.
 
 	// copy to global variables.
 #ifdef SHT_AXISYM
@@ -1310,7 +1343,7 @@ void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, in
 #endif
 
 	alloc_SHTarrays();	// allocate dynamic arrays
-	planFFT();		// initialize fftw
+	planFFT(theta_inc, phi_inc, phi_embed);		// initialize fftw
 	zlm_dct0 = NULL;	// used as a flag.
   #if SHT_VERBOSE > 0
 	if (2*NLAT <= 3*LMAX) printf("     !! Warning : anti-aliasing condition in theta direction not met.\n");

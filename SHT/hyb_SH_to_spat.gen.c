@@ -19,12 +19,14 @@
 // MTR_DCT : -1 => no dct
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
-#Q void spat_to_SH_dct(complex double *BrF, complex double *Qlm)
-#V void SHsphtor_to_spat_dct(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF)
+#Q void SH_to_spat(complex double *Qlm, double *Vr)
+#V void SHsphtor_to_spat_dct(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
 # {
 Q	complex double *Ql;
 S	complex double *Sl;
 T	complex double *Tl;
+Q	complex double *BrF;
+V	complex double *BtF, *BpF;
 Q	double *yl;
 V	double *dyl0;
   #ifndef SHT_AXISYM
@@ -47,6 +49,16 @@ V	#define BP0 ((double *)BpF)
 	long int k,im,m,l;
 
 	llim = LTR;	// copy LTR to a local variable for faster access (inner loop limit)
+Q    	BrF = (complex double *) Vr;
+V    	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
+
+  #ifndef SHT_AXISYM
+	if (SHT_FFT > 1) {		// alloc memory for the FFT
+Q	    	BrF = fftw_malloc( (NPHI/2+1)*NLAT * sizeof(complex double) );
+V	    	BtF = fftw_malloc( 2* (NPHI/2+1)*NLAT * sizeof(complex double) );
+V	    	BpF = BtF + (NPHI/2+1)*NLAT;
+	}
+  #endif
 
 	im=0;	m=0;
 Q		Ql = Qlm;
@@ -332,23 +344,27 @@ V			}
 		}
 	}
   #endif
-Q	fftw_execute_dft_c2r(ifft, BrF, (double *) BrF);
-V	fftw_execute_dft_c2r(ifft, BtF, (double *) BtF);
-V	fftw_execute_dft_c2r(ifft, BpF, (double *) BpF);
+Q	fftw_execute_dft_c2r(ifft, BrF, Vr);
+V	fftw_execute_dft_c2r(ifft, BtF, Vt);
+V	fftw_execute_dft_c2r(ifft, BpF, Vp);
+	if (SHT_FFT > 1) {		// free memory
+Q	    fftw_free(BrF);
+V	    fftw_free(BtF);	// this frees also BpF.
+	}
     } else {
 	k=1;	do {	// compress complex to real
-Q		((double *)BrF)[k] = (double) BrF[k];
-V		((double *)BtF)[k] = (double) BtF[k];
-V		((double *)BpF)[k] = (double) BpF[k];
+Q		Vr[k] = (double) BrF[k];
+V		Vt[k] = (double) BtF[k];
+V		Vp[k] = (double) BpF[k];
 		k++;
 	} while(k<NLAT);
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {
-Q		fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
-V		fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
-V		fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
+Q		fftw_execute_r2r(idct,Vr, Vr);		// iDCT m=0
+V		fftw_execute_r2r(idct,Vt, Vt);		// iDCT m=0
+V		fftw_execute_r2r(idct,Vp, Vp);		// iDCT m=0
 V		k=0;	do {
-V			((double *)BtF)[k] *= st[k];	((double *)BpF)[k] *= st[k];
+V			Vt[k] *= st[k]; 	Vp[k] *= st[k];
 V			k++;
 V		} while (k<NLAT);
 	}

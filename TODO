@@ -11,17 +11,19 @@
 
 + cache optimization have been performed for m=0 and are quite impressive at high LMAX.
 
+TIP:
 + LM_LOOP : translating an integer to a double is SLOW. So if l or l(l+1) is used in the computation, using an array is faster.
      furthermore, it seems that cache misses has less penalty than branch misses.
      LM loop with li[lm] array access seems faster... (at least for 4 arrays access).
+
+TIP:
++ other optimization : NLAT and NPHI should be checked for fftw-friendliness.
 
 *** SHT.c
 
 + CHECK for accuracy with MTR_DCT, default to gauss if not good enough.
 - Implement l even/odd sub-transforms.
 - Implement sperate m sub-transforms.
-
-+ other optimization : NLAT and NPHI should be checked for fftw-friendliness.
 
 - SHT e/o does not work in DCT space. (ok in Gauss version as of r72)
 

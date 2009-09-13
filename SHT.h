@@ -90,6 +90,10 @@ enum shtns_type {
 	sht_reg_poles	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. \ref NLAT odd is supported even if \link compil SHT_NLAT_EVEN \endlink is defined, useful for vizualisation.
 };
 
+#define SHT_NATIVE_LAYOUT 0		///< Tells shtns_init to use \ref native
+#define SHT_THETA_CONTIGUOUS 256	///< use \ref theta_fast
+#define SHT_PHI_CONTIGUOUS 256*2	///< use \ref phi_fast
+
 // FUNCTIONS //
 
 /// Initializes spherical harmonic transforms of given size, and sets all global variables.
@@ -102,17 +106,17 @@ int Get_MTR_DCT();
 
 /// \name Scalar transforms
 //@{
-void spat_to_SH(complex double *BrF, complex double *Qlm);
-void SH_to_spat(complex double *Qlm, complex double *BrF);
+void spat_to_SH(double *Vr, complex double *Qlm);
+void SH_to_spat(complex double *Qlm, double *Vr);
 //@}
 
 /// \name Vector transforms
 //@{
-void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF);
-void SHsph_to_spat(complex double *Slm, complex double *BtF, complex double *BpF);
-void SHtor_to_spat(complex double *Tlm, complex double *BtF, complex double *BpF);
+void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
+void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp);
+void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp);
 
-void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm);
+void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
 //@}
 #define SH_to_grad_spat(S,Gt,Gp) SHsph_to_spat(S, Gt, Gp)
 
@@ -125,12 +129,12 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 
 /// \name Truncated transforms at given degree l
 //@{
-void spat_to_SH_l(complex double *BrF, complex double *Qlm, int LTR);
-void SH_to_spat_l(complex double *Qlm, complex double *BrF, int LTR);
+void spat_to_SH_l(double *Vr, complex double *Qlm, int LTR);
+void SH_to_spat_l(complex double *Qlm, double *Vr, int LTR);
 
-void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, int LTR);
-void SHsph_to_spat_l(complex double *Slm, complex double *BtF, complex double *BpF, int LTR);
-void SHtor_to_spat_l(complex double *Tlm, complex double *BtF, complex double *BpF, int LTR);
-void spat_to_SHsphtor_l(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm, int LTR);
+void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int LTR);
+void SHsph_to_spat_l(complex double *Slm, double *Vt, double *Vp, int LTR);
+void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR);
+void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR);
 //@}
 #define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat(S, Gt, Gp, ltr)

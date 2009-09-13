@@ -38,13 +38,13 @@ SHTg.o : SHT.c Makefile $(shtfiles)
 SHTaxi.o : SHT.c Makefile $(shtfiles)
 	$(cmd) -c -DSHT_AXISYM SHT.c -o SHTaxi.o
 
-time_SHT : time_SHT.c SHT.o Makefile
+time_SHT : SHT.h time_SHT.c SHT.o Makefile
 	$(cmd) time_SHT.c SHT.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHT
 
-time_SHTg : time_SHT.c SHTg.o Makefile
+time_SHTg : SHT.h time_SHT.c SHTg.o Makefile
 	$(cmd) time_SHT.c SHTg.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHTg
 
-time_SHTaxi : time_SHT.c SHTaxi.o Makefile
+time_SHTaxi : SHT.h time_SHT.c SHTaxi.o Makefile
 	$(cmd) -DSHT_AXISYM time_SHT.c SHTaxi.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHTaxi
 
 SHT_example : SHT_example.c SHT.o Makefile

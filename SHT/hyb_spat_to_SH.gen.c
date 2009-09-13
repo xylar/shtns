@@ -9,11 +9,13 @@
 //  Spherical Harmonics Transform
 // input  : BrF, BtF, BpF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
 // output : Qlm, Slm, Tlm = spherical harmonics coefficients : complex double array of size NLM
-#Q void spat_to_SH(complex double *BrF, complex double *Qlm)
-#V void spat_to_SHsphtor(complex double *BtF, complex double *BpF, complex double *Slm, complex double *Tlm)
+#Q void spat_to_SH(double *Vr, complex double *Qlm)
+#V void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
 # {
 Q	complex double *Ql;		// virtual pointers for given im
 V	complex double *Sl, *Tl;	// virtual pointers for given im
+Q	complex double *BrF;		// contains the Fourier transformed data
+V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	double *zl;
 V	double *dzl0;
 V	struct DtDp *dzl;
@@ -73,12 +75,21 @@ V1	#define po0	((double *)BpF)[i]
   #endif
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
+Q    	BrF = (complex double *) Vr;
+V    	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 
-	if (NPHI>1) {
-Q		fftw_execute_dft_r2c(fft,(double *) BrF, BrF);
-V		fftw_execute_dft_r2c(fft,(double *) BtF, BtF);
-V		fftw_execute_dft_r2c(fft,(double *) BpF, BpF);
+  #ifndef SHT_AXISYM
+	if (SHT_FFT > 0) {
+	    if (SHT_FFT > 1) {		// alloc memory for the FFT
+Q	    	BrF = fftw_malloc( (NPHI/2+1)*NLAT * sizeof(complex double) );
+V	    	BtF = fftw_malloc( 2* (NPHI/2+1)*NLAT * sizeof(complex double) );
+V	    	BpF = BtF + (NPHI/2+1)*NLAT;
+	    }
+Q	    fftw_execute_dft_r2c(fft,Vr, BrF);
+V	    fftw_execute_dft_r2c(fft,Vt, BtF);
+V	    fftw_execute_dft_r2c(fft,Vp, BpF);
 	}
+  #endif
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
   #ifndef SHT_NO_DCT
@@ -329,6 +340,13 @@ V			Sl[l] = 0.0;	Tl[l] = 0.0;
 		}
 	}
   #endif
+  #ifndef SHT_AXISYM
+  	if (SHT_FFT > 1) {		// free memory
+Q	    fftw_free(BrF - NLAT*(MTR+1));
+V	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
+	}
+  #endif
+
 Q	#undef re
 Q	#undef ro
 V	#undef te

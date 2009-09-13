@@ -58,13 +58,13 @@ int test_SHT()
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
-		SH_to_spat(Slm,ShF);
-		SH_to_spat(Tlm,ThF);
+		SH_to_spat(Slm,Sh);
+		SH_to_spat(Tlm,Th);
 		for (i=0; i< NLAT*NPHI; i++) {
 			ThF[i] *= ShF[i];
 		}
 // analyse (direct legendre)
-		spat_to_SH(ShF,Slm);
+		spat_to_SH(Sh,Slm);
 	}
 	tcpu = clock() - tcpu;
 	printf("   2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
@@ -98,13 +98,13 @@ int test_SHT_l(int ltr)
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
-		SH_to_spat_l(Slm,ShF,ltr);
-		SH_to_spat_l(Tlm,ThF,ltr);
+		SH_to_spat_l(Slm,Sh,ltr);
+		SH_to_spat_l(Tlm,Th,ltr);
 		for (i=0; i< NLAT*NPHI; i++) {
 			ThF[i] *= ShF[i];
 		}
 // analyse (direct legendre)
-		spat_to_SH_l(ShF,Slm,ltr);
+		spat_to_SH_l(Sh,Slm,ltr);
 	}
 	tcpu = clock() - tcpu;
 	printf("   2iSHT + NL + SHT x%d with L-truncation at %d. time : %d\n", SHT_ITER, ltr, (int )tcpu);
@@ -143,11 +143,11 @@ int test_SHT_vect()
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 	#ifndef _SHT_EO_
-		SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
-		spat_to_SHsphtor(ShF,ThF,Slm,Tlm);
+		SHsphtor_to_spat(Slm,Tlm,Sh,Th);
+		spat_to_SHsphtor(Sh,Th,Slm,Tlm);
 	#else
-		SHsphtor_to_spat(Slm,Slm,ShF,ThF);
-		spat_to_SHsphtor(ShF,ThF,Slm,Slm);
+		SHsphtor_to_spat(Slm,Slm,Sh,Th);
+		spat_to_SHsphtor(Sh,Th, Slm,Slm);
 	#endif
 	}
 	tcpu = clock() - tcpu;
@@ -189,6 +189,115 @@ int test_SHT_vect()
 	return (int) tcpu;
 }
 
+fftw_plan ifft_in, ifft_out;
+fftw_plan fft_in, fft_out;
+fftw_plan fft_tr, ifft_tr;
+
+
+// we want to test if in-place is faster than out-of place or not.
+init_fft_tests()
+{
+	complex double *ShF, *Shout;
+	double *Sh;
+	int nfft, ncplx, nreal;
+	unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
+
+	nfft = NPHI;
+	ncplx = NPHI/2 +1;
+	nreal = 2*ncplx;
+
+// Allocate dummy Spatial Fields.
+	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	Sh = (double *) ShF;
+
+// IFFT : unnormalized
+	ifft_in = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, NLAT, 1, fftw_plan_mode);
+	if (ifft_in == NULL) printf("ifft_in failed\n");
+// FFT : must be normalized.
+	fft_in = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, NLAT, 1, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
+	if (fft_in == NULL) printf("fft_in failed\n");
+printf("in-place done\n");
+	printf("** ifft in-place :\n");	fftw_print_plan(ifft_in);
+	printf("\n** fft in-place :\n");	fftw_print_plan(fft_in);
+
+	Shout = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	ifft_out = fftw_plan_many_dft_c2r(1, &nfft, NLAT, Shout, &ncplx, NLAT, 1, Sh, &nfft, NLAT, 1, fftw_plan_mode);
+	if (ifft_out == NULL) printf("ifft_out failed\n");
+	fft_out = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nfft, NLAT, 1, Shout, &ncplx, NLAT, 1, fftw_plan_mode);
+	if (fft_out == NULL) printf("fft_out failed\n");
+printf("\nout-of-place done\n");
+	printf("** ifft out-of-place :\n");	fftw_print_plan(ifft_out);
+	printf("\n** fft out-of-place :\n");	fftw_print_plan(fft_out);
+
+	ifft_tr = fftw_plan_many_dft_c2r(1, &nfft, NLAT, Shout, &ncplx, NLAT, 1, Sh, &nfft, 1, NPHI, fftw_plan_mode);
+	if (ifft_out == NULL) printf("ifft_out failed\n");
+	fft_tr = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nfft, 1, NPHI, Shout, &ncplx, NLAT, 1, fftw_plan_mode);
+	if (fft_out == NULL) printf("fft_out failed\n");
+printf("\ntranspose done\n");
+	printf("** ifft + transpose :\n");	fftw_print_plan(ifft_tr);
+	printf("\n** fft + transpose :\n"); fftw_print_plan(fft_tr);
+
+	fftw_free(Shout);	fftw_free(ShF);
+}
+
+do_fft_tests()
+{
+	complex double *Sho;
+	int jj;
+	clock_t tcpu;
+
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		fftw_execute_dft_c2r(ifft_in, ShF, (double *) ShF);
+	}
+	tcpu = clock() - tcpu;
+	printf("  ifft in-place : %d\n", (int) tcpu);
+
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		fftw_execute_dft_r2c(fft_in, (double *) ShF, ShF);
+	}
+	tcpu = clock() - tcpu;
+	printf("  fft in-place : %d\n", (int) tcpu);
+
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		Sho = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+		fftw_execute_dft_c2r(ifft_out, Sho, (double *) ShF);
+		fftw_free(Sho);
+	}
+	tcpu = clock() - tcpu;
+	printf("  ifft out-of-place (+malloc) : %d\n", (int) tcpu);
+
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		Sho = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+		fftw_execute_dft_r2c(fft_out, (double *) ShF, Sho);
+		fftw_free(Sho);
+	}
+	tcpu = clock() - tcpu;
+	printf("  fft out-of-place (+malloc) : %d\n", (int) tcpu);
+
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		Sho = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+		fftw_execute_dft_c2r(ifft_tr, Sho, (double *) ShF);
+		fftw_free(Sho);
+	}
+	tcpu = clock() - tcpu;
+	printf("  ifft transpose (+malloc) : %d\n", (int) tcpu);
+
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		Sho = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+		fftw_execute_dft_r2c(fft_tr, (double *) ShF, Sho);
+		fftw_free(Sho);
+	}
+	tcpu = clock() - tcpu;
+	printf("  fft transpose (+malloc) : %d\n", (int) tcpu);
+
+}
+
 void usage()
 {
 	printf("\nUsage: time_SHT lmax [options] \n");
@@ -201,6 +310,9 @@ void usage()
 	printf(" -polaropt=<thr> : set the threshold for polar optimization. 0 for no polar optimization, 1.e-6 for agressive.\n");
 	printf(" -iter=<n> : set the number of back-and-forth transforms to compute timings and errors.\n");
 	printf(" -gauss : force gauss grid\n");
+	printf(" -reg : force regular grid\n");
+	printf(" -oop : force out-of-place transform\n");
+	printf(" -transpose : force transpose data (ie phi varies fastest)\n");
 }
 
 int main(int argc, char *argv[])
@@ -214,6 +326,7 @@ int main(int argc, char *argv[])
 	double e0,e1;
 	double polaropt = 1.e-6;		// an aggressive default for polar optimization.
 	enum shtns_type shtmode = sht_auto;		// default to "auto" (fastest) mode.
+	int layout = SHT_NATIVE_LAYOUT;
 	char name[20];
 
 	srand( time(NULL) );	// initialise les nombres.
@@ -237,9 +350,11 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"iter") == 0) SHT_ITER = t;
 		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
 		if (strcmp(name,"reg") == 0) shtmode = sht_reg_fast;	// force regular grid.
+		if (strcmp(name,"oop") == 0) layout = SHT_THETA_CONTIGUOUS;
+		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
 	}
 
-	init_SH(shtmode, polaropt, lmax, mmax, mres, nlat, nphi);
+	shtns_init(shtmode | layout, polaropt, lmax, mmax, mres, nlat, nphi);
 	m_opt = Get_MTR_DCT();
 
 	t1 = 1.0+2.0*I;
@@ -265,17 +380,21 @@ int main(int argc, char *argv[])
 	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) malloc(sizeof(complex double)* NLM);
 
+// perform fft tests.
+//	init_fft_tests();
+//	do_fft_tests();
+//	exit(0);
+
 	Set_MTR_DCT(MMAX);
 
 // SH_to_spat
 	for (i=0;i<NLM;i++) {
 		Slm[i] = 0.0;	Tlm[i] = 0.0;
 	}
-//	Slm[LiM(1,1)] = 1;
 	Slm[LiM(1,0)] = Y10_ct;
-	SH_to_spat(Slm,ShF);
+	SH_to_spat(Slm,Sh);
 	write_mx("spat",Sh,NPHI,NLAT);
-	SHsphtor_to_spat(Slm,Tlm,ShF,ThF);
+	SHsphtor_to_spat(Slm,Tlm,Sh,Th);
 	write_mx("spatt",Sh,NPHI,NLAT);
 	write_mx("spatp",Th,NPHI,NLAT);
 
@@ -285,8 +404,8 @@ int main(int argc, char *argv[])
 			Sh[im*NLAT+i] = ct[i];
 		}
 	}
-	spat_to_SH(ShF,Slm);
-	write_vect("ylm",Slm,NLM*2);
+	spat_to_SH(Sh,Slm);
+//	write_vect("ylm",Slm,NLM*2);
 
 
 // test case...
