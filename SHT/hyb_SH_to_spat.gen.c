@@ -305,15 +305,13 @@ V			dyl += (LMAX-LTR);
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
-  #ifndef SHT_AXISYM
 	for (k=0; k < NLAT*(NPHI/2 -MTR); k++) {	// padding for high m's
 Q			BrF[k] = 0.0;
 V			BtF[k] = 0.0;	BpF[k] = 0.0;
 	}
-  #endif
 Q	BrF -= NLAT*(MTR+1);		// restore original pointer
 V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);	// restore original pointer
-  #endif
+
     if (NPHI>1) {
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {
@@ -358,6 +356,7 @@ V		Vt[k] = (double) BtF[k];
 V		Vp[k] = (double) BpF[k];
 		k++;
 	} while(k<NLAT);
+  #endif
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {
 Q		fftw_execute_r2r(idct,Vr, Vr);		// iDCT m=0
@@ -369,7 +368,9 @@ V			k++;
 V		} while (k<NLAT);
 	}
   #endif
+  #ifndef SHT_AXISYM
     }
+  #endif
 
 Q	#undef BR0
 V	#undef BT0
