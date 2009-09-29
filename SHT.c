@@ -904,12 +904,16 @@ void init_SH_dct()
 	printf("\n max st^2 + ct^2 -1 = %lg\n",tsum);
 #endif
 
+#define KMAX (LMAX+1)
+
 	for(im=0, sk=0, dsk=0; im<=MMAX; im++) {	// how much memory to allocate for ykm_dct ?
 		m = im*MRES;
-		for (it=0; it<= LMAX; it+=2) {
-			l = (it < m) ? m : it+(m&1);
-			sk += LMAX+1 - l;
+		for (it=0; it<= KMAX; it+=2) {
 			l = (it < m) ? m : it-(m&1);
+			sk += LMAX+1 - l;
+		}
+		for (it=0; it<= KMAX; it+=2) {
+			l = (it-2 < m) ? m : it-2+(m&1);
 			dsk += LMAX+1 - l;
 		}
 	}
@@ -925,10 +929,12 @@ void init_SH_dct()
 	zlm_dct0 = (double *) fftw_malloc( sizeof(double)* it );
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
-		for (it=0, sk=0, dsk=0; it<= LMAX; it+=2) {
-			l = (it < m) ? m : it+(m&1);
-			sk += LMAX+1 - l;
+		for (it=0, sk=0; it<= KMAX; it+=2) {
 			l = (it < m) ? m : it-(m&1);
+			sk += LMAX+1 - l;
+		}
+		for (it=0, dsk=0; it<= KMAX; it+=2) {
+			l = (it-2 < m) ? m : it-2+(m&1);
 			dsk += LMAX+1 - l;
 		}
 		ykm_dct[im+1] = ykm_dct[im] + sk;
@@ -939,10 +945,10 @@ void init_SH_dct()
 	idct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT01, FFTW_ESTIMATE );	// quick and dirty idct.
 
 // Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT_2 points required.
-/* for synthesis (inverse transform) */
+/// for synthesis (inverse transform)
 	// temp memory for ykm_dct.
-	yk = (double *) malloc( sizeof(double) * (LMAX+1)*(LMAX+1) );
-	dyk = (struct DtDp *) malloc( sizeof(struct DtDp)* (LMAX+1)*(LMAX+1) );
+	yk = (double *) malloc( sizeof(double) * (KMAX+1)*(LMAX+1) );
+	dyk = (struct DtDp *) malloc( sizeof(struct DtDp)* (KMAX+1)*(LMAX+1) );
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
 		for (it=0; it<NLAT_2; it++) {
@@ -954,7 +960,7 @@ void init_SH_dct()
 			}
 		}
 	// go to DCT space
-		for (it=0;it<=LMAX;it+=2) {
+		for (it=0;it<=KMAX;it+=2) {
 			for(l=m; l<=LMAX; l++) {
 				yk[(it/2)*(LMAX+1-m) + (l-m)] = 0.0;
 				dyk[(it/2)*(LMAX+1-m) + (l-m)].t = 0.0;
@@ -964,17 +970,18 @@ void init_SH_dct()
 		for (l=m; l<=LMAX; l++) {
 			if (m & 1) {	// m odd
 				for (it=0; it<NLAT_2; it++) {
-					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)] / st[it];	// P[l-1](x)	/st
+					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * st[it];	// P[l+1](x)	*st
+//					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)] / st[it];	// P[l-1](x)	/st
 					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t * st[it];	// P[l](x)	*1
 					dZp[it] = dylm[im][it*(LMAX-m+1) + (l-m)].p;		// P[l-1](x)	*1
 				}
 			} else {	// m even
 				for (it=0; it<NLAT_2; it++) {
 					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)];		// P[l](x)	*1
-					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t;	// P[l-1](x)	/st
-//					dZp[it] = dylm[im][it*(LMAX-m+1) + (l-m)].p / st[it];	// P[l-2](x)	/st
-					dZp[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * m/(st[it]*st[it]);	// P[l-2](x)	/st
-//					dZp[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * m;	// P[l](x)	*st
+//					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t;	// P[l-1](x)	/st
+//					dZp[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * m/(st[it]*st[it]);	// P[l-2](x)	/st
+					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t *st[it]*st[it];	// P[l+1](x)	*st
+					dZp[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * m;	// P[l](x)	*st
 				}
 			}
 			if ((l-m)&1) {	// odd
@@ -996,18 +1003,18 @@ void init_SH_dct()
 #if SHT_VERBOSE > 1
 			if (LMAX <= 12) {
 				printf("\nl=%d, m=%d ::\t", l,m);
-				for(it=0;it<2*NLAT_2;it++) printf("%f ",Z[it]);
-				printf("\n     dYt ::\t", l,m);
-				for(it=0;it<2*NLAT_2;it++) printf("%f ",dZt[it]);
-				printf("\n     dYp ::\t", l,m);
-				for(it=0;it<2*NLAT_2;it++) printf("%f ",dZp[it]);
+				for(it=0;it<2*NLAT_2;it++) printf("%e ",Z[it]/(2*NLAT));
+				printf("\n     dYt ::\t");
+				for(it=0;it<2*NLAT_2;it++) printf("%e ",dZt[it]/(2*NLAT));
+				printf("\n     dYp ::\t");
+				for(it=0;it<2*NLAT_2;it++) printf("%e ",dZp[it]/(2*NLAT));
 			}
 #endif
-			for (it=(l-m)&1; it<=l; it+=2) {
+			for (it=(l-m)&1; it<=l+1; it+=2) {
 				yk[(it/2)*(LMAX+1-m) + (l-m)] = Z[it]/(2*NLAT);	// and transpose
 				dyk[(it/2)*(LMAX+1-m) + (l-m)].p = dZp[it]/(2*NLAT);
 			}
-			for (it=(l+1-m)&1; it<=l; it+=2) {
+			for (it=(l+1-m)&1; it<=l+1; it+=2) {
 				dyk[(it/2)*(LMAX+1-m) + (l-m)].t = dZt[it]/(2*NLAT);
 			}
 		}
@@ -1020,13 +1027,15 @@ void init_SH_dct()
 		// Compact the coefficients for improved cache efficiency.
 		yg = ykm_dct[im];
 		dyg = dykm_dct[im];
-		for (it=0; it<= LMAX; it+=2) {
-			l = (it < m) ? m : it+(m&1);
+		for (it=0; it<= KMAX; it+=2) {
+			l = (it < m) ? m : it-(m&1);
 			while (l<=LMAX) {
 				yg[0] = yk[(it/2)*(LMAX+1-m) + (l-m)];
 				l++;	yg++;
 			}
-			l = (it < m) ? m : it-(m&1);
+		}
+		for (it=0; it<= KMAX; it+=2) {
+			l = (it-2 < m) ? m : it-2+(m&1);
 			while (l<=LMAX) {
 				dyg[0].t = dyk[(it/2)*(LMAX+1-m) + (l-m)].t;
 				dyg[0].p = dyk[(it/2)*(LMAX+1-m) + (l-m)].p;
@@ -1036,10 +1045,12 @@ void init_SH_dct()
 		if (im == 0) {		// compact m=0 dylm because .p = 0 :
 			dyg = dykm_dct[im];
 			yg = (double *) dykm_dct[im];
-			for (it=0; it< LMAX; it+=2) {
-				for (l=it; l<=LMAX; l++) {
+			for (it=0; it<= KMAX; it+=2) {
+				for (l=it-2; l<=LMAX; l++) {
+					if (l>=0) {
 					yg[0] = dyg[0].t;
 					yg++;	dyg++;
+					}
 				}
 			}
 		}
