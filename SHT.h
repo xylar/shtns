@@ -97,7 +97,7 @@ enum shtns_type {
 // FUNCTIONS //
 
 /// Initializes spherical harmonic transforms of given size, and sets all global variables.
-void init_SH(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi);
+void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi);
 
 /// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to init_SH
 long int nlm_calc(long int lmax, long int mmax, long int mres);

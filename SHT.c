@@ -512,6 +512,8 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 	double *Sh;
 	int nfft, ncplx, nreal;
 
+	if (NPHI <= 2*MMAX) runerr("the sampling condition Nphi > 2*Mmax is not met.");
+
   if (NPHI>1) {
 	SHT_FFT = 1;		// yes, do some fft
 	nfft = NPHI;
@@ -526,7 +528,6 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 	if (NPHI < 3*MMAX) printf("     !! Warning : 2/3 rule for anti-aliasing not met !\n");
 	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
 #endif
-	if (NPHI <= 2*MMAX) runerr("[FFTW] the sampling condition Nphi > 2*Mmax is not met.");
 
 // Allocate dummy Spatial Fields.
 	if (SHT_FFT > 1) {
@@ -555,7 +556,7 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 	if (SHT_FFT > 1) fftw_free(Sh);
 	fftw_free(ShF);
   } else {
-	if (theta_inc != 1) runerr("only contiguous spatial data is supported for NPHI=1\n");
+	if (theta_inc != 1) runerr("only contiguous spatial data is supported for NPHI=1");
 #if SHT_VERBOSE > 0
 	printf("        => no fft for NPHI=1.\n");
 #endif
@@ -1193,7 +1194,7 @@ void init_SH_dct()
 	
 #if SHT_VERBOSE > 1
 	tik1 = getticks();
-	printf("    ticks : %.3f\n", elapsed(tik1,tik0)/(NLM*NLAT));
+	printf("\n    ticks : %.3f\n", elapsed(tik1,tik0)/(NLM*NLAT*(MMAX+1)));
 #endif
 
 	// compact yk to zlm_dct0
@@ -1372,18 +1373,20 @@ void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres,
 				Set_MTR_DCT(-1);		// turn off DCT.
 			}
 		}
-		if (MTR_DCT == -1) {			// free memory used by DCT.
+  #if SHT_VERBOSE < 2
+		if (MTR_DCT == -1) {			// free memory used by DCT and disables DCT.
 			fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);	fftw_free(ykm_dct[0]);		// free now useless arrays.
-			zlm_dct0 = NULL;
+			zlm_dct0 = NULL;			// this completely disables DCT.
 			if (idct != NULL) fftw_destroy_plan(idct);	// free unused dct plans
 			if (dctm0 != NULL) fftw_destroy_plan(dctm0);
 			if (flags == sht_auto) {
 				flags = sht_gauss;		// switch to gauss grid, even better accuracy.
-  #if SHT_VERBOSE > 0
+	#if SHT_VERBOSE > 0
 				printf("        => switching back to Gauss Grid for higher accuracy.\n");
-  #endif
+	#endif
 			}
 		}
+  #endif
 	}
 	if (flags == sht_gauss)
 #else
