@@ -47,6 +47,44 @@ enum shtns_type {
 #define SHT_PHI_CONTIGUOUS 256*2
 //#define SHT_CUSTOM_LAYOUT 256*3
 
+
+long int SHT_FFT = 0;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
+
+/// sizes for SHT, in a structure to avoid problems with conflicting names.
+struct sht_sze {
+	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
+	long int lmax;			///< maximum degree (lmax) of spherical harmonics.
+	long int mmax;			///< maximum order (mmax*mres) of spherical harmonics.
+	long int mres;			///< the periodicity along the phi axis.
+	long int nlat;			///< number of spatial points in Theta direction (latitude) ...
+	long int nlat_2;		///< ...and half of it (using (NLAT+1)/2 allows odd NLAT.)
+	long int nphi;			///< number of spatial points in Phi direction (longitude)
+	long int nlm;			///< total number of (l,m) spherical harmonics components.
+};
+struct sht_sze shtns;
+
+// define shortcuts to sizes + allow compile-time optimizations when SHT_AXISYM is defined.
+#define LMAX shtns.lmax
+#define NLAT shtns.nlat
+#define NLAT_2 shtns.nlat_2
+#ifndef SHT_AXISYM
+  #define NPHI shtns.nphi
+  #define MMAX shtns.mmax
+  #define MRES shtns.mres
+#else
+  #define NPHI 1
+  #define MMAX 0
+  #define MRES 1
+#endif
+#define NLM shtns.nlm
+#define MTR_DCT shtns.mtr_dct
+// number of double that have to be allocated for a spatial field (includes reserved space)
+#define NSPAT_ALLOC (NLAT*(NPHI/2+1)*2)
+
+#ifndef M_PI
+# define M_PI 3.1415926535897932384626433832795
+#endif
+
 /*
 struct SHTdef {
 	long int nlm;
@@ -94,22 +132,6 @@ struct VSHTdef {
 	SH_to_spat
 }
 */
-
-
-long int SHT_FFT = 0;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
-// parameter for SHT (sizes : LMAX, NLAT, MMAX, MRES, NPHI)
-long int LMAX = -1;	// maximum degree (LMAX) of spherical harmonics.
-long int NLAT, NLAT_2;	// number of spatial points in Theta direction (latitude) and half of it (using (NLAT+1)/2 allows odd NLAT.)
-#ifndef SHT_AXISYM
-  long int MMAX,MRES;	// maximum order (MMAX*MRES) of spherical harmonics. MRES is the periodicity along the phi axis.
-  long int NPHI;	// number of spatial points in Phi direction (longitude)
-#else
-  #define MMAX 0
-  #define NPHI 1
-  #define MRES 1
-#endif
-long int NLM = 0;	// total number of (l,m) spherical harmonics components.
-long int MTR_DCT = -1;	// m truncation for dct. -1 means no dct at all.
 
 // number of double that have to be allocated for a spatial field (includes reserved space)
 #define NSPAT_ALLOC (NLAT*(NPHI/2+1)*2)
@@ -358,6 +380,77 @@ void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex dou
 
 #undef MTR
 #undef SHT_VAR_LTR
+
+/*
+	SYNTHESIS AT A GIVEN LATITUDE
+ */
+
+double cost_lat = 2.;	// init with something impossible.
+double* ylm_lat;
+double* dylm_lat;
+fftw_plan ifft_lat;
+
+void init_SH_lat()
+{
+	double *data;
+
+	ylm_lat = (double *) malloc(sizeof(double)* NLM*2);
+	dylm_lat = ylm_lat + NLM;
+	data = (double *) fftw_malloc(sizeof(complex double)* (NPHI/2+1));
+	ifft_lat = fftw_plan_dft_c2r_1d(NPHI, (complex double *) data, data, fftw_plan_mode);
+	fftw_free(data);
+}
+
+/// vr, vp, vt are double arrays of size 2*(NPHI/2+1) [use fftw_malloc]
+void SHqst_to_lat(complex double *Qlm, double *Slm, complex double *Tlm, double cost,
+					double *vr, double *vt, double *vp)
+{
+	long int im, m, l, i;
+	complex double vst, vtt, vsp, vtp, vrr;
+	double sint;
+
+	sint = sqrt(1. -cost*cost);	// sin(theta)
+	if (cost != cost_lat) {		// compute and store the legendre functions.
+		i = 0;
+		for (i=0, m=0; m<=MMAX*MRES; m+=MRES) {
+			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, cost, &ylm_lat[i], &dylm_lat[i]);
+			i+=(LMAX+1-m);		// go to next location.
+		}
+		cost_lat = cost;
+	}
+	i=0;
+	im=0;	m=0;
+		vrr=0;	vtt=0;	vst=0;
+		for(l=m; l<=LMAX; l++, i++) {
+			vrr += ylm_lat[i] * creal(Qlm[i]);
+			vst += dylm_lat[i] * creal(Slm[i]);
+			vtt += dylm_lat[i] * creal(Tlm[i]);
+		}
+		vr[im] = vrr;
+		vt[im] = -sint*vst;	// Vt =   dS/dt
+		vp[im] =  sint*vtt;	// Vp = - dT/dt
+	for (im=0; im<=MMAX; im++) {
+		m=im*MRES;
+		vrr=0;	vtt=0;	vst=0;	vsp=0;	vtp=0;
+		for(l=m; l<=LMAX; l++, i++) {
+			vrr += ylm_lat[i] * Qlm[i];
+			vst += dylm_lat[i] * Slm[i];
+			vtt += dylm_lat[i] * Tlm[i];
+			vsp += ylm_lat[i] * Slm[i];
+			vtp += ylm_lat[i] * Tlm[i];
+		}
+		vr[im] = vrr;
+		vt[im] = I*m*vtp/sint + (-sint*vst);	// Vt = I.m/sint *T  + dS/dt
+		vp[im] = I*m*vsp/sint - (-sint*vtt);	// Vp = I.m/sint *S  - dT/dt
+	}
+	for (im=MMAX+1; im<NPHI/2+1; im++) {
+		vr[im] = 0.0;	vt[im] = 0.0;	vp[im] = 0.0;
+	}
+	fftw_execute_dft_c2r(ifft_lat,(complex double *) vr,vr);
+	fftw_execute_dft_c2r(ifft_lat,(complex double *) vt,vt);
+	fftw_execute_dft_c2r(ifft_lat,(complex double *) vp,vp);
+}
+
 
 /*
 	INITIALIZATION FUNCTIONS
@@ -861,7 +954,6 @@ void init_SH_gauss()
 	}
 }
 
-
 void init_SH_dct()
 {
 	double Z[2*NLAT_2], dZt[2*NLAT_2], dZp[2*NLAT_2];		// equally spaced theta points.
@@ -1296,6 +1388,7 @@ double SHT_error()
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after shtns_geometry and before any SH transform.</b> and sets all global variables.
+ * returns the number of modes to describe a scalar field.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
@@ -1304,12 +1397,13 @@ double SHT_error()
  * \param eps : polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
  *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
 */
-void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
+int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
 {
 	double t;
 	int im,m,l,lm;
 	int theta_inc, phi_inc, phi_embed;
 
+	shtns.mtr_dct = -1;
 	switch (flags & 0xFFFF00) {
 		case SHT_NATIVE_LAYOUT : 	theta_inc=1;  phi_inc=nlat;  phi_embed=2*(nphi/2+1);  break;
 		case SHT_THETA_CONTIGUOUS :	theta_inc=1;  phi_inc=nlat;  phi_embed=nphi;  break;
@@ -1320,6 +1414,7 @@ void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres,
 
 	// copy to global variables.
 #ifdef SHT_AXISYM
+	shtns.mmax = 0;		shtns.mres = 1;		shtns.nphi = 1;
 	if ((mmax != MMAX)||(nphi != NPHI)) runerr("[SHTns] axisymmetric version : only Mmax=0 and Nphi=1 allowed");
 #else
 	MMAX = mmax;	MRES = mres;	NPHI = nphi;
@@ -1387,7 +1482,7 @@ void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres,
   #if SHT_VERBOSE < 2
 		if (MTR_DCT == -1) {			// free memory used by DCT and disables DCT.
 			fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);	fftw_free(ykm_dct[0]);		// free now useless arrays.
-			zlm_dct0 = NULL;			// this completely disables DCT.
+			zlm_dct0 = NULL;		// this disables DCT completely.
 			if (idct != NULL) fftw_destroy_plan(idct);	// free unused dct plans
 			if (dctm0 != NULL) fftw_destroy_plan(dctm0);
 			if (flags == sht_auto) {
@@ -1433,4 +1528,5 @@ void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres,
   #endif
 		if (t > 1.e-3) runerr("[SHTns] bad SHT accuracy");		// stop if something went wrong.
 	}
+	return(NLM);	// returns the number of modes to describe a SHT.
 }

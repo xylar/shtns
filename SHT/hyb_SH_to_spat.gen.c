@@ -356,7 +356,7 @@ V		fftw_execute_dft_c2r(ifft, BtF, Vt);
 V		fftw_execute_dft_c2r(ifft, BpF, Vp);
 		if (SHT_FFT > 1) {		// free memory
 Q		    fftw_free(BrF);
-V	    	fftw_free(BtF);	// this frees also BpF.
+V		    fftw_free(BtF);	// this frees also BpF.
 		}
     } else {
 		k=1;	do {	// compress complex to real

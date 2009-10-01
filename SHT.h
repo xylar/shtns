@@ -4,33 +4,24 @@
 
 // GLOBAL VARIABLES : do not modify, they are set by the call to init_SH. //
 
-/*! \name size variables
- * The spherical harmonic coefficients are stored in a one-dimensional array of size NLM (the SH array).
- * The following variables are used to record the size of the physical space fields and its spherical harmonic description.
- * 
- * <b>DO NOT MODIFY</b> these variables ! They are set once for all by \ref init_SH.
- */
-//@{
-extern long int LMAX;	///< maximum degree (LMAX) of spherical harmonics.
-extern long int NLAT;	///< number of spatial points in Theta direction (latitude).
-#ifndef SHT_AXISYM
-  extern long int MRES;	///< \c 2.pi/MRES is the periodicity along the phi coord. (MRES=1 means no assumed periodicity).
-  extern long int MMAX;	///< maximum number of azimutal modes. \c (MMAX*MRES) is the maximum order of spherical harmonics. 
-  extern long int NPHI;	///< number of spatial points in Phi direction (longitude).
-#else
-  #define MMAX 0
-  #define NPHI 1
-  #define MRES 1
-#endif
-extern long int NLM;	///< total number of (l,m) spherical harmonics components (complex double).
-//@}
+struct sht_sze {
+	long int lmax;			///< maximum degree (lmax) of spherical harmonics.
+	long int mmax;			///< maximum order (mmax*mres) of spherical harmonics.
+	long int mres;			///< the periodicity along the phi axis.
+	long int nlat;			///< number of spatial points in Theta direction (latitude) ...
+	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	long int nphi;			///< number of spatial points in Phi direction (longitude)
+	long int nlm;			///< total number of (l,m) spherical harmonics components.
+	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
+};
+extern struct sht_sze shtns;
 
 /// total number of 'doubles' required for a spatial field (includes FFTW padding).
-/// only the first NLAT*NPHI are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat_data
-#define NSPAT_ALLOC (NLAT*(NPHI/2+1)*2)
+/// only the first shtns.nlat*shtns.nphi are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat_data
+#define NSPAT_ALLOC (shtns.nlat*(shtns.nphi/2+1)*2)
 
 /*! \name physical space coordinates arrays
- * functions of the co-latitude theta for latitudinal grid points [0..NLAT-1]
+ * functions of the co-latitude theta for latitudinal grid points [0..shtns.nlat-1]
  */
 //@{
 extern double *ct;	///< ct[i] = cos(theta)
@@ -59,13 +50,13 @@ extern long int *lmidx;
 ///LiM(l,im) : macro returning array index for given l and im.
 #define LiM(l,im) ( lmidx[im] + l )
 /// LM(l,m) : macro returning array index for given l and m.
-#define LM(l,m) ( lmidx[(m)/MRES] + l )
+#define LM(l,m) ( lmidx[(m)/shtns.mres] + l )
 /// LM_LOOP( action ) : macro that performs "action" for every (l,m), with lm set, but neither l, m nor im.
 /// \c lm must be a declared int and is the loop counter and the SH array index. more info : \ref spec_data
-#define LM_LOOP( action ) for (lm=0; lm<NLM; lm++) { action }
+#define LM_LOOP( action ) for (lm=0; lm<shtns.nlm; lm++) { action }
 /// LM_L_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined (but NOT m and im).
 /// \c lm and \c m must be declared int's. \c lm is the loop counter and SH array index, while \c l is the SH degree. more info : \ref spec_data
-#define LM_L_LOOP( action ) for (lm=0; lm<NLM; lm++) { l=li[lm]; { action } }
+#define LM_L_LOOP( action ) for (lm=0; lm<shtns.nlm; lm++) { l=li[lm]; { action } }
 //@}
 
 #ifndef M_PI
@@ -87,7 +78,7 @@ enum shtns_type {
 	sht_reg_fast,	///< use fastest algorithm, on a <b>regular grid</b>, mixing dct and regular quadrature.
 	sht_reg_dct,	///< use pure dct algorithm, on a <b>regular grid</b>.
 	sht_quick_init, ///< gauss grid, with minimum initialization time (useful for pre/post-processing)
-	sht_reg_poles	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. \ref NLAT odd is supported even if \link compil SHT_NLAT_EVEN \endlink is defined, useful for vizualisation.
+	sht_reg_poles	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. \ref shtns.nlat odd is supported even if \link compil SHT_shtns.nlat_EVEN \endlink is defined, useful for vizualisation.
 };
 
 #define SHT_NATIVE_LAYOUT 0		///< Tells shtns_init to use \ref native
@@ -97,7 +88,7 @@ enum shtns_type {
 // FUNCTIONS //
 
 /// Initializes spherical harmonic transforms of given size, and sets all global variables.
-void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi);
+int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi);
 
 /// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to init_SH
 long int nlm_calc(long int lmax, long int mmax, long int mres);

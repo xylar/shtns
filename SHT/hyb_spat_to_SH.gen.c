@@ -96,10 +96,12 @@ V	    fftw_execute_dft_r2c(fft,Vp, BpF);
 Q	#define BR0	((double *)BrF)
 Q	if (MTR_DCT >= 0) {		// unfortunately, only scalar SHT can be faster with DCT.
 Q		fftw_execute_r2r(dctm0,(double *) BrF, (double *) BrF);		// DCT
+Q    #ifndef SHT_AXISYM
 Q		if (NPHI>1) {
 Q			l=1;	// compact complex to real, in-place.
 Q			do {	BR0[l] = (double) BrF[l];	l++;	} while(l < NLAT);
 Q		}
+Q    #endif
 Q		l=0;
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
 Q		zl = zlm_dct0;
@@ -134,6 +136,7 @@ Q  #endif
 Q		BrF += NLAT;
 Q	} else {
   #endif
+  #ifndef SHT_AXISYM
 	    if (NPHI>1) {
 		i=0;	l=NLAT-1;
  B		do {	// compute symmetric and antisymmetric parts.
@@ -153,6 +156,7 @@ VB			pe0 = (double) BpF[i];	po0 = 0.0;
  B		}
     #endif
 	    } else {
+  #endif
 		i=0;	l=NLAT-1;
  B		do {	// compute symmetric and antisymmetric parts.
 QB			re0 = ((double*)BrF)[i] + ((double*)BrF)[l];
@@ -170,7 +174,9 @@ VB			te0 = ((double*)BtF)[i];	to0 = 0.0;
 VB			pe0 = ((double*)BpF)[i];	po0 = 0.0;
  B		}
     #endif
+  #ifndef SHT_AXISYM
 	    }
+  #endif
 		l=0;
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
 V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im

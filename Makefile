@@ -31,6 +31,7 @@ SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 
 SHT.o : SHT.c Makefile $(shtfiles)
 	$(cmd) -c SHT.c -o SHT.o
+#	ar -cr libshtns.a SHT.o
 
 SHTg.o : SHT.c Makefile $(shtfiles)
 	$(cmd) -c -DSHT_NO_DCT SHT.c -o SHTg.o
