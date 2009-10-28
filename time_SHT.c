@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
 	clock_t tcpu;
 	ticks tik0, tik1;
 	double e0,e1;
-	double polaropt = 1.e-6;		// an aggressive default for polar optimization.
+	double polaropt = 1.e-8;		// default for polar optimization.
 	enum shtns_type shtmode = sht_auto;		// default to "auto" (fastest) mode.
 	int layout = SHT_NATIVE_LAYOUT;
 	char name[20];

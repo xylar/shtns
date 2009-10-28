@@ -7,6 +7,14 @@
 
 *** Optimizations ***
 
+for m=0, z[k] is zero up to l-1
+         dtz[k] is zero up to l-2
+for m=1, z[k] is zero up to l-2
+         dtz[k] is constant up to l-1
+for m=2, z[k] is constant up to l-1
+         dtz[k] is constant up to l-2
+for m=3, z[k] is constant up to l-2
+
 - Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
 
 + cache optimization have been performed for m=0 and are quite impressive at high LMAX.

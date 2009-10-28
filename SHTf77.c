@@ -148,3 +148,28 @@ void shtns_qst_to_point_(double *vr, double *vt, double *vp,
 	SHqst_to_point(Qlm, Slm, Tlm, *cost, *phi, vr, vt, vp);
 }
 //@}
+
+/** \name Axisymmetric Spherical Harmonic transform
+*/
+//@{
+void shtns_spat_to_sh_m0_(double *Vr, complex double *Qlm) {
+	spat_to_SH_m0(Vr, Qlm);
+}
+void shtns_sh_to_spat_m0_(complex double *Qlm, double *Vr) {
+    SH_to_spat_m0(Qlm, Vr);
+}
+
+void shtns_spat_to_sphtor_m0_(double *Vt, double *Vp, complex double *Slm, complex double *Tlm) {
+    spat_to_SHsphtor_m0(Vt, Vp, Slm, Tlm);
+}
+void shtns_sphtor_to_spat_m0_(complex double *Slm, complex double *Tlm, double *Vt, double *Vp) {
+    SHsphtor_to_spat_m0(Slm, Tlm, Vt, Vp);
+}
+
+void shtns_sph_to_spat_m0_(complex double *Slm, double *Vt) {
+    SHsph_to_spat_m0(Slm, Vt);
+}
+void shtns_tor_to_spat_m0_(complex double *Tlm, double *Vp) {
+    SHtor_to_spat_m0(Tlm, Vp);
+}
+//@}

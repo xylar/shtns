@@ -93,47 +93,94 @@ V	    fftw_execute_dft_r2c(fft,Vp, BpF);
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
   #ifndef SHT_NO_DCT
-Q	#define BR0	((double *)BrF)
-Q	if (MTR_DCT >= 0) {		// unfortunately, only scalar SHT can be faster with DCT.
-Q		fftw_execute_r2r(dctm0,(double *) BrF, (double *) BrF);		// DCT
-Q		if (NPHI>1) {
-Q			l=1;	// compact complex to real, in-place.
-Q			do {	BR0[l] = (double) BrF[l];	l++;	} while(l < NLAT);
-Q		}
+	if (MTR_DCT >= 0) {
+	#ifndef SHT_AXISYM
+Q		#define BR0	((double *)reo)
+V		#define BT0	((double *)tpeo)
+V		#define BP0	((double *)tpeo + NLAT)
+V		l = (NPHI==1) ? 1 : 2;		// stride of source data.
+V		i=0;	i0=0;	do {
+V			((double *)BtF)[i0] *= st_1[i]; 	((double *)BpF)[i0] *= st_1[i];
+V			i++;	i0+=l;
+V		} while (i<NLAT);
+Q		fftw_execute_r2r(dct_m0,(double *) BrF, BR0);		// DCT out-of-place.
+V		fftw_execute_r2r(dct_m0,(double *) BtF, BT0);		// DCT out-of-place.
+V		fftw_execute_r2r(dct_m0,(double *) BpF, BP0);		// DCT out-of-place.
+	#else
+Q		#define BR0	((double *)BrF)
+V		#define BT0	((double *)BtF)
+V		#define BP0	((double *)BpF)
+V		i=0;	do {
+V			BT0[i] *= st_1[i]; 	BP0[i] *= st_1[i];
+V			i++;
+V		} while (i<NLAT);
+Q		fftw_execute_r2r(dct_r1,(double *) BrF, (double *) BrF);	// DCT in-place.
+V		fftw_execute_r2r(dct_r1,(double *) BtF, (double *) BtF);	// DCT in-place.
+V		fftw_execute_r2r(dct_r1,(double *) BpF, (double *) BpF);	// DCT in-place.
+	#endif
 Q		l=0;
+V		l=1;
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
 Q		zl = zlm_dct0;
-Q		do {	// l has parity of m
+V		Sl = Slm;	Tl = Tlm;
+V		dzl0 = dzlm_dct0;
+V		Sl[0] = 0.0;	Tl[0] = 0.0;
+#		qs0 = 0.0;	qs1 = 0.0;			// sum of first Ql's
+		do {	// l has parity of m
 Q			q0 = 0.0;	q1 = 0.0;
+V			s0 = 0.0;	t1 = 0.0;	t0 = 0.0;	s1 = 0.0;
 Q			i=l;	// l < NLAT
-Q			do {
+V			i=l-1;	// l > 0
+#			qs0 += BR0[l];	qs1 += BR0[l+1];
+#			q0 = qs0*zl[i];	q1 = qs1*zl[i+1];
+			do {
 Q				q0 += BR0[i]   * zl[0];
 Q				q1 += BR0[i+1] * zl[1];
-Q				zl+=2;	i+=2;
-Q			} while(i<NLAT);
+V				s0 += BT0[i]   * dzl0[0];
+V				t0 -= BP0[i]   * dzl0[0];
+V				s1 += BT0[i+1] * dzl0[1];
+V				t1 -= BP0[i+1] * dzl0[1];
+Q				zl+=2;
+V				dzl0+=2;
+				i+=2;
+			} while(i<NLAT);
 Q			Ql[l] = q0;	Ql[l+1] = q1;
-Q			l+=2;
-Q		} while(l<LTR);
-Q		if (l == LTR) {
+V			Sl[l] = s0;	Sl[l+1] = s1;
+V			Tl[l] = t0;	Tl[l+1] = t1;
+			l+=2;
+		} while(l<LTR);
+		if (l == LTR) {
 Q			q0 = 0.0;
+V			s0 = 0.0;	t0 = 0.0;
 Q			i=l;	// l < NLAT
-Q			do {
-Q				q0   += BR0[i]   * zl[0];
-Q				zl+=2;	i+=2;
-Q			} while(i<NLAT);
+V			i=l-1;
+			do {
+Q				q0 += BR0[i] * zl[0];
+V				s0 += BT0[i] * dzl0[0];
+V				t0 -= BP0[i] * dzl0[0];
+Q				zl+=2;
+V				dzl0+=2;
+				i+=2;
+			} while(i<NLAT);
 Q			Ql[l] = q0;
-Q			l++;
-Q		}
+V			Sl[l] = s0;	Tl[l] = t0;
+			l++;
+		}
 Q	#undef BR0
-Q  #ifdef SHT_VAR_LTR
-Q		while( l<=LMAX ) {
+V	#undef BT0
+V	#undef BP0
+  #ifdef SHT_VAR_LTR
+		while( l<=LMAX ) {
 Q			Ql[l] = 0.0;
-Q			l++;
-Q		}
-Q  #endif
-Q		BrF += NLAT;
-Q	} else {
+V			Sl[l] = 0.0;	Tl[l] = 0.0;
+			l++;
+		}
   #endif
+Q		BrF += NLAT;
+V		BtF += NLAT;	BpF += NLAT;
+	} else {
+  #endif
+  #ifndef SHT_AXISYM
 	    if (NPHI>1) {
 		i=0;	l=NLAT-1;
  B		do {	// compute symmetric and antisymmetric parts.
@@ -153,6 +200,7 @@ VB			pe0 = (double) BpF[i];	po0 = 0.0;
  B		}
     #endif
 	    } else {
+  #endif
 		i=0;	l=NLAT-1;
  B		do {	// compute symmetric and antisymmetric parts.
 QB			re0 = ((double*)BrF)[i] + ((double*)BrF)[l];
@@ -170,14 +218,18 @@ VB			te0 = ((double*)BtF)[i];	to0 = 0.0;
 VB			pe0 = ((double*)BpF)[i];	po0 = 0.0;
  B		}
     #endif
+  #ifndef SHT_AXISYM
 	    }
-		l=0;
+  #endif
+Q		l=0;
+V		l=1;		// l=0 is zero for the vector transform.
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
 V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
 Q		zl = zlm[im];
 V		dzl0 = (double *) dzlm[im];		// only theta derivative (d/dphi = 0 for m=0)
 QB		BrF += NLAT;
 VB		BtF += NLAT;	BpF += NLAT;
+V		Sl[0] = 0.0;	Tl[0] = 0.0;
 		do {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			i=0;
 QE			q0 = 0.0;
@@ -197,42 +249,42 @@ V				dzl0 +=2;
 			} while(i < ni);
 QE			Ql[l] = q0;
 QO			Ql[l+1] = q1;
-VE			Sl[l] = s0;	Tl[l+1] = t1;
-VO			Tl[l] = t0;	Sl[l+1] = s1;
+VE			Sl[l] = s1;	Tl[l+1] = t0;
+VO			Tl[l] = t1;	Sl[l+1] = s0;
 			l+=2;
 		} while (l<LTR);
 		if (l==LMAX) {
 QE			q0 = 0.0;
-VE			s0 = 0.0;
-VO			t0 = 0.0;
+VE			s1 = 0.0;
+VO			t1 = 0.0;
 			i=0;	do {
 QE				q0 += zl[0] * re0;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				s0 += dzl0[0] * to0;
-VO				t0 -= dzl0[0] * po0;
+VE				s1 += dzl0[0] * te0;
+VO				t1 -= dzl0[0] * pe0;
 Q				zl ++;
 V				dzl0 ++;
 				i++;
 			} while(i<ni);
 QE			Ql[l] = q0;
-VE			Sl[l] = s0;
-VO			Tl[l] = t0;
+VE			Sl[l] = s1;
+VO			Tl[l] = t1;
   #ifdef SHT_VAR_LTR
 		} else {
 		    if (l==LTR) {
 QE			q0 = 0.0;
-VE			s0 = 0.0;
-VO			t0 = 0.0;
+VE			s1 = 0.0;
+VO			t1 = 0.0;
 			i=0;	do {
 QE				q0 += zl[0] * re0;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				s0 += dzl0[0] * to0;
-VO				t0 -= dzl0[0] * po0;
+VO				s1 += dzl0[1] * te0;
+VE				t1 -= dzl0[1] * pe0;
 Q				zl +=2;
 V				dzl0 +=2;
 				i++;
 			} while(i<ni);
 QE			Ql[l] = q0;
-VE			Sl[l] = s0;
-VO			Tl[l] = t0;
+VE			Sl[l] = s1;
+VO			Tl[l] = t1;
 			l++;
 		    }
 		    while( l<=LMAX ) {
@@ -243,7 +295,7 @@ V			Sl[l] = 0.0;	Tl[l] = 0.0;
   #endif
 		}
   #ifndef SHT_NO_DCT
-Q	}
+	}
   #endif
   #ifndef SHT_AXISYM
 	for (im=1;im<=MTR;im++) {
@@ -339,8 +391,7 @@ V			Sl[l] = 0.0;	Tl[l] = 0.0;
     #endif
 		}
 	}
-  #endif
-  #ifndef SHT_AXISYM
+
   	if (SHT_FFT > 1) {		// free memory
 Q	    fftw_free(BrF - NLAT*(MTR+1));
 V	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
@@ -362,4 +413,6 @@ V	#undef po0
 Q	#undef reo0
 V	#undef teo0
 V	#undef peo0
+Q	#undef reo0
+V	#undef tpeo0
 # }

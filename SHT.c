@@ -12,7 +12,7 @@
 //#define SHT_EO
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info)
-#define SHT_VERBOSE 1
+#define SHT_VERBOSE 2
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -140,9 +140,11 @@ struct DtDp** dzlm;
 double** ykm_dct;	// matrix for inverse transform (synthesis) using dct.
 struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix
 double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
+double* dzlm_dct0;
 
 fftw_plan ifft, fft;	// plans for FFTW.
-fftw_plan idct, dctm0;
+fftw_plan idct, dct_m0;			// (I)DCT for NPHI>1
+fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
 unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 
 #define SSE __attribute__((aligned (16)))
@@ -162,11 +164,7 @@ unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner 
 /// \param[out] Qlm = spherical harmonics coefficients : complex double array of size NLM
 void spat_to_SH(double *Vr, complex double *Qlm)
 {
-	#ifndef _SHT_EO_
-		#include "SHT/spat_to_SH.c"
-	#else
-		#include "SHT/spat_to_SHo.c"
-	#endif
+	#include "SHT/spat_to_SH.c"
 }
 
 /////////////////////////////////////////////////////
@@ -175,11 +173,7 @@ void spat_to_SH(double *Vr, complex double *Qlm)
 /// \param[out] Vr = spatial data : double array of size NLAT*(NPHI/2+1)*2
 void SH_to_spat(complex double *Qlm, double *Vr)
 {
-	#ifndef _SHT_EO_
-		#include "SHT/SH_to_spat.c"
-	#else
-		#include "SHT/SHo_to_spat.c"
-	#endif
+	#include "SHT/SH_to_spat.c"
 }
 
 //void SH_to_grad_spat(complex double *Slm, complex double *BtF, complex double *BpF)
@@ -193,21 +187,17 @@ void SH_to_spat(complex double *Qlm, double *Vr)
 /// \param[out] Vt/Vp : theta/phi components of vector field. double array of size NLAT*(NPHI/2+1)*2
 void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
 {
-#ifndef _SHT_EO_
-  #include "SHT/SHst_to_spat.c"
-#else
-  #include "SHT/SHost_to_spat.c"
-#endif
+	#include "SHT/SHst_to_spat.c"
 }
 
 void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp)
 {
-#include "SHT/SHs_to_spat.c"
+	#include "SHT/SHs_to_spat.c"
 }
 
 void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp)
 {
-#include "SHT/SHt_to_spat.c"
+	#include "SHT/SHt_to_spat.c"
 }
 
 /////////////////////////////////////////////////////
@@ -216,11 +206,7 @@ void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp)
 /// \param[out] Slm/Tlm : SH array of Spheroidal/Toroidal scalar. complex size NLM
 void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
 {
-#ifndef _SHT_EO_
-  #include "SHT/spat_to_SHst.c"
-#else
-  #include "SHT/spat_to_SHost.c"
-#endif
+	#include "SHT/spat_to_SHst.c"
 }
 
 /// Evaluate scalar SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
@@ -285,6 +271,7 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	*vp = vsp/sint - (-sint*vtt);	// Bp = I.m/sint *S  - dT/dt
 }
 
+
 /*
 	SHT FUNCTIONS with variable LTR truncation.
 */
@@ -296,11 +283,7 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 /// spatial field Vr is converted to SH representation Qlm with maximum degree LTR
 void spat_to_SH_l(double *Vr, complex double *Qlm, int LTR)
 {
-	#ifndef _SHT_EO_
-		#include "SHT/spat_to_SH.c"
-	#else
-		#include "SHT/spat_to_SHo.c"
-	#endif
+	#include "SHT/spat_to_SH.c"
 }
 
 /////////////////////////////////////////////////////
@@ -310,11 +293,7 @@ void spat_to_SH_l(double *Vr, complex double *Qlm, int LTR)
 
 void SH_to_spat_l(complex double *Qlm, double *Vr, int LTR)
 {
-	#ifndef _SHT_EO_
-		#include "SHT/SH_to_spat.c"
-	#else
-		#include "SHT/SHo_to_spat.c"
-	#endif
+	#include "SHT/SH_to_spat.c"
 }
 
 //void SH_to_grad_spat(complex double *Slm, complex double *BtF, complex double *BpF)
@@ -330,11 +309,7 @@ void SH_to_spat_l(complex double *Qlm, double *Vr, int LTR)
 //          double array of size NLAT*(NPHI/2+1)*2
 void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int LTR)
 {
-#ifndef _SHT_EO_
-  #include "SHT/SHst_to_spat.c"
-#else
-  #include "SHT/SHost_to_spat.c"
-#endif
+	#include "SHT/SHst_to_spat.c"
 }
 
 void SHsph_to_spat_l(complex double *Slm, double *Vt, double *Vp, int LTR)
@@ -349,11 +324,7 @@ void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR)
 
 void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR)
 {
-#ifndef _SHT_EO_
-  #include "SHT/spat_to_SHst.c"
-#else
-  #include "SHT/spat_to_SHost.c"
-#endif
+	#include "SHT/spat_to_SHst.c"
 }
 
 #undef MTR
@@ -433,12 +404,6 @@ void GaussNodes(long double *x, long double *w, int n)
 
 	eps = 1.1e-19;	// desired precision, minimum = 1.0842e-19 (long double)
 
-#ifdef _SHT_EO_
-	n *=2;
-  #if SHT_VERBOSE > 0
-	printf(" Even/odd separation, n=%d\n",n);
-  #endif
-#endif
 	m = (n+1)/2;
 	for (i=1;i<=m;i++) {
 		z = cosl(pi*((long double)i-0.25)/((long double)n+0.5));
@@ -456,10 +421,8 @@ void GaussNodes(long double *x, long double *w, int n)
 		} while ( fabsl(z-z1) > eps );
 		x[i-1] = z;		// Build up the abscissas.
 		w[i-1] = 2.0/((1-z*z)*(pp*pp));		// Build up the weights.
-#ifndef _SHT_EO_
 		x[n-i] = -z;
 		w[n-i] = w[i-1];
-#endif
 	}
 
 // as we started with initial guesses, we should check if the gauss points are actually unique.
@@ -487,11 +450,7 @@ void EqualPolarGrid()
 	printf("        => using Equaly Spaced Nodes including poles\n");
 #endif
 // cos theta of latidunal points (equaly spaced in theta)
-#ifndef _SHT_EO_
 	f = pi/(NLAT-1.0);
-#else
-	f = pi/(2.*NLAT -1.0);
-#endif
 	for (j=0; j<NLAT; j++) {
 		ct[j] = cosl(f*j);
 		st[j] = sinl(f*j);
@@ -562,59 +521,79 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 #endif
 	SHT_FFT = 0;	// no fft.
   }
-	dctm0 = NULL;	idct = NULL;		// set dct plans to uninitialized.
+	dct_m0 = NULL;	idct = NULL;		// set dct plans to uninitialized.
+	dct_r1 = NULL;	idct_r1 = NULL;
 }
 
 /// initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
 void planDCT()
 {
-	complex double *ShF;
 	double *Sh;
 	int ndct = NLAT;
 	fftw_r2r_kind r2r_kind;
 	fftw_iodim dims, hdims[2];
+	double Sh0[NLAT] SSE;				// temp storage on the stack, aligned.
 	
-    if (NPHI>1) {
+// real NPHI=1, allocate only once since it does not change.
+	if ((dct_r1 == NULL)||(idct_r1 == NULL)) {
+		Sh = (double *) fftw_malloc( NLAT * sizeof(double) );
+		if (dct_r1 == NULL) {
+			r2r_kind = FFTW_REDFT10;
+			dct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);
+		}
+		if (idct_r1 == NULL) {
+			r2r_kind = FFTW_REDFT01;
+			idct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);
+		}
+		fftw_free(Sh);
+		if ((dct_r1 == NULL)||(idct_r1 == NULL))
+			runerr("[FFTW] (i)dct_r1 planning failed !");
+#if SHT_VERBOSE > 1
+			printf(" *** idct_r1 plan :\n");		fftw_print_plan(idct_r1);
+			printf("\n *** dct_r1 plan :\n");	fftw_print_plan(dct_r1);	printf("\n");
+#endif
+	}
+
+#ifndef SHT_AXISYM
 	if (idct != NULL) fftw_destroy_plan(idct);
-// Allocate dummy Spatial Fields.
-	ShF = (complex double *) fftw_malloc((NPHI/2 +1) * NLAT * sizeof(complex double));
-	Sh = (double *) ShF;
+	// Allocate dummy Spatial Fields.
+	Sh = (double *) fftw_malloc((NPHI/2 +1) * NLAT*2 * sizeof(double));
 
 	dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
 	hdims[0].n = MTR_DCT+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
 	hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
-	
-//	r2r_kind = FFTW_REDFT10;
-//	dct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
-	r2r_kind = FFTW_REDFT01;
-	idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode );
-	if (idct == NULL)
-		runerr("[FFTW] dct planning failed !");
 
-	if (dctm0 == NULL) {
-		r2r_kind = FFTW_REDFT10;
-		dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode );
-		if (dctm0 == NULL)
-			runerr("[FFTW] dctm0 planning failed !");
-	}
-	fftw_free(ShF);
-    } else {
-	if ((dctm0 == NULL)||(idct == NULL)) {
-		ShF = (complex double *) fftw_malloc((NPHI/2 +1) * NLAT * sizeof(complex double));
-		Sh = (double *) ShF;
-		if (dctm0 == NULL) {
+	if (NPHI>1) {		// complex data for NPHI>1, recompute as it does depend on MTR_DCT
+		r2r_kind = FFTW_REDFT01;
+		idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode);
+		if (idct == NULL)
+			runerr("[FFTW] idct planning failed !");
+#if SHT_VERBOSE > 1
+			printf(" *** idct plan :\n");		fftw_print_plan(idct);	printf("\n");
+#endif
+		if (dct_m0 == NULL) {
 			r2r_kind = FFTW_REDFT10;
-			dctm0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
+//			dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode);
+			dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);	// out-of-place.
+			if (dct_m0 == NULL)
+				runerr("[FFTW] dct_m0 planning failed !");
+#if SHT_VERBOSE > 1
+				printf(" *** dct_m0 plan :\n");		fftw_print_plan(dct_m0);	printf("\n");
+#endif
 		}
-		if (idct == NULL) {
-			r2r_kind = FFTW_REDFT01;
-			idct = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode );
+	} else {	// NPHI==1
+		if (dct_m0 == NULL) {
+			r2r_kind = FFTW_REDFT10;
+			dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);	// out-of-place.
+			if (dct_m0 == NULL)
+				runerr("[FFTW] dct_m0 planning failed !");
+#if SHT_VERBOSE > 1
+				printf(" *** dct_m0 plan :\n");		fftw_print_plan(dct_m0);	printf("\n");
+#endif
 		}
-		fftw_free(ShF);
-		if ((dctm0 == NULL)||(idct == NULL))
-			runerr("[FFTW] dct planning failed !");
 	}
-    }
+	fftw_free(Sh);
+#endif
 }
 
 /// SET MTR_DCT and updates fftw_plan for DCT's
@@ -745,15 +724,21 @@ void OptimizeMatrices(double eps)
 	}
 	yg = (double *) dzlm[im];
 	if (yg != NULL) {	// for sht_reg_poles there is no dzlm defined.
-		for (l=m; l<LMAX; l+=2) {
+		for (l=1; l<LMAX-1; l+=2) {		// l=0 is zero, so we start at l=1.
 			for (it=0; it<NLAT_2; it++) {
-				yg[(l-m)*NLAT_2 + it*2] = dzlm[im][(l-m)*NLAT_2 + it*2].t;
-				yg[(l-m)*NLAT_2 + it*2+1] = dzlm[im][(l-m)*NLAT_2 + it*2+1].t;
+				yg[(l-m-1)*NLAT_2 + it*2] = dzlm[im][(l-m+1)*NLAT_2 + it*2].t;		// l+1
+				yg[(l-m-1)*NLAT_2 + it*2+1] = dzlm[im][(l-m-1)*NLAT_2 + it*2+1].t;	// l
+			}
+		}
+		if (l==LMAX-1) {
+			for (it=0; it<NLAT_2; it++) {
+				yg[(l-m-1)*NLAT_2 + it*2] = dzlm[im][(l-m+1)*NLAT_2 + it].t;		// l+1
+				yg[(l-m-1)*NLAT_2 + it*2+1] = dzlm[im][(l-m-1)*NLAT_2 + it*2+1].t;	// l
 			}
 		}
 		if (l==LMAX) {		// last l is stored right away, without interleaving.
 			for (it=0; it<NLAT_2; it++) {
-				yg[(l-m)*NLAT_2 + it] = dzlm[im][(l-m)*NLAT_2 + it].t;
+				yg[(l-m-1)*NLAT_2 + it] = dzlm[im][(l-m-1)*NLAT_2 + it*2+1].t;		// l (odd)
 			}
 		}
 	}
@@ -800,9 +785,6 @@ void init_SH_gauss()
 	long int it,im,m,l;
 	long double xg[NLAT], wg[NLAT];	// gauss points and weights.
 
-#ifdef _SHT_EO_
-	iylm_fft_norm *= 2.0;	// normation must be multiplied by 2.
-#endif
 #if SHT_VERBOSE > 0
 	printf("        => using Gauss Nodes\n");
 #endif
@@ -820,9 +802,9 @@ void init_SH_gauss()
 	for (it = 0; it<NLAT_2; it++) {
 		t = gsl_sf_legendre_sphPlm(NLAT, 0, ct[it]);
 		if (t>tmax) tmax = t;
-//		printf("i=%d, x=%12.12g, p=%12.12g\n",i,ct[i],t);
+//		printf("i=%d, x=%12.12g, p=%12.12g\n",it,ct[it],t);
 	}
-	printf("          max zero at Gauss node for Plm[l=LMAX+1,m=0] : %g\n",tmax);
+	printf("          max zero at Gauss node for Plm[l=NLAT,m=0] : %g\n",tmax);
 	if (NLAT_2 < 100) {
 		printf("          Gauss nodes :");
 		for (it=0;it<NLAT_2; it++)
@@ -861,8 +843,6 @@ void init_SH_gauss()
 	}
 }
 
-
-
 /// Clenshaw algorithm to evaluate a partial Chebyshev series dct[] up to degree n at any ct = cos(theta)
 /// works for n>=2. see http://en.wikipedia.org/wiki/Clenshaw_algorithm
 inline eval_dct(double *val, double *dct, long int n, double ct)
@@ -900,7 +880,7 @@ inline eval_dct_cplx(complex double *val, complex double *dct, long int n, doubl
 void init_SH_dct(int analysis)
 {
 	fftw_plan dct, idct;
-	double *yk, *yk0, *yg;		// temp storage
+	double *yk, *yk0, *dyk0, *yg;		// temp storage
 	struct DtDp *dyg, *dyk;
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
 	double iylm_fft_norm = 2.0*M_PI/NPHI;	// FFT normation for zlm
@@ -950,9 +930,10 @@ void init_SH_dct(int analysis)
 			dsk += LMAX+1 - l;
 		}
 	}
-	for (l=0, it=0; l<=LMAX; l+=2) {	// how much memory for zlm_dct0 ?
+	for (l=0, it=0; l<=LMAX; l+=2)	// how much memory for zlm_dct0 ?
 		it += (2*NLAT_2 -l);
-	}
+	for (l=1, im=0; l<=LMAX; l+=2)	// how much memory for dzlm_dct0 ?
+		im += (2*NLAT_2 -l+1);
 
 #if SHT_VERBOSE > 1
 	printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
@@ -960,6 +941,7 @@ void init_SH_dct(int analysis)
 	ykm_dct[0] = (double *) fftw_malloc(sizeof(double)* sk);
 	dykm_dct[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* dsk);
 	zlm_dct0 = (double *) fftw_malloc( sizeof(double)* it );
+	dzlm_dct0 = (double *) fftw_malloc( sizeof(double)* im );
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
 		for (it=0, sk=0; it<= KMAX; it+=2) {
@@ -992,7 +974,8 @@ void init_SH_dct(int analysis)
 	yk = (double *) malloc( sizeof(double) * (KMAX+1)*(LMAX+1) );
 	dyk = (struct DtDp *) malloc( sizeof(struct DtDp)* (KMAX+1)*(LMAX+1) );
 	if (analysis) {
-		yk0 = (double *) malloc( sizeof(double) * ( LMAX/2+1)*(2*NLAT_2) );		// temp for zlm_dct0
+		yk0 = (double *) malloc( sizeof(double) * (LMAX/2+1)*(2*NLAT_2) * 2 );		// temp for zlm_dct0
+		dyk0 = yk0 + (LMAX/2+1)*(2*NLAT_2);
 	}
 
 	for (im=0; im<=MMAX; im++) {
@@ -1112,17 +1095,30 @@ void init_SH_dct(int analysis)
 			for (k=0; k<(2*NLAT_2); k++) printf("%f ",Z[k]);
 			printf("\n       dZt ::\t");
 			for (k=0; k<(2*NLAT_2); k++) printf("%f ",dZt[k]);
+			if (m&1) {
+				printf("\n       dZp ::\t");
+				for (k=0; k<(2*NLAT_2); k++) printf("%f ",dZp[k]);
+			}
 		}
 #endif
 
 			if (m == 0) {		// we store zlm in dct space for m=0
-				if (k0==0) 	for (k=0;k<(2*NLAT_2);k++) yk0[((l-m)>>1)*(2*NLAT_2) +k] = 0.0;
-				for (k=k0; k<(2*NLAT_2); k+=2) {
-					if (k == 0) {
-						yk0[((l-m)>>1)*(2*NLAT_2) +k] = Z[k]*0.5;         // store zlm_dct
-					} else {
-						yk0[((l-m)>>1)*(2*NLAT_2) +k] = Z[k];             // store zlm_dct
+				if (k0==0) 	{
+					yk0[((l-m)>>1)*(2*NLAT_2)] = Z[0]*0.5;         // store zlm_dct (k=0)
+					for (k=1; k<(2*NLAT_2); k++) yk0[((l-m)>>1)*(2*NLAT_2) +k] = 0.0;		// zero out.
+					k0=2;
+				}
+				for (k=k0; k<(2*NLAT_2); k+=2)
+					yk0[((l-m)>>1)*(2*NLAT_2) +k] = Z[k];             // store zlm_dct
+					
+				if (l>0) {
+					if (k1==0) 	{
+						dyk0[((l-1-m)>>1)*(2*NLAT_2)] = dZt[0]*0.5;         // store dzlm_dct (k=0)
+						for (k=1; k<(2*NLAT_2); k++) dyk0[((l-1-m)>>1)*(2*NLAT_2) +k] = 0.0;		// zero out.
+						k1=2;
 					}
+					for (k=k1; k<(2*NLAT_2); k+=2)
+						dyk0[((l-1-m)>>1)*(2*NLAT_2) +k] = dZt[k];             // store dzlm_dct
 				}
 			}
 
@@ -1177,8 +1173,8 @@ void init_SH_dct(int analysis)
 			for (it=0; it<= KMAX; it+=2) {
 				for (l=it-2; l<=LMAX; l++) {
 					if (l>=0) {
-					yg[0] = dyg[0].t;
-					yg++;	dyg++;
+						yg[0] = dyg[0].t;
+						yg++;	dyg++;
 					}
 				}
 			}
@@ -1194,6 +1190,14 @@ void init_SH_dct(int analysis)
 				yg++;
 			}
 			yk0 += 2*NLAT_2;
+		}
+		yg = dzlm_dct0;
+		for (l=1; l<=LMAX; l+=2) {
+			for (it=l-1; it<2*NLAT_2; it++) {	// for m=0, dzl coeff with i<l-1 are zeros.
+				*yg = dyk0[it];
+				yg++;
+			}
+			dyk0 += 2*NLAT_2;
 		}
 		free(yk0 - (2*NLAT_2)*(LMAX/2+1));
 	}
@@ -1422,4 +1426,76 @@ void shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres,
 		if (t > 1.e-3) runerr("[SHTns] bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
   #endif
 	}
+}
+
+
+/*
+	SHT FUNCTIONS for m=0 only (axisymmetric)
+*/
+
+#define SHT_AXISYM
+// truncation at LMAX and MMAX
+#define LTR LMAX
+#define MTR MMAX
+#undef SHT_VAR_LTR
+
+void spat_to_SH_m0(double *Vr, complex double *Qlm)
+{
+	#include "SHT/spat_to_SH.c"
+}
+
+void SH_to_spat_m0(complex double *Qlm, double *Vr)
+{
+	#include "SHT/SH_to_spat.c"
+}
+
+void SHsphtor_to_spat_m0(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
+{
+	#include "SHT/SHst_to_spat.c"
+}
+
+void SHsph_to_spat_m0(complex double *Slm, double *Vt)
+{
+	#include "SHT/SHs_to_spat.c"
+}
+
+void SHtor_to_spat_m0(complex double *Tlm, double *Vp)
+{
+	#include "SHT/SHt_to_spat.c"
+}
+
+void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
+{
+	#include "SHT/spat_to_SHst.c"
+}
+
+#undef SHT_AXISYM
+
+/*
+	SHT FUNCTIONS with assumed equatorial symmetry
+*/
+
+#define SHT_NO_DCT
+#define LTR LMAX
+#define MTR MMAX
+#undef SHT_VAR_LTR
+
+void SHeo_to_spat(complex double *Qlm, double *Vr, int parity)
+{
+	#include "SHT/SHe_to_spat.c"
+}
+
+void spat_to_SHeo(double *Vr, complex double *Qlm, int parity)
+{
+	#include "SHT/spat_to_SHe.c"
+}
+
+void SHeo_sphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int parity)
+{
+	#include "SHT/SHest_to_spat.c"
+}
+
+void spat_to_SHeo_sphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int parity)
+{
+	#include "SHT/spat_to_SHest.c"
 }

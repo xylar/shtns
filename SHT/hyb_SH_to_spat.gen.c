@@ -26,10 +26,8 @@ Q	complex double *Ql;
 S	complex double *Sl;
 T	complex double *Tl;
 Q	complex double *BrF;
-V	complex double *BtF, *BpF;
-Q	double *yl;
-V	double *dyl0;
   #ifndef SHT_AXISYM
+V	complex double *BtF, *BpF;
 V	struct DtDp *dyl;
 Q	complex double re,ro;
 V	complex double te,to, pe,po;
@@ -39,25 +37,33 @@ Q	#define BR0 BrF
 V	#define BT0 BtF
 V	#define BP0 BpF
   #else
+S	complex double *BtF;
+T	complex double *BpF;
 Q	double re,ro;
-V	double te,to, pe,po;
+S	double te,to;
+T	double pe,po;
 Q	#define BR0 ((double *)BrF)
-V	#define BT0 ((double *)BtF)
-V	#define BP0 ((double *)BpF)
+S	#define BT0 ((double *)BtF)
+T	#define BP0 ((double *)BpF)
   #endif
+Q	double *yl;
+V	double *dyl0;
 	long int llim;
 	long int k,im,m,l;
 
 	llim = LTR;	// copy LTR to a local variable for faster access (inner loop limit)
+  #ifndef SHT_AXISYM
 Q	BrF = (complex double *) Vr;
 V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
-
-  #ifndef SHT_AXISYM
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
 Q		BrF = fftw_malloc( (NPHI/2+1)*NLAT * sizeof(complex double) );
 V		BtF = fftw_malloc( 2* (NPHI/2+1)*NLAT * sizeof(complex double) );
 V		BpF = BtF + (NPHI/2+1)*NLAT;
 	}
+  #else
+Q	BrF = (complex double *) Vr;
+S	BtF = (complex double *) Vt;
+T	BpF = (complex double *) Vp;
   #endif
 
 	im=0;	m=0;
@@ -69,8 +75,9 @@ T		Tl = Tlm;
 Q		yl = ykm_dct[im];
 V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
-V			te = 0.0;	pe = 0.0;	to = 0.0;	po = 0.0;
 Q			re = 0.0;	ro = 0.0;
+S			te = 0.0;	to = 0.0;
+T			pe = 0.0;	po = 0.0;
 		do {
 			l = k;
 			do {
@@ -92,13 +99,14 @@ Q				yl++;
 V				dyl0++;
 			}
 Q			BR0[k] = re;	BR0[k+1] = ro;
-V			BT0[k] = te;	BT0[k+1] = to;
-V			BP0[k] = pe;	BP0[k+1] = po;
+S			BT0[k] = te;	BT0[k+1] = to;
+T			BP0[k] = pe;	BP0[k+1] = po;
 			k+=2;
 Q			yl+= (LMAX-LTR);
 V			dyl0+= (LMAX-LTR);
 Q			re = 0.0;	ro = 0.0;
-V			to = 0.0;	po = 0.0;
+S			to = 0.0;
+T			po = 0.0;
 SO			te = dyl0[1] * (double) Sl[k-1];
 TE			pe = -dyl0[1] * (double) Tl[k-1];
 V			dyl0+=2;
@@ -109,58 +117,60 @@ SE			to = dyl0[0] * (double) Sl[k];
 TO			po = -dyl0[0] * (double) Tl[k];
 		}
 Q		BR0[k] = re;	BR0[k+1] = ro;
-V		BT0[k] = te;	BT0[k+1] = to;
-V		BP0[k] = pe;	BP0[k+1] = po;
+S		BT0[k] = te;	BT0[k+1] = to;
+T		BP0[k] = pe;	BP0[k+1] = po;
 		k+=2;
 		while (k<NLAT) {	// dct padding (NLAT is even)
 Q			BR0[k] = 0.0;	BR0[k+1] = 0.0;
-V			BT0[k] = 0.0;	BP0[k] = 0.0;
-V			BT0[k+1] = 0.0;	BP0[k+1] = 0.0;
+S			BT0[k] = 0.0;	BT0[k+1] = 0.0;
+T			BP0[k] = 0.0;	BP0[k+1] = 0.0;
 			k+=2;
 		}
+    #ifdef SHT_AXISYM
+Q		fftw_execute_r2r(idct_r1,Vr, Vr);		// iDCT m=0
+S		fftw_execute_r2r(idct_r1,Vt, Vt);		// iDCT m=0
+T		fftw_execute_r2r(idct_r1,Vp, Vp);		// iDCT m=0
+V		k=0;	do {
+S			Vt[k] *= st_1[k];
+T		 	Vp[k] *= st_1[k];
+V			k++;
+V		} while (k<NLAT);
+    #endif
 	} else {
   #endif
 		k=0;
 Q		yl  = ylm[im];
 V		dyl0 = (double *) dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
-		do {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+		do {	// ops : NLAT_2 * [ (lmax-m+1) + 4]	: almost twice as fast.
 			l=0;
 Q			re = 0.0;	ro = 0.0;
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
 			do {	// compute even and odd parts
-QE				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-QO				ro += yl[1] * (double) Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
-TO				po += dyl0[0] * (double) Tl[l];	// m=0 : everything is real.
-SE				to += dyl0[0] * (double) Sl[l];
-TE				pe += dyl0[1] * (double) Tl[l+1];
-SO				te += dyl0[1] * (double) Sl[l+1];
+Q				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+QB				ro += yl[1] * (double) Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
+TB				po += dyl0[0] * (double) Tl[l];	// m=0 : everything is real.
+S				to += dyl0[0] * (double) Sl[l];
+T				pe += dyl0[1] * (double) Tl[l+1];
+SB				te += dyl0[1] * (double) Sl[l+1];
 				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
 			} while (l<llim);
 			if (l==llim) {
-QE				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-TO				po += dyl0[0] * (double) Tl[l];
-SE				to += dyl0[0] * (double) Sl[l];
+Q				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+TB				po += dyl0[0] * (double) Tl[l];
+S				to += dyl0[0] * (double) Sl[l];
 Q				yl++;
 V				dyl0++;
 			}
 Q			BR0[k] = re + ro;
-V			BT0[k] = 0.0
-S				+ (te+to)			// Bt = dS/dt
-V				;
-V			BP0[k] = 0.0
-T		 		- (pe+po)			// Bp = - dT/dt
-V				;
+S			BT0[k] = te + to;			// Bt = dS/dt
+T			BP0[k] = -(pe+po);			// Bp = - dT/dt
 			k++;
 QB			BR0[NLAT-k] = re - ro;
-VB			BT0[NLAT-k] = 0.0
-SB		 		+ (te-to)
-VB				;
-VB			BP0[NLAT-k] = 0.0
-TB				- (pe-po)
-VB				;
+SB			BT0[NLAT-k] = te - to;
+TB			BP0[NLAT-k] = -(pe-po);
 Q			yl  += (LMAX-LTR);
 V			dyl0 += (LMAX-LTR);
 		} while (k < NLAT_2);
@@ -265,16 +275,16 @@ Q			re = 0.0;	ro = 0.0;
 S			dte = 0.0;	dto = 0.0;	pe = 0.0;	po = 0.0;
 T			dpe = 0.0;	dpo = 0.0;	te = 0.0;	to = 0.0;
 			while (l<llim) {	// compute even and odd parts
-QE				re  += yl[0] * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-QO				ro  += yl[1] * Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
-TO				dpo += dyl[0].t * Tl[l];
-TO				te  += dyl[0].p * Tl[l];
-SE				dto += dyl[0].t * Sl[l];
-SE				pe  += dyl[0].p * Sl[l];
-TE				dpe += dyl[1].t * Tl[l+1];
-TE				to  += dyl[1].p * Tl[l+1];
-SO				dte += dyl[1].t * Sl[l+1];
-SO				po  += dyl[1].p * Sl[l+1];
+Q				re  += yl[0] * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+QB				ro  += yl[1] * Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
+TB				dpo += dyl[0].t * Tl[l];
+TB				te  += dyl[0].p * Tl[l];
+S				dto += dyl[0].t * Sl[l];
+S				pe  += dyl[0].p * Sl[l];
+T				dpe += dyl[1].t * Tl[l+1];
+T				to  += dyl[1].p * Tl[l+1];
+SB				dte += dyl[1].t * Sl[l+1];
+SB				po  += dyl[1].p * Sl[l+1];
 				l+=2;
 Q				yl+=2;
 V				dyl+=2;
@@ -365,19 +375,17 @@ V			Vt[k] = (double) BtF[k];
 V			Vp[k] = (double) BpF[k];
 			k++;
 		} while(k<NLAT);
-  #endif
-  #ifndef SHT_NO_DCT
+    #ifndef SHT_NO_DCT
 		if (MTR_DCT >= 0) {
-Q			fftw_execute_r2r(idct,Vr, Vr);		// iDCT m=0
-V			fftw_execute_r2r(idct,Vt, Vt);		// iDCT m=0
-V			fftw_execute_r2r(idct,Vp, Vp);		// iDCT m=0
+Q			fftw_execute_r2r(idct_r1,Vr, Vr);		// iDCT m=0
+V			fftw_execute_r2r(idct_r1,Vt, Vt);		// iDCT m=0
+V			fftw_execute_r2r(idct_r1,Vp, Vp);		// iDCT m=0
 V			k=0;	do {
 V				Vt[k] *= st_1[k]; 	Vp[k] *= st_1[k];
 V				k++;
 V			} while (k<NLAT);
 		}
-  #endif
-  #ifndef SHT_AXISYM
+    #endif
     }
   #endif
 
