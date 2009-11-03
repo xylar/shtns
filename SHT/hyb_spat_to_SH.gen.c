@@ -89,6 +89,14 @@ Q	    fftw_execute_dft_r2c(fft,Vr, BrF);
 V	    fftw_execute_dft_r2c(fft,Vt, BtF);
 V	    fftw_execute_dft_r2c(fft,Vp, BpF);
 	}
+  #else
+	if (NPHI > 1) {		// TODO avoid this with some precomputing !
+		i=0;	do {
+V			Vt[i] *= NPHI; 	Vp[i] *= NPHI;
+Q			Vr[i] *= NPHI;
+			i++;
+		} while (i<NLAT);
+	}
   #endif
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL

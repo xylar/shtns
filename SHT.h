@@ -114,9 +114,14 @@ void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex doubl
 /// \name Evalution of a SH representation at a given point in physical space.
 //@{
 double SH_to_point(complex double *Qlm, double cost, double phi);
-void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost, double phi,
-					   double *vr, double *vt, double *vp);
+void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm,
+					double cost, double phi, double *vr, double *vt, double *vp);
 //@}
+
+/// synthesis at a given latitude, on nphi equispaced longitude points.
+/// vr, vt, and vp arrays must have nphi+2 doubles allocated (fftw requirement)
+void SHqst_to_lat(complex double *Qlm, double *Slm, complex double *Tlm, double cost,
+					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
 
 /// \name Truncated transforms at given degree l
 //@{
@@ -129,3 +134,15 @@ void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR);
 void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR);
 //@}
 #define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat(S, Gt, Gp, ltr)
+
+/// \name Axisymmetric transforms m=0 only
+/** these work for any MMAX, and will only transform MMAX=0, to/from a vector with NLAT contiguous theta-values. */
+//@{
+void spat_to_SH_m0(double *Vr, complex double *Qlm);
+void SH_to_spat_m0(complex double *Qlm, double *Vr);
+void SHsphtor_to_spat_m0(complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
+void SHsph_to_spat_m0(complex double *Slm, double *Vt);
+void SHtor_to_spat_m0(complex double *Tlm, double *Vp);
+void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
+//@}
+#define SH_to_grad_spat_m0(S,Gt,Gp,ltr) SHsph_to_spat_m0(S, Gt, ltr)

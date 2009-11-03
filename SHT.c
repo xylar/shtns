@@ -239,7 +239,7 @@ double SH_to_point(complex double *Qlm, double cost, double phi)
 	double vr;
 	complex double *Ql;
 	long int l,m,im;
-	
+
 	vr = 0.0;
 	m=0;
 		gsl_sf_legendre_sphPlm_array(LTR, m, cost, &yl[m]);
@@ -266,8 +266,8 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	double sint, vst, vtt, vsp, vtp;
 	complex double *Ql, *Sl, *Tl;
 	long int l,m,im;
-	
-	sint = sqrt(1.0 - cost*cost);
+
+	sint = sqrt((1.-cost)*(1.+cost));
 	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; *vr = 0.;
 	m=0;
 		gsl_sf_legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
@@ -293,6 +293,78 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	*vp = vsp/sint - (-sint*vtt);	// Bp = I.m/sint *S  - dT/dt
 }
 
+/*
+	SYNTHESIS AT A GIVEN LATITUDE
+*/
+
+fftw_plan ifft_lat = NULL;		///< fftw plan for SHqst_to_lat
+long int nphi_lat = 0;			///< nphi of previous SHqst_to_lat
+
+/// synthesis at a given latitude, on nphi equispaced longitude points.
+void SHqst_to_lat(complex double *Qlm, double *Slm, complex double *Tlm, double cost,
+					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr)
+{
+	complex double vst, vtt, vsp, vtp, vrr;
+	complex double *vrc, *vtc, *vpc;
+	double sint;
+	double* ylm_lat;
+	double* dylm_lat;
+	long int m, l, j;
+
+	sint = sqrt((1.-cost)*(1.+cost));	// sin(theta)
+	if (ltr > LMAX) ltr=LMAX;
+	if (mtr*MRES > ltr) mtr=ltr/MRES;
+	if (mtr*2*MRES >= nphi) mtr = (nphi-1)/(2*MRES);
+
+	vrc = (complex double *) vr;
+	vtc = (complex double *) vt;
+	vpc = (complex double *) vp;
+
+	if ((nphi != nphi_lat)||(ifft_lat == NULL)) {
+		if (ifft_lat != NULL) fftw_destroy_plan(ifft_lat);
+		ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, fftw_plan_mode);
+		nphi_lat = nphi;
+	}
+	ylm_lat = (double *) malloc(sizeof(double)* (ltr+1)*2);
+	dylm_lat = ylm_lat + (ltr+1);
+
+	for (m = 0; m<nphi/2+1; m++) {	// init with zeros
+		vrc[m] = 0.0;	vtc[m] = 0.0;	vpc[m] = 0.0;
+	}
+
+	j=0;
+	m=0;
+		gsl_sf_legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[m], &dylm_lat[m]);
+		vrr=0;	vtt=0;	vst=0;
+		for(l=m; l<=ltr; l++, j++) {
+			vrr += ylm_lat[l] * creal(Qlm[j]);
+			vst += dylm_lat[l] * creal(Slm[j]);
+			vtt += dylm_lat[l] * creal(Tlm[j]);
+		}
+		j += (LMAX-ltr);
+		vrc[m] = vrr;
+		vtc[m] = -sint*vst;	// Vt =   dS/dt
+		vpc[m] =  sint*vtt;	// Vp = - dT/dt
+	for (m=MRES; m<=mtr*MRES; m+=MRES) {
+		gsl_sf_legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[m], &dylm_lat[m]);
+		vrr=0;	vtt=0;	vst=0;	vsp=0;	vtp=0;
+		for(l=m; l<=ltr; l++, j++) {
+			vrr += ylm_lat[l] * Qlm[j];
+			vst += dylm_lat[l] * Slm[j];
+			vtt += dylm_lat[l] * Tlm[j];
+			vsp += ylm_lat[l] * Slm[j];
+			vtp += ylm_lat[l] * Tlm[j];
+		}
+		j+=(LMAX-ltr);
+		vrc[m] = vrr;
+		vtc[m] = I*m*vtp/sint + (-sint*vst);	// Vt = I.m/sint *T  + dS/dt
+		vpc[m] = I*m*vsp/sint - (-sint*vtt);	// Vp = I.m/sint *S  - dT/dt
+	}
+	fftw_execute_dft_c2r(ifft_lat,vrc,vr);
+	fftw_execute_dft_c2r(ifft_lat,vtc,vt);
+	fftw_execute_dft_c2r(ifft_lat,vpc,vp);
+	free(ylm_lat);
+}
 
 /*
 	SHT FUNCTIONS with variable LTR truncation.
@@ -351,76 +423,6 @@ void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex dou
 
 #undef MTR
 #undef SHT_VAR_LTR
-
-/*
-	SYNTHESIS AT A GIVEN LATITUDE
- */
-
-double cost_lat = 2.;	// init with something impossible.
-double* ylm_lat;
-double* dylm_lat;
-fftw_plan ifft_lat;
-
-void init_SH_lat()
-{
-	double *data;
-
-	ylm_lat = (double *) malloc(sizeof(double)* NLM*2);
-	dylm_lat = ylm_lat + NLM;
-	data = (double *) fftw_malloc(sizeof(complex double)* (NPHI/2+1));
-	ifft_lat = fftw_plan_dft_c2r_1d(NPHI, (complex double *) data, data, fftw_plan_mode);
-	fftw_free(data);
-}
-
-/// vr, vp, vt are double arrays of size 2*(NPHI/2+1) [use fftw_malloc]
-void SHqst_to_lat(complex double *Qlm, double *Slm, complex double *Tlm, double cost,
-					double *vr, double *vt, double *vp)
-{
-	long int im, m, l, i;
-	complex double vst, vtt, vsp, vtp, vrr;
-	double sint;
-
-	sint = sqrt(1. -cost*cost);	// sin(theta)
-	if (cost != cost_lat) {		// compute and store the legendre functions.
-		i = 0;
-		for (i=0, m=0; m<=MMAX*MRES; m+=MRES) {
-			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, cost, &ylm_lat[i], &dylm_lat[i]);
-			i+=(LMAX+1-m);		// go to next location.
-		}
-		cost_lat = cost;
-	}
-	i=0;
-	im=0;	m=0;
-		vrr=0;	vtt=0;	vst=0;
-		for(l=m; l<=LMAX; l++, i++) {
-			vrr += ylm_lat[i] * creal(Qlm[i]);
-			vst += dylm_lat[i] * creal(Slm[i]);
-			vtt += dylm_lat[i] * creal(Tlm[i]);
-		}
-		vr[im] = vrr;
-		vt[im] = -sint*vst;	// Vt =   dS/dt
-		vp[im] =  sint*vtt;	// Vp = - dT/dt
-	for (im=0; im<=MMAX; im++) {
-		m=im*MRES;
-		vrr=0;	vtt=0;	vst=0;	vsp=0;	vtp=0;
-		for(l=m; l<=LMAX; l++, i++) {
-			vrr += ylm_lat[i] * Qlm[i];
-			vst += dylm_lat[i] * Slm[i];
-			vtt += dylm_lat[i] * Tlm[i];
-			vsp += ylm_lat[i] * Slm[i];
-			vtp += ylm_lat[i] * Tlm[i];
-		}
-		vr[im] = vrr;
-		vt[im] = I*m*vtp/sint + (-sint*vst);	// Vt = I.m/sint *T  + dS/dt
-		vp[im] = I*m*vsp/sint - (-sint*vtt);	// Vp = I.m/sint *S  - dT/dt
-	}
-	for (im=MMAX+1; im<NPHI/2+1; im++) {
-		vr[im] = 0.0;	vt[im] = 0.0;	vp[im] = 0.0;
-	}
-	fftw_execute_dft_c2r(ifft_lat,(complex double *) vr,vr);
-	fftw_execute_dft_c2r(ifft_lat,(complex double *) vt,vt);
-	fftw_execute_dft_c2r(ifft_lat,(complex double *) vp,vp);
-}
 
 
 /*
@@ -884,8 +886,8 @@ void init_SH_gauss()
 	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
 		ct[it] = xg[it];
-		st[it] = sqrtl(1.0 - xg[it]*xg[it]);
-		st_1[it] = 1.0/sqrtl(1.0 - xg[it]*xg[it]);
+		st[it] = sqrtl((1.-xg[it])*(1.+xg[it]));
+		st_1[it] = 1.0/sqrtl((1.-xg[it])*(1.+xg[it]));
 	}
 
 #if SHT_VERBOSE > 1
