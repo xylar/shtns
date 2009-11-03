@@ -126,7 +126,7 @@ V		Sl = Slm;	Tl = Tlm;
 V		dzl0 = dzlm_dct0;
 V		Sl[0] = 0.0;	Tl[0] = 0.0;
 #		qs0 = 0.0;	qs1 = 0.0;			// sum of first Ql's
-		do {	// l has parity of m
+		while(l<LTR) {	// l has parity of m
 Q			q0 = 0.0;	q1 = 0.0;
 V			s0 = 0.0;	t1 = 0.0;	t0 = 0.0;	s1 = 0.0;
 Q			i=l;	// l < NLAT
@@ -148,7 +148,7 @@ Q			Ql[l] = q0;	Ql[l+1] = q1;
 V			Sl[l] = s0;	Sl[l+1] = s1;
 V			Tl[l] = t0;	Tl[l+1] = t1;
 			l+=2;
-		} while(l<LTR);
+		}
 		if (l == LTR) {
 Q			q0 = 0.0;
 V			s0 = 0.0;	t0 = 0.0;
@@ -230,7 +230,7 @@ V		dzl0 = (double *) dzlm[im];		// only theta derivative (d/dphi = 0 for m=0)
 QB		BrF += NLAT;
 VB		BtF += NLAT;	BpF += NLAT;
 V		Sl[0] = 0.0;	Tl[0] = 0.0;
-		do {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+		while(l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			i=0;
 QE			q0 = 0.0;
 QO			q1 = 0.0;
@@ -252,7 +252,7 @@ QO			Ql[l+1] = q1;
 VE			Sl[l] = s1;	Tl[l+1] = t0;
 VO			Tl[l] = t1;	Sl[l+1] = s0;
 			l+=2;
-		} while (l<LTR);
+		}
 		if (l==LMAX) {
 QE			q0 = 0.0;
 VE			s1 = 0.0;

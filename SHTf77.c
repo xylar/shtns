@@ -20,6 +20,7 @@
 /** \name Initialization
 Call from fortran using : \code
 call shtns_init_sh_*( lmax, mmax, mres, nlat, nphi) \endcode
+(without the trailing '_')
 \see init_SH for argument description
 */
 //@{
@@ -66,7 +67,7 @@ void shtns_lmidx_(int *lm, int *l, int *m)
 void shtns_cos_array_(double *costh)
 {
 	int i;	
-	for (i=0; i<NLAT; i++)
+	for (i=0; i<shtns.nlat; i++)
 		costh[i] = ct[i];
 }
 

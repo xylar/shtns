@@ -17,6 +17,8 @@ complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
 complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
+long int LMAX,MMAX,NLAT,MRES,NPHI,NLM;
+
 // number of SH iterations
 long int SHT_ITER = 50;		// do 50 iterations by default
 
@@ -189,6 +191,7 @@ int test_SHT_vect()
 	return (int) tcpu;
 }
 
+/*
 fftw_plan ifft_in, ifft_out;
 fftw_plan fft_in, fft_out;
 fftw_plan fft_tr, ifft_tr;
@@ -297,6 +300,7 @@ do_fft_tests()
 	printf("  fft transpose (+malloc) : %d\n", (int) tcpu);
 
 }
+*/
 
 void usage()
 {
@@ -317,7 +321,6 @@ void usage()
 
 int main(int argc, char *argv[])
 {
-	int lmax,mmax,mres,nlat,nphi;
 	complex double t1, t2;
 	double t,tmax,n2;
 	int i,im,m,l,jj, m_opt;
@@ -337,15 +340,15 @@ int main(int argc, char *argv[])
 	}
 
 //	first argument is lmax, and is mandatory.
-	sscanf(argv[1],"%lf",&t);	lmax=t;
-	mmax=lmax;	mres=1;	nlat=lmax+2+(lmax&1);	nphi=(mmax+1)*2;		//defaults
+	sscanf(argv[1],"%lf",&t);	LMAX=t;
+	MMAX=LMAX;	MRES=1;	NLAT=LMAX+2+(LMAX&1);	NPHI=(MMAX+1)*2;		//defaults
 
 	for (i=2; i<argc; i++) {		// parse command line
 		sscanf(argv[i],"-%[^=]=%lf",name,&t);
-		if (strcmp(name,"mmax") == 0) mmax = t;
-		if (strcmp(name,"mres") == 0) mres = t;
-		if (strcmp(name,"nlat") == 0) nlat = t;
-		if (strcmp(name,"nphi") == 0) nphi = t;
+		if (strcmp(name,"mmax") == 0) MMAX = t;
+		if (strcmp(name,"mres") == 0) MRES = t;
+		if (strcmp(name,"nlat") == 0) NLAT = t;
+		if (strcmp(name,"nphi") == 0) NPHI = t;
 		if (strcmp(name,"polaropt") == 0) polaropt = t;
 		if (strcmp(name,"iter") == 0) SHT_ITER = t;
 		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
@@ -354,7 +357,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
 	}
 
-	shtns_init(shtmode | layout, polaropt, lmax, mmax, mres, nlat, nphi);
+	NLM = shtns_init(shtmode | layout, polaropt, LMAX, MMAX, MRES, NLAT, NPHI);
 	m_opt = Get_MTR_DCT();
 
 	t1 = 1.0+2.0*I;

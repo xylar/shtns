@@ -21,13 +21,16 @@ void write_mx(char *fn, double *mx, int N1, int N2);
 
 int main()
 {
+	long int lmax,mmax,nlat,nphi,mres, NLM;
 	complex double *Slm, *Tlm;	// spherical harmonics l,m space
 	double *Sh, *Th;		// real space : theta,phi
 	long int i,im,lm;
 	double t;
 
-//	shtns_init(shtns_type, eps,         lmax, mmax, mres, nlat, nphi);
-	shtns_init( sht_gauss, POLAR_OPT_THR, 11, 3,    1,   16,  12 );
+	lmax = 5;	nlat = 8;
+	mmax = 3;	nphi = 10;
+	mres = 1;
+	NLM = shtns_init( sht_gauss, POLAR_OPT_THR, lmax, mmax, mres, nlat, nphi );
 
 // allocate spatial fields.
 	Sh = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double));
@@ -37,7 +40,6 @@ int main()
 	Slm = (complex double *) malloc( NLM * sizeof(complex double));
 	Tlm = (complex double *) malloc( NLM * sizeof(complex double));
 
-
 // SH_to_spat
 	LM_LOOP( Slm[lm]=0.0;  Tlm[lm] = 0.0; )		/* this is the same as :
 						for (lm=0;lm<NLM;lm++) {
@@ -45,26 +47,39 @@ int main()
 						} */
 
 	Slm[LM(1,1)] = Y11_st;				// access to SH coefficient
-//	Slm[LiM(1,0)] = Y10_ct;
+// 	Slm[LiM(1,0)] = Y10_ct;
+//	Slm[LiM(0,0)] = 0.5*Y00_1;
 	SH_to_spat(Slm,Sh);
+	write_vect("ylm",(double *) Slm,NLM*2);
+	write_mx("spat",Sh,nphi,nlat);
 
 // compute value of SH expansion at a given physical point.
-	t = SH_to_point(Slm, ct[NLAT/3], 2.*M_PI/(MRES*NPHI));
-	printf("check if SH_to_point coincides with SH_to_spat : %f = %f\n",t,Sh[NLAT/3 + NLAT]);
+	t = SH_to_point(Slm, ct[nlat/3], 2.*M_PI/(mres*nphi));
+	printf("check if SH_to_point coincides with SH_to_spat : %f = %f\n",t,Sh[nlat/3 + nlat]);
 
-	write_mx("spat",Sh,NPHI,NLAT);
+// check non-linear behaviour
+	for (im=0;im<nphi;im++) {
+		for (i=0;i<nlat;i++) {
+			Sh[im*nlat+i] *= Sh[im*nlat+i];
+		}
+	}
+	spat_to_SH(Sh,Tlm);
+	write_vect("ylm_nl",(double *) Tlm,NLM*2);
+
+// vector transform
+	LM_LOOP( Slm[lm]=0.0;  Tlm[lm] = 0.0; )
 	SHsphtor_to_spat(Slm,Tlm,Sh,Th);		// vector transform
-	write_mx("spatt",Sh,NPHI,NLAT);
-	write_mx("spatp",Th,NPHI,NLAT);
+	write_mx("spatt",Sh,nphi,nlat);
+	write_mx("spatp",Th,nphi,nlat);
 
 // spat_to_SH
-	for (im=0;im<NPHI;im++) {
-		for (i=0;i<NLAT;i++) {
-			Sh[im*NLAT+i] = ct[i];			// use cos(theta) array
+	for (im=0;im<nphi;im++) {
+		for (i=0;i<nlat;i++) {
+			Sh[im*nlat+i] = ct[i];			// use cos(theta) array
 		}
 	}
 	spat_to_SH(Sh,Slm);
-	write_vect("ylm",(double *) Slm,NLM*2);
+	write_vect("ylm_v",(double *) Slm,NLM*2);
 }
 
 
