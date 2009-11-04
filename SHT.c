@@ -12,7 +12,7 @@
 //#define SHT_EO
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info)
-#define SHT_VERBOSE 2
+#define SHT_VERBOSE 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -167,6 +167,7 @@ double* dzlm_dct0;
 fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dct_m0;			// (I)DCT for NPHI>1
 fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
+fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 
 #define SSE __attribute__((aligned (16)))
@@ -301,7 +302,7 @@ fftw_plan ifft_lat = NULL;		///< fftw plan for SHqst_to_lat
 long int nphi_lat = 0;			///< nphi of previous SHqst_to_lat
 
 /// synthesis at a given latitude, on nphi equispaced longitude points.
-void SHqst_to_lat(complex double *Qlm, double *Slm, complex double *Tlm, double cost,
+void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr)
 {
 	complex double vst, vtt, vsp, vtp, vrr;
@@ -597,6 +598,11 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 		if (ifft == NULL) runerr("[FFTW] ifft planning failed !");
 		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
 		if (fft == NULL) runerr("[FFTW] fft planning failed !");
+
+		ifft_eo = fftw_plan_many_dft_c2r(1, &nfft, NLAT_2, ShF, &ncplx, NLAT_2, 1, Sh, &nreal, (phi_inc+1)/2, theta_inc, fftw_plan_mode);
+		if (ifft_eo == NULL) runerr("[FFTW] ifft planning failed !");
+		fft_eo = fftw_plan_many_dft_r2c(1, &nfft, NLAT_2, Sh, &nreal, (phi_inc+1)/2, theta_inc, ShF, &ncplx, NLAT_2, 1, fftw_plan_mode);
+		if (fft_eo == NULL) runerr("[FFTW] fft planning failed !");
 
 #if SHT_VERBOSE > 1
 	printf(" *** fft plan :\n");
@@ -1478,7 +1484,7 @@ int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, 
 			fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);	fftw_free(ykm_dct[0]);		// free now useless arrays.
 			zlm_dct0 = NULL;		// this disables DCT completely.
 			if (idct != NULL) fftw_destroy_plan(idct);	// free unused dct plans
-			if (dctm0 != NULL) fftw_destroy_plan(dctm0);
+			if (dct_m0 != NULL) fftw_destroy_plan(dct_m0);
 			if (flags == sht_auto) {
 				flags = sht_gauss;		// switch to gauss grid, even better accuracy.
 	#if SHT_VERBOSE > 0
@@ -1581,20 +1587,20 @@ void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex do
 
 void SHeo_to_spat(complex double *Qlm, double *Vr, int parity)
 {
-	#include "SHT/SHe_to_spat.c"
+	#include "SHT/SHeo_to_spat.c"
 }
 
 void spat_to_SHeo(double *Vr, complex double *Qlm, int parity)
 {
-	#include "SHT/spat_to_SHe.c"
+	#include "SHT/spat_to_SHeo.c"
 }
 
 void SHeo_sphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int parity)
 {
-	#include "SHT/SHest_to_spat.c"
+	#include "SHT/SHeost_to_spat.c"
 }
 
 void spat_to_SHeo_sphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int parity)
 {
-	#include "SHT/spat_to_SHest.c"
+	#include "SHT/spat_to_SHeost.c"
 }

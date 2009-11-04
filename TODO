@@ -5,6 +5,13 @@
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 + Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
 
+*** TODO ***
+Compare speed with spherepack.
+Split init routines and transform routines + combine them in a lib.
+Import legendre function from gsl, as they can be made more precise (long double)
+	and/or faster (by storing precomputations). Also direct evaluation at specified x
+	could be made directly.
+
 *** Optimizations ***
 
 for m=0, z[k] is zero up to l-1
@@ -16,6 +23,7 @@ for m=2, z[k] is constant up to l-1
 for m=3, z[k] is constant up to l-2
 
 - Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
+- Using CUDA may be interesting !
 
 + cache optimization have been performed for m=0 and are quite impressive at high LMAX.
 

@@ -120,7 +120,7 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 
 /// synthesis at a given latitude, on nphi equispaced longitude points.
 /// vr, vt, and vp arrays must have nphi+2 doubles allocated (fftw requirement)
-void SHqst_to_lat(complex double *Qlm, double *Slm, complex double *Tlm, double cost,
+void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
 
 /// \name Truncated transforms at given degree l
@@ -146,3 +146,12 @@ void SHtor_to_spat_m0(complex double *Tlm, double *Vp);
 void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
 //@}
 #define SH_to_grad_spat_m0(S,Gt,Gp,ltr) SHsph_to_spat_m0(S, Gt, ltr)
+
+///	SHT transforms with assumed equatorial symmetry (parity = 0 or 1)
+/** these work with (NLAT+1)/2 latitudinal points, and do not overwrite SH coefficients of other parity */
+//@{
+void SHeo_to_spat(complex double *Qlm, double *Vr, int parity);
+void spat_to_SHeo(double *Vr, complex double *Qlm, int parity);
+void SHeo_sphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int parity);
+void spat_to_SHeo_sphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int parity);
+//@}

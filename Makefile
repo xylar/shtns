@@ -20,7 +20,7 @@ cmd = gcc $(go)
 ## r2d2
 #cmd = gcc $(go) -march=core2 -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
 
-shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/Makefile
+shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile
 
 default : SHT.o
 
@@ -28,6 +28,10 @@ SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) SH_to_spat.c -C SHT
 SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 	$(MAKE) spat_to_SH.c -C SHT
+SHT/SHeo_to_spat.c : SHT/sparse_SH_to_spat.gen.c SHT/Makefile
+	$(MAKE) SHeo_to_spat.c -C SHT
+SHT/spat_to_SHeo.c : SHT/sparse_spat_to_SH.gen.c SHT/Makefile
+	$(MAKE) spat_to_SHeo.c -C SHT
 
 SHT.o : SHT.c Makefile $(shtfiles)
 	$(cmd) -c SHT.c -o SHT.o

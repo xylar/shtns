@@ -417,7 +417,9 @@ int main(int argc, char *argv[])
 			Sh[im*NLAT+i] = 0.0;
 		}
 	}
+	Slm[LiM(1,0)] = Y10_ct;
 	Slm[LiM(1,1)] = Y11_st;
+//	write_vect("ylm0",Slm, NLM*2);
 	SH_to_spat(Slm,Sh);
 	write_mx("spat",Sh,NPHI,NLAT);
 	SHsphtor_to_spat(Slm,Tlm,Sh,Th);
@@ -427,6 +429,26 @@ int main(int argc, char *argv[])
 //	SHqst_to_lat(Slm,Slm,Tlm,ct[0],Sh,Th,Th,NPHI/2,LMAX,MMAX);
 //	write_vect("spat_lat", Sh, NPHI/2);
 
+/*	for (i=0;i<(NLAT/2)*NPHI;i++) {
+		Sh[i] = 0.0;
+	}
+	SHeo_to_spat(Slm, Sh, 0);
+	write_mx("spate",Sh,NPHI,NLAT/2);
+	for (i=0;i<(NLAT/2)*NPHI;i++) {
+		Th[i] = 0.0;
+	}
+	SHeo_to_spat(Slm, Th, 1);
+	write_mx("spato",Th,NPHI,NLAT/2);
+
+	for (i=0;i<NLM;i++)
+		Slm[i] = 0.0;
+	spat_to_SHeo(Sh, Slm, 0);
+	write_vect("ylme",Slm, NLM*2);
+	for (i=0;i<NLM;i++)
+		Tlm[i] = 0.0;
+	spat_to_SHeo(Th, Slm, 1);
+	write_vect("ylmeo",Slm, NLM*2);
+*/
 // spat_to_SH
 	for (im=0;im<NPHI;im++) {
 		for (i=0;i<NLAT;i++) {
