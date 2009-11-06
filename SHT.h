@@ -87,6 +87,10 @@ enum shtns_type {
 
 // FUNCTIONS //
 
+/// defines the sizes of the spectral description.
+int shtns_set_size(int lmax, int mmax, int mres);
+/// precompute everything for a given spatial grid.
+int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi);
 /// Initializes spherical harmonic transforms of given size, and sets all global variables.
 int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi);
 

@@ -151,7 +151,7 @@ V				t1 -= BP0[i+1] * dzl0[1];
 Q				zl+=2;
 V				dzl0+=2;
 				i+=2;
-			} while(i<NLAT);
+			} while(i<NLAT);	// this may be reduced to the maximum l, if known (ex:2*LTR for a quadratic term).
 Q			Ql[l] = q0;	Ql[l+1] = q1;
 V			Sl[l] = s0;	Sl[l+1] = s1;
 V			Tl[l] = t0;	Tl[l+1] = t1;

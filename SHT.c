@@ -147,13 +147,13 @@ struct DtDp {		// theta and phi derivatives stored together.
 
 double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
 double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
-int *li;
+int *li = NULL;				// used as flag for shtns_set_size
 
-long int *lmidx;		// (virtual) index in SH array of given im.
+int *lmidx;		// (virtual) index in SH array of given im.
 // LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
 #define LiM(l,im) ( lmidx[im] + l )
 
-long int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
 struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
 double** zlm;		// matrix for direct transform (analysis)
@@ -296,10 +296,14 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 
 /*
 	SYNTHESIS AT A GIVEN LATITUDE
+	(does not require any precomputation)
 */
 
 fftw_plan ifft_lat = NULL;		///< fftw plan for SHqst_to_lat
 long int nphi_lat = 0;			///< nphi of previous SHqst_to_lat
+double* ylm_lat = NULL;
+double* dylm_lat;
+double ct_lat = 2.0;
 
 /// synthesis at a given latitude, on nphi equispaced longitude points.
 void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
@@ -308,12 +312,11 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 	complex double vst, vtt, vsp, vtp, vrr;
 	complex double *vrc, *vtc, *vpc;
 	double sint;
-	double* ylm_lat;
-	double* dylm_lat;
 	long int m, l, j;
 
 	sint = sqrt((1.-cost)*(1.+cost));	// sin(theta)
 	if (ltr > LMAX) ltr=LMAX;
+	if (mtr > MMAX) mtr=MMAX;
 	if (mtr*MRES > ltr) mtr=ltr/MRES;
 	if (mtr*2*MRES >= nphi) mtr = (nphi-1)/(2*MRES);
 
@@ -326,35 +329,40 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 		ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, fftw_plan_mode);
 		nphi_lat = nphi;
 	}
-	ylm_lat = (double *) malloc(sizeof(double)* (ltr+1)*2);
-	dylm_lat = ylm_lat + (ltr+1);
+	if (ylm_lat == NULL) {
+		ylm_lat = (double *) malloc(sizeof(double)* NLM*2);
+		dylm_lat = ylm_lat + NLM;
+	}
+	if (cost != ct_lat) {		// don't recompute if same latitude
+		for (m=0,j=0; m<=mtr*MRES; m+=MRES) {
+			gsl_sf_legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[j], &dylm_lat[j]);
+			j+=LMAX-m+1;
+		}
+	}
 
 	for (m = 0; m<nphi/2+1; m++) {	// init with zeros
 		vrc[m] = 0.0;	vtc[m] = 0.0;	vpc[m] = 0.0;
 	}
-
 	j=0;
 	m=0;
-		gsl_sf_legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[m], &dylm_lat[m]);
 		vrr=0;	vtt=0;	vst=0;
 		for(l=m; l<=ltr; l++, j++) {
-			vrr += ylm_lat[l] * creal(Qlm[j]);
-			vst += dylm_lat[l] * creal(Slm[j]);
-			vtt += dylm_lat[l] * creal(Tlm[j]);
+			vrr += ylm_lat[j] * creal(Qlm[j]);
+			vst += dylm_lat[j] * creal(Slm[j]);
+			vtt += dylm_lat[j] * creal(Tlm[j]);
 		}
 		j += (LMAX-ltr);
 		vrc[m] = vrr;
 		vtc[m] = -sint*vst;	// Vt =   dS/dt
 		vpc[m] =  sint*vtt;	// Vp = - dT/dt
 	for (m=MRES; m<=mtr*MRES; m+=MRES) {
-		gsl_sf_legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[m], &dylm_lat[m]);
 		vrr=0;	vtt=0;	vst=0;	vsp=0;	vtp=0;
 		for(l=m; l<=ltr; l++, j++) {
-			vrr += ylm_lat[l] * Qlm[j];
-			vst += dylm_lat[l] * Slm[j];
-			vtt += dylm_lat[l] * Tlm[j];
-			vsp += ylm_lat[l] * Slm[j];
-			vtp += ylm_lat[l] * Tlm[j];
+			vrr += ylm_lat[j] * Qlm[j];
+			vst += dylm_lat[j] * Slm[j];
+			vtt += dylm_lat[j] * Tlm[j];
+			vsp += ylm_lat[j] * Slm[j];
+			vtp += ylm_lat[j] * Tlm[j];
 		}
 		j+=(LMAX-ltr);
 		vrc[m] = vrr;
@@ -364,7 +372,7 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 	fftw_execute_dft_c2r(ifft_lat,vrc,vr);
 	fftw_execute_dft_c2r(ifft_lat,vtc,vt);
 	fftw_execute_dft_c2r(ifft_lat,vpc,vp);
-	free(ylm_lat);
+//	free(ylm_lat);
 }
 
 /*
@@ -442,16 +450,10 @@ void alloc_SHTarrays()
 
 	ct = (double *) fftw_malloc(sizeof(double) * NLAT*3);
 	st = ct + NLAT;		st_1 = ct + 2*NLAT;
-	tm = (long int *) fftw_malloc(sizeof(long int) * (MMAX+1)*2);
-	lmidx =  tm + (MMAX+1);
 	ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );
 	zlm = ylm + (MMAX+1);		ykm_dct = ylm + (MMAX+1)*2;
 	dylm = (struct DtDp **) fftw_malloc( sizeof(struct DtDp *) * (MMAX+1)*3);
 	dzlm = dylm + (MMAX+1);		dykm_dct = dylm + (MMAX+1)*2;
-
-	el = (double *) fftw_malloc( 3*NLM*sizeof(double) + NLM*sizeof(int) );	// NLM defined at runtime.
-	l2 = el + NLM;	l_2 = el + 2*NLM;
-	li = (int *) (el + 3*NLM);
 
 // Allocate legendre functions lookup tables.
 	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
@@ -1379,29 +1381,79 @@ double SHT_error()
 	return(err);		// return max error.
 }
 
+
 #ifndef _HGID_
   #define _HGID_ "unknown"
 #endif
 
+/*! This sets the description of spherical harmonic coefficients.
+ * It tells SHTns how to interpret spherical harmonic coefficient arrays, and it sets usefull arrays.
+ * \param lmax : maximum SH degree that we want to describe.
+ * \param mmax : number of azimutal wave numbers.
+ * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
+*/
+int shtns_set_size(int lmax, int mmax, int mres)
+{
+	int im, m, l, lm;
+
+	if (lmax < 1) runerr("[SHTns] lmax must be larger than 1");
+	if (li != NULL) {
+		if ( (lmax != LMAX)||(mmax != MMAX)||(mres != MRES) )
+			runerr("[SHTns] different size already set");
+		return(NLM);
+	}
+
+	// copy to global variables.
+#ifdef SHT_AXISYM
+	shtns.mmax = 0;		shtns.mres = 2;		shtns.nphi = 1;
+	if (mmax != 0) runerr("[SHTns] axisymmetric version : only Mmax=0 allowed");
+#else
+	MMAX = mmax;	MRES = mres;
+#endif
+	LMAX = lmax;
+	NLM = nlm_calc(LMAX,MMAX,MRES);
+#if SHT_VERBOSE > 0
+	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
+	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d\n",LMAX,MMAX*MRES,MRES,NLM);
+#endif
+	if (MMAX*MRES > LMAX) runerr("[SHTns] MMAX*MRES should not exceed LMAX");
+	if (MRES <= 0) runerr("[SHTns] MRES must be > 0");
+
+	// alloc spectral arrays
+	lmidx = (int *) fftw_malloc(sizeof(int) * (MMAX+1)*2);
+	tm =  lmidx + (MMAX+1);
+	el = (double *) fftw_malloc( 3*NLM*sizeof(double) + NLM*sizeof(int) );	// NLM defined at runtime.
+	l2 = el + NLM;	l_2 = el + 2*NLM;
+	li = (int *) (el + 3*NLM);
+
+	for (im=0, lm=0; im<=MMAX; im++) {		// init l-related arrays.
+		m = im*MRES;
+		lmidx[im] = lm -m;		// virtual pointer for l=0
+		for (l=im*MRES;l<=LMAX;l++) {
+			el[lm] = l;	l2[lm] = l*(l+1.0);	l_2[lm] = 1.0/(l*(l+1.0));
+			li[lm] = l;
+			lm++;
+		}
+	}
+	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.	
+	if (lm != NLM) runerr("[SHTns] unexpected error");
+	return(NLM);
+}
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after shtns_geometry and before any SH transform.</b> and sets all global variables.
  * returns the number of modes to describe a scalar field.
- * \param lmax : maximum SH degree that we want to describe.
- * \param mmax : number of azimutal wave numbers.
- * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
  * \param nlat,nphi : respectively the number of latitudinal and longitudinal grid points.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
  * \param eps : polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
  *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
 */
-int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
+int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 {
 	double t;
 	int im,m,l,lm;
 	int theta_inc, phi_inc, phi_embed;
 
-	if (lmax < 1) runerr("[SHTns] lmax must be larger than 1");
 	shtns.mtr_dct = -1;
 
 	switch (flags & 0xFFFF00) {
@@ -1414,24 +1466,19 @@ int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, 
 
 	// copy to global variables.
 #ifdef SHT_AXISYM
-	shtns.mmax = 0;		shtns.mres = 1;		shtns.nphi = 1;
-	if ((mmax != MMAX)||(nphi != NPHI)) runerr("[SHTns] axisymmetric version : only Mmax=0 and Nphi=1 allowed");
+	shtns.nphi = 1;
+	if (nphi != 1) runerr("[SHTns] axisymmetric version : only Nphi=1 allowed");
 #else
-	MMAX = mmax;	MRES = mres;	NPHI = nphi;
+	NPHI = nphi;
 #endif
-	LMAX = lmax;	NLAT_2 = (nlat+1)/2;
-	NLAT = nlat;
-	NLM = nlm_calc(LMAX,MMAX,MRES);
-  #if SHT_VERBOSE > 0
-	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
-	printf("        Lmax=%d, Nlat=%d, Mres=%d, Mmax*Mres=%d, Nlm=%d\n",LMAX,NLAT,MRES,MMAX*MRES,NLM);
-  #endif
-	if (MMAX*MRES > LMAX) runerr("[SHTns] MMAX*MRES should not exceed LMAX");
+	NLAT_2 = (nlat+1)/2;	NLAT = nlat;
 	if ((NLAT_2)*2 <= LMAX) runerr("[SHTns] NLAT_2*2 should be at least LMAX+1");
-	if (MRES <= 0) runerr("[SHTns] MRES must be > 0");
 #ifdef SHT_NLAT_EVEN
 	if ((NLAT & 1)&&(flags != sht_reg_poles)) runerr("[SHTns] NLAT must be even.");
 #endif
+  #if SHT_VERBOSE > 0
+	printf("        Nlat=%d, Nphi=%d\n",NLAT,NPHI);
+  #endif
 
 	alloc_SHTarrays();	// allocate dynamic arrays
 	planFFT(theta_inc, phi_inc, phi_embed);		// initialize fftw
@@ -1439,17 +1486,6 @@ int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, 
   #if SHT_VERBOSE > 0
 	if (2*NLAT <= 3*LMAX) printf("     !! Warning : anti-aliasing condition in theta direction not met.\n");
   #endif
-// Additional arrays init :
-	for (im=0, lm=0; im<=MMAX; im++) {
-		m = im*MRES;
-		lmidx[im] = lm -m;		// virtual pointer for l=0
-		for (l=im*MRES;l<=LMAX;l++) {
-			el[lm] = l;	l2[lm] = l*(l+1.0);	l_2[lm] = 1.0/(l*(l+1.0));
-			li[lm] = l;
-			lm++;
-		}
-	}
-	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.
 
 #ifndef SHT_NO_DCT
 	if (flags == sht_reg_dct) {	// pure dct.
@@ -1531,6 +1567,23 @@ int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, 
   #endif
 	}
 	return(NLM);	// returns the number of modes to describe a SHT.
+}
+
+/*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
+ * <b>This function must be called after shtns_geometry and before any SH transform.</b> and sets all global variables.
+ * returns the number of modes to describe a scalar field.
+ * \param lmax : maximum SH degree that we want to describe.
+ * \param mmax : number of azimutal wave numbers.
+ * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
+ * \param nlat,nphi : respectively the number of latitudinal and longitudinal grid points.
+ * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
+ * \param eps : polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
+ *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
+*/
+int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
+{
+	shtns_set_size(lmax, mmax, mres);
+	shtns_precompute(flags, eps, nlat, nphi);
 }
 
 
