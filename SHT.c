@@ -20,9 +20,8 @@
 #include <math.h>
 // FFTW la derivee d/dx = ik	(pas de moins !)
 #include <fftw3.h>
-// GSL for Legendre functions
-#include <gsl/gsl_errno.h>
-#include <gsl/gsl_sf_legendre.h>
+// Legendre functions
+#include "sht_legendre.c"
 
 // cycle counter from FFTW
 #include "cycle.h"
@@ -52,6 +51,7 @@ long int SHT_FFT = 0;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-p
 
 /// sizes for SHT, in a structure to avoid problems with conflicting names.
 struct sht_sze {
+	
 	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
 	long int lmax;			///< maximum degree (lmax) of spherical harmonics.
 	long int mmax;			///< maximum order (mmax*mres) of spherical harmonics.
@@ -243,12 +243,12 @@ double SH_to_point(complex double *Qlm, double cost, double phi)
 
 	vr = 0.0;
 	m=0;
-		gsl_sf_legendre_sphPlm_array(LTR, m, cost, &yl[m]);
+		legendre_sphPlm_array(LTR, m, cost, &yl[m]);
 		for (l=m; l<=LTR; l++)
 			vr += yl[l] * creal( Qlm[l] );
 	for (im=1; im<=MTR; im++) {
 		m = im*MRES;
-		gsl_sf_legendre_sphPlm_array(LTR, m, cost, &yl[m]);
+		legendre_sphPlm_array(LTR, m, cost, &yl[m]);
 		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 		for (l=m; l<=LTR; l++)
@@ -271,7 +271,7 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	sint = sqrt((1.-cost)*(1.+cost));
 	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; *vr = 0.;
 	m=0;
-		gsl_sf_legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
+		legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
 		for (l=m; l<=LTR; l++) {
 			*vr += yl[l] * creal( Qlm[l] );
 			vst += dtyl[l] * creal( Slm[l] );
@@ -279,7 +279,7 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 		}
 	for (im=1; im<=MTR; im++) {
 		m = im*MRES;
-		gsl_sf_legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
+		legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
 		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 		Ql = &Qlm[LiM(0,im)];	Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
 		for (l=m; l<=LTR; l++) {
@@ -290,8 +290,8 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 			vtp += (yl[l] *m) * creal(I*Tl[l]*eimp);
 		}
 	}
-	*vt = vtp/sint + (-sint*vst);	// Bt = I.m/sint *T  + dS/dt
-	*vp = vsp/sint - (-sint*vtt);	// Bp = I.m/sint *S  - dT/dt
+	*vt = vtp/sint + vst;	// Bt = I.m/sint *T  + dS/dt
+	*vp = vsp/sint - vtt;	// Bp = I.m/sint *S  - dT/dt
 }
 
 /*
@@ -335,7 +335,7 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 	}
 	if (cost != ct_lat) {		// don't recompute if same latitude
 		for (m=0,j=0; m<=mtr*MRES; m+=MRES) {
-			gsl_sf_legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[j], &dylm_lat[j]);
+			legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[j], &dylm_lat[j]);
 			j+=LMAX-m+1;
 		}
 	}
@@ -353,8 +353,8 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 		}
 		j += (LMAX-ltr);
 		vrc[m] = vrr;
-		vtc[m] = -sint*vst;	// Vt =   dS/dt
-		vpc[m] =  sint*vtt;	// Vp = - dT/dt
+		vtc[m] =  vst;	// Vt =   dS/dt
+		vpc[m] = -vtt;	// Vp = - dT/dt
 	for (m=MRES; m<=mtr*MRES; m+=MRES) {
 		vrr=0;	vtt=0;	vst=0;	vsp=0;	vtp=0;
 		for(l=m; l<=ltr; l++, j++) {
@@ -366,8 +366,8 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 		}
 		j+=(LMAX-ltr);
 		vrc[m] = vrr;
-		vtc[m] = I*m*vtp/sint + (-sint*vst);	// Vt = I.m/sint *T  + dS/dt
-		vpc[m] = I*m*vsp/sint - (-sint*vtt);	// Vp = I.m/sint *S  - dT/dt
+		vtc[m] = I*m*vtp/sint + vst;	// Vt = I.m/sint *T  + dS/dt
+		vpc[m] = I*m*vsp/sint - vtt;	// Vp = I.m/sint *S  - dT/dt
 	}
 	fftw_execute_dft_c2r(ifft_lat,vrc,vr);
 	fftw_execute_dft_c2r(ifft_lat,vtc,vt);
@@ -858,23 +858,12 @@ void init_SH_synth()
 // for synthesis (inverse transform)
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-//		ylm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT_2);
-//		dylm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT_2);
 		for (it=0; it<NLAT_2; it++) {
-			if ((m==1)&&(st[it]==0.)) {		// gsl function diverges for m=1 and sint=0 => use approximation
-				gsl_sf_legendre_sphPlm_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1));
-				gsl_sf_legendre_sphPlm_array(LMAX, m, sqrt(sqrt(ct[it+1])), dtylm);
-				for (l=m; l<=LMAX; l++) {		// d(Pl1)/dt |(t=0) = Pl1(epsilon)/sin(epsilon)
-					dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m] / sqrt(1. - sqrt(ct[it+1]));
-					dylm[im][it*(LMAX-m+1) + (l-m)].p = dylm[im][it*(LMAX-m+1) + (l-m)].t;
-				}
-			} else {
-				gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
-				for (l=m; l<=LMAX; l++) {
-					dylm[im][it*(LMAX-m+1) + (l-m)].t = -st[it] *dtylm[l-m];	// d(Plm(cost))/dt = -sin(t).d(Plm(x))/dx
-					dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
-					if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
-				}
+			legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
+			for (l=m; l<=LMAX; l++) {
+				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
+				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
+				if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
 			}
 		}
 	}
@@ -882,7 +871,6 @@ void init_SH_synth()
 
 void init_SH_gauss()
 {
-	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
 	double iylm_fft_norm = 2.0*M_PI/NPHI;	// normation FFT pour zlm
 	double t,tmax;
 	long int it,im,m,l;
@@ -903,7 +891,7 @@ void init_SH_gauss()
 // TEST if gauss points are ok.
 	tmax = 0.0;
 	for (it = 0; it<NLAT_2; it++) {
-		t = gsl_sf_legendre_sphPlm(NLAT, 0, ct[it]);
+		t = legendre_sphPlm(NLAT, 0, ct[it]);
 		if (t>tmax) tmax = t;
 //		printf("i=%d, x=%12.12g, p=%12.12g\n",it,ct[it],t);
 	}
@@ -1084,9 +1072,9 @@ void init_SH_dct(int analysis)
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
 		for (it=0; it<NLAT_2; it++) {
-			gsl_sf_legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
-				dylm[im][it*(LMAX-m+1) + (l-m)].t = - dtylm[l-m];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
+				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
 				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
 				if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
 			}
@@ -1103,16 +1091,13 @@ void init_SH_dct(int analysis)
 			if (m & 1) {	// m odd
 				for (it=0; it<NLAT_2; it++) {
 					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * st[it];	// P[l+1](x)	*st
-//					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)] / st[it];	// P[l-1](x)	/st
-					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t * st[it];	// P[l](x)	*1
+					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t;	// P[l](x)	*1
 					dZp[it] = dylm[im][it*(LMAX-m+1) + (l-m)].p;		// P[l-1](x)	*1
 				}
 			} else {	// m even
 				for (it=0; it<NLAT_2; it++) {
 					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)];		// P[l](x)	*1
-//					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t;	// P[l-1](x)	/st
-//					dZp[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * m/(st[it]*st[it]);	// P[l-2](x)	/st
-					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t *st[it]*st[it];	// P[l+1](x)	*st
+					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t *st[it];	// P[l+1](x)	*st
 					dZp[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * m;	// P[l](x)	*st
 				}
 			}
@@ -1150,12 +1135,7 @@ void init_SH_dct(int analysis)
 				dyk[(it/2)*(LMAX+1-m) + (l-m)].t = dZt[it]/(2*NLAT);
 			}
 		}
-		for (it=0; it<NLAT_2; it++) {		// do corrections for dylm.t non-DCT array.
-			for (l=m; l<=LMAX; l++) {
-				dylm[im][it*(LMAX-m+1) + (l-m)].t *= st[it];	// d(Plm(cos(t)))/dt = -sin(t) d(Plm(x))/dx
-			}
-		}
-		
+
 	/* compute analysis coefficients (fast way)
 	 * Wklm = int(Tk*Ylm) = int(Tk.sum(i,a_ilm*Ti)) = sum(i, a_ilm* int(Tk*Ti)) = sum(i, a_ilm*Jik)
 	 * with Jik = int(Tk*Ti) = 1/(1-(k-i)^2) + 1/(1-(k+i)^2)
@@ -1347,7 +1327,7 @@ double SHT_error()
 
 	SH_to_spat(Slm0,Sh);		// scalar SHT
 	spat_to_SH(Sh, Slm);
-	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
+	for (i=0, tmax=0., n2=0., jj=0; i<NLM; i++) {		// compute error
 		t = cabs(Slm[i] - Slm0[i]);
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
@@ -1360,7 +1340,7 @@ double SHT_error()
 	Slm0[0] = 0.0; 	Tlm0[0] = 0.0;		// l=0, m=0 n'a pas de signification sph/tor
 	SHsphtor_to_spat(Slm0, Tlm0, Sh, Th);		// vector SHT
 	spat_to_SHsphtor(Sh, Th, Slm, Tlm);
-	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
+	for (i=0, tmax=0., n2=0., jj=0; i<NLM; i++) {		// compute error
 		t = cabs(Slm[i] - Slm0[i]);
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
@@ -1369,7 +1349,7 @@ double SHT_error()
 #if SHT_VERBOSE > 1
 	printf("        vector SH - spheroidal rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
 #endif
-	for (i=0, tmax=0., n2=0.; i<NLM; i++) {		// compute error
+	for (i=0, tmax=0., n2=0., jj=0; i<NLM; i++) {		// compute error
 		t = cabs(Tlm[i] - Tlm0[i]);
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
@@ -1402,6 +1382,9 @@ int shtns_set_size(int lmax, int mmax, int mres)
 			runerr("[SHTns] different size already set");
 		return(NLM);
 	}
+
+	// this quickly precomputes some values for the legendre recursion.
+//	legendre_precomp(lmax, mmax, mres);
 
 	// copy to global variables.
 #ifdef SHT_AXISYM
@@ -1455,6 +1438,9 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 	int theta_inc, phi_inc, phi_embed;
 
 	shtns.mtr_dct = -1;
+
+	// this quickly precomputes some values for the legendre recursion.
+	legendre_precomp(nlat, shtns.mmax, shtns.mres);
 
 	switch (flags & 0xFFFF00) {
 		case SHT_NATIVE_LAYOUT : 	theta_inc=1;  phi_inc=nlat;  phi_embed=2*(nphi/2+1);  break;
