@@ -11,7 +11,7 @@
 #define SHT_NLAT_EVEN
 //#define SHT_EO
 
-/// 0:no output, 1:output info to stdout, 2:more output (debug info)
+/// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
 #define SHT_VERBOSE 1
 
 #include <stdio.h>
@@ -20,6 +20,13 @@
 #include <math.h>
 // FFTW la derivee d/dx = ik	(pas de moins !)
 #include <fftw3.h>
+
+void runerr(const char * error_text)
+{
+	printf("*** Run-time error : %s\n",error_text);
+	exit(1);
+}
+
 // Legendre functions
 #include "sht_legendre.c"
 
@@ -51,15 +58,18 @@ long int SHT_FFT = 0;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-p
 
 /// sizes for SHT, in a structure to avoid problems with conflicting names.
 struct sht_sze {
-	
-	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
 	long int lmax;			///< maximum degree (lmax) of spherical harmonics.
 	long int mmax;			///< maximum order (mmax*mres) of spherical harmonics.
 	long int mres;			///< the periodicity along the phi axis.
-	long int nlat;			///< number of spatial points in Theta direction (latitude) ...
-	long int nlat_2;		///< ...and half of it (using (NLAT+1)/2 allows odd NLAT.)
-	long int nphi;			///< number of spatial points in Phi direction (longitude)
 	long int nlm;			///< total number of (l,m) spherical harmonics components.
+
+	long int nlat;			///< number of spatial points in Theta direction (latitude) ...
+	long int nphi;			///< number of spatial points in Phi direction (longitude)
+
+	int *lmidx;				///< (virtual) index in SH array of given im.
+
+	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
+	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
 };
 struct sht_sze shtns;
 
@@ -96,8 +106,8 @@ struct SHTdef {
 	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 	int *li;
 
-	long int *lmidx;		// (virtual) index in SH array of given im.
-	long int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+	int *lmidx;		// (virtual) index in SH array of given im.
+	int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 
 	double** ylm;		// matrix for inverse transform (synthesis)
 	double** zlm;		// matrix for direct transform (analysis)
@@ -118,8 +128,8 @@ struct VSHTdef {
 	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 	int *li;
 
-	long int *lmidx;		// (virtual) index in SH array of given im.
-	long int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+	int *lmidx;		// (virtual) index in SH array of given im.
+	int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 
 	struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
 	struct DtDp** dzlm;
@@ -149,9 +159,8 @@ double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
 double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 int *li = NULL;				// used as flag for shtns_set_size
 
-int *lmidx;		// (virtual) index in SH array of given im.
 // LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
-#define LiM(l,im) ( lmidx[im] + l )
+#define LiM(l,im) ( shtns.lmidx[im] + l )
 
 int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
@@ -438,12 +447,6 @@ void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex dou
 	INITIALIZATION FUNCTIONS
 */
 
-void runerr(const char * error_text)
-{
-	printf("*** Run-time error : %s\n",error_text);
-	exit(1);
-}
-
 void alloc_SHTarrays()
 {
 	long int im,m;
@@ -489,54 +492,6 @@ long int nlm_calc_eo(long int lmax, long int mmax, long int mres) {
 	return lm;
 }
 */
-
-/// Generates the abscissa and weights for a Gauss-Legendre quadrature.
-/// Newton method from initial Guess to find the zeros of the Legendre Polynome
-/// \param x = abscissa, \param w = weights, \param n points.
-/// \note Reference:  Numerical Recipes, Cornell press.
-void GaussNodes(long double *x, long double *w, int n)
-{
-	long double z, z1, p1, p2, p3, pp, eps;
-	long int i,j,m;
-	long double pi = M_PI;
-
-	eps = 1.1e-19;	// desired precision, minimum = 1.0842e-19 (long double)
-
-	m = (n+1)/2;
-	for (i=1;i<=m;i++) {
-		z = cosl(pi*((long double)i-0.25)/((long double)n+0.5));
-		do {
-			p1 = 1.0;
-			p2 = 0.0;
-			for(j=1;j<=n;j++) {
-				p3 = p2;
-				p2 = p1;
-				p1 = ((2*j-1)*z*p2-(j-1)*p3)/j;	// The Legendre polynomial...
-			}
-			pp = ((long double)n)*(z*p1-p2)/(z*z-1.0);                       // ... and its derivative.
-			z1 = z;
-			z = z-p1/pp;
-		} while ( fabsl(z-z1) > eps );
-		x[i-1] = z;		// Build up the abscissas.
-		w[i-1] = 2.0/((1-z*z)*(pp*pp));		// Build up the weights.
-		x[n-i] = -z;
-		w[n-i] = w[i-1];
-	}
-
-// as we started with initial guesses, we should check if the gauss points are actually unique.
-	for (i=m-1; i>0; i--) {
-		if (x[i] == x[i-1]) runerr("[SHTns] bad gauss points");
-	}
-
-#if SHT_VERBOSE > 1
-// test integral to compute :
-	z = 0;
-	for (i=0;i<m;i++) {
-		z += w[i]*x[i]*x[i];
-	}
-	printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);
-#endif
-}
 
 void EqualPolarGrid()
 {
@@ -606,7 +561,7 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 		fft_eo = fftw_plan_many_dft_r2c(1, &nfft, NLAT_2, Sh, &nreal, (phi_inc+1)/2, theta_inc, ShF, &ncplx, NLAT_2, 1, fftw_plan_mode);
 		if (fft_eo == NULL) runerr("[FFTW] fft planning failed !");
 
-#if SHT_VERBOSE > 1
+#if SHT_VERBOSE > 2
 	printf(" *** fft plan :\n");
 	fftw_print_plan(fft);
 	printf("\n *** ifft plan :\n");
@@ -651,8 +606,8 @@ void planDCT()
 		fftw_free(Sh);
 		if ((dct_r1 == NULL)||(idct_r1 == NULL))
 			runerr("[FFTW] (i)dct_r1 planning failed !");
-#if SHT_VERBOSE > 1
-			printf(" *** idct_r1 plan :\n");		fftw_print_plan(idct_r1);
+#if SHT_VERBOSE > 2
+			printf(" *** idct_r1 plan :\n");	fftw_print_plan(idct_r1);
 			printf("\n *** dct_r1 plan :\n");	fftw_print_plan(dct_r1);	printf("\n");
 #endif
 	}
@@ -671,8 +626,8 @@ void planDCT()
 		idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode);
 		if (idct == NULL)
 			runerr("[FFTW] idct planning failed !");
-#if SHT_VERBOSE > 1
-			printf(" *** idct plan :\n");		fftw_print_plan(idct);	printf("\n");
+#if SHT_VERBOSE > 2
+			printf(" *** idct plan :\n");	fftw_print_plan(idct);	printf("\n");
 #endif
 		if (dct_m0 == NULL) {
 			r2r_kind = FFTW_REDFT10;
@@ -680,7 +635,7 @@ void planDCT()
 			dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);	// out-of-place.
 			if (dct_m0 == NULL)
 				runerr("[FFTW] dct_m0 planning failed !");
-#if SHT_VERBOSE > 1
+#if SHT_VERBOSE > 2
 				printf(" *** dct_m0 plan :\n");		fftw_print_plan(dct_m0);	printf("\n");
 #endif
 		}
@@ -690,7 +645,7 @@ void planDCT()
 			dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);	// out-of-place.
 			if (dct_m0 == NULL)
 				runerr("[FFTW] dct_m0 planning failed !");
-#if SHT_VERBOSE > 1
+#if SHT_VERBOSE > 2
 				printf(" *** dct_m0 plan :\n");		fftw_print_plan(dct_m0);	printf("\n");
 #endif
 		}
@@ -879,7 +834,7 @@ void init_SH_gauss()
 #if SHT_VERBOSE > 0
 	printf("        => using Gauss Nodes\n");
 #endif
-	GaussNodes(xg,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
+	gauss_nodes(xg,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
 		ct[it] = xg[it];
 		st[it] = sqrtl((1.-xg[it])*(1.+xg[it]));
@@ -934,6 +889,45 @@ void init_SH_gauss()
 	}
 }
 
+/*
+eval_sht(double *val, complex double *ql, double *al, double *bl, long int lmax, double ct)
+{
+	complex double t1, t2;
+	long int l;
+
+// basic "naive"
+	t2 = ql[lmax];								// al[l] = (2l-1)/(l-m);	bl[l] = -(l-1+m)/(l-m);
+	t1 = ql[lmax-1] + (al[lmax]*ct)*t2;
+	for (l=lmax-2; l>m; l-=2) {		// ops: 10*, 8+ (double)
+		t2 = ql[l]   + (al[l+1]*ct)*t1 + bl[l+2]*t2;		// 5*, 4+
+		t1 = ql[l-1] + (al[l]*ct)*t2   + bl[l+1]*t1;		// 5*, 4+
+	}
+	if (l==m)
+		t1 = ql[l] + (al[l+1]*ct)*t1 + bl[l+2]*t2;		// 5*, 4+
+	*val = t1 * y_mm(ct);		// y_mm   = sqrt((2.0+1.0/m)/(4.0*M_PI)) * sgn * exp(lnpre); (cf gsl)
+
+// advanced "even/odd" (saves some op, and reduces loop dependancy)
+	te2 = 0.0;
+	to2 = ql[lmax];
+	te1 = ql[lmax-1];
+	to1 = al[lmax]*ct*to2;
+	for (l=lmax-2; l>m; l-=2) {		// ops: 18*, 12+  (instead of 20*, 16+, + cache miss)
+		te2 =           (al[l+1]*ct)*te1 + bl[l+2]*te2;			// 4*, 2+
+		to2 = ql[l]   + (al[l+1]*ct)*to1 + bl[l+2]*to2;			// 5*, 4+
+		te1 = ql[l-1] + (al[l]*ct)*te2   + bl[l+1]*te1;			// 4*, 4+
+		to1 =           (al[l]*ct)*to2   + bl[l+1]*to1;			// 5*, 2+
+	}		// compare to 4*, 4+ of the hyb_SH_to_spat...
+	if (l==m) {		// only 1 left, + exchange even and odd.
+		te2 =         al[l+1]*ct*te1 + bl[l+2]*te2;		// 5*, 2+
+		to2 = ql[l] + al[l+1]*ct*to1 + bl[l+2]*to2;		// 5*, 4+
+		te1 = to2;
+		to1 = te2;
+	}
+	*vale = te1 * y_mm(ct);		// y_mm   = sqrt((2.0+1.0/m)/(4.0*M_PI)) * sgn * exp(lnpre); (cf gsl)
+	*valo = to1 * y_mm(ct);		// y_mm   = sqrt((2.0+1.0/m)/(4.0*M_PI)) * sgn * exp(lnpre); (cf gsl)
+	    // P_{\ell}^{\ell}(x) = (-1)^l (2\ell-1)!! (1- x^2)^{(l/2)}
+}
+
 /// Clenshaw algorithm to evaluate a partial Chebyshev series dct[] up to degree n at any ct = cos(theta)
 /// works for n>=2. see http://en.wikipedia.org/wiki/Clenshaw_algorithm
 inline eval_dct(double *val, double *dct, long int n, double ct)
@@ -946,7 +940,7 @@ inline eval_dct(double *val, double *dct, long int n, double ct)
 	t1 = dct[n-1] + ct2*t2;
 	for (i=n-2; i>0; i--) {
 		tmp = t1;
-		t1 = dct[i] + ct2*t1 - t2;
+		t1 = dct[i] + ct2*t1 - t2;		// 1*, 2+
 		t2 = tmp;
 	}
 	*val = dct[0] + ct*t1 - t2;
@@ -962,11 +956,51 @@ inline eval_dct_cplx(complex double *val, complex double *dct, long int n, doubl
 	t1 = dct[n-1] + ct2*t2;
 	for (i=n-2; i>0; i--) {
 		tmp = t1;
-		t1 = dct[i] + ct2*t1 - t2;
+		t1 = dct[i] + ct2*t1 - t2;		// 2*, 4+
 		t2 = tmp;
 	}
 	*val = dct[0] + ct*t1 - t2;
+
+// unrolled version
+	t2 = dct[n];
+	t1 = dct[n-1] + ct2*t2;
+	for (i=n-2; i>1; i-=2) {
+		t2 = dct[i]   + ct2*t1 - t2;		// 2*, 4+
+		t1 = dct[i-1] + ct2*t2 - t1;		// 2*, 4+
+	}
+	if (i != 0) {
+		tmp = t1;
+		t1 = dct[i] + ct2*t1 - t2;		// 2*, 4+
+		t2 = tmp;
+	}
+	*val = dct[0] + ct*t1 - t2;
+
+// even/odd acceleration (saves 2+, reduces loop dependancy)
+	t2e = 0.0;
+	t2o = dct[n];
+	t1e = dct[n-1];
+	t1o = ct2*t2o;
+	for (i=n-2; i>1; i-=2) {	// total : 8*, 12+
+		t2e =            ct2*t1e - t2e;		// 2*, 2+
+		t2o = dct[i]   + ct2*t1o - t2o;		// 2*, 4+
+		t1e = dct[i-1] + ct2*t2e - t1e;		// 2*, 4+
+		t1o =            ct2*t2o - t1o;		// 2*, 2+
+	}
+	if (i != 0) {	// i == 1
+		t2e =          ct2*t1e - t2e;		// 2*, 2+
+		t2o = dct[i] + ct2*t1o - t2o;		// 2*, 4+
+		t1e = dct[0] + ct*t2e - t1e;		// 2*, 4+
+		t1o =          ct*t2o - t1o;		// 2*, 2+
+	} else {	// i == 0: exchange even and odd.
+		t2e =          ct*t1e - t2e;
+		t2o = dct[0] + ct*t1o - t2o;
+		t1e = t2o;
+		t1o = t2e;
+	}
+	*vale = t1e;
+	*valo = t1o;
 }
+*/
 
 void init_SH_dct(int analysis)
 {
@@ -1377,6 +1411,7 @@ int shtns_set_size(int lmax, int mmax, int mres)
 	int im, m, l, lm;
 
 	if (lmax < 1) runerr("[SHTns] lmax must be larger than 1");
+//	if (lmax < 2) runerr("[SHTns] lmax must be at least 2");
 	if (li != NULL) {
 		if ( (lmax != LMAX)||(mmax != MMAX)||(mres != MRES) )
 			runerr("[SHTns] different size already set");
@@ -1403,15 +1438,15 @@ int shtns_set_size(int lmax, int mmax, int mres)
 	if (MRES <= 0) runerr("[SHTns] MRES must be > 0");
 
 	// alloc spectral arrays
-	lmidx = (int *) fftw_malloc(sizeof(int) * (MMAX+1)*2);
-	tm =  lmidx + (MMAX+1);
+	shtns.lmidx = (int *) fftw_malloc(sizeof(int) * (MMAX+1)*2);
+	tm =  shtns.lmidx + (MMAX+1);
 	el = (double *) fftw_malloc( 3*NLM*sizeof(double) + NLM*sizeof(int) );	// NLM defined at runtime.
 	l2 = el + NLM;	l_2 = el + 2*NLM;
 	li = (int *) (el + 3*NLM);
 
 	for (im=0, lm=0; im<=MMAX; im++) {		// init l-related arrays.
 		m = im*MRES;
-		lmidx[im] = lm -m;		// virtual pointer for l=0
+		shtns.lmidx[im] = lm -m;		// virtual pointer for l=0
 		for (l=im*MRES;l<=LMAX;l++) {
 			el[lm] = l;	l2[lm] = l*(l+1.0);	l_2[lm] = 1.0/(l*(l+1.0));
 			li[lm] = l;

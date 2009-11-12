@@ -8,11 +8,15 @@ struct sht_sze {
 	long int lmax;			///< maximum degree (lmax) of spherical harmonics.
 	long int mmax;			///< maximum order (mmax*mres) of spherical harmonics.
 	long int mres;			///< the periodicity along the phi axis.
-	long int nlat;			///< number of spatial points in Theta direction (latitude) ...
-	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
-	long int nphi;			///< number of spatial points in Phi direction (longitude)
 	long int nlm;			///< total number of (l,m) spherical harmonics components.
+
+	long int nlat;			///< number of spatial points in Theta direction (latitude) ...
+	long int nphi;			///< number of spatial points in Phi direction (longitude)
+
+	int *lmidx;				///< (virtual) index in SH array of given im.
+
 	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
+	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
 };
 extern struct sht_sze shtns;
 
@@ -38,9 +42,6 @@ extern double *l2;	///< l2[lm] = l(l+1)
 extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 //@}
 
-/// required by some macros. Do not use directly.
-extern long int *lmidx;
-
 // MACROS //
 
 /*! \name Access to spherical harmonic components
@@ -48,9 +49,9 @@ extern long int *lmidx;
 **/
 //@{
 ///LiM(l,im) : macro returning array index for given l and im.
-#define LiM(l,im) ( lmidx[im] + l )
+#define LiM(l,im) ( shtns.lmidx[im] + l )
 /// LM(l,m) : macro returning array index for given l and m.
-#define LM(l,m) ( lmidx[(m)/shtns.mres] + l )
+#define LM(l,m) ( shtns.lmidx[(m)/shtns.mres] + l )
 /// LM_LOOP( action ) : macro that performs "action" for every (l,m), with lm set, but neither l, m nor im.
 /// \c lm must be a declared int and is the loop counter and the SH array index. more info : \ref spec_data
 #define LM_LOOP( action ) for (lm=0; lm<shtns.nlm; lm++) { action }
