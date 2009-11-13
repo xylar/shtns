@@ -20,16 +20,6 @@
 #include <math.h>
 // FFTW la derivee d/dx = ik	(pas de moins !)
 #include <fftw3.h>
-
-void runerr(const char * error_text)
-{
-	printf("*** Run-time error : %s\n",error_text);
-	exit(1);
-}
-
-// Legendre functions
-#include "sht_legendre.c"
-
 // cycle counter from FFTW
 #include "cycle.h"
 
@@ -143,14 +133,6 @@ struct VSHTdef {
 }
 */
 
-// number of double that have to be allocated for a spatial field (includes reserved space)
-#define NSPAT_ALLOC (NLAT*(NPHI/2+1)*2)
-
-#ifndef M_PI
-# define M_PI 3.1415926535897932384626433832795
-#endif
-
-
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };
@@ -180,6 +162,15 @@ fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 
 #define SSE __attribute__((aligned (16)))
+
+void shtns_runerr(const char * error_text)
+{
+	printf("*** [SHTns] Run-time error : %s\n",error_text);
+	exit(1);
+}
+
+/*  LEGENDRE FUNCTIONS  */
+#include "sht_legendre.c"
 
 /*
 	SHT FUNCTIONS
@@ -305,7 +296,7 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 
 /*
 	SYNTHESIS AT A GIVEN LATITUDE
-	(does not require any precomputation)
+	(does not require a previous call to shtns_precompute)
 */
 
 fftw_plan ifft_lat = NULL;		///< fftw plan for SHqst_to_lat
@@ -335,14 +326,14 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 
 	if ((nphi != nphi_lat)||(ifft_lat == NULL)) {
 		if (ifft_lat != NULL) fftw_destroy_plan(ifft_lat);
-		ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, fftw_plan_mode);
+		ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, FFTW_ESTIMATE);
 		nphi_lat = nphi;
 	}
 	if (ylm_lat == NULL) {
 		ylm_lat = (double *) malloc(sizeof(double)* NLM*2);
 		dylm_lat = ylm_lat + NLM;
 	}
-	if (cost != ct_lat) {		// don't recompute if same latitude
+	if (cost != ct_lat) {		// don't recompute if same latitude (ie equatorial disc rendering)
 		for (m=0,j=0; m<=mtr*MRES; m+=MRES) {
 			legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[j], &dylm_lat[j]);
 			j+=LMAX-m+1;
@@ -524,7 +515,7 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 	double *Sh;
 	int nfft, ncplx, nreal;
 
-	if (NPHI <= 2*MMAX) runerr("the sampling condition Nphi > 2*Mmax is not met.");
+	if (NPHI <= 2*MMAX) shtns_runerr("the sampling condition Nphi > 2*Mmax is not met.");
 
   if (NPHI>1) {
 	SHT_FFT = 1;		// yes, do some fft
@@ -552,14 +543,14 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 
 // IFFT : unnormalized.  FFT : must be normalized.
 		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, fftw_plan_mode);
-		if (ifft == NULL) runerr("[FFTW] ifft planning failed !");
+		if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
-		if (fft == NULL) runerr("[FFTW] fft planning failed !");
+		if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
 
 		ifft_eo = fftw_plan_many_dft_c2r(1, &nfft, NLAT_2, ShF, &ncplx, NLAT_2, 1, Sh, &nreal, (phi_inc+1)/2, theta_inc, fftw_plan_mode);
-		if (ifft_eo == NULL) runerr("[FFTW] ifft planning failed !");
+		if (ifft_eo == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 		fft_eo = fftw_plan_many_dft_r2c(1, &nfft, NLAT_2, Sh, &nreal, (phi_inc+1)/2, theta_inc, ShF, &ncplx, NLAT_2, 1, fftw_plan_mode);
-		if (fft_eo == NULL) runerr("[FFTW] fft planning failed !");
+		if (fft_eo == NULL) shtns_runerr("[FFTW] fft planning failed !");
 
 #if SHT_VERBOSE > 2
 	printf(" *** fft plan :\n");
@@ -573,7 +564,7 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 	if (SHT_FFT > 1) fftw_free(Sh);
 	fftw_free(ShF);
   } else {
-	if (theta_inc != 1) runerr("only contiguous spatial data is supported for NPHI=1");
+	if (theta_inc != 1) shtns_runerr("only contiguous spatial data is supported for NPHI=1");
 #if SHT_VERBOSE > 0
 	printf("        => no fft for NPHI=1.\n");
 #endif
@@ -605,7 +596,7 @@ void planDCT()
 		}
 		fftw_free(Sh);
 		if ((dct_r1 == NULL)||(idct_r1 == NULL))
-			runerr("[FFTW] (i)dct_r1 planning failed !");
+			shtns_runerr("[FFTW] (i)dct_r1 planning failed !");
 #if SHT_VERBOSE > 2
 			printf(" *** idct_r1 plan :\n");	fftw_print_plan(idct_r1);
 			printf("\n *** dct_r1 plan :\n");	fftw_print_plan(dct_r1);	printf("\n");
@@ -625,7 +616,7 @@ void planDCT()
 		r2r_kind = FFTW_REDFT01;
 		idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode);
 		if (idct == NULL)
-			runerr("[FFTW] idct planning failed !");
+			shtns_runerr("[FFTW] idct planning failed !");
 #if SHT_VERBOSE > 2
 			printf(" *** idct plan :\n");	fftw_print_plan(idct);	printf("\n");
 #endif
@@ -634,7 +625,7 @@ void planDCT()
 //			dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode);
 			dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);	// out-of-place.
 			if (dct_m0 == NULL)
-				runerr("[FFTW] dct_m0 planning failed !");
+				shtns_runerr("[FFTW] dct_m0 planning failed !");
 #if SHT_VERBOSE > 2
 				printf(" *** dct_m0 plan :\n");		fftw_print_plan(dct_m0);	printf("\n");
 #endif
@@ -644,7 +635,7 @@ void planDCT()
 			r2r_kind = FFTW_REDFT10;
 			dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);	// out-of-place.
 			if (dct_m0 == NULL)
-				runerr("[FFTW] dct_m0 planning failed !");
+				shtns_runerr("[FFTW] dct_m0 planning failed !");
 #if SHT_VERBOSE > 2
 				printf(" *** dct_m0 plan :\n");		fftw_print_plan(dct_m0);	printf("\n");
 #endif
@@ -846,11 +837,11 @@ void init_SH_gauss()
 // TEST if gauss points are ok.
 	tmax = 0.0;
 	for (it = 0; it<NLAT_2; it++) {
-		t = legendre_sphPlm(NLAT, 0, ct[it]);
+		t = legendre_Pl(NLAT, ct[it]);
 		if (t>tmax) tmax = t;
 //		printf("i=%d, x=%12.12g, p=%12.12g\n",it,ct[it],t);
 	}
-	printf("          max zero at Gauss node for Plm[l=NLAT,m=0] : %g\n",tmax);
+	printf("          max zero at Gauss nodes for Pl[l=NLAT] : %g\n",tmax);
 	if (NLAT_2 < 100) {
 		printf("          Gauss nodes :");
 		for (it=0;it<NLAT_2; it++)
@@ -1017,8 +1008,8 @@ void init_SH_dct(int analysis)
 #if SHT_VERBOSE > 0
 	printf("        => using Equaly Spaced Nodes with DCT acceleration\n");
 #endif
-	if ((NLAT_2)*2 <= LMAX+1) runerr("[SHTns] NLAT_2*2 should be at least LMAX+2 (DCT)");
-	if (NLAT & 1) runerr("[SHTns] NLAT must be even (DCT)");
+	if ((NLAT_2)*2 <= LMAX+1) shtns_runerr("NLAT_2*2 should be at least LMAX+2 (DCT)");
+	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
 	for (it=0; it<NLAT; it++) {	// Chebychev points : equaly spaced but skipping poles.
 		long double th = M_PI*(it+0.5)/NLAT;
 		ct[it] = cosl(th);
@@ -1410,21 +1401,18 @@ int shtns_set_size(int lmax, int mmax, int mres)
 {
 	int im, m, l, lm;
 
-	if (lmax < 1) runerr("[SHTns] lmax must be larger than 1");
-//	if (lmax < 2) runerr("[SHTns] lmax must be at least 2");
+	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
+//	if (lmax < 2) shtns_runerr("lmax must be at least 2");
 	if (li != NULL) {
 		if ( (lmax != LMAX)||(mmax != MMAX)||(mres != MRES) )
-			runerr("[SHTns] different size already set");
+			shtns_runerr("different size already set");
 		return(NLM);
 	}
-
-	// this quickly precomputes some values for the legendre recursion.
-//	legendre_precomp(lmax, mmax, mres);
 
 	// copy to global variables.
 #ifdef SHT_AXISYM
 	shtns.mmax = 0;		shtns.mres = 2;		shtns.nphi = 1;
-	if (mmax != 0) runerr("[SHTns] axisymmetric version : only Mmax=0 allowed");
+	if (mmax != 0) shtns_runerr("axisymmetric version : only Mmax=0 allowed");
 #else
 	MMAX = mmax;	MRES = mres;
 #endif
@@ -1434,8 +1422,8 @@ int shtns_set_size(int lmax, int mmax, int mres)
 	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
 	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d\n",LMAX,MMAX*MRES,MRES,NLM);
 #endif
-	if (MMAX*MRES > LMAX) runerr("[SHTns] MMAX*MRES should not exceed LMAX");
-	if (MRES <= 0) runerr("[SHTns] MRES must be > 0");
+	if (MMAX*MRES > LMAX) shtns_runerr("MMAX*MRES should not exceed LMAX");
+	if (MRES <= 0) shtns_runerr("MRES must be > 0");
 
 	// alloc spectral arrays
 	shtns.lmidx = (int *) fftw_malloc(sizeof(int) * (MMAX+1)*2);
@@ -1454,7 +1442,11 @@ int shtns_set_size(int lmax, int mmax, int mres)
 		}
 	}
 	l_2[0] = 0.0;	// undefined for l=0 => replace with 0.	
-	if (lm != NLM) runerr("[SHTns] unexpected error");
+	if (lm != NLM) shtns_runerr("unexpected error");
+
+	// this quickly precomputes some values for the legendre recursion.
+	legendre_precomp();
+
 	return(NLM);
 }
 
@@ -1474,9 +1466,6 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 
 	shtns.mtr_dct = -1;
 
-	// this quickly precomputes some values for the legendre recursion.
-	legendre_precomp(nlat, shtns.mmax, shtns.mres);
-
 	switch (flags & 0xFFFF00) {
 		case SHT_NATIVE_LAYOUT : 	theta_inc=1;  phi_inc=nlat;  phi_embed=2*(nphi/2+1);  break;
 		case SHT_THETA_CONTIGUOUS :	theta_inc=1;  phi_inc=nlat;  phi_embed=nphi;  break;
@@ -1488,14 +1477,14 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 	// copy to global variables.
 #ifdef SHT_AXISYM
 	shtns.nphi = 1;
-	if (nphi != 1) runerr("[SHTns] axisymmetric version : only Nphi=1 allowed");
+	if (nphi != 1) shtns_runerr("axisymmetric version : only Nphi=1 allowed");
 #else
 	NPHI = nphi;
 #endif
 	NLAT_2 = (nlat+1)/2;	NLAT = nlat;
-	if ((NLAT_2)*2 <= LMAX) runerr("[SHTns] NLAT_2*2 should be at least LMAX+1");
+	if ((NLAT_2)*2 <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
 #ifdef SHT_NLAT_EVEN
-	if ((NLAT & 1)&&(flags != sht_reg_poles)) runerr("[SHTns] NLAT must be even.");
+	if ((NLAT & 1)&&(flags != sht_reg_poles)) shtns_runerr("NLAT must be even.");
 #endif
   #if SHT_VERBOSE > 0
 	printf("        Nlat=%d, Nphi=%d\n",NLAT,NPHI);
@@ -1584,7 +1573,7 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 		printf("        + SHT accuracy = %.3g\n",t);
   #endif
   #if SHT_VERBOSE < 2
-		if (t > 1.e-3) runerr("[SHTns] bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
+		if (t > 1.e-3) shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
   #endif
 	}
 	return(NLM);	// returns the number of modes to describe a SHT.

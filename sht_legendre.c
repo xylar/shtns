@@ -10,7 +10,7 @@
 
 
 //#define SHT_LEGENDRE_GSL
-#define LEG_LONG_DOUBLE
+//#define LEG_LONG_DOUBLE
 
 #ifdef LEG_LONG_DOUBLE
   #define LEG_FLOAT_TYPE long double
@@ -55,12 +55,18 @@ int legendre_sphPlm_deriv_array(int lmax, int m, double x, double *yl, double *d
 	return res;
 }
 
-void legendre_precomp(int lmax, int mmax, int mres)
+void legendre_precomp()
 {
 #if SHT_VERBOSE > 0
 	printf("        > using GSL for legendre polynomials\n");
 #endif
 	// nothing to do when using the gsl.
+}
+
+/// returns the value of the Legendre Polynomial of degree l
+double legendre_Pl(const int l, double x)
+{
+	return gsl_sf_legendre_Pl(l, x);
 }
 
 #else
@@ -69,7 +75,7 @@ void legendre_precomp(int lmax, int mmax, int mres)
 inline LEG_FLOAT_TYPE sint_pow_n(LEG_FLOAT_TYPE cost, int n)
 {
 	LEG_FLOAT_TYPE val = 1.0;
-	LEG_FLOAT_TYPE s2 = (1l-cost)*(1l+cost);		// sin(t)^2 = 1 - cos(t)^2
+	LEG_FLOAT_TYPE s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
 	if (n&1) val *= LEG_SQRT(s2);	// = sin(t)
 	n >>= 1;
 	while(n>0) {
@@ -83,28 +89,34 @@ inline LEG_FLOAT_TYPE sint_pow_n(LEG_FLOAT_TYPE cost, int n)
 LEG_FLOAT_TYPE *alm;
 LEG_FLOAT_TYPE *blm;
 int *mmidx;
-long int MRES = 0;
 
 /// compute value of a legendre polynomial, using recursion.
 /// (requires a previous call to legendre_precompute())
 double legendre_sphPlm(const int l, const int m, double x)
 {
-	LEG_FLOAT_TYPE ymm, ymmp1, yl;
+	LEG_FLOAT_TYPE ymm, ymmp1;
 	int i,lm;
 
-	if ( ((m>0)&&((x==1.)||(x==-1.))) || (l<m) || (m%MRES) ) return 0.0;
+	if ( (l<m) || (l>LMAX) || (m>MMAX*MRES) || (m%MRES) ) return 0.0;		// out of range.
+
+	if ( ((m>0)&&((x==1.)||(x==-1.))) )  return 0.0;
 
 	lm = mmidx[m/MRES];
-	ymm = alm[lm] * sint_pow_n(x, m);
+	ymm = alm[lm] * sint_pow_n(x, m);		// l=m
 	lm++;
-	if (l==m) return ymm;
+	if (l==m) return ((double) ymm);
 
-	ymmp1 = ymm * alm[lm] * x;
+	ymmp1 = ymm * alm[lm] * x;				// l=m+1
 	lm++;
-	for (i=m+2; i<=l; i++) {
-		yl = alm[lm]*x*ymmp1 + blm[lm]*ymm;
-		ymm = ymmp1;	ymmp1 = yl;
-		lm++;
+	if (l == m+1) return ((double) ymmp1);
+	
+	for (i=m+2; i<l; i+=2) {
+		ymm   = alm[lm]*x*ymmp1 + blm[lm]*ymm;
+		ymmp1 = alm[lm+1]*x*ymm + blm[lm+1]*ymmp1;
+		lm+=2;
+	}
+	if (i==l) {
+		ymmp1 = alm[lm]*x*ymmp1 + blm[lm]*ymm;
 	}
 	return ((double) ymmp1);
 }
@@ -113,10 +125,10 @@ double legendre_sphPlm(const int l, const int m, double x)
 /// requires a previous call to legendre_precompute()
 int legendre_sphPlm_array(const int lmax, const int m, double x, double *yl)
 {
-	LEG_FLOAT_TYPE ymm, ymmp1, ylm;
+	LEG_FLOAT_TYPE ymm, ymmp1;
 	int l,lm;
 
-	if ((lmax < m)||(m % MRES)) return -1;
+	if ((lmax < m)||(lmax > LMAX)||(m>MMAX*MRES)||(m % MRES)) return -1;
 
 	if ((m>0)&&((x==1.)||(x==-1.))) {
 		for(l=m; l<=lmax; l++) {
@@ -134,14 +146,18 @@ int legendre_sphPlm_array(const int lmax, const int m, double x, double *yl)
 	ymmp1 = ymm * alm[lm] * x;		// l=m+1
 	yl[1] = ymmp1;
 	lm++;
+	if (lmax==m+1) return 0;		// done.
 
-	for (l=m+2; l<=lmax; l++) {
-		ylm = alm[lm]*x*ymmp1 + blm[lm]*ymm;
-		yl[l-m] = ylm;
-		ymm = ymmp1;	ymmp1 = ylm;
-		lm++;
+	for (l=m+2; l<lmax; l+=2) {
+		ymm   = alm[lm]*x*ymmp1 + blm[lm]*ymm;
+		ymmp1 = alm[lm+1]*x*ymm + blm[lm+1]*ymmp1;
+		yl[l-m] = ymm;
+		yl[l-m+1] = ymmp1;
+		lm+=2;
 	}
-
+	if (l==lmax) {
+		yl[l-m] = alm[lm]*x*ymmp1 + blm[lm]*ymm;
+	}
 	return 0;
 }
 
@@ -152,7 +168,7 @@ int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *y
 	double stm, mstm1, st2, st;
 	int l,lm;
 		
-	if ((lmax < m)||(m % MRES)) return -1;
+	if ((lmax < m)||(lmax > LMAX)||(m>MMAX*MRES)||(m % MRES)) return -1;
 
 	if ((m>1)&&((x==1.)||(x==-1.))) {
 		for(l=m; l<=lmax; l++) {
@@ -197,37 +213,33 @@ int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *y
 }
 
 
-/// precompute constants for the legendre recursion.
-void legendre_precomp(int lmax, int mmax, int mres)
+/// precompute constants for the legendre recursion, of size specified by \ref shtns_set_size
+void legendre_precomp()
 {
 	LEG_FLOAT_TYPE t1, t2;
-	int im, m, l, lm, nlm;
+	int im, m, l, lm;
 
 #if SHT_VERBOSE > 0
 	printf("        > using custom fast recursion for legendre polynomials\n");
 #endif
 
-	if (mmax*mres > lmax) mmax = lmax/mres;
-	nlm = (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2;
-
-	alm = (LEG_FLOAT_TYPE *) malloc( 2*nlm * sizeof(LEG_FLOAT_TYPE) );
-	blm = alm + nlm;
-	mmidx = (int *) malloc( (mmax+1) * sizeof(int) );
-	MRES = mres;
+	alm = (LEG_FLOAT_TYPE *) malloc( 2*NLM * sizeof(LEG_FLOAT_TYPE) );
+	blm = alm + NLM;
+	mmidx = (int *) malloc( (MMAX+1) * sizeof(int) );
 
 // precompute the factors of the recurrence relation :
 // y(l,m) = alm[l,m]*x*y(l-1,m) - blm[l,m]*y(l-2,m)
-	for (im=0, lm=0; im<=mmax; im++) {
-		m = im*mres;
+	for (im=0, lm=0; im<=MMAX; im++) {
+		m = im*MRES;
 		mmidx[im] = lm;
 		//l=m;
 			alm[lm] = 0.0;	blm[lm] = 0.0;	lm++;
-		if (m < lmax) {	// l=m+1
+		if (m < LMAX) {	// l=m+1
 			alm[lm] = LEG_SQRT(m+m+3);
 			blm[lm] = 0.0;
 			t2 = (m+m+1);	lm++;
 		}
-		for (l=m+2; l<=lmax; l++) {
+		for (l=m+2; l<=LMAX; l++) {
 			t1 = (l+m)*(l-m);
 			alm[lm] = LEG_SQRT((l+l+1)*(l+l-1)/t1);
 			blm[lm] = - LEG_SQRT(((l+l+1)*t2)/((l+l-3)*t1));
@@ -241,14 +253,33 @@ void legendre_precomp(int lmax, int mmax, int mres)
 //	gamma(x+1) = x*gamma(x)   et   gamma(1.5)/gamma(1) = sqrt(pi)/2
 	alm[0] = 0.5/LEG_SQRT(M_PI);          // Y00 = 1/sqrt(4pi)
 	m=1;	t1 = 1.0;
-	for (im=1; im<=mmax; im++) {
-		while(m<im*mres) {
+	for (im=1; im<=MMAX; im++) {
+		while(m<im*MRES) {
 			t1 *= (m+0.5)/m;
 			m++;
 		}
 		t2 = (m&1) ? -1.0 : 1.0;	// (-1)^m
 		alm[mmidx[im]] = t2 * LEG_SQRT( (2.0+1.0/m)/(8.0*M_PI) * t1 );
 	}
+}
+
+/// returns the value of the Legendre Polynomial of degree l
+double legendre_Pl(const int l, double x)
+{
+	double p1, p2, p3;
+	int i;
+
+	if ((l==0)||(x==1.0)) return ( 1. );
+	if (x==-1.0) return ( (l&1) ? -1. : 1. );
+
+	p2 = 1.0;		// P_0
+	p1 = x;			// P_1
+	for (i=2; i<=l; i++) {		 // recurrence : l P_l = (2l-1) z P_{l-1} - (l-1) P_{l-2}	(works ok up to l=100000)
+		p3 = p2;
+		p2 = p1;
+		p1 = (x*(2*i-1)*p2 - (i-1)*p3)/i;
+	}
+	return ((double) p1);
 }
 
 /* test code
@@ -285,6 +316,8 @@ int main()
 */
 #endif
 
+
+
 /// Generates the abscissa and weights for a Gauss-Legendre quadrature.
 /// Newton method from initial Guess to find the zeros of the Legendre Polynome
 /// \param x = abscissa, \param w = weights, \param n points.
@@ -320,7 +353,7 @@ void gauss_nodes(long double *x, long double *w, int n)
 
 // as we started with initial guesses, we should check if the gauss points are actually unique.
 	for (i=m-1; i>0; i--) {
-		if (((double) x[i]) == ((double) x[i-1])) runerr("[SHTns] bad gauss points");
+		if (((double) x[i]) == ((double) x[i-1])) shtns_runerr("bad gauss points");
 	}
 
 #if SHT_VERBOSE > 1

@@ -2,7 +2,8 @@
 HGID=`hg id -ti`
 
 ## global options for gcc
-go= -O3 -std=gnu99 -D_GNU_SOURCE -D_HGID_="\"$(HGID)\""
+## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
+go= -O3 -std=gnu99 -ffast-math -D_GNU_SOURCE -D_HGID_="\"$(HGID)\""
 
 ## compiler :
 ## generic gcc
