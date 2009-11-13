@@ -263,17 +263,17 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 {
 	double yl[LMAX+1];
 	double dtyl[LMAX+1];
-	complex double eimp;
-	double sint, vst, vtt, vsp, vtp;
+	complex double eimp, imeimp;
+	double sint, vst, vtt, vsp, vtp, vr0, vrm;
 	complex double *Ql, *Sl, *Tl;
 	long int l,m,im;
 
 	sint = sqrt((1.-cost)*(1.+cost));
-	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; *vr = 0.;
+	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; vr0 = 0.; vrm = 0.;
 	m=0;
 		legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
 		for (l=m; l<=LTR; l++) {
-			*vr += yl[l] * creal( Qlm[l] );
+			vr0 += yl[l] * creal( Qlm[l] );
 			vst += dtyl[l] * creal( Slm[l] );
 			vtt += dtyl[l] * creal( Tlm[l] );
 		}
@@ -281,17 +281,19 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 		m = im*MRES;
 		legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
 		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
+		imeimp = I*m*eimp;
 		Ql = &Qlm[LiM(0,im)];	Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
 		for (l=m; l<=LTR; l++) {
-			*vr += yl[l] * creal( Ql[l]*eimp );
+			vrm += yl[l] * creal( Ql[l]*eimp );
 			vst += dtyl[l] * creal(Sl[l]*eimp);
 			vtt += dtyl[l] * creal(Tl[l]*eimp);
-			vsp += (yl[l] *m) * creal(I*Sl[l]*eimp);
-			vtp += (yl[l] *m) * creal(I*Tl[l]*eimp);
+			vsp += yl[l] * creal(Sl[l]*imeimp);
+			vtp += yl[l] * creal(Tl[l]*imeimp);
 		}
 	}
-	*vt = vtp/sint + vst;	// Bt = I.m/sint *T  + dS/dt
-	*vp = vsp/sint - vtt;	// Bp = I.m/sint *S  - dT/dt
+	*vr = vr0 + vrm*sint;
+	*vt = vtp + vst;	// Bt = I.m/sint *T  + dS/dt
+	*vp = vsp - vtt;	// Bp = I.m/sint *S  - dT/dt
 }
 
 /*
@@ -365,9 +367,9 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 			vtp += ylm_lat[j] * Tlm[j];
 		}
 		j+=(LMAX-ltr);
-		vrc[m] = vrr;
-		vtc[m] = I*m*vtp/sint + vst;	// Vt = I.m/sint *T  + dS/dt
-		vpc[m] = I*m*vsp/sint - vtt;	// Vp = I.m/sint *S  - dT/dt
+		vrc[m] = vrr*sint;
+		vtc[m] = I*m*vtp + vst;	// Vt = I.m/sint *T  + dS/dt
+		vpc[m] = I*m*vsp - vtt;	// Vp = I.m/sint *S  - dT/dt
 	}
 	fftw_execute_dft_c2r(ifft_lat,vrc,vr);
 	fftw_execute_dft_c2r(ifft_lat,vtc,vt);
@@ -808,8 +810,8 @@ void init_SH_synth()
 			legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
-				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
-				if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
+				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m;	// 1/sint(t) dYlm/dphi
+				if (m>0) ylm[im][it*(LMAX-m+1) + (l-m)] *= st[it];
 			}
 		}
 	}
@@ -1100,8 +1102,8 @@ void init_SH_dct(int analysis)
 			legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
-				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m/st[it];	// 1/sint(t) dYlm/dphi
-				if (st[it]==0.) dylm[im][it*(LMAX-m+1) + (l-m)].p = 0.0;
+				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m;	// 1/sint(t) dYlm/dphi
+				if (m>0) ylm[im][it*(LMAX-m+1) + (l-m)] *= st[it];
 			}
 		}
 	// go to DCT space

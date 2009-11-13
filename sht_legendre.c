@@ -38,21 +38,40 @@ int legendre_sphPlm_deriv_array(int lmax, int m, double x, double *yl, double *d
 	int res, l;
 
 	st = sqrt((1.-x)*(1.+x));
-	stmin = 1.e-6;
-	if ( (m==1) && (st < stmin ) ) {		// gsl function diverges for m=1 and sint=0 => use approximation
-		printf("this should not happen !\n");
-		gsl_sf_legendre_sphPlm_array(lmax, m, x, yl);
-		res=gsl_sf_legendre_sphPlm_array(lmax, m, sqrt((1.-stmin)*(1.+stmin)) *((x<0.)? -1.:1.), dyl);
-		for (l=m; l<=lmax; l++) {		// d(Pl1)/dt |(t=0) = Pl1(epsilon)/sin(epsilon)
-			dyl[l-m] /= stmin;
-		}
-	} else {
+	if (m==0) {
 		res = gsl_sf_legendre_sphPlm_deriv_array(lmax, m, x, yl, dyl);
 		for (l=m; l<=lmax; l++) {
 			dyl[l-m] *= -st;		// multiply by - sin(theta) to compute dyl/dtheta
 		}
+		return res;
 	}
-	return res;
+	
+	if (st > 0.0) {
+		res = gsl_sf_legendre_sphPlm_deriv_array(lmax, m, x, yl, dyl);
+		for (l=m; l<=lmax; l++) {
+			dyl[l-m] *= -st;		// multiply by - sin(theta) to compute dyl/dtheta
+			yl[l-m] *= 1./st;
+		}
+		return res;
+	}
+	
+	if (m >= 2) {
+		for (l=m; l<=lmax; l++) {	// spherical harmonics for m>1 are zero near the poles.
+			yl[l-m] = 0.0;
+			dyl[l-m] = 0.0;
+		}
+		return 0.0;		// success.
+	} else {	// m=1 here
+		stmin = 1.e-6;
+	// gsl function diverges for m=1 and sint=0 => use (bad) approximation
+		printf("bad approximation used for m=1 spherical harmonics neer the poles !\n");
+		res=gsl_sf_legendre_sphPlm_array(lmax, m, sqrt((1.-stmin)*(1.+stmin)) *((x<0.)? -1.:1.), dyl);
+		for (l=m; l<=lmax; l++) {		// d(Pl1)/dt |(t=0) = Pl1(epsilon)/sin(epsilon)
+			dyl[l-m] *= 1./stmin;
+			yl[l-m] = dyl[l-m];
+		}
+		return res;
+	}
 }
 
 void legendre_precomp()
@@ -163,11 +182,13 @@ int legendre_sphPlm_array(const int lmax, const int m, double x, double *yl)
 
 /// compute value of a legendre polynomial for a range of l, using recursion.
 /// requires a previous call to legendre_precompute()
+/// for m=0 : returns ylm(x)  and  d(ylm)/d(theta)
+/// for m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta)
 int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *yl, double *dyl)
 {
-	double stm, mstm1, st2, st;
+	double st;
 	int l,lm;
-		
+
 	if ((lmax < m)||(lmax > LMAX)||(m>MMAX*MRES)||(m % MRES)) return -1;
 
 	if ((m>1)&&((x==1.)||(x==-1.))) {
@@ -176,27 +197,31 @@ int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *y
 		}
 		return 0;
 	}
-	
-	// compute simultaneously sin(theta)^m and sin(theta)^(m-1)
-	st2 = (1.-x)*(1.+x);		st = sqrt(st2);
-	stm = 1.0;		mstm1 = x*m;
-	if (m>0) {
-		l = m;		lm = m-1;
-		if (l&1) stm *= st;
-		if (lm&1) mstm1 *= st;
-		l >>= 1;	lm >>= 1;
-		while(l>0) {
-			if (l&1) stm *= st2;
-			if (lm&1) mstm1 *= st2;
-			l >>= 1;	lm >>= 1;
-			st2 *= st2;
-		}
-	}
 
 	lm = mmidx[m/MRES];
-	yl[0] = alm[lm] * stm;	// l=m
-	dyl[0] = alm[lm] * mstm1;		// if (m==0) : mstm1 = 0
-	lm++;
+	st = (1.-x)*(1.+x);		// st = sin(theta)^2 is used in the recursion for m>0
+	
+	if (m==0) {
+		st = sqrt(st);		// we need the square root for the recursion.
+		yl[0] = alm[lm];	// l=m
+		dyl[0] = 0.0;
+		lm++;
+	} else {		// m > 0
+		double stm1 = alm[lm];
+		double st2 = st;
+		l = m-1;			// compute  sin(theta)^(m-1)
+		if (l&1) stm1 *= sqrt(st2);
+		l >>= 1;
+		while(l>0) {
+			if (l&1) stm1 *= st2;
+			l >>= 1;
+			st2 *= st2;
+		}
+		yl[0] = stm1;	// l=m
+		dyl[0] = x*m*stm1;
+		lm++;
+	}
+
 	if (lmax==m) return 0;		// done.
 
 	yl[1] = alm[lm] * x * yl[0];		// l=m+1
