@@ -116,8 +116,8 @@ V			BtF[k] = 0.0;
 V			BpF[k] = 0.0;
 			k++;
 		}
-Q		yl  = ylm[im + parity*(MMAX+1)] + k*(LMAX-m+1) + parity;
-V		dyl = dylm[im] + k*(LMAX-m+1);
+Q		yl  = ylm[im] + parity;
+V		dyl = dylm[im];
 		do {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 Q			re = 0.0;

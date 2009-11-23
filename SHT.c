@@ -765,6 +765,30 @@ void OptimizeMatrices(double eps)
 			printf(" %d",tm[im]);
 		printf("\n");
 #endif
+		for (im=1; im<=MMAX; im++) {	//	im >= 1
+		  if (tm[im] > 0) {		// we can remove the data corresponding to polar values.
+			m = im*MRES;
+			ylm[im]  += tm[im]*(LMAX-m+1);		// shift pointers (still one block for each m)
+			dylm[im] += tm[im]*(LMAX-m+1);
+			for (l=m; l<LMAX; l+=2) {
+				for (it=0; it<NLAT_2-tm[im]; it++) {	// copy data to avoid cache misses.
+					zlm[im][(l-m)*(NLAT_2-tm[im]) + it*2]   = zlm[im][(l-m)*NLAT_2 + (it+tm[im])*2];
+					zlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1] = zlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1];
+					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2].t;
+					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2].p;
+					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1].t;
+					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1].p;
+				}
+			}
+			if (l==LMAX) {
+				for (it=0; it<NLAT_2-tm[im]; it++) {
+					zlm[im][(l-m)*(NLAT_2-tm[im]) + it]   = zlm[im][(l-m)*NLAT_2 + (it+tm[im])];
+					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])].t;
+					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])].p;
+				}
+			}
+		  }
+		}
 	} else {
 		for (im=0;im<=MMAX;im++)	tm[im] = 0;
 	}

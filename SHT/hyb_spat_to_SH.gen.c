@@ -308,7 +308,7 @@ V			Sl[l] = 0.0;	Tl[l] = 0.0;
   #ifndef SHT_AXISYM
 	for (im=1;im<=MTR;im++) {
 		i0 = tm[im];
- B		i=i0;	l=NLAT-1-i;
+ B		i=i0;	l=NLAT-1-i0;
  B		do {	// compute symmetric and antisymmetric parts.
 QB			re = BrF[i] + BrF[l];	ro = BrF[i] - BrF[l];
 VB			te = BtF[i] + BtF[l];	to = BtF[i] - BtF[l];
@@ -330,8 +330,6 @@ V		dzl = dzlm[im];
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
-Q			zl += 2*i0;
-V			dzl += 2*i0;
 QE			q0 = 0.0;
 QO			q1 = 0.0;
 VE			s0 = 0.0;	t1 = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
@@ -354,8 +352,6 @@ VO			Tl[l] = t0;	Sl[l+1] = s1;
 			l+=2;
 		}
 		if (l==LMAX) {
-Q			zl += i0;
-V			dzl += i0;
 QE			q0 = 0.0;	// Qlm[LiM(l,im)] = 0.0;
 VE			s0 = 0.0;
 VO			t0 = 0.0;
@@ -373,8 +369,6 @@ VO			Tl[l] = t0;
     #ifdef SHT_VAR_LTR
 		} else {
 		    if (l==LTR) {
-Q			zl += 2*i0;
-V			dzl += 2*i0;
 QE			q0 = 0.0;
 VE			s0 = 0.0;
 VO			t0 = 0.0;

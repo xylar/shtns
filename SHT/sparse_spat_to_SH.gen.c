@@ -148,8 +148,6 @@ V		dzl = dzlm[im];
 Q		BrF += NLAT_2;
 V		BtF += NLAT_2;	BpF += NLAT_2;
 		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
-Q			zl += 2*i0;
-V			dzl += 2*i0;
 Q			q0 = 0.0;
 V			s0 = 0.0;	t1 = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
 			i=i0;	do {		// tm[im] : polar optimization
@@ -165,7 +163,6 @@ V			Sl[l] = s0*sgn_sph;	Tl[l+1] = t1*sgn_tor;
 			l+=2;
 		}
 		if (l==LMAX) {
-V			dzl += i0;
 V			s0 = 0.0;
 V			i=i0;	do {		// tm[im] : polar optimization
 V				s0 += dzl[0].t *to - dzl[0].p *pe*I;
@@ -174,7 +171,6 @@ V				i++;
 V			} while(i<ni);
 V			Sl[l] = s0*sgn_sph;
 Q			if (parity == 0) {
-Q				zl += i0;
 Q				q0 = 0.0;	// Qlm[LiM(l,im)] = 0.0;
 Q				i=i0;	do {		// tm[im] : polar optimization
 Q					q0 += zl[0] * re;	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
@@ -186,7 +182,6 @@ Q			}
     #ifdef SHT_VAR_LTR
 		} else {
 		    if (l==LTR) {
-V				dzl += 2*i0;
 V				s0 = 0.0;
 V				i=i0;	do {		// tm[im] : polar optimization
 V					s0 += dzl[0].t *to - dzl[0].p *pe*I;		// ref: these E. Dormy p 72.
@@ -194,7 +189,6 @@ V					dzl +=2;
 V					i++;
 V				} while (i<ni);
 V				Sl[l] = s0*sgn_sph;
-Q				zl += 2*i0;
 Q				q0 = 0.0;
 Q				if (parity == 0) {
 Q					i=i0;	do {		// tm[im] : polar optimization

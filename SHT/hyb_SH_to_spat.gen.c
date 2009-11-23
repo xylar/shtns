@@ -267,8 +267,8 @@ V			BpF[k] = 0.0;
 VB			BpF[NLAT-tm[im] + k] = 0.0;	// south pole zeroes
 			k++;
 		}
-Q		yl  = ylm[im] + k*(LMAX-m+1);
-V		dyl = dylm[im] + k*(LMAX-m+1);
+Q		yl  = ylm[im];
+V		dyl = dylm[im];
 		do {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 Q			re = 0.0;	ro = 0.0;
