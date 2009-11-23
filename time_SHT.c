@@ -126,10 +126,10 @@ int test_SHT()
 	for (jj=0; jj< SHT_ITER; jj++) {
 // synthese (inverse legendre)
 		SH_to_spat(Slm,Sh);
-		SH_to_spat(Tlm,Th);
-		for (i=0; i< NLAT*NPHI; i++) {
-			ThF[i] *= ShF[i];
-		}
+//		SH_to_spat(Tlm,Th);
+//		for (i=0; i< NLAT*NPHI; i++) {
+//			ThF[i] *= ShF[i];
+//		}
 // analyse (direct legendre)
 		spat_to_SH(Sh,Slm);
 	}
@@ -466,7 +466,8 @@ int main(int argc, char *argv[])
 		Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 	}
 
-	printf("** performing %d scalar SHT with NL evaluation\n", SHT_ITER);
+//	printf("** performing %d scalar SHT with NL evaluation\n", SHT_ITER);
+	printf("** performing %d scalar SHT\n", SHT_ITER);
 	printf(":: OPTIMAL\n");
 	Set_MTR_DCT(m_opt);
 	test_SHT();

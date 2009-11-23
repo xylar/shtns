@@ -21,6 +21,9 @@ cmd = gcc $(go)
 ## r2d2
 #cmd = gcc $(go) -march=core2 -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
 
+# intel compiler (lower performance for vector transform as of 23/11/2009, icc 9.1 vs gcc 4.1.2)
+#cmd = icc -axT -xT -msse3 -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
+
 shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
 
 default : SHT.o
@@ -45,22 +48,22 @@ SHTaxi.o : SHT.c Makefile $(shtfiles)
 	$(cmd) -c -DSHT_AXISYM SHT.c -o SHTaxi.o
 
 time_SHT : SHT.h time_SHT.c SHT.o Makefile
-	$(cmd) time_SHT.c SHT.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHT
+	$(cmd) time_SHT.c SHT.o -lfftw3 -lm -o time_SHT
 
 time_SHTg : SHT.h time_SHT.c SHTg.o Makefile
-	$(cmd) time_SHT.c SHTg.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHTg
+	$(cmd) time_SHT.c SHTg.o -lfftw3 -lm -o time_SHTg
 
 time_SHTaxi : SHT.h time_SHT.c SHTaxi.o Makefile
-	$(cmd) -DSHT_AXISYM time_SHT.c SHTaxi.o -lfftw3 -lgsl -lgslcblas -lm -o time_SHTaxi
+	$(cmd) -DSHT_AXISYM time_SHT.c SHTaxi.o -lfftw3 -lm -o time_SHTaxi
 
 SHT_example : SHT_example.c SHT.o Makefile
-	$(cmd) SHT_example.c SHT.o -lfftw3 -lgsl -lgslcblas -lm -o SHT_example
+	$(cmd) SHT_example.c SHT.o -lfftw3 -lm -o SHT_example
 
 
 SHTf77.o : SHTf77.c SHT.h Makefile
 	gcc -c SHTf77.c
 SHT_fort_ex : SHT_example.f SHT.o SHTf77.o Makefile
-	gfortran -fdefault-real-8 SHT_example.f SHT.o SHTf77.o -lfftw3 -lgsl -lgslcblas -lm -lc -o SHT_fort_ex
+	gfortran -fdefault-real-8 SHT_example.f SHT.o SHTf77.o -lfftw3 -lm -lc -o SHT_fort_ex
 
 docs :
 	doxygen doxygen.conf

@@ -1,15 +1,13 @@
-/**************************************************
- * Spherical Harmonics (pre)computation           *
- *    some ideas and code taken from the GSL 1.13 *
- *    written by Nathanael Schaeffer / LGIT,CNRS  *
- **************************************************/
+/** \file sht_legendre.c
+ \brief Compute legendre associated functions.
+ written by Nathanael Schaeffer / LGIT,CNRS, with some ideas and code taken from the GSL 1.13
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 
-//#define SHT_LEGENDRE_GSL
 //#define LEG_LONG_DOUBLE
 
 #ifdef LEG_LONG_DOUBLE
@@ -20,75 +18,6 @@
   #define LEG_SQRT(a) sqrt(a)
 #endif
 
-#ifdef SHT_LEGENDRE_GSL
-
-#include <gsl/gsl_sf_legendre.h>
-
-double legendre_sphPlm(int l, int m, double x) {
-	return gsl_sf_legendre_sphPlm(l, m, x);
-}
-
-int legendre_sphPlm_array(int lmax, int m, double x, double *yl) {
-	return gsl_sf_legendre_sphPlm_array(lmax, m, x, yl); 
-}
-
-int legendre_sphPlm_deriv_array(int lmax, int m, double x, double *yl, double *dyl)
-{
-	double st,stmin;
-	int res, l;
-
-	st = sqrt((1.-x)*(1.+x));
-	if (m==0) {
-		res = gsl_sf_legendre_sphPlm_deriv_array(lmax, m, x, yl, dyl);
-		for (l=m; l<=lmax; l++) {
-			dyl[l-m] *= -st;		// multiply by - sin(theta) to compute dyl/dtheta
-		}
-		return res;
-	}
-	
-	if (st > 0.0) {
-		res = gsl_sf_legendre_sphPlm_deriv_array(lmax, m, x, yl, dyl);
-		for (l=m; l<=lmax; l++) {
-			dyl[l-m] *= -st;		// multiply by - sin(theta) to compute dyl/dtheta
-			yl[l-m] *= 1./st;
-		}
-		return res;
-	}
-	
-	if (m >= 2) {
-		for (l=m; l<=lmax; l++) {	// spherical harmonics for m>1 are zero near the poles.
-			yl[l-m] = 0.0;
-			dyl[l-m] = 0.0;
-		}
-		return 0.0;		// success.
-	} else {	// m=1 here
-		stmin = 1.e-6;
-	// gsl function diverges for m=1 and sint=0 => use (bad) approximation
-		printf("bad approximation used for m=1 spherical harmonics neer the poles !\n");
-		res=gsl_sf_legendre_sphPlm_array(lmax, m, sqrt((1.-stmin)*(1.+stmin)) *((x<0.)? -1.:1.), dyl);
-		for (l=m; l<=lmax; l++) {		// d(Pl1)/dt |(t=0) = Pl1(epsilon)/sin(epsilon)
-			dyl[l-m] *= 1./stmin;
-			yl[l-m] = dyl[l-m];
-		}
-		return res;
-	}
-}
-
-void legendre_precomp()
-{
-#if SHT_VERBOSE > 0
-	printf("        > using GSL for legendre polynomials\n");
-#endif
-	// nothing to do when using the gsl.
-}
-
-/// returns the value of the Legendre Polynomial of degree l
-double legendre_Pl(const int l, double x)
-{
-	return gsl_sf_legendre_Pl(l, x);
-}
-
-#else
 
 /// computes sin(t)^n from cos(t). ie returns (1-x^2)^(n/2), with x = cos(t)
 inline LEG_FLOAT_TYPE sint_pow_n(LEG_FLOAT_TYPE cost, int n)
@@ -105,12 +34,12 @@ inline LEG_FLOAT_TYPE sint_pow_n(LEG_FLOAT_TYPE cost, int n)
 	return val;		// = sint(t)^n
 }
 
-LEG_FLOAT_TYPE *alm;
-LEG_FLOAT_TYPE *blm;
-int *mmidx;
+int *mmidx;				///< index array (size MMAX+1)
+LEG_FLOAT_TYPE *alm;	///< coefficient list for recursion (size NLM)
 
-/// compute value of a legendre polynomial, using recursion.
-/// (requires a previous call to legendre_precompute())
+/// Returns the value of a legendre polynomial of degree l and order m, noramalized for spherical harmonics, using recursion.
+/// Requires a previous call to \ref legendre_precomp().
+/// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
 double legendre_sphPlm(const int l, const int m, double x)
 {
 	LEG_FLOAT_TYPE ymm, ymmp1;
@@ -118,30 +47,33 @@ double legendre_sphPlm(const int l, const int m, double x)
 
 	if ( (l<m) || (l>LMAX) || (m>MMAX*MRES) || (m%MRES) ) return 0.0;		// out of range.
 
-	if ( ((m>0)&&((x==1.)||(x==-1.))) )  return 0.0;
+	if ((m>0)&&( (x==1.)||(x==-1.) ))  return 0.0;
 
 	lm = mmidx[m/MRES];
 	ymm = alm[lm] * sint_pow_n(x, m);		// l=m
-	lm++;
 	if (l==m) return ((double) ymm);
 
-	ymmp1 = ymm * alm[lm] * x;				// l=m+1
-	lm++;
+	ymmp1 = ymm * alm[lm+1] * x;				// l=m+1
+	lm+=2;
 	if (l == m+1) return ((double) ymmp1);
 	
 	for (i=m+2; i<l; i+=2) {
-		ymm   = alm[lm]*x*ymmp1 + blm[lm]*ymm;
-		ymmp1 = alm[lm+1]*x*ymm + blm[lm+1]*ymmp1;
-		lm+=2;
+		ymm   = alm[lm+1]*x*ymmp1 + alm[lm]*ymm;
+		ymmp1 = alm[lm+3]*x*ymm + alm[lm+2]*ymmp1;
+		lm+=4;
 	}
 	if (i==l) {
-		ymmp1 = alm[lm]*x*ymmp1 + blm[lm]*ymm;
+		ymmp1 = alm[lm+1]*x*ymmp1 + alm[lm]*ymm;
 	}
 	return ((double) ymmp1);
 }
 
-/// compute value of a legendre polynomial for a range of l, using recursion.
-/// requires a previous call to legendre_precompute()
+/// Compute values of legendre polynomials noramalized for spherical harmonics,
+/// for a range of l=m..lmax, at given m and x, using recursion.
+/// Requires a previous call to \ref legendre_precomp().
+/// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
+/// \param lmax maximum degree computed, \param m order, \param x argument.
+/// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
 int legendre_sphPlm_array(const int lmax, const int m, double x, double *yl)
 {
 	LEG_FLOAT_TYPE ymm, ymmp1;
@@ -159,31 +91,33 @@ int legendre_sphPlm_array(const int lmax, const int m, double x, double *yl)
 	lm = mmidx[m/MRES];
 	ymm = alm[lm] * sint_pow_n(x, m);	// l=m
 	yl[0] = ymm;
-	lm++;
 	if (lmax==m) return 0;		// done.
 
-	ymmp1 = ymm * alm[lm] * x;		// l=m+1
+	ymmp1 = ymm * alm[lm+1] * x;		// l=m+1
 	yl[1] = ymmp1;
-	lm++;
+	lm+=2;
 	if (lmax==m+1) return 0;		// done.
 
 	for (l=m+2; l<lmax; l+=2) {
-		ymm   = alm[lm]*x*ymmp1 + blm[lm]*ymm;
-		ymmp1 = alm[lm+1]*x*ymm + blm[lm+1]*ymmp1;
+		ymm   = alm[lm+1]*x*ymmp1 + alm[lm]*ymm;
+		ymmp1 = alm[lm+3]*x*ymm + alm[lm+2]*ymmp1;
 		yl[l-m] = ymm;
 		yl[l-m+1] = ymmp1;
-		lm+=2;
+		lm+=4;
 	}
 	if (l==lmax) {
-		yl[l-m] = alm[lm]*x*ymmp1 + blm[lm]*ymm;
+		yl[l-m] = alm[lm+1]*x*ymmp1 + alm[lm]*ymm;
 	}
 	return 0;
 }
 
-/// compute value of a legendre polynomial for a range of l, using recursion.
-/// requires a previous call to legendre_precompute()
-/// for m=0 : returns ylm(x)  and  d(ylm)/d(theta)
-/// for m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta)
+/// Compute values of a legendre polynomial normalized for spherical harmonics derivatives, for a range of l=m..lmax, using recursion.
+/// Requires a previous call to \ref legendre_precomp(). Not directly compatible with GSL :
+/// - if m=0 : returns ylm(x)  and  d(ylm)/d(theta) = -sin(theta)*d(ylm)/dx
+/// - if m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta)
+/// \param lmax maximum degree computed, \param m order, \param x argument.
+/// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
+/// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
 int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *yl, double *dyl)
 {
 	double st;
@@ -191,7 +125,7 @@ int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *y
 
 	if ((lmax < m)||(lmax > LMAX)||(m>MMAX*MRES)||(m % MRES)) return -1;
 
-	if ((m>1)&&((x==1.)||(x==-1.))) {
+	if ((m>1)&&( (x==1.)||(x==-1.) )) {
 		for(l=m; l<=lmax; l++) {
 			yl[l-m] = 0.0;	dyl[l-m] = 0.0;
 		}
@@ -205,7 +139,6 @@ int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *y
 		st = sqrt(st);		// we need the square root for the recursion.
 		yl[0] = alm[lm];	// l=m
 		dyl[0] = 0.0;
-		lm++;
 	} else {		// m > 0
 		double stm1 = alm[lm];
 		double st2 = st;
@@ -219,19 +152,18 @@ int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *y
 		}
 		yl[0] = stm1;	// l=m
 		dyl[0] = x*m*stm1;
-		lm++;
 	}
 
 	if (lmax==m) return 0;		// done.
 
-	yl[1] = alm[lm] * x * yl[0];		// l=m+1
-	dyl[1] = alm[lm]*( x*dyl[0] - st*yl[0] );
-	lm++;
+	yl[1] = alm[lm+1] * x * yl[0];		// l=m+1
+	dyl[1] = alm[lm+1]*( x*dyl[0] - st*yl[0] );
+	lm+=2;
 
 	for (l=m+2; l<=lmax; l++) {
-		yl[l-m] = alm[lm]*x*yl[l-m-1] + blm[lm]*yl[l-m-2];
-		dyl[l-m] = alm[lm]*(x*dyl[l-m-1] - yl[l-m-1]*st) + blm[lm]*dyl[l-m-2];
-		lm++;
+		yl[l-m] = alm[lm+1]*x*yl[l-m-1] + alm[lm]*yl[l-m-2];
+		dyl[l-m] = alm[lm+1]*(x*dyl[l-m-1] - yl[l-m-1]*st) + alm[lm]*dyl[l-m-2];
+		lm+=2;
 	}
 
 	return 0;
@@ -244,36 +176,33 @@ void legendre_precomp()
 	LEG_FLOAT_TYPE t1, t2;
 	int im, m, l, lm;
 
-#if SHT_VERBOSE > 0
+#if SHT_VERBOSE > 1
 	printf("        > using custom fast recursion for legendre polynomials\n");
 #endif
 
-	alm = (LEG_FLOAT_TYPE *) malloc( 2*NLM * sizeof(LEG_FLOAT_TYPE) );
-	blm = alm + NLM;
 	mmidx = (int *) malloc( (MMAX+1) * sizeof(int) );
+	alm = (LEG_FLOAT_TYPE *) malloc( 2*NLM * sizeof(LEG_FLOAT_TYPE) );
 
-// precompute the factors of the recurrence relation :
-// y(l,m) = alm[l,m]*x*y(l-1,m) - blm[l,m]*y(l-2,m)
+/// precompute the factors alm and blm of the recurrence relation :
+/// y(l,m) = alm[l,m]*x*y(l-1,m) - blm[l,m]*y(l-2,m)
 	for (im=0, lm=0; im<=MMAX; im++) {
 		m = im*MRES;
 		mmidx[im] = lm;
-		//l=m;
-			alm[lm] = 0.0;	blm[lm] = 0.0;	lm++;
 		if (m < LMAX) {	// l=m+1
-			alm[lm] = LEG_SQRT(m+m+3);
-			blm[lm] = 0.0;
-			t2 = (m+m+1);	lm++;
+			alm[lm] = 0.0;		// will contain the starting value.
+			alm[lm+1] = LEG_SQRT(m+m+3);
+			t2 = (m+m+1);	lm+=2;
 		}
 		for (l=m+2; l<=LMAX; l++) {
 			t1 = (l+m)*(l-m);
-			alm[lm] = LEG_SQRT((l+l+1)*(l+l-1)/t1);
-			blm[lm] = - LEG_SQRT(((l+l+1)*t2)/((l+l-3)*t1));
-			t2 = t1;	lm++;
+			alm[lm+1] = LEG_SQRT((l+l+1)*(l+l-1)/t1);
+			alm[lm] = - LEG_SQRT(((l+l+1)*t2)/((l+l-3)*t1));
+			t2 = t1;	lm+=2;
 		}
 	}
 
-// Starting value for recursion.
-// Y_m^m(x) = sqrt( (2m+1)/(4pi m) gamma(m+1/2)/gamma(m) ) (-1)^m (1-x^2)^(m/2) / pi^(1/4)
+/// Starting value for recursion :
+/// Y_m^m(x) = sqrt( (2m+1)/(4pi m) gamma(m+1/2)/gamma(m) ) (-1)^m (1-x^2)^(m/2) / pi^(1/4)
 // alternate method : direct recursive computation, using the following properties:
 //	gamma(x+1) = x*gamma(x)   et   gamma(1.5)/gamma(1) = sqrt(pi)/2
 	alm[0] = 0.5/LEG_SQRT(M_PI);          // Y00 = 1/sqrt(4pi)
@@ -288,7 +217,8 @@ void legendre_precomp()
 	}
 }
 
-/// returns the value of the Legendre Polynomial of degree l
+/// returns the value of the Legendre Polynomial of degree l.
+/// Does not require a previous call to legendre_precomp(), l is arbitrary.
 double legendre_Pl(const int l, double x)
 {
 	double p1, p2, p3;
@@ -339,8 +269,6 @@ int main()
 	printf("max error = %e\n",dmax);
 }
 */
-#endif
-
 
 
 /// Generates the abscissa and weights for a Gauss-Legendre quadrature.

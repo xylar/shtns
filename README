@@ -10,8 +10,7 @@ Run "make docs" to generate documentation with doxygen.
  *
  * Using DCT acceleration and other classical optimizations, it is intended to be <b>very fast</b>.
  * 
- * It uses the <a href="http://www.gnu.org/software/gsl/">GSL</a> and <a href="http://www.fftw.org/">FFTW</a> libraries and is
- * distributed under the GPL License.
+ * It uses the <a href="http://www.fftw.org/">FFTW</a> library and is distributed under the GPL License.
  *
  * There is also a simple Fortran interface.
  * 

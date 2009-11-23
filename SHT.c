@@ -163,6 +163,7 @@ unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner 
 
 #define SSE __attribute__((aligned (16)))
 
+/// Abort program with error message.
 void shtns_runerr(const char * error_text)
 {
 	printf("*** [SHTns] Run-time error : %s\n",error_text);
@@ -486,6 +487,8 @@ long int nlm_calc_eo(long int lmax, long int mmax, long int mres) {
 }
 */
 
+
+/// Generates an equi-spaced theta grid including the poles, for synthesis only.
 void EqualPolarGrid()
 {
 	int j;
@@ -796,7 +799,7 @@ void OptimizeMatrices(double eps)
 }
 
 
-
+/// Precompute the matrix for SH synthesis.
 void init_SH_synth()
 {
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
@@ -817,12 +820,15 @@ void init_SH_synth()
 	}
 }
 
+
+/// Precompute matrices for SH synthesis and analysis, on a Gauss-Legendre grid.
 void init_SH_gauss()
 {
-	double iylm_fft_norm = 2.0*M_PI/NPHI;	// normation FFT pour zlm
 	double t,tmax;
 	long int it,im,m,l;
+	long double iylm_fft_norm = 2.0*M_PI/NPHI;		// FFT/SHT normalization for zlm
 	long double xg[NLAT], wg[NLAT];	// gauss points and weights.
+	double wgd[NLAT_2];		// gauss weights, double precision.
 
 #if SHT_VERBOSE > 0
 	printf("        => using Gauss Nodes\n");
@@ -833,6 +839,8 @@ void init_SH_gauss()
 		st[it] = sqrtl((1.-xg[it])*(1.+xg[it]));
 		st_1[it] = 1.0/sqrtl((1.-xg[it])*(1.+xg[it]));
 	}
+	for (it=0; it<NLAT_2; it++)
+		wgd[it] = wg[it]*iylm_fft_norm;		// faster double-precision computations.
 
 #if SHT_VERBOSE > 1
 	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
@@ -862,21 +870,21 @@ void init_SH_gauss()
 //		dzlm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT_2);
 		for (it=0;it<NLAT_2;it++) {
 			for (l=m;l<LMAX;l+=2) {
-				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * wg[it] *iylm_fft_norm;
-				zlm[im][(l-m)*NLAT_2 + it*2 +1] =  ylm[im][it*(LMAX-m+1) + (l+1-m)] * wg[it] *iylm_fft_norm;
-				dzlm[im][(l-m)*NLAT_2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wg[it] *iylm_fft_norm /(l*(l+1));
-				dzlm[im][(l-m)*NLAT_2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wg[it] *iylm_fft_norm /(l*(l+1));
-				dzlm[im][(l-m)*NLAT_2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * wg[it] *iylm_fft_norm /((l+1)*(l+2));
-				dzlm[im][(l-m)*NLAT_2 + it*2+1].p = dylm[im][it*(LMAX-m+1) + (l+1-m)].p * wg[it] *iylm_fft_norm /((l+1)*(l+2));
+				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * wgd[it];
+				zlm[im][(l-m)*NLAT_2 + it*2 +1] =  ylm[im][it*(LMAX-m+1) + (l+1-m)] * wgd[it];
+				dzlm[im][(l-m)*NLAT_2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wgd[it] /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wgd[it] /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * wgd[it] /((l+1)*(l+2));
+				dzlm[im][(l-m)*NLAT_2 + it*2+1].p = dylm[im][it*(LMAX-m+1) + (l+1-m)].p * wgd[it] /((l+1)*(l+2));
 				if (l == 0) {		// les derivees sont nulles pour l=0 (=> m=0)
 					dzlm[im][(l-m)*NLAT_2 + it*2].t = 0.0;
 					dzlm[im][(l-m)*NLAT_2 + it*2].p = 0.0;
 				}
 			}
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
-				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * wg[it] *iylm_fft_norm;
-				dzlm[im][(l-m)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wg[it] *iylm_fft_norm /(l*(l+1));
-				dzlm[im][(l-m)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wg[it] *iylm_fft_norm /(l*(l+1));
+				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * wgd[it];
+				dzlm[im][(l-m)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wgd[it] /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wgd[it] /(l*(l+1));
 			}
 		}
 	}
@@ -995,13 +1003,15 @@ inline eval_dct_cplx(complex double *val, complex double *dct, long int n, doubl
 }
 */
 
+/// Computes the matrices required for SH transform on a regular grid (with or without DCT).
+/// \param analysis : 0 => synthesis only.
 void init_SH_dct(int analysis)
 {
 	fftw_plan dct, idct;
 	double *yk, *yk0, *dyk0, *yg;		// temp storage
 	struct DtDp *dyg, *dyk;
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
-	double iylm_fft_norm = 2.0*M_PI/NPHI;	// FFT normation for zlm
+	double iylm_fft_norm = 2.0*M_PI/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm
 	long int it,im,m,l;
 	long int sk, dsk;
 	double Z[2*NLAT_2], dZt[2*NLAT_2], dZp[2*NLAT_2];		// equally spaced theta points.
@@ -1087,7 +1097,6 @@ void init_SH_dct(int analysis)
 		is1[it] = 1./(1. - 4.*it*it);
 
 // Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT_2 points required.
-/// for synthesis (inverse transform)
 	// temp memory for ykm_dct.
 	yk = (double *) malloc( sizeof(double) * (KMAX+1)*(LMAX+1) );
 	dyk = (struct DtDp *) malloc( sizeof(struct DtDp)* (KMAX+1)*(LMAX+1) );
@@ -1178,8 +1187,8 @@ void init_SH_dct(int analysis)
 			k0 = (l-m)&1;	k1 = 1-k0;
 			for(k=0; k<NLAT; k++) {	Z[k] = 0.0;		dZt[k] = 0.0;	dZp[k] = 0.0; }
 			for (i=k0; i<=l+1; i+=2) {		// i+k even
-				yy = yk[(i/2)*(LMAX+1-m) + (l-m)] * iylm_fft_norm/NLAT_2;
-				dyy = dyk[(i/2)*(LMAX+1-m) + (l-m)].p * iylm_fft_norm/(NLAT_2 *l*(l+1));
+				yy = yk[(i/2)*(LMAX+1-m) + (l-m)] * iylm_fft_norm;
+				dyy = dyk[(i/2)*(LMAX+1-m) + (l-m)].p * iylm_fft_norm/(l*(l+1));
 				if (i==0) {	yy*=0.5;	dyy*=0.5; }
 				for (k=k0; k<NLAT; k+=2) {
 					d = (k<i) ? i-k : k-i;		// d=|i-k|
@@ -1190,7 +1199,7 @@ void init_SH_dct(int analysis)
 			}
 			if (l != 0) {
 				for (i=k1; i<=l+1; i+=2) {		// i+k even
-					yy = dyk[(i/2)*(LMAX+1-m) + (l-m)].t * iylm_fft_norm/(NLAT_2 *l*(l+1));
+					yy = dyk[(i/2)*(LMAX+1-m) + (l-m)].t * iylm_fft_norm/(l*(l+1));
 					if (i==0) yy*=0.5;
 					for (k=k1; k<NLAT; k+=2) {
 						d = (k<i) ? i-k : k-i;		// d=|i-k|
@@ -1595,7 +1604,7 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
 {
 	shtns_set_size(lmax, mmax, mres);
-	shtns_precompute(flags, eps, nlat, nphi);
+	return shtns_precompute(flags, eps, nlat, nphi);
 }
 
 
