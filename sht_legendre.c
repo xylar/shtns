@@ -1,13 +1,15 @@
 /** \file sht_legendre.c
- \brief Compute legendre associated functions.
- written by Nathanael Schaeffer / LGIT,CNRS, with some ideas and code taken from the GSL 1.13
+ \brief Compute legendre polynomials and associated functions.
+ The normalization of the associated functions is for spherical harmonics, and the Condon-Shortley phase is included.
+ When computing the derivatives (with respect to colatitude theta), there are no singularities.
+ written by Nathanael Schaeffer / LGIT,CNRS, with some ideas and code from the GSL 1.13 and Numerical Recipies.
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
-
+// it appears that long double precision does not help the precision of the SHT (if the SHT itself is computed in double precision)
 //#define LEG_LONG_DOUBLE
 
 #ifdef LEG_LONG_DOUBLE
@@ -42,8 +44,8 @@ LEG_FLOAT_TYPE *alm;	///< coefficient list for recursion (size NLM)
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
 double legendre_sphPlm(const int l, const int m, double x)
 {
+	long int i,lm;
 	LEG_FLOAT_TYPE ymm, ymmp1;
-	int i,lm;
 
 	if ( (l<m) || (l>LMAX) || (m>MMAX*MRES) || (m%MRES) ) return 0.0;		// out of range.
 
@@ -76,8 +78,8 @@ double legendre_sphPlm(const int l, const int m, double x)
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
 int legendre_sphPlm_array(const int lmax, const int m, double x, double *yl)
 {
+	long int l,lm;
 	LEG_FLOAT_TYPE ymm, ymmp1;
-	int l,lm;
 
 	if ((lmax < m)||(lmax > LMAX)||(m>MMAX*MRES)||(m % MRES)) return -1;
 
@@ -114,14 +116,16 @@ int legendre_sphPlm_array(const int lmax, const int m, double x, double *yl)
 /// Compute values of a legendre polynomial normalized for spherical harmonics derivatives, for a range of l=m..lmax, using recursion.
 /// Requires a previous call to \ref legendre_precomp(). Not directly compatible with GSL :
 /// - if m=0 : returns ylm(x)  and  d(ylm)/d(theta) = -sin(theta)*d(ylm)/dx
-/// - if m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta)
+/// - if m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta).
+/// This way, there are no singularities, everything is well defined for x=[-1,1], for any m.
 /// \param lmax maximum degree computed, \param m order, \param x argument.
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
 /// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
 int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *yl, double *dyl)
 {
-	double st;
-	int l,lm;
+	long int l,lm;
+	LEG_FLOAT_TYPE y0, y1, dy0, dy1;
+	LEG_FLOAT_TYPE st;
 
 	if ((lmax < m)||(lmax > LMAX)||(m>MMAX*MRES)||(m % MRES)) return -1;
 
@@ -132,39 +136,66 @@ int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *y
 		return 0;
 	}
 
+	st = (1.-(LEG_FLOAT_TYPE)x)*(1.+ (LEG_FLOAT_TYPE)x);	// st = sin(theta)^2 is used in the recursion for m>0
 	lm = mmidx[m/MRES];
-	st = (1.-x)*(1.+x);		// st = sin(theta)^2 is used in the recursion for m>0
 	
 	if (m==0) {
-		st = sqrt(st);		// we need the square root for the recursion.
-		yl[0] = alm[lm];	// l=m
-		dyl[0] = 0.0;
+		st = LEG_SQRT(st);		// we need the square root for the recursion.
+		y0 = alm[lm];	// l=m
+		dy0 = 0.0;
 	} else {		// m > 0
-		double stm1 = alm[lm];
-		double st2 = st;
+		LEG_FLOAT_TYPE stm1 = alm[lm];
+		LEG_FLOAT_TYPE st2 = st;
 		l = m-1;			// compute  sin(theta)^(m-1)
-		if (l&1) stm1 *= sqrt(st2);
+		if (l&1) stm1 *= LEG_SQRT(st2);
 		l >>= 1;
 		while(l>0) {
 			if (l&1) stm1 *= st2;
 			l >>= 1;
 			st2 *= st2;
 		}
-		yl[0] = stm1;	// l=m
-		dyl[0] = x*m*stm1;
+		y0 = stm1;	// l=m
+		dy0 = x*m*stm1;
 	}
-
+	yl[0] = y0;
+	dyl[0] = dy0;
 	if (lmax==m) return 0;		// done.
 
-	yl[1] = alm[lm+1] * x * yl[0];		// l=m+1
-	dyl[1] = alm[lm+1]*( x*dyl[0] - st*yl[0] );
+	y1 = alm[lm+1] * x * y0;		// l=m+1
+	dy1 = alm[lm+1]*( x*dy0 - st*y0 );
+	yl[1] = y1;
+	dyl[1] = dy1;
 	lm+=2;
+	if (lmax==m+1) return 0;		// done.
 
-	for (l=m+2; l<=lmax; l++) {
-		yl[l-m] = alm[lm+1]*x*yl[l-m-1] + alm[lm]*yl[l-m-2];
-		dyl[l-m] = alm[lm+1]*(x*dyl[l-m-1] - yl[l-m-1]*st) + alm[lm]*dyl[l-m-2];
-		lm+=2;
+	for (l=m+2; l<lmax; l+=2) {
+		y0 = alm[lm+1]*x*y1 + alm[lm]*y0;
+		dy0 = alm[lm+1]*(x*dy1 - y1*st) + alm[lm]*dy0;
+		yl[l-m] = y0;		dyl[l-m] = dy0;
+		y1 = alm[lm+3]*x*y0 + alm[lm+2]*y1;
+		dy1 = alm[lm+3]*(x*dy0 - y0*st) + alm[lm+2]*dy1;
+		yl[l+1-m] = y1;		dyl[l+1-m] = dy1;
+		lm+=4;
 	}
+	if (l==lmax) {
+		yl[l-m] = alm[lm+1]*x*y1 + alm[lm]*y0;
+		dyl[l-m] = alm[lm+1]*(x*dy1 - y1*st) + alm[lm]*dy0;
+	}
+	
+/*	// Alternative for evaluating the derivative (not better)
+	for (l=m+2; l<=lmax; l++) {
+//		dyl/dx = - (l * x * y[l] - c1 * (l+m) * y[l-1]) / (1-x^2);
+//		=> dyl/dtheta = (l * x * y[l] - c1 * (l+m) * y[l-1]) / sqrt(1-x^2);
+		if (m==0) {
+			const double c1 = sqrt( (2.*l+1.)/(2.*l-1.) );
+			dyl[l-m] = l*(x*yl[l] - c1*yl[l-1])/st;
+			if ( 1.-fabs(x) < 1.e-15 ) dyl[l] = 0.0;	// -l*(l+1)/2 *sin(theta)
+		} else {
+			const double c1 = sqrt(((2.*l+1.)/(2.*l-1.)) * ((double)(l-m)/(double)(l+m)));
+			dyl[l-m] = l*x*yl[l-m] - c1*(l+m)*yl[l-1-m];
+		}
+	}
+*/
 
 	return 0;
 }
@@ -221,8 +252,8 @@ void legendre_precomp()
 /// Does not require a previous call to legendre_precomp(), l is arbitrary.
 double legendre_Pl(const int l, double x)
 {
-	double p1, p2, p3;
-	int i;
+	long int i;
+	LEG_FLOAT_TYPE p1, p2, p3;
 
 	if ((l==0)||(x==1.0)) return ( 1. );
 	if (x==-1.0) return ( (l&1) ? -1. : 1. );
