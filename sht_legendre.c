@@ -173,8 +173,8 @@ int legendre_sphPlm_deriv_array(const int lmax, const int m, double x, double *y
 /// precompute constants for the legendre recursion, of size specified by \ref shtns_set_size
 void legendre_precomp()
 {
+	long int im, m, l, lm;
 	LEG_FLOAT_TYPE t1, t2;
-	int im, m, l, lm;
 
 #if SHT_VERBOSE > 1
 	printf("        > using custom fast recursion for legendre polynomials\n");
@@ -205,15 +205,15 @@ void legendre_precomp()
 /// Y_m^m(x) = sqrt( (2m+1)/(4pi m) gamma(m+1/2)/gamma(m) ) (-1)^m (1-x^2)^(m/2) / pi^(1/4)
 // alternate method : direct recursive computation, using the following properties:
 //	gamma(x+1) = x*gamma(x)   et   gamma(1.5)/gamma(1) = sqrt(pi)/2
-	alm[0] = 0.5/LEG_SQRT(M_PI);          // Y00 = 1/sqrt(4pi)
-	m=1;	t1 = 1.0;
-	for (im=1; im<=MMAX; im++) {
+	t1 = 0.25/M_PI;
+	alm[0] = LEG_SQRT(t1);          // Y00 = 1/sqrt(4.pi)
+	for (im=1, m=0; im<=MMAX; im++) {
 		while(m<im*MRES) {
-			t1 *= (m+0.5)/m;
 			m++;
+			t1 *= (m+0.5)/m;
 		}
-		t2 = (m&1) ? -1.0 : 1.0;	// (-1)^m
-		alm[mmidx[im]] = t2 * LEG_SQRT( (2.0+1.0/m)/(8.0*M_PI) * t1 );
+		t2 = (m&1) ? -1.0 : 1.0;	// (-1)^m  Condon-Shortley phase.
+		alm[mmidx[im]] = t2 * LEG_SQRT(t1);
 	}
 }
 
@@ -237,39 +237,6 @@ double legendre_Pl(const int l, double x)
 	return ((double) p1);
 }
 
-/* test code
-
-int main()
-{
-	double x,v1, v2, dmax;
-	int n=30;
-	int mmax=15;
-	int mres=1;
-	int lmax=50;
-	int i,im,m,l;
-	
-	legendre_precomp(lmax, mmax, mres);
-	dmax = 0.;
-	
-	for (i=0;i<n;i++) {
-		x = cos((i+0.5)*M_PI/n);
-		for (im=0; im<=mmax; im++) {
-			m=im*mres;
-			for (l=m; l<=lmax; l+=mres) {
-				v1 = gsl_sf_legendre_sphPlm(l,m,x);
-				v2 = legendre_sphPlm(l,m,x);
-//				v1 = legendre_sphPlm(l,m,x+1.e-16);
-				if ((fabs((v2 - v1)/v1) > dmax)&&(fabs(v1)>1e-16)) {
-					printf("m=%d l=%d x=%f   gsl=%e   me=%e   diff=%e  err=%e\n",m,l,x,v1,v2,v2-v1,(v2-v1)/v1);
-					dmax = fabs((v2-v1)/v1);
-				}
-			}
-		} 
-	}
-	printf("max error = %e\n",dmax);
-}
-*/
-
 
 /// Generates the abscissa and weights for a Gauss-Legendre quadrature.
 /// Newton method from initial Guess to find the zeros of the Legendre Polynome
@@ -277,11 +244,10 @@ int main()
 /// \note Reference:  Numerical Recipes, Cornell press.
 void gauss_nodes(long double *x, long double *w, int n)
 {
-	long double z, z1, p1, p2, p3, pp, eps;
 	long int i,l,m;
+	long double z, z1, p1, p2, p3, pp;
 	long double pi = M_PI;
-
-	eps = 1.1e-19;	// desired precision, minimum = 1.0842e-19 (long double)
+	long double eps = 1.1e-19;	// desired precision, minimum = 1.0842e-19 (long double)
 
 	m = (n+1)/2;
 	for (i=1;i<=m;i++) {

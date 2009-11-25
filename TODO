@@ -26,6 +26,7 @@ for m=3, z[k] is constant up to l-2
 - Using CUDA may be interesting !
 
 + cache optimization have been performed for m=0 and are quite impressive at high LMAX.
++ cache optimizations associated with polar optimization for m>0.
 
 TIP:
 + LM_LOOP : translating an integer to a double is SLOW. So if l or l(l+1) is used in the computation, using an array is faster.

@@ -34,7 +34,7 @@ These symbol can be defined at compile time :
  - \c SHT_NO_DCT : disables DCT at compile time (smaller, simpler and maybe faster code for gauss SHT)
  - \c SHT_AXISYM : axysimmetric version of SHTns (m=0 only), which is supposed to be a little faster than setting MMAX=0 at runtime.
  - \c SHT_NLAT_EVEN : only \ref NLAT \b even is supported for analysis (spatial to SH). This is the default, it removes some code and conditional jumps, so it runs (slightly) faster.
- - \c SHT_DEBUG : prints additional debug information.
+ - \c SHT_VERBOSE : sets the quantity of information to print during execution. Usefull for debugging.
 
 */
 
@@ -166,7 +166,7 @@ transforms.
 
 A less common, but still classic optimization : high m's spherical harmonics have their magnitude descrease exponentially
 when aproaching the poles. SHTns use a threshold below which the SH is take to be zero.
-You can choose this threshold, with the \c eps parameter of the \ref init_SH function, trading some accuracy for more speed.
+You can choose this threshold, with the \c eps parameter of the \ref shtns_init function, trading some accuracy for more speed.
 Around 5% to 15% speed increase are typical values for a SHT with a large \ref MMAX.
 
 \section opt_cache Cache optimizations
@@ -187,16 +187,22 @@ Using a DCT requires a regular grid instead of the usual Gauss grid, and this
 means doubling the number of grid points to keep an equally accurate quadrature (Tchebychev quadrature), reducing
 the performance gain from DCT to zero, when not performing worse.
 
-However, we managed using a Gauss-Legendre quadrature together with an equally spaced grid,
+However, SHTns uses a quadrature inspired by the clenshaw-curtis one, which allows exact result
 using only one more grid-point as the classical Gauss-Legendre quadrature.
 This allows SHTns to efficiently use the DCT optimization, but also to use regular grids with
 almost half the grid points.
 
-To put it another way, SHTns performs a Gauss-Legendre quadrature on a regular grid.
-This do work well but ther is a significant loss of accuracy due to round-off errors
-(as an example, relative errors with DCT are around \c 1.e-11 instead of \c 1.e-13 without)
+The theoretical result is that for a function band-limited by L, L+2 equispaced grid-points allow us
+to fully recover the spectral content.
+There is still a drawback for non-linear terms : for a non-linear product of two functions band-limited to L,
+we would require L*2+2 grid points, whereas the Gauss-Legendre quadrature would only require (L+1)*3/2 grid-points if we
+are interested in only the first L modes of the product.
+
+There is a slight loss of accuracy due to round-off errors (as an example, relative errors 
+with DCT are around \c 1.e-11 instead of \c 1.e-12 without for lmax around 500).
 If you can live with it, the DCT-based algorithm performs much faster on small m's :
 twice as fast for axisymmetric transforms, and between 1.5 and 1.2 times faster on non-axisymmetric ones.
+For large m's however the spatial-domain polar optimization is better.
 
 Note also that the DCT algorithm, while beeing usually faster, requires significantly larger init time. It
 is then suitable for performing many transforms (as in a direct numerical simulations).
@@ -208,7 +214,7 @@ is then suitable for performing many transforms (as in a direct numerical simula
 The default mode used by SHTns is to measure performance of the different algorithms, and choose
 the one that performs best (it will also check that the accuracy is good enough).
 However, there are situation where either the Gauss-Legendre algorithm or a regular grid is required, and you
-can choose to do so using the adequate \ref shtns_type when calling \ref init_SH.
+can choose to do so using the adequate \ref shtns_type when calling \ref shtns_init.
 
 
 
