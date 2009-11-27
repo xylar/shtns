@@ -45,7 +45,7 @@ V	#define pe0	((double *)BpF)[i]
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 Q	BrF = (complex double *) Vr;
 V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
-V	sgn_tor = -1.0;		sgn_sph = 1.0;
+V	sgn_tor = -2.0;		sgn_sph = 2.0;		// factor 2 to compensate summing only on half the data.
 
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 0) {
@@ -63,15 +63,17 @@ V	    fftw_execute_dft_r2c(fft_eo,Vp, BpF);
 V	if (parity) {	// antisymmetric scalar or vector.
 V		Sl = Slm;		Slm = Tlm;		Tlm = Sl;		// exchange Slm and Tlm pointers.
 V		Sl = BtF;		BtF = BpF;		BpF = Sl;		// exchange BtF and BpF pointers.
-V		sgn_tor = 1.0;		sgn_sph = -1.0;
+V		sgn_tor = 2.0;		sgn_sph = -2.0;
 V	}
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
-		l=0;
+Q		l=0;
+V		l=1;
 Q		Ql = Qlm + parity;		// virtual pointer for l=0 and im
 V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
 Q		zl = zlm[im] + parity;
 V		dzl0 = (double *) dzlm[im];		// only theta derivative (d/dphi = 0 for m=0)
+V		Sl[0] = 0.0;
 		do {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			i=0;
 Q			q0 = 0.0;
@@ -85,17 +87,17 @@ V				dzl0 +=2;
 				i++;
 			} while(i < ni);
 Q			Ql[l] = q0 + q0;
-V			Sl[l] = s0*sgn_sph;	Tl[l+1] = t1*sgn_tor;
+V			Sl[l+1] = s0*sgn_sph;	Tl[l] = t1*sgn_tor;
 			l+=2;
 		} while (l<LTR);
 		if (l==LMAX) {
-V			s0 = 0.0;
+V			t1 = 0.0;
 V			i=0;	do {
-V				s0 += dzl0[0] * to0;
+V				t1 += dzl0[0] * pe0;
 V				dzl0 ++;
 V				i++;
 V			} while(i<ni);
-V			Sl[l] = s0*sgn_sph;
+V			Tl[l] = t1*sgn_tor;
 Q			if (parity==0) {
 Q				q0 = 0.0;
 Q				i=0;	do {
@@ -109,9 +111,9 @@ Q			}
 		} else {
 		    if (l==LTR) {
 Q				q0 = 0.0;
-V				s0 = 0.0;
+V				t1 = 0.0;
 V				i=0;	do {
-V					s0 += dzl0[0] * to0;
+V					t1 += dzl0[1] * pe0;
 V					dzl0 +=2;
 V					i++;
 V				} while(i<ni);
@@ -123,16 +125,16 @@ Q						i++;
 Q					} while(i<ni);
 				}
 Q				Ql[l] = q0 + q0;
-V				Sl[l] = s0*sgn_sph;
+V				Tl[l] = t1*sgn_tor;
 				l++;
 			}
 			while( l<LMAX ) {
-V				Sl[l] = 0.0;	Tl[l+1] = 0.0;
+V				Tl[l] = 0.0;	Sl[l+1] = 0.0;
 Q				Ql[l] = 0.0;
 				l+=2;
 			}
 			if ( l==LMAX ) {
-V				Sl[l] = 0.0;
+V				Tl[l] = 0.0;
 Q				if (parity==0) Ql[l] == 0.0;
 			}
   #endif

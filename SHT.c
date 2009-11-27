@@ -8,7 +8,6 @@
 /* FLAGS */
 //#define SHT_AXISYM
 //#define SHT_NO_DCT
-#define SHT_NLAT_EVEN
 //#define SHT_EO
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
@@ -866,6 +865,10 @@ void init_SH_gauss()
 	for (it=0; it<NLAT_2; it++)
 		wgd[it] = wg[it]*iylm_fft_norm;		// faster double-precision computations.
 
+	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point.
+		wgd[NLAT_2-1] *= 0.5;
+	}
+
 #if SHT_VERBOSE > 1
 	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
 // TEST if gauss points are ok.
@@ -1274,7 +1277,7 @@ void init_SH_dct(int analysis)
 			} else {	// m even
 				for (it=0; it<NLAT; it++) { dZp[it] = Z[it]*m/(l*(l+1)*st[it]); 	dZt[it] *= st_1[it]; }
 			}
-			
+
 			sk = (l-m)&1;
 			if ((sk == 0)&&(l == LMAX)) {
 				for (it=0; it<NLAT_2; it++) {
@@ -1518,9 +1521,6 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 #endif
 	NLAT_2 = (nlat+1)/2;	NLAT = nlat;
 	if ((NLAT_2)*2 <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
-#ifdef SHT_NLAT_EVEN
-	if ((NLAT & 1)&&(flags != sht_reg_poles)) shtns_runerr("NLAT must be even.");
-#endif
   #if SHT_VERBOSE > 0
 	printf("        Nlat=%d, Nphi=%d\n",NLAT,NPHI);
   #endif

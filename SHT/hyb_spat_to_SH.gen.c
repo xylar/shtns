@@ -199,14 +199,7 @@ VB			to0 = (double) BtF[i] - (double) BtF[l];
 VB			pe0 = (double) BpF[i] + (double) BpF[l];
 VB			po0 = (double) BpF[i] - (double) BpF[l];
  B			i++;	l--;
- B		} while(i<l);
-    #ifndef SHT_NLAT_EVEN
- B		if (i == l) {		// NLAT is odd : special equator handling
-QB			re0 = (double) BrF[i];	ro0 = 0.0;
-VB			te0 = (double) BtF[i];	to0 = 0.0;
-VB			pe0 = (double) BpF[i];	po0 = 0.0;
- B		}
-    #endif
+ B		} while(i<=l);
 	    } else {
   #endif
 		i=0;	l=NLAT-1;
@@ -218,14 +211,7 @@ VB			to0 = ((double*)BtF)[i] - ((double*)BtF)[l];
 VB			pe0 = ((double*)BpF)[i] + ((double*)BpF)[l];
 VB			po0 = ((double*)BpF)[i] - ((double*)BpF)[l];
  B			i++;	l--;
- B		} while(i<l);
-    #ifndef SHT_NLAT_EVEN
- B		if (i == l) {		// NLAT is odd : special equator handling
-QB			re0 = ((double*)BrF)[i];	ro0 = 0.0;
-VB			te0 = ((double*)BtF)[i];	to0 = 0.0;
-VB			pe0 = ((double*)BpF)[i];	po0 = 0.0;
- B		}
-    #endif
+ B		} while(i<=l);
   #ifndef SHT_AXISYM
 	    }
   #endif
@@ -314,14 +300,7 @@ QB			re = BrF[i] + BrF[l];	ro = BrF[i] - BrF[l];
 VB			te = BtF[i] + BtF[l];	to = BtF[i] - BtF[l];
 VB			pe = BpF[i] + BpF[l];	po = BpF[i] - BpF[l];
  B			i++;	l--;
- B		} while (i < l);
-    #ifndef SHT_NLAT_EVEN
- B		if (i == l) {		// NLAT is odd : special equator handling
-QB			re = BrF[i];	ro = 0.0;
-VB			te = BtF[i];	to = 0.0;
-VB			pe = BpF[i];	po = 0.0;
- B		}
-    #endif
+ B		} while (i <= l);
 		l=im*MRES;
 Q		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 V		Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];

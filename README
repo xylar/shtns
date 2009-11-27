@@ -33,7 +33,6 @@ type \c make to compile SHTns. It will produce the object file SHT.o
 These symbol can be defined at compile time :
  - \c SHT_NO_DCT : disables DCT at compile time (smaller, simpler and maybe faster code for gauss SHT)
  - \c SHT_AXISYM : axysimmetric version of SHTns (m=0 only), which is supposed to be a little faster than setting MMAX=0 at runtime.
- - \c SHT_NLAT_EVEN : only \ref NLAT \b even is supported for analysis (spatial to SH). This is the default, it removes some code and conditional jumps, so it runs (slightly) faster.
  - \c SHT_VERBOSE : sets the quantity of information to print during execution. Usefull for debugging.
 
 */

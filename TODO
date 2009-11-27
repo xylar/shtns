@@ -8,9 +8,6 @@
 *** TODO ***
 Compare speed with spherepack.
 Split init routines and transform routines + combine them in a lib.
-Import legendre function from gsl, as they can be made more precise (long double)
-	and/or faster (by storing precomputations). Also direct evaluation at specified x
-	could be made directly.
 
 *** Optimizations ***
 
@@ -33,12 +30,8 @@ TIP:
      furthermore, it seems that cache misses has less penalty than branch misses.
      LM loop with li[lm] array access seems faster... (at least for 4 arrays access).
 
-TIP:
-+ other optimization : NLAT and NPHI should be checked for fftw-friendliness.
-
 *** SHT.c
 
-+ CHECK for accuracy with MTR_DCT, default to gauss if not good enough.
 - Implement l even/odd sub-transforms.
 - Implement sperate m sub-transforms.
 
@@ -53,14 +46,14 @@ for SHsphtor_to_spat, maybe storing .t and .p together is not the best... => I t
 - FFTW : out-of-place is faster than in-place. switch ? http://www.fftw.org/speed/CoreDuo-3.0GHz-icc64/
 - try blas ?
 
-- SHT : NLAT odd could be improved a little bit.
-
-+ NLAT odd is now allowed
-	special treatment in SHT function. (but could be improved : point NLAT_2 has only even component)
-
++ NLAT odd is now allowed (but not for DCT)
 
 *** NOTES :
 DCT SHT is ok for LMAX=1300 and NLAT_2=1024. changeset 70:f901295a7862
 
 Run-time setup for everything.
 DCT is about 25% faster than GAUSS for xshells dj_ref case (axisym).
+
+Using long double for computing the legendre associated functions does not improve precision
+(if SHT are computed in double precisions !)
+
