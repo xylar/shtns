@@ -77,7 +77,7 @@ V		dyl0 = (double *) dylm[im];
 			l = 0;
 Q			re = 0.0;
 V			to = 0.0;		pe = 0.0;
-			do {	// compute even and odd parts
+			do {
 Q				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 S				to += dyl0[0] * (double) Sl[l];
 T				pe += dyl0[1] * (double) Tl[l+1];
@@ -122,7 +122,7 @@ V		dyl = dylm[im];
 			l=m;
 Q			re = 0.0;
 V			dto = 0.0;	pe = 0.0;	dpe = 0.0;	to = 0.0;
-			while (l<llim) {	// compute even and odd parts
+			while (l<llim) {
 Q				re  += yl[0] * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 V				dto += dyl[0].t * Sl[l];
 V				pe  += dyl[0].p * Sl[l];
@@ -176,8 +176,6 @@ V			Vt[k] = (double) BtF[k];
 V			Vp[k] = (double) BpF[k];
 			k++;
 		} while(k<NLAT_2);
-  #endif
-  #ifndef SHT_AXISYM
     }
   #endif
 

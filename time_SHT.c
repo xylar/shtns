@@ -140,6 +140,25 @@ int test_SHT()
 	return (int) tcpu;
 }
 
+int test_SHT_parity(int eo)
+{
+	long int jj,i, nlm_cplx;
+	clock_t tcpu;
+
+	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+// synthese (inverse legendre)
+		SHeo_to_spat(Slm,Sh,eo);
+		spat_to_SHeo(Sh,Slm,eo);
+	}
+	tcpu = clock() - tcpu;
+	printf("   2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
+
+	scal_error(Slm, Slm0, LMAX);
+	return (int) tcpu;
+}
+
 int test_SHT_l(int ltr)
 {
 	int jj,i;
@@ -186,10 +205,30 @@ int test_SHT_vect()
 	tcpu = clock() - tcpu;
 	printf("   iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
 
-//	write_vect("dylm0", dylm_dct[0]
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
 	return (int) tcpu;
 }
+
+int test_SHT_vect_parity(int eo)
+{
+	int jj,i;
+	clock_t tcpu;
+
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
+	}
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		SHeo_sphtor_to_spat(Slm,Tlm,Sh,Th, eo);
+		spat_to_SHeo_sphtor(Sh,Th,Slm,Tlm, eo);
+	}
+	tcpu = clock() - tcpu;
+	printf("   iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
+
+	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
+	return (int) tcpu;
+}
+
 
 int test_SHT_m0()
 {
@@ -498,6 +537,11 @@ int main(int argc, char *argv[])
 	Set_MTR_DCT(-1);
 	test_SHT_m0();
 
+	printf(":: scalar even\n");
+	test_SHT_parity(0);
+	printf(":: scalar odd\n");
+	test_SHT_parity(1);
+
 #define TEST_VECT_SHT
 #ifdef TEST_VECT_SHT
 	Slm0[LM(0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
@@ -514,6 +558,11 @@ int main(int argc, char *argv[])
 	printf(":: NO DCT\n");
 	Set_MTR_DCT(-1);
 	test_SHT_vect();
+
+	printf(":: vector even\n");
+	test_SHT_vect_parity(0);
+	printf(":: vector odd\n");
+	test_SHT_vect_parity(1);
 #endif
 
 }

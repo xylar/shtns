@@ -22,27 +22,17 @@ V	struct DtDp *dzl;
 	long int ni;
 	long int i,i0, im,l;
 Q	complex double q0;
-V	complex double s0,t1;
+V	complex double s0,t1, s0i,t1i;
 V  	double sgn_sph, sgn_tor;
 
 // defines how to access even and odd parts of data
-  #ifndef SHT_AXISYM
 Q	#define re	BrF[i]
 V	#define to	BtF[i]
 V	#define pe	BpF[i]
-Q	#define re0	BrF[i]
-V	#define to0	BtF[i]
-V	#define pe0	BpF[i]
-  #else
-Q	#define re	((double *)BrF)[i]
-V	#define to	((double *)BtF)[i]
-V	#define pe	((double *)BpF)[i]
 Q	#define re0	((double *)BrF)[i]
 V	#define to0	((double *)BtF)[i]
 V	#define pe0	((double *)BpF)[i]
-  #endif
 
-	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 Q	BrF = (complex double *) Vr;
 V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 V	sgn_tor = -2.0;		sgn_sph = 2.0;		// factor 2 to compensate summing only on half the data.
@@ -57,6 +47,14 @@ V	    	BpF = BtF + (NPHI/2+1)*NLAT_2;
 Q	    fftw_execute_dft_r2c(fft_eo,Vr, BrF);
 V	    fftw_execute_dft_r2c(fft_eo,Vt, BtF);
 V	    fftw_execute_dft_r2c(fft_eo,Vp, BpF);
+	}
+  #else
+	if (NPHI > 1) {		// TODO avoid this with some precomputing !
+		i=0;	do {
+V			Vt[i] *= NPHI; 	Vp[i] *= NPHI;
+Q			Vr[i] *= NPHI;
+			i++;
+		} while (i<NLAT_2);
 	}
   #endif
 
@@ -74,6 +72,12 @@ V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
 Q		zl = zlm[im] + parity;
 V		dzl0 = (double *) dzlm[im];		// only theta derivative (d/dphi = 0 for m=0)
 V		Sl[0] = 0.0;
+  #ifndef SHT_AXISYM
+		i0 = (NPHI==1) ? 1 : 2;			// stride of source data.
+  #else
+		i0 = 1;
+  #endif
+		ni = NLAT_2*i0;		// copy NLAT_2 to a local variable for faster access (inner loop limit)
 		do {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			i=0;
 Q			q0 = 0.0;
@@ -84,7 +88,7 @@ V				s0 += dzl0[0] * to0;
 V				t1 += dzl0[1] * pe0;
 Q				zl +=2;
 V				dzl0 +=2;
-				i++;
+				i+=i0;
 			} while(i < ni);
 Q			Ql[l] = q0 + q0;
 V			Sl[l+1] = s0*sgn_sph;	Tl[l] = t1*sgn_tor;
@@ -95,7 +99,7 @@ V			t1 = 0.0;
 V			i=0;	do {
 V				t1 += dzl0[0] * pe0;
 V				dzl0 ++;
-V				i++;
+V				i+=i0;
 V			} while(i<ni);
 V			Tl[l] = t1*sgn_tor;
 Q			if (parity==0) {
@@ -103,7 +107,7 @@ Q				q0 = 0.0;
 Q				i=0;	do {
 Q					q0 += zl[0] * re0;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 Q					zl ++;
-Q					i++;
+Q					i+=i0;
 Q				} while(i<ni);
 Q				Ql[l] = q0 + q0;
 Q			}
@@ -115,13 +119,13 @@ V				t1 = 0.0;
 V				i=0;	do {
 V					t1 += dzl0[1] * pe0;
 V					dzl0 +=2;
-V					i++;
+V					i+=i0;
 V				} while(i<ni);
 Q				if (parity==0) {
 Q					i=0;	do {
 Q						q0 += zl[0] * re0;		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 Q						zl +=2;
-Q						i++;
+Q						i+=i0;
 Q					} while(i<ni);
 				}
 Q				Ql[l] = q0 + q0;
@@ -140,6 +144,7 @@ Q				if (parity==0) Ql[l] == 0.0;
   #endif
 		}
   #ifndef SHT_AXISYM
+	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 	for (im=1;im<=MTR;im++) {
 		i0 = tm[im];
 		l=im*MRES;
@@ -152,26 +157,31 @@ V		BtF += NLAT_2;	BpF += NLAT_2;
 		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 Q			q0 = 0.0;
 V			s0 = 0.0;	t1 = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
+V			s0i = 0.0;	t1i = 0.0;
 			i=i0;	do {		// tm[im] : polar optimization
 Q				q0 += re * zl[0];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-V				s0 += dzl[0].t *to - dzl[0].p *pe*I;		// ref: these E. Dormy p 72.
-V				t1 += dzl[1].t *pe - dzl[1].p *to*I;
+V				s0 += dzl[0].t *to;
+V				s0i += dzl[0].p *pe;
+V				t1 += dzl[1].t *pe;
+V				t1i += dzl[1].p *to;
 Q				zl +=2;
 V				dzl +=2;
 				i++;
 			} while (i < ni);
 Q			Ql[l] = q0 + q0;
-V			Sl[l] = s0*sgn_sph;	Tl[l+1] = t1*sgn_tor;
+V			Sl[l] = s0*sgn_sph - I*(s0i+s0i);
+V			Tl[l+1] = t1*sgn_tor - I*(t1i+t1i);
 			l+=2;
 		}
 		if (l==LMAX) {
-V			s0 = 0.0;
+V			s0 = 0.0;	s0i = 0.0;
 V			i=i0;	do {		// tm[im] : polar optimization
-V				s0 += dzl[0].t *to - dzl[0].p *pe*I;
+V				s0 += dzl[0].t *to;
+V				s0i += dzl[0].p *pe;
 V				dzl++;
 V				i++;
 V			} while(i<ni);
-V			Sl[l] = s0*sgn_sph;
+V			Sl[l] = s0*sgn_sph - I*(s0i+s0i);
 Q			if (parity == 0) {
 Q				q0 = 0.0;	// Qlm[LiM(l,im)] = 0.0;
 Q				i=i0;	do {		// tm[im] : polar optimization
@@ -184,13 +194,14 @@ Q			}
     #ifdef SHT_VAR_LTR
 		} else {
 		    if (l==LTR) {
-V				s0 = 0.0;
+V				s0 = 0.0;	s0i = 0.0;
 V				i=i0;	do {		// tm[im] : polar optimization
-V					s0 += dzl[0].t *to - dzl[0].p *pe*I;		// ref: these E. Dormy p 72.
+V					s0 += dzl[0].t *to;
+V					s0i += dzl[0].p *pe;
 V					dzl +=2;
 V					i++;
 V				} while (i<ni);
-V				Sl[l] = s0*sgn_sph;
+V				Sl[l] = s0*sgn_sph - I*(s0i+s0i);
 Q				q0 = 0.0;
 Q				if (parity == 0) {
 Q					i=i0;	do {		// tm[im] : polar optimization
@@ -234,6 +245,4 @@ V	#undef te0
 V	#undef to0
 V	#undef pe0
 V	#undef po0
-V	#undef teo0
-V	#undef peo0
 # }

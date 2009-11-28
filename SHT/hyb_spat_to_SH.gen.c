@@ -46,33 +46,6 @@ VB	#define te0	tpeo0[4*i]
 VB	#define to0	tpeo0[4*i+1]
 VB	#define pe0	tpeo0[4*i+2]
 VB	#define po0	tpeo0[4*i+3]
-  #ifndef SHT_AXISYM
-Q1	#define re	BrF[i]
-Q1	#define ro	BrF[i]
-V1	#define te	BtF[i]
-V1	#define to	BtF[i]
-V1	#define pe	BpF[i]
-V1	#define po	BpF[i]
-Q1	#define re0	BrF[i]
-Q1	#define ro0	BrF[i]
-V1	#define te0	BtF[i]
-V1	#define to0	BtF[i]
-V1	#define pe0	BpF[i]
-V1	#define po0	BpF[i]
-  #else
-Q1	#define re	((double *)BrF)[i]
-Q1	#define ro	((double *)BrF)[i]
-V1	#define te	((double *)BtF)[i]
-V1	#define to	((double *)BtF)[i]
-V1	#define pe	((double *)BpF)[i]
-V1	#define po	((double *)BpF)[i]
-Q1	#define re0	((double *)BrF)[i]
-Q1	#define ro0	((double *)BrF)[i]
-V1	#define te0	((double *)BtF)[i]
-V1	#define to0	((double *)BtF)[i]
-V1	#define pe0	((double *)BpF)[i]
-V1	#define po0	((double *)BpF)[i]
-  #endif
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 Q    	BrF = (complex double *) Vr;
@@ -189,32 +162,20 @@ V		BtF += NLAT;	BpF += NLAT;
 	} else {
   #endif
   #ifndef SHT_AXISYM
-	    if (NPHI>1) {
-		i=0;	l=NLAT-1;
- B		do {	// compute symmetric and antisymmetric parts.
-QB			re0 = (double) BrF[i] + (double) BrF[l];
-QB			ro0 = (double) BrF[i] - (double) BrF[l];
-VB			te0 = (double) BtF[i] + (double) BtF[l];
-VB			to0 = (double) BtF[i] - (double) BtF[l];
-VB			pe0 = (double) BpF[i] + (double) BpF[l];
-VB			po0 = (double) BpF[i] - (double) BpF[l];
- B			i++;	l--;
- B		} while(i<=l);
-	    } else {
+		i0 = (NPHI==1) ? 1 : 2;		// stride of source data.
+  #else
+		i0 = 1;
   #endif
 		i=0;	l=NLAT-1;
  B		do {	// compute symmetric and antisymmetric parts.
-QB			re0 = ((double*)BrF)[i] + ((double*)BrF)[l];
-QB			ro0 = ((double*)BrF)[i] - ((double*)BrF)[l];
-VB			te0 = ((double*)BtF)[i] + ((double*)BtF)[l];
-VB			to0 = ((double*)BtF)[i] - ((double*)BtF)[l];
-VB			pe0 = ((double*)BpF)[i] + ((double*)BpF)[l];
-VB			po0 = ((double*)BpF)[i] - ((double*)BpF)[l];
+QB			re0 = ((double*)BrF)[i*i0] + ((double*)BrF)[l*i0];
+QB			ro0 = ((double*)BrF)[i*i0] - ((double*)BrF)[l*i0];
+VB			te0 = ((double*)BtF)[i*i0] + ((double*)BtF)[l*i0];
+VB			to0 = ((double*)BtF)[i*i0] - ((double*)BtF)[l*i0];
+VB			pe0 = ((double*)BpF)[i*i0] + ((double*)BpF)[l*i0];
+VB			po0 = ((double*)BpF)[i*i0] - ((double*)BpF)[l*i0];
  B			i++;	l--;
  B		} while(i<=l);
-  #ifndef SHT_AXISYM
-	    }
-  #endif
 Q		l=0;
 V		l=1;		// l=0 is zero for the vector transform.
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
