@@ -7,7 +7,7 @@
 #
 //////////////////////////////////////////////////
 //  Spherical Harmonics Transform
-// input  : BrF, BtF, BpF = spatial/fourrier data : complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+// input  : Vr, Vt, Vp = spatial data : double array of size NLAT*(NPHI/2+1)*2
 // output : Qlm, Slm, Tlm = spherical harmonics coefficients : complex double array of size NLM
 #Q void spat_to_SH(double *Vr, complex double *Qlm)
 #V void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
@@ -24,6 +24,7 @@ V	struct DtDp *dzl;
 Q	complex double q0,q1;
 V	complex double s0,t0,s1,t1;
   #ifndef SHT_AXISYM
+V	complex double s0i,t0i,s1i,t1i;
 QB	complex double reo[2*NLAT_2] SSE;	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 VB	complex double tpeo[4*NLAT_2] SSE;	// theta and phi even and odd parts
 Q	#define reo0 ((double*)reo)
@@ -272,57 +273,65 @@ V		BtF += NLAT;	BpF += NLAT;
 		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 QE			q0 = 0.0;
 QO			q1 = 0.0;
-VE			s0 = 0.0;	t1 = 0.0;		// Slm[LiM(l,im)] = 0.0;	Slm[LiM(l+1,im)] = 0.0;
-VO			t0 = 0.0;	s1 = 0.0;
+VE			s0 = 0.0;	t1 = 0.0;		s0i = 0.0;	t1i = 0.0;
+VO			t0 = 0.0;	s1 = 0.0;		t0i = 0.0;	s1i = 0.0;
 			i=i0;	do {		// tm[im] : polar optimization
 QE				q0 += re * zl[0];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 QO				q1 += ro * zl[1];	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-VE				s0 += dzl[0].t *to - dzl[0].p *pe*I;		// ref: these E. Dormy p 72.
-VO				t0 -= dzl[0].t *po + dzl[0].p *te*I;
-VO				s1 += dzl[1].t *te - dzl[1].p *po*I;
-VE				t1 -= dzl[1].t *pe + dzl[1].p *to*I;
+VE				s0 += dzl[0].t *to;		// ref: these E. Dormy p 72.
+VE				s0i += dzl[0].p *pe;
+VO				t0 -= dzl[0].t *po;
+VO				t0i += dzl[0].p *te;
+VO				s1 += dzl[1].t *te;
+VO				s1i += dzl[1].p *po;
+VE				t1 -= dzl[1].t *pe;
+VE				t1i += dzl[1].p *to;
 Q				zl +=2;
 V				dzl +=2;
 				i++;
 			} while (i < ni);
 QE			Ql[l] = q0;
 QO			Ql[l+1] = q1;
-VE			Sl[l] = s0;	Tl[l+1] = t1;
-VO			Tl[l] = t0;	Sl[l+1] = s1; 
+VE			Sl[l] = s0 - I*s0i;		Tl[l+1] = t1 -I*t1i;
+VO			Tl[l] = t0 - I*t0i;		Sl[l+1] = s1 -I*s1i;
 			l+=2;
 		}
 		if (l==LMAX) {
 QE			q0 = 0.0;	// Qlm[LiM(l,im)] = 0.0;
-VE			s0 = 0.0;
-VO			t0 = 0.0;
+VE			s0 = 0.0;	s0i = 0.0;
+VO			t0 = 0.0;	t0i = 0.0;
 			i=i0;	do {		// tm[im] : polar optimization
 QE				q0 += zl[0] * re;	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				s0 += dzl[0].t *to - dzl[0].p *pe*I;
-VO				t0 -= dzl[0].t *po + dzl[0].p *te*I;
+VE				s0 += dzl[0].t *to;
+VE				s0i += dzl[0].p *pe;
+VO				t0 -= dzl[0].t *po;
+VO				t0i += dzl[0].p *te;
 Q				zl++;
 V				dzl++;
 				i++;
 			} while(i<ni);
 QE			Ql[l] = q0;
-VE			Sl[l] = s0;
-VO			Tl[l] = t0;
+VE			Sl[l] = s0 - I*s0i;
+VO			Tl[l] = t0 - I*t0i;
     #ifdef SHT_VAR_LTR
 		} else {
 		    if (l==LTR) {
 QE			q0 = 0.0;
-VE			s0 = 0.0;
-VO			t0 = 0.0;
+VE			s0 = 0.0;	s0i = 0.0;
+VO			t0 = 0.0;	t0i = 0.0;
 			i=i0;	do {		// tm[im] : polar optimization
 QE				q0 += re * zl[0];		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				s0 += dzl[0].t *to - dzl[0].p *pe*I;		// ref: these E. Dormy p 72.
-VO				t0 -= dzl[0].t *po + dzl[0].p *te*I;
+VE				s0 += dzl[0].t *to;
+VE				s0i += dzl[0].p *pe;
+VO				t0 -= dzl[0].t *po;
+VO				t0i += dzl[0].p *te;
 Q				zl +=2;
 V				dzl +=2;
 				i++;
 			} while (i<ni);
 QE			Ql[l] = q0;
-VE			Sl[l] = s0;
-VO			Tl[l] = t0;
+VE			Sl[l] = s0 - I*s0i;
+VO			Tl[l] = t0 - I*t0i;
 			l++;
 		    }
 		    while( l<=LMAX ) {

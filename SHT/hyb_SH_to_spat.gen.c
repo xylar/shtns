@@ -14,13 +14,13 @@
 //   Inverse Spherical Harmonic Transform (Synthesis) using DCT on a regular theta grid.
 // input  : Qlm,Slm,Tlm = spherical harmonics coefficients of Scalar, Spheroidal and Toroidal scalars : 
 //          complex double array of size NLM [unmodified]
-// output : BrF, BtF, BpF = r, theta, phi vector components, spatial/fourrier data : 
-//          complex double array of size NLAT*(NPHI/2+1) or double array of size NLAT*(NPHI/2+1)*2
+// output : Vr, Vt, Vp = r, theta, phi vector components, spatial data : 
+//          double array of size NLAT*(NPHI/2+1)*2
 // MTR_DCT : -1 => no dct
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
 #Q void SH_to_spat(complex double *Qlm, double *Vr)
-#V void SHsphtor_to_spat_dct(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
+#V void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
 # {
 Q	complex double *Ql;
 S	complex double *Sl;
@@ -31,8 +31,7 @@ V	complex double *BtF, *BpF;
 V	struct DtDp *dyl;
 Q	complex double re,ro;
 V	complex double te,to, pe,po;
-S	complex double dte, dto;	// spheroidal even and odd parts
-T	complex double dpe, dpo;	// toroidal ...
+V	complex double dte,dto, dpe,dpo;
 Q	#define BR0 BrF
 V	#define BT0 BtF
 V	#define BP0 BpF
@@ -194,41 +193,34 @@ V		dyl = dykm_dct[im];
 		do {
 Q			re = 0.0;	ro = 0.0;
 V			te = 0.0;	to = 0.0;	pe = 0.0;	po = 0.0;
+V			dte = 0.0;	dto = 0.0;	dpe = 0.0;	dpo = 0.0;
 			while(l<llim) {
 QE				re += yl[0] * Ql[l];
 QO				ro += yl[1] * Ql[l+1];
-VO				te +=
-TO					  dyl[0].p * (I*Tl[l])
-SO					+ dyl[1].t * Sl[l+1]
-VO					;
-VO				po +=
-SO					  dyl[1].p * (I*Sl[l+1])
-TO					- dyl[0].t * Tl[l]
-VO					;
-VE				pe +=
-SE					  dyl[0].p * (I*Sl[l])
-TE					- dyl[1].t * Tl[l+1]
-VE					;
-VE				to +=
-TE					  dyl[1].p * (I*Tl[l+1])
-SE					+ dyl[0].t * Sl[l]
-VE					;
+TO				dte += dyl[0].p * Tl[l];
+TO				po += dyl[0].t * Tl[l];
+SE				dpe += dyl[0].p * Sl[l];
+SE				to += dyl[0].t * Sl[l];
+SO				dpo += dyl[1].p * Sl[l+1];
+SO				te += dyl[1].t * Sl[l+1];
+TE				dto += dyl[1].p * Tl[l+1];
+TE				pe += dyl[1].t * Tl[l+1];
 				l+=2;
 Q				yl+=2;
 V				dyl+=2;
 			}
 			if (l==llim) {
 QE				re += yl[0]   * Ql[l];
-TO				te += dyl[0].p * (I*Tl[l]);
-SE				pe += dyl[0].p * (I*Sl[l]);
+TO				dte += dyl[0].p * Tl[l];
+TO				po += dyl[0].t * Tl[l];
+SE				dpe += dyl[0].p * Sl[l];
 SE				to += dyl[0].t * Sl[l];
-TO				po -= dyl[0].t * Tl[l];
 Q				yl++;
 V				dyl++;
 			}
 Q			BrF[k] = re;	BrF[k+1] = ro;
-V			BtF[k] = te;	BtF[k+1] = to;
-V			BpF[k] = pe;	BpF[k+1] = po;
+V			BtF[k] = dte*I + te;	BtF[k+1] = dto*I + to;
+V			BpF[k] = dpe*I - pe;	BpF[k+1] = dpo*I - po;
 V			l = (k < m) ? m : k+(m&1);
 			k+=2;
 Q			yl+= (LMAX-LTR);
