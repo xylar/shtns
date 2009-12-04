@@ -11,7 +11,7 @@
 //#define SHT_EO
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
-#define SHT_VERBOSE 1
+#define SHT_VERBOSE 2
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,6 +82,9 @@ struct sht_sze shtns;
 
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
+#endif
+#ifndef M_PIl
+# define M_PIl 3.1415926535897932384626433832795L
 #endif
 
 /*
@@ -236,23 +239,27 @@ void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex doubl
 double SH_to_point(complex double *Qlm, double cost, double phi)
 {
 	double yl[LMAX+1];
-	complex double eimp;
 	double vr;
 	complex double *Ql;
 	long int l,m,im;
 
 	vr = 0.0;
-	m=0;
-		legendre_sphPlm_array(LTR, m, cost, &yl[m]);
+	m=0;	im=0;
+		legendre_sphPlm_array(LTR, im, cost, &yl[m]);
 		for (l=m; l<=LTR; l++)
 			vr += yl[l] * creal( Qlm[l] );
-	for (im=1; im<=MTR; im++) {
-		m = im*MRES;
-		legendre_sphPlm_array(LTR, m, cost, &yl[m]);
-		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
-		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
-		for (l=m; l<=LTR; l++)
-			vr += yl[l] * creal( Ql[l]*eimp );
+	if (MTR>0) {
+		complex double eip, eimp;
+		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
+		for (im=1; im<=MTR; im++) {
+			m = im*MRES;
+			legendre_sphPlm_array(LTR, im, cost, &yl[m]);
+//			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
+			eimp *= eip;			// not so accurate, but it should be enough for rendering uses.
+			Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
+			for (l=m; l<=LTR; l++)
+				vr += yl[l] * creal( Ql[l]*eimp );
+		}
 	}
 	return vr;
 }
@@ -263,35 +270,40 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 {
 	double yl[LMAX+1];
 	double dtyl[LMAX+1];
-	complex double eimp, imeimp;
-	double sint, vst, vtt, vsp, vtp, vr0, vrm;
+	double vst, vtt, vsp, vtp, vr0, vrm;
 	complex double *Ql, *Sl, *Tl;
 	long int l,m,im;
 
-	sint = sqrt((1.-cost)*(1.+cost));
+	const double sint = sqrt((1.-cost)*(1.+cost));
 	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; vr0 = 0.; vrm = 0.;
-	m=0;
-		legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
+	m=0;	im=0;
+		legendre_sphPlm_deriv_array(LTR, im, cost, sint, &yl[m], &dtyl[m]);
 		for (l=m; l<=LTR; l++) {
 			vr0 += yl[l] * creal( Qlm[l] );
 			vst += dtyl[l] * creal( Slm[l] );
 			vtt += dtyl[l] * creal( Tlm[l] );
 		}
-	for (im=1; im<=MTR; im++) {
-		m = im*MRES;
-		legendre_sphPlm_deriv_array(LTR, m, cost, &yl[m], &dtyl[m]);
-		eimp = 2.*(cos(m*phi) + I*sin(m*phi));
-		imeimp = I*m*eimp;
-		Ql = &Qlm[LiM(0,im)];	Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
-		for (l=m; l<=LTR; l++) {
-			vrm += yl[l] * creal( Ql[l]*eimp );
-			vst += dtyl[l] * creal(Sl[l]*eimp);
-			vtt += dtyl[l] * creal(Tl[l]*eimp);
-			vsp += yl[l] * creal(Sl[l]*imeimp);
-			vtp += yl[l] * creal(Tl[l]*imeimp);
+	if (MTR>0) {
+		complex double eip, eimp, imeimp;
+		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
+		for (im=1; im<=MTR; im++) {
+			m = im*MRES;
+			legendre_sphPlm_deriv_array(LTR, im, cost, sint, &yl[m], &dtyl[m]);
+//			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
+			eimp *= eip;		// not so accurate, but it should be enough for rendering uses.
+			imeimp = I*m*eimp;
+			Ql = &Qlm[LiM(0,im)];	Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
+			for (l=m; l<=LTR; l++) {
+				vrm += yl[l] * creal( Ql[l]*eimp );
+				vst += dtyl[l] * creal(Sl[l]*eimp);
+				vtt += dtyl[l] * creal(Tl[l]*eimp);
+				vsp += yl[l] * creal(Sl[l]*imeimp);
+				vtp += yl[l] * creal(Tl[l]*imeimp);
+			}
 		}
+		vrm *= sint;
 	}
-	*vr = vr0 + vrm*sint;
+	*vr = vr0 + vrm;
 	*vt = vtp + vst;	// Bt = I.m/sint *T  + dS/dt
 	*vp = vsp - vtt;	// Bp = I.m/sint *S  - dT/dt
 }
@@ -306,6 +318,7 @@ long int nphi_lat = 0;			///< nphi of previous SHqst_to_lat
 double* ylm_lat = NULL;
 double* dylm_lat;
 double ct_lat = 2.0;
+double st_lat;
 
 /// synthesis at a given latitude, on nphi equispaced longitude points.
 void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
@@ -313,10 +326,8 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 {
 	complex double vst, vtt, vsp, vtp, vrr;
 	complex double *vrc, *vtc, *vpc;
-	double sint;
 	long int m, l, j;
 
-	sint = sqrt((1.-cost)*(1.+cost));	// sin(theta)
 	if (ltr > LMAX) ltr=LMAX;
 	if (mtr > MMAX) mtr=MMAX;
 	if (mtr*MRES > ltr) mtr=ltr/MRES;
@@ -336,9 +347,10 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 		dylm_lat = ylm_lat + NLM;
 	}
 	if (cost != ct_lat) {		// don't recompute if same latitude (ie equatorial disc rendering)
-		for (m=0,j=0; m<=mtr*MRES; m+=MRES) {
-			legendre_sphPlm_deriv_array(ltr, m, cost, &ylm_lat[j], &dylm_lat[j]);
-			j+=LMAX-m+1;
+		st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)	
+		for (m=0,j=0; m<=mtr; m++) {
+			legendre_sphPlm_deriv_array(ltr, m, cost, st_lat, &ylm_lat[j], &dylm_lat[j]);
+			j += LMAX -m*MRES +1;
 		}
 	}
 
@@ -367,7 +379,7 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 			vtp += ylm_lat[j] * Tlm[j];
 		}
 		j+=(LMAX-ltr);
-		vrc[m] = vrr*sint;
+		vrc[m] = vrr*st_lat;
 		vtc[m] = I*m*vtp + vst;	// Vt = I.m/sint *T  + dS/dt
 		vpc[m] = I*m*vsp - vtt;	// Vp = I.m/sint *S  - dT/dt
 	}
@@ -491,18 +503,17 @@ long int nlm_calc_eo(long int lmax, long int mmax, long int mres) {
 void EqualPolarGrid()
 {
 	int j;
-	long double f;
-	long double pi = M_PI;
+	double f;
 
 #if SHT_VERBOSE > 0
 	printf("        => using Equaly Spaced Nodes including poles\n");
 #endif
 // cos theta of latidunal points (equaly spaced in theta)
-	f = pi/(NLAT-1.0);
+	f = M_PI/(NLAT-1.0);
 	for (j=0; j<NLAT; j++) {
-		ct[j] = cosl(f*j);
-		st[j] = sinl(f*j);
-		st_1[j] = 1.0/sinl(f*j);
+		ct[j] = cos(f*j);
+		st[j] = sin(f*j);
+		st_1[j] = 1.0/st[j];
 	}
 #if SHT_VERBOSE > 0
 	printf("     !! Warning : only synthesis (inverse transform) supported so far for this grid !\n");
@@ -833,7 +844,7 @@ void init_SH_synth()
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array(LMAX, im, ct[it], st[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
 				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m;	// 1/sint(t) dYlm/dphi
@@ -849,7 +860,7 @@ void init_SH_gauss()
 {
 	double t,tmax;
 	long int it,im,m,l;
-	long double iylm_fft_norm = 2.0*M_PI/NPHI;		// FFT/SHT normalization for zlm
+	long double iylm_fft_norm = 2.0*M_PIl/NPHI;		// FFT/SHT normalization for zlm
 	long double xg[NLAT], wg[NLAT];	// gauss points and weights.
 	double wgd[NLAT_2];		// gauss weights, double precision.
 
@@ -1050,7 +1061,7 @@ void init_SH_dct(int analysis)
 	if ((NLAT_2)*2 <= LMAX+1) shtns_runerr("NLAT_2*2 should be at least LMAX+2 (DCT)");
 	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
 	for (it=0; it<NLAT; it++) {	// Chebychev points : equaly spaced but skipping poles.
-		long double th = M_PI*(it+0.5)/NLAT;
+		long double th = M_PIl*(it+0.5)/NLAT;
 		ct[it] = cosl(th);
 		st[it] = sinl(th);
 		st_1[it] = 1.0/sinl(th);
@@ -1135,7 +1146,7 @@ void init_SH_dct(int analysis)
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(LMAX, m, ct[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array(LMAX, im, ct[it], st[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
 				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m;	// 1/sint(t) dYlm/dphi
