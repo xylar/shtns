@@ -11,7 +11,7 @@
 //#define SHT_EO
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
-#define SHT_VERBOSE 2
+#define SHT_VERBOSE 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1533,18 +1533,22 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 	NLAT_2 = (nlat+1)/2;	NLAT = nlat;
 	if ((NLAT_2)*2 <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
   #if SHT_VERBOSE > 0
-	printf("        Nlat=%d, Nphi=%d\n",NLAT,NPHI);
+	printf("[SHTns] precomputing for Nlat=%d, Nphi=%d\n",NLAT,NPHI);
   #endif
 
-	alloc_SHTarrays();	// allocate dynamic arrays
+	alloc_SHTarrays();		// allocate dynamic arrays
+
+	if ((flags == sht_reg_poles)||(flags == sht_quick_init))
+		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init
 	planFFT(theta_inc, phi_inc, phi_embed);		// initialize fftw
-	zlm_dct0 = NULL;	// used as a flag.
+
+	zlm_dct0 = NULL;		// used as a flag.
   #if SHT_VERBOSE > 0
 	if (2*NLAT <= 3*LMAX) printf("     !! Warning : anti-aliasing condition in theta direction not met.\n");
   #endif
 
 #ifndef SHT_NO_DCT
-	if (flags == sht_reg_dct) {	// pure dct.
+	if (flags == sht_reg_dct) {		// pure dct.
 		init_SH_dct(1);
 		OptimizeMatrices(0.0);
 		Set_MTR_DCT(MMAX);
@@ -1597,7 +1601,6 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 	}
 	if (flags == sht_reg_poles)
 	{
-		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init
 		MTR_DCT = -1;		// we do not use DCT !!!
 		fftw_free(dzlm[0]);	fftw_free(zlm[0]);	// no inverse transform.
 		dzlm[0] = NULL;		zlm[0] = NULL;		// mark as unused.
@@ -1607,7 +1610,6 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 	}
 	if (flags == sht_quick_init)
 	{
-		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init
 		MTR_DCT = -1;		// we do not use DCT !!!
 		init_SH_gauss();
 		OptimizeMatrices(eps);
