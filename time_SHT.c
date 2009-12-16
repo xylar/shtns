@@ -387,6 +387,7 @@ int main(int argc, char *argv[])
 	double e0,e1;
 	double polaropt = 1.e-8;		// default for polar optimization.
 	enum shtns_type shtmode = sht_auto;		// default to "auto" (fastest) mode.
+	enum shtns_norm shtnorm = sht_orthonormal;		// default to "orthonormal" SH.
 	int layout = SHT_NATIVE_LAYOUT;
 	char name[20];
 
@@ -411,11 +412,16 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"iter") == 0) SHT_ITER = t;
 		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
 		if (strcmp(name,"reg") == 0) shtmode = sht_reg_fast;	// force regular grid.
+		if (strcmp(name,"schmidt") == 0) shtnorm = sht_schmidt | SHT_NO_CS_PHASE;
+		if (strcmp(name,"4pi") == 0) shtnorm = sht_fourpi;
 		if (strcmp(name,"oop") == 0) layout = SHT_THETA_CONTIGUOUS;
 		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
 	}
 
-	NLM = shtns_init(shtmode | layout, polaropt, LMAX, MMAX, MRES, NLAT, NPHI);
+//	NLM = shtns_init(shtmode | layout, polaropt, LMAX, MMAX, MRES, NLAT, NPHI);
+	NLM = shtns_set_size(LMAX, MMAX, MRES, shtnorm);
+	shtns_precompute(shtmode | layout, polaropt, NLAT, NPHI);
+	
 	m_opt = Get_MTR_DCT();
 
 	t1 = 1.0+2.0*I;
@@ -457,8 +463,8 @@ int main(int argc, char *argv[])
 			Sh[im*NLAT+i] = 0.0;
 		}
 	}
-	Slm[LiM(1,0)] = Y10_ct;
-	Slm[LiM(1,1)] = Y11_st;
+	Slm[LiM(1,0)] = sh10_ct();
+	Slm[LiM(1,1)] = sh11_st();
 //	write_vect("ylm0",Slm, NLM*2);
 	SH_to_spat(Slm,Sh);
 	write_mx("spat",Sh,NPHI,NLAT);
@@ -496,7 +502,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	spat_to_SH(Sh,Slm);
-//	write_vect("ylm",Slm,NLM*2);
+	write_vect("ylm",(double *)Slm,NLM*2);
 
 // test case...
 	t = 1.0 / (RAND_MAX/2);

@@ -46,9 +46,9 @@ int main()
 							Slm[lm] = 0.0;	Tlm[lm] = 0.0;
 						} */
 
-	Slm[LM(1,1)] = Y11_st;				// access to SH coefficient
-// 	Slm[LiM(1,0)] = Y10_ct;
-//	Slm[LiM(0,0)] = 0.5*Y00_1;
+	Slm[LM(1,1)] = sh11_st();				// access to SH coefficient
+// 	Slm[LiM(1,0)] = sh10_ct();
+//	Slm[LiM(0,0)] = 0.5*sh00_1();
 	SH_to_spat(Slm,Sh);
 	write_vect("ylm",(double *) Slm,NLM*2);
 	write_mx("spat",Sh,nphi,nlat);

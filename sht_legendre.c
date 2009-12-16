@@ -1,8 +1,18 @@
 /** \file sht_legendre.c
  \brief Compute legendre polynomials and associated functions.
- The normalization of the associated functions is for spherical harmonics, and the Condon-Shortley phase is included.
- When computing the derivatives (with respect to colatitude theta), there are no singularities.
- written by Nathanael Schaeffer / LGIT,CNRS, with some ideas and code from the GSL 1.13 and Numerical Recipies.
+ 
+ - Normalization of the associated functions for various spherical harmonics conventions are possible, with or without Condon-Shortley phase.
+ - When computing the derivatives (with respect to colatitude theta), there are no singularities.
+ - written by Nathanael Schaeffer / LGIT,CNRS, with some ideas and code from the GSL 1.13 and Numerical Recipies.
+
+ The associated legendre functions are computed using the following recurrence formula :
+ \f[  Y_l^m(x) = a_l^m \, x \  Y_{l-1}^m(x) + b_l^m \ Y_{l-2}^m(x)  \f]
+ with starting values :
+ \f[  Y_m^m(x) = a_m^m \ (1-x^2)^{m/2}  \f]
+ and
+ \f[  Y_{m+1}^m(x) = a_{m+1}^m \ Y_m^m(x)  \f]
+ where \f$ a_l^m \f$ and \f$ b_l^m \f$ are coefficients that depend on the normalization, and which are
+ precomputed once for all by \ref legendre_precomp.
 */
 
 // range checking for legendre functions. Comment out for slightly faster legendre function generation.
@@ -23,7 +33,6 @@
   #define LEG_RANGE_CHECK
 #endif
 
-
 /// computes sin(t)^n from cos(t). ie returns (1-x^2)^(n/2), with x = cos(t)
 inline LEG_FLOAT_TYPE sint_pow_n(LEG_FLOAT_TYPE cost, int n)
 {
@@ -40,9 +49,9 @@ inline LEG_FLOAT_TYPE sint_pow_n(LEG_FLOAT_TYPE cost, int n)
 }
 
 int *mmidx;				///< index array (size MMAX+1)
-LEG_FLOAT_TYPE *alm;	///< coefficient list for recursion (size NLM)
+LEG_FLOAT_TYPE *alm;	///< coefficient list for recurrence (size 2*NLM)
 
-/// Returns the value of a legendre polynomial of degree l and order m, noramalized for spherical harmonics, using recursion.
+/// Returns the value of a legendre polynomial of degree l and order im*MRES, noramalized for spherical harmonics, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
 double legendre_sphPlm(const int l, const int im, double x)
@@ -75,10 +84,10 @@ double legendre_sphPlm(const int l, const int im, double x)
 }
 
 /// Compute values of legendre polynomials noramalized for spherical harmonics,
-/// for a range of l=m..lmax, at given m and x, using recursion.
+/// for a range of l=m..lmax, at given m and x, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
-/// \param lmax maximum degree computed, \param m order, \param x argument.
+/// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
 void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 {
@@ -115,7 +124,7 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 }
 
 
-/// Compute values of a legendre polynomial normalized for spherical harmonics derivatives, for a range of l=m..lmax, using recursion.
+/// Compute values of a legendre polynomial normalized for spherical harmonics derivatives, for a range of l=m..lmax, using recurrence.
 /// Requires a previous call to \ref legendre_precomp(). Output is not directly compatible with GSL :
 /// - if m=0 : returns ylm(x)  and  d(ylm)/d(theta) = -sin(theta)*d(ylm)/dx
 /// - if m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta).
@@ -146,7 +155,7 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 			st *= st;
 		}
 		dy0 = x*m*y0;
-		st = sint*sint;		// st = sin(theta)^2 is used in the recursion for m>0
+		st = sint*sint;		// st = sin(theta)^2 is used in the recurrence for m>0
 	}
 	yl[0] = y0;		// l=m
 	dyl[0] = dy0;
@@ -199,59 +208,81 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 
 }
 
-/// precompute constants for the legendre recursion, of size specified by \ref shtns_set_size
-void legendre_precomp()
+/// Precompute constants for the recursive generation of Legendre associated functions, with given normalization.
+/// this function is called by \ref shtns_set_size, and assumes up-to-date values in \ref shtns.
+/// For the same conventions as GSL, use \c legendre_precomp(sht_orthonormal,1);
+/// \param[in] norm : normalization of the associated legendre functions (\ref shtns_norm).
+/// \param[in] with_cs_phase : Condon-Shortley phase (-1)^m is included (1) or not (0)
+void legendre_precomp(enum shtns_norm norm, int with_cs_phase)
 {
 	long int im, m, l, lm;
 	LEG_FLOAT_TYPE t1, t2;
 
 #if SHT_VERBOSE > 1
-	printf("        > using custom fast recursion for legendre polynomials\n");
+	printf("        > using custom fast recurrence for legendre polynomials\n");
+	printf("        > Condon-Shortley phase = %d, normalization = %d\n", with_cs_phase, norm);
 #endif
+
+	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
 
 	mmidx = (int *) malloc( (MMAX+1) * sizeof(int) );
 	alm = (LEG_FLOAT_TYPE *) malloc( 2*NLM * sizeof(LEG_FLOAT_TYPE) );
 
-/// precompute the factors alm and blm of the recurrence relation :
-/// y(l,m) = alm[l,m]*x*y(l-1,m) - blm[l,m]*y(l-2,m)
-	for (im=0, lm=0; im<=MMAX; im++) {
+/// - Precompute the factors alm and blm of the recurrence relation :
+  if (norm == sht_schmidt) {
+	for (im=0, lm=0; im<=MMAX; im++) {		/// <b> For Schmidt semi-normalized </b>
 		m = im*MRES;
 		mmidx[im] = lm;
-		if (m < LMAX) {	// l=m+1
-			alm[lm] = 0.0;		// will contain the starting value.
-			alm[lm+1] = LEG_SQRT(m+m+3);
-			t2 = (m+m+1);	lm+=2;
-		}
+		t2 = LEG_SQRT(2*m+1);
+		alm[lm] = 1.0/t2;		/// starting value will be divided by \f$ \sqrt{2m+1} \f$ 
+		alm[lm+1] = t2;		// l=m+1
+		lm+=2;
 		for (l=m+2; l<=LMAX; l++) {
-			t1 = (l+m)*(l-m);
-			alm[lm+1] = LEG_SQRT((l+l+1)*(l+l-1)/t1);
-			alm[lm] = - LEG_SQRT(((l+l+1)*t2)/((l+l-3)*t1));
+			t1 = LEG_SQRT((l+m)*(l-m));
+			alm[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
+			alm[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
 			t2 = t1;	lm+=2;
 		}
 	}
+  } else {
+	for (im=0, lm=0; im<=MMAX; im++) {		/// <b> For orthonormal or 4pi-normalized </b>
+		m = im*MRES;
+		mmidx[im] = lm;
+		t2 = 2*m+1;
+		alm[lm] = 1.0;		// will contain the starting value.
+		alm[lm+1] = LEG_SQRT(2*m+3);		// l=m+1
+		lm+=2;
+		for (l=m+2; l<=LMAX; l++) {
+			t1 = (l+m)*(l-m);
+			alm[lm+1] = LEG_SQRT(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
+			alm[lm] = - LEG_SQRT(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
+			t2 = t1;	lm+=2;
+		}
+	}
+  }
 
-/// Starting value for recursion :
-/// Y_m^m(x) = sqrt( (2m+1)/(4pi m) gamma(m+1/2)/gamma(m) ) (-1)^m (1-x^2)^(m/2) / pi^(1/4)
-// alternate method : direct recursive computation, using the following properties:
-//	gamma(x+1) = x*gamma(x)   et   gamma(1.5)/gamma(1) = sqrt(pi)/2
-#ifdef LEG_LONG_DOUBLE
-	t1 = 0.25L/M_PIl;
-#else
-	t1 = 0.25/M_PI;
-#endif
-	alm[0] = LEG_SQRT(t1);          // Y00 = 1/sqrt(4.pi)
+/// - Compute and store the prefactor (independant of x) of the starting value for the recurrence :
+/// \f[  Y_m^m(x) = Y_0^0 \ \sqrt{ \prod_{k=1}^{m} \frac{2k+1}{2k} } \ \ (-1)^m \ (1-x^2)^{m/2}  \f]
+	if ((norm == sht_fourpi)||(norm == sht_schmidt)) {
+		t1 = 1.0;
+		alm[0] = t1;		/// \f$ Y_0^0 = 1 \f$  for Schmidt or 4pi-normalized 
+	} else {
+		t1 = 0.25L/M_PIl;
+		alm[0] = LEG_SQRT(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
+	}
 	for (im=1, m=0; im<=MMAX; im++) {
 		while(m<im*MRES) {
 			m++;
 			t1 *= ((LEG_FLOAT_TYPE)m + 0.5)/m;	// t1 *= (m+0.5)/m;
 		}
-		t2 = (m&1) ? -1.0 : 1.0;	// (-1)^m  Condon-Shortley phase.
-		alm[mmidx[im]] = t2 * LEG_SQRT(t1);
+		t2 = LEG_SQRT(t1);
+		if ( m & with_cs_phase ) t2 = -t2;		/// optional \f$ (-1)^m \f$ Condon-Shortley phase.
+		alm[mmidx[im]] *= t2;
 	}
 }
 
 /// returns the value of the Legendre Polynomial of degree l.
-/// Does not require a previous call to legendre_precomp(), l is arbitrary.
+/// l is arbitrary, a direct recurrence relation is used, and a previous call to legendre_precomp() is not required.
 double legendre_Pl(const int l, double x)
 {
 	long int i;
@@ -260,9 +291,9 @@ double legendre_Pl(const int l, double x)
 	if ((l==0)||(x==1.0)) return ( 1. );
 	if (x==-1.0) return ( (l&1) ? -1. : 1. );
 
-	p2 = 1.0;		// P_0
-	p1 = x;			// P_1
-	for (i=2; i<=l; i++) {		 // recurrence : l P_l = (2l-1) z P_{l-1} - (l-1) P_{l-2}	(works ok up to l=100000)
+	p2 = 1.0;		/// \f$  P_0 = 1  \f$
+	p1 = x;			/// \f$  P_1 = x  \f$
+	for (i=2; i<=l; i++) {		 /// recurrence : \f[  l P_l = (2l-1) x P_{l-1} - (l-1) P_{l-2}	 \f] (works ok up to l=100000)
 		p3 = p2;
 		p2 = p1;
 		p1 = (x*(2*i-1)*p2 - (i-1)*p3)/i;

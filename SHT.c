@@ -22,44 +22,16 @@
 // cycle counter from FFTW
 #include "cycle.h"
 
+#include "SHT.h"
+
 /// Minimum performance improve for DCT in sht_auto mode. If not atained, we switch back to gauss.
 #define MIN_PERF_IMPROVE_DCT 0.95
 /// Try to enforce at least this accuracy for DCT in sht_auto mode.
 #define MIN_ACCURACY_DCT 1.e-8
 
-// supported types of sht's
-enum shtns_type {
-	sht_gauss,	// use gaussian grid and quadrature. highest accuracy.
-	sht_auto,	// use a regular grid if dct is faster with goog accuracy, otherwise defaults to gauss.
-	sht_reg_fast,	// use fastest algorithm, on a regular grid, mixing dct and regular quadrature.
-	sht_reg_dct,	// use pure dct algorithm, on a regular grid.
-	sht_quick_init,	// gauss grid, with minimum init time (useful for pre/post-processing).
-	sht_reg_poles	// use a synthesis only algo including poles, not suitable for computations.
-};
-
-#define SHT_NATIVE_LAYOUT 0
-#define SHT_THETA_CONTIGUOUS 256
-#define SHT_PHI_CONTIGUOUS 256*2
-//#define SHT_CUSTOM_LAYOUT 256*3
-
-
 long int SHT_FFT = 0;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
 
 /// sizes for SHT, in a structure to avoid problems with conflicting names.
-struct sht_sze {
-	long int lmax;			///< maximum degree (lmax) of spherical harmonics.
-	long int mmax;			///< maximum order (mmax*mres) of spherical harmonics.
-	long int mres;			///< the periodicity along the phi axis.
-	long int nlm;			///< total number of (l,m) spherical harmonics components.
-
-	long int nlat;			///< number of spatial points in Theta direction (latitude) ...
-	long int nphi;			///< number of spatial points in Phi direction (longitude)
-
-	int *lmidx;				///< (virtual) index in SH array of given im.
-
-	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
-	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
-};
 struct sht_sze shtns;
 
 // define shortcuts to sizes + allow compile-time optimizations when SHT_AXISYM is defined.
@@ -77,8 +49,7 @@ struct sht_sze shtns;
 #endif
 #define NLM shtns.nlm
 #define MTR_DCT shtns.mtr_dct
-// number of double that have to be allocated for a spatial field (includes reserved space)
-#define NSPAT_ALLOC (NLAT*(NPHI/2+1)*2)
+
 
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
@@ -171,6 +142,21 @@ void shtns_runerr(const char * error_text)
 	printf("*** [SHTns] Run-time error : %s\n",error_text);
 	exit(1);
 }
+
+double Y00_1, Y10_ct, Y11_st;
+/// returns the l=0, m=0 SH coefficient corresponding to a uniform value of 1.
+double sh00_1() {
+	return Y00_1;
+}
+/// returns the l=1, m=0 SH coefficient corresponding to cos(theta).
+double sh10_ct() {
+	return Y10_ct;
+}
+/// returns the l=1, m=1 SH coefficient corresponding to sin(theta).cos(phi).
+double sh11_st() {
+	return Y11_st;
+}
+
 
 /*  LEGENDRE FUNCTIONS  */
 #include "sht_legendre.c"
@@ -860,10 +846,15 @@ void init_SH_gauss()
 {
 	double t,tmax;
 	long int it,im,m,l;
-	long double iylm_fft_norm = 2.0*M_PIl/NPHI;		// FFT/SHT normalization for zlm
+	long double iylm_fft_norm;
 	long double xg[NLAT], wg[NLAT];	// gauss points and weights.
 	double wgd[NLAT_2];		// gauss weights, double precision.
 
+ 	if ((shtns.norm == sht_fourpi)||(shtns.norm == sht_schmidt)) {
+ 		iylm_fft_norm = 0.5/NPHI;		// FFT/SHT normalization for zlm (4pi normalized)
+	} else {
+ 		iylm_fft_norm = 2.0*M_PIl/NPHI;		// FFT/SHT normalization for zlm (orthonormalized)
+	}
 #if SHT_VERBOSE > 0
 	printf("        => using Gauss Nodes\n");
 #endif
@@ -907,22 +898,29 @@ void init_SH_gauss()
 //		zlm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT_2);
 //		dzlm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT_2);
 		for (it=0;it<NLAT_2;it++) {
+			double nz0, nz1;
+			nz0 = wgd[it];	nz1 = wgd[it];
 			for (l=m;l<LMAX;l+=2) {
-				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * wgd[it];
-				zlm[im][(l-m)*NLAT_2 + it*2 +1] =  ylm[im][it*(LMAX-m+1) + (l+1-m)] * wgd[it];
-				dzlm[im][(l-m)*NLAT_2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wgd[it] /(l*(l+1));
-				dzlm[im][(l-m)*NLAT_2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wgd[it] /(l*(l+1));
-				dzlm[im][(l-m)*NLAT_2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * wgd[it] /((l+1)*(l+2));
-				dzlm[im][(l-m)*NLAT_2 + it*2+1].p = dylm[im][it*(LMAX-m+1) + (l+1-m)].p * wgd[it] /((l+1)*(l+2));
+				if (shtns.norm == sht_schmidt) {
+					nz0 = wgd[it]*(2*l+1);	nz1 = wgd[it]*(2*l+3);
+				}
+				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * nz0;
+				zlm[im][(l-m)*NLAT_2 + it*2 +1] =  ylm[im][it*(LMAX-m+1) + (l+1-m)] * nz1;
+				dzlm[im][(l-m)*NLAT_2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * nz1 /((l+1)*(l+2));
+				dzlm[im][(l-m)*NLAT_2 + it*2+1].p = dylm[im][it*(LMAX-m+1) + (l+1-m)].p * nz1 /((l+1)*(l+2));
 				if (l == 0) {		// les derivees sont nulles pour l=0 (=> m=0)
 					dzlm[im][(l-m)*NLAT_2 + it*2].t = 0.0;
 					dzlm[im][(l-m)*NLAT_2 + it*2].p = 0.0;
 				}
 			}
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
-				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * wgd[it];
-				dzlm[im][(l-m)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * wgd[it] /(l*(l+1));
-				dzlm[im][(l-m)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * wgd[it] /(l*(l+1));
+				if (shtns.norm == sht_schmidt)
+					nz0 = wgd[it]*(2*l+1);
+				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * nz0;
+				dzlm[im][(l-m)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
+				dzlm[im][(l-m)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
 			}
 		}
 	}
@@ -1049,11 +1047,17 @@ void init_SH_dct(int analysis)
 	double *yk, *yk0, *dyk0, *yg;		// temp storage
 	struct DtDp *dyg, *dyk;
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
-	double iylm_fft_norm = 2.0*M_PI/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm
+	double iylm_fft_norm;
 	long int it,im,m,l;
 	long int sk, dsk;
 	double Z[2*NLAT_2], dZt[2*NLAT_2], dZp[2*NLAT_2];		// equally spaced theta points.
 	double is1[NLAT];		// tabulate values for integrals.
+
+	if ((shtns.norm == sht_fourpi)||(shtns.norm == sht_schmidt)) {
+ 		iylm_fft_norm = 0.5/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm (4pi)
+	} else {
+ 		iylm_fft_norm = 2.0*M_PI/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm (orthonormal)
+	}
 
 #if SHT_VERBOSE > 0
 	printf("        => using Equaly Spaced Nodes with DCT acceleration\n");
@@ -1221,12 +1225,15 @@ void init_SH_dct(int analysis)
 		for (l=m; l<=LMAX; l++) {
 			long int k0,k1, k,i,d;
 			double Jik, yy, dyy;
+			double lnorm = iylm_fft_norm;
+
+			if (shtns.norm == sht_schmidt)	lnorm *= (2*l+1);		// Schmidt semi-normalization
 
 			k0 = (l-m)&1;	k1 = 1-k0;
 			for(k=0; k<NLAT; k++) {	Z[k] = 0.0;		dZt[k] = 0.0;	dZp[k] = 0.0; }
 			for (i=k0; i<=l+1; i+=2) {		// i+k even
-				yy = yk[(i/2)*(LMAX+1-m) + (l-m)] * iylm_fft_norm;
-				dyy = dyk[(i/2)*(LMAX+1-m) + (l-m)].p * iylm_fft_norm/(l*(l+1));
+				yy = yk[(i/2)*(LMAX+1-m) + (l-m)] * lnorm;
+				dyy = dyk[(i/2)*(LMAX+1-m) + (l-m)].p * lnorm/(l*(l+1));
 				if (i==0) {	yy*=0.5;	dyy*=0.5; }
 				for (k=k0; k<NLAT; k+=2) {
 					d = (k<i) ? i-k : k-i;		// d=|i-k|
@@ -1237,7 +1244,7 @@ void init_SH_dct(int analysis)
 			}
 			if (l != 0) {
 				for (i=k1; i<=l+1; i+=2) {		// i+k even
-					yy = dyk[(i/2)*(LMAX+1-m) + (l-m)].t * iylm_fft_norm/(l*(l+1));
+					yy = dyk[(i/2)*(LMAX+1-m) + (l-m)].t * lnorm/(l*(l+1));
 					if (i==0) yy*=0.5;
 					for (k=k1; k<NLAT; k+=2) {
 						d = (k<i) ? i-k : k-i;		// d=|i-k|
@@ -1369,7 +1376,7 @@ void init_SH_dct(int analysis)
 
 
 /// return the max error for a back-and-forth SHT transform.
-/// \param[in] disp : 1 = print more informations about accuracy, 0 = silent.
+/// this function is used to internally measure the accuracy.
 double SHT_error()
 {
 	complex double *Tlm0, *Slm0, *Tlm, *Slm;
@@ -1445,10 +1452,13 @@ double SHT_error()
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
+ * \param norm : define the normalization of the spherical harmonics (\ref shtns_norm)
+ * and optionnaly disable Condon-Shortley phase (ex: sht_schmidt | SHT_NO_CS_PHASE)
 */
-int shtns_set_size(int lmax, int mmax, int mres)
+int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 {
 	int im, m, l, lm;
+	int with_cs_phase = 1;		/// Condon-Shortley phase (-1)^m is used by default.
 
 	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
 //	if (lmax < 2) shtns_runerr("lmax must be at least 2");
@@ -1458,7 +1468,12 @@ int shtns_set_size(int lmax, int mmax, int mres)
 		return(NLM);
 	}
 
+	if (norm & SHT_NO_CS_PHASE)
+		with_cs_phase = 0;
+	norm = norm & 0x0F;		// keep only the normalization part.
+
 	// copy to global variables.
+	shtns.norm = norm;
 #ifdef SHT_AXISYM
 	shtns.mmax = 0;		shtns.mres = 2;		shtns.nphi = 1;
 	if (mmax != 0) shtns_runerr("axisymmetric version : only Mmax=0 allowed");
@@ -1469,7 +1484,11 @@ int shtns_set_size(int lmax, int mmax, int mres)
 	NLM = nlm_calc(LMAX,MMAX,MRES);
 #if SHT_VERBOSE > 0
 	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
-	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d\n",LMAX,MMAX*MRES,MRES,NLM);
+	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d  [",LMAX,MMAX*MRES,MRES,NLM);
+	if (!with_cs_phase) printf("no Condon-Shortley phase, ");
+	if (norm == sht_fourpi) printf("4.pi normalized]\n");
+	else if (norm == sht_schmidt) printf("Schmidt semi-normalized]\n");
+	else printf("orthonormalized]\n");
 #endif
 	if (MMAX*MRES > LMAX) shtns_runerr("MMAX*MRES should not exceed LMAX");
 	if (MRES <= 0) shtns_runerr("MRES must be > 0");
@@ -1494,13 +1513,29 @@ int shtns_set_size(int lmax, int mmax, int mres)
 	if (lm != NLM) shtns_runerr("unexpected error");
 
 	// this quickly precomputes some values for the legendre recursion.
-	legendre_precomp();
+	legendre_precomp(norm, with_cs_phase);
+
+	switch(norm) {
+		case sht_schmidt:
+			Y00_1 = 1.0;		Y10_ct = 1.0;
+			Y11_st = sqrt(0.5);
+			break;
+		case sht_fourpi:
+			Y00_1 = 1.0;		Y10_ct = sqrt(1./3.);
+			Y11_st = sqrt(1./6.);
+			break;
+		case sht_orthonormal:
+		default:
+			Y00_1 = sqrt(4.*M_PI);		Y10_ct = sqrt(4.*M_PI/3.);
+			Y11_st = sqrt(2.*M_PI/3.);		// orthonormal :  \f$ \sin\theta\cos\phi/(Y_1^1 + Y_1^{-1}) = -\sqrt{2 \pi /3} \f$
+	}
+	if (with_cs_phase)	Y11_st *= -1.0;		// correct Condon-Shortley phase
 
 	return(NLM);
 }
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
- * <b>This function must be called after shtns_geometry and before any SH transform.</b> and sets all global variables.
+ * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables.
  * returns the number of modes to describe a scalar field.
  * \param nlat,nphi : respectively the number of latitudinal and longitudinal grid points.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
@@ -1628,7 +1663,7 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 }
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
- * <b>This function must be called after shtns_geometry and before any SH transform.</b> and sets all global variables.
+ * This function sets all global variables by calling \ref shtns_set_size followed by \ref shtns_precompute.
  * returns the number of modes to describe a scalar field.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
@@ -1640,7 +1675,7 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 */
 int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
 {
-	shtns_set_size(lmax, mmax, mres);
+	shtns_set_size(lmax, mmax, mres, sht_orthonormal);
 	return shtns_precompute(flags, eps, nlat, nphi);
 }
 

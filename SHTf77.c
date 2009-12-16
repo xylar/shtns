@@ -47,6 +47,23 @@ void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nla
 {
     shtns_init(sht_reg_poles | *layout, 0, *lmax, *mmax, *mres, *nlat, *nphi);
 }
+
+/// Defines the size and convention of the transform.
+/// Allow to choose the normalization and whether or not to include the Condon-Shortley phase.
+void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm, int *cs_phase)
+{
+	if (*cs_phase)
+		shtns_set_size(*lmax, *mmax, *mres, *norm);
+	else
+		shtns_set_size(*lmax, *mmax, *mres, *norm | SHT_NO_CS_PHASE);
+}
+
+/// Precompute matrices for synthesis and analysis.
+/// Allow to choose polar optimization threshold and algorithm type.
+void shtns_precompute_(int *flags, double *eps, int *nlat, int *nphi)
+{
+	shtns_precompute(*flags, *eps, *nlat, *nphi);
+}
 //@}
 
 /// returns nlm, the number of complex*16 elements in an SH array.

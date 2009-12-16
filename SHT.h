@@ -2,8 +2,24 @@
  \brief SHT.h is the definition file for SHTns : include this file in your source code to use SHTns.
 **/
 
-// GLOBAL VARIABLES : do not modify, they are set by the call to init_SH. //
+/// different Spherical Harmonic normalizations.
+enum shtns_norm {
+	sht_orthonormal,	///< orthonormalized spherical harmonics (default).
+	sht_fourpi,			///< Geodesy and spectral analysis : 4.pi normalization.
+	sht_schmidt			///< Schmidt semi-normalized : 4.pi/(2l+1)
+};
 
+/// different SHT types and algorithms
+enum shtns_type {
+	sht_gauss,	///< use <b>gaussian grid</b> and quadrature. highest accuracy.
+	sht_auto,	///< use a regular grid if dct is faster with goog accuracy, otherwise defaults to gauss.
+	sht_reg_fast,	///< use fastest algorithm, on a <b>regular grid</b>, mixing dct and regular quadrature.
+	sht_reg_dct,	///< use pure dct algorithm, on a <b>regular grid</b>.
+	sht_quick_init, ///< gauss grid, with minimum initialization time (useful for pre/post-processing)
+	sht_reg_poles	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. Useful for vizualisation.
+};
+
+/// structure containing useful information about the SHT.
 struct sht_sze {
 	long int lmax;			///< maximum degree (lmax) of spherical harmonics.
 	long int mmax;			///< maximum order (mmax*mres) of spherical harmonics.
@@ -17,25 +33,24 @@ struct sht_sze {
 
 	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
 	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
-};
-extern struct sht_sze shtns;
 
-/// total number of 'doubles' required for a spatial field (includes FFTW padding).
-/// only the first shtns.nlat*shtns.nphi are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat_data
-#define NSPAT_ALLOC (shtns.nlat*(shtns.nphi/2+1)*2)
+	enum shtns_norm norm;	///< store the normalization of the Spherical Harmonics.
+};
+
+// GLOBAL VARIABLES : do not modify, they are set by the call to init_SH. //
+extern struct sht_sze shtns;
 
 /*! \name physical space coordinates arrays
  * functions of the co-latitude theta for latitudinal grid points [0..shtns.nlat-1]
- */
-//@{
+ *///@{
 extern double *ct;	///< ct[i] = cos(theta)
 extern double *st;	///< st[i] = sin(theta)
 extern double *st_1;	///< st_1[i] = 1/sin(theta)
 //@}
+
 /*! \name spherical harmonic space arrays
  * useful combinations of the \b degree \b l of the spherical harmonic stored at offset \c lm in the SH array.
- */
-//@{
+ *///@{
 extern int *li;		///< li[lm] is the \b degree \b l of the spherical harmonic coefficient stored in lm position (integer array)
 extern double *el;	///< el[lm] is the \b degree \b l of the spherical harmonic coefficient stored in lm position (double array)
 extern double *l2;	///< l2[lm] = l(l+1) 
@@ -46,8 +61,7 @@ extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 
 /*! \name Access to spherical harmonic components
  * The following macros give access to single spherical harmonic coefficient or perform loops spanning all of them.
-**/
-//@{
+**///@{
 ///LiM(l,im) : macro returning array index for given l and im.
 #define LiM(l,im) ( shtns.lmidx[im] + l )
 /// LM(l,m) : macro returning array index for given l and m.
@@ -60,36 +74,20 @@ extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 #define LM_L_LOOP( action ) for (lm=0; lm<shtns.nlm; lm++) { l=li[lm]; { action } }
 //@}
 
-#ifndef M_PI
-  #define M_PI 3.1415926535897932384626433832795
-#endif
-
-// useful values for some basic spherical harmonic representations
-/// Y00_1 = \f$ 1/Y_0^0 = \sqrt{4 \pi} \f$ spherical harmonic representation of 1 (l=0,m=0)
-#define Y00_1 sqrt(4.*M_PI)
-/// Y10_ct = \f$ \cos\theta/Y_1^0 = \sqrt{4 \pi /3} \f$ spherical harmonic representation of cos(theta) (l=1,m=0)
-#define Y10_ct sqrt(4.*M_PI/3.)
-/// Y11_st = \f$ \sin\theta\cos\phi/(Y_1^1 + Y_1^{-1}) = \sqrt{2 \pi /3} \f$ spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
-#define Y11_st -sqrt(2.*M_PI/3.)
-
-/// different SHT types and algorithms
-enum shtns_type {
-	sht_gauss,	///< use <b>gaussian grid</b> and quadrature. highest accuracy.
-	sht_auto,	///< use a regular grid if dct is faster with goog accuracy, otherwise defaults to gauss.
-	sht_reg_fast,	///< use fastest algorithm, on a <b>regular grid</b>, mixing dct and regular quadrature.
-	sht_reg_dct,	///< use pure dct algorithm, on a <b>regular grid</b>.
-	sht_quick_init, ///< gauss grid, with minimum initialization time (useful for pre/post-processing)
-	sht_reg_poles	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. \ref shtns.nlat odd is supported even if \link compil SHT_shtns.nlat_EVEN \endlink is defined, useful for vizualisation.
-};
-
-#define SHT_NATIVE_LAYOUT 0		///< Tells shtns_init to use \ref native
+#define SHT_NATIVE_LAYOUT 0			///< Tells shtns_init to use \ref native
 #define SHT_THETA_CONTIGUOUS 256	///< use \ref theta_fast
-#define SHT_PHI_CONTIGUOUS 256*2	///< use \ref phi_fast
+#define SHT_PHI_CONTIGUOUS (256*2)	///< use \ref phi_fast
+
+#define SHT_NO_CS_PHASE (256*4)	///< don't include Condon-Shortley phase (add to last argument of \ref shtns_set_size)
+
+/// total number of 'doubles' required for a spatial field (includes FFTW reserved space).
+/// only the first shtns.nlat*shtns.nphi are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat
+#define NSPAT_ALLOC (shtns.nlat*(shtns.nphi/2+1)*2)
 
 // FUNCTIONS //
 
 /// defines the sizes of the spectral description.
-int shtns_set_size(int lmax, int mmax, int mres);
+int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm);
 /// precompute everything for a given spatial grid.
 int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi);
 /// Initializes spherical harmonic transforms of given size, and sets all global variables.
@@ -99,6 +97,13 @@ int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, 
 long int nlm_calc(long int lmax, long int mmax, long int mres);
 void Set_MTR_DCT(int m);
 int Get_MTR_DCT();
+
+/// \name special values
+//@{
+double sh00_1();	///< returns the spherical harmonic representation of 1 (l=0,m=0)
+double sh10_ct();	///< returns the spherical harmonic representation of cos(theta) (l=1,m=0)
+double sh11_st();	///< spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
+//@}
 
 /// \name Scalar transforms
 //@{
@@ -140,9 +145,9 @@ void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex dou
 //@}
 #define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat(S, Gt, Gp, ltr)
 
-/// \name Axisymmetric transforms m=0 only
-/** these work for any MMAX, and will only transform MMAX=0, to/from a vector with NLAT contiguous theta-values. */
-//@{
+/*! \name Axisymmetric transforms m=0 only
+ * these work for any MMAX, and will only transform MMAX=0, to/from a vector with NLAT contiguous theta-values.
+ *///@{
 void spat_to_SH_m0(double *Vr, complex double *Qlm);
 void SH_to_spat_m0(complex double *Qlm, double *Vr);
 void SHsphtor_to_spat_m0(complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
@@ -152,9 +157,9 @@ void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex do
 //@}
 #define SH_to_grad_spat_m0(S,Gt,Gp,ltr) SHsph_to_spat_m0(S, Gt, ltr)
 
-///	SHT transforms with assumed equatorial symmetry (parity = 0 or 1)
-/** these work with (NLAT+1)/2 latitudinal points, and do not overwrite SH coefficients of other parity */
-//@{
+/*! \name SHT transforms with assumed equatorial symmetry (parity = 0 or 1)
+ * these work with (NLAT+1)/2 latitudinal points, and do not overwrite SH coefficients of other parity
+ *///@{
 void SHeo_to_spat(complex double *Qlm, double *Vr, int parity);
 void spat_to_SHeo(double *Vr, complex double *Qlm, int parity);
 void SHeo_sphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int parity);
