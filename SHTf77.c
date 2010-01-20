@@ -17,6 +17,9 @@
 #include <stdio.h>
 #include "SHT.h"
 
+//#define SHTNS_DEFAULT_NORM ( sht_schmidt | SHT_NO_CS_PHASE )
+#define SHTNS_DEFAULT_NORM ( sht_orthonormal )
+
 /** \name Initialization
 Call from fortran using : \code
 call shtns_init_sh_*( lmax, mmax, mres, nlat, nphi) \endcode
@@ -27,25 +30,29 @@ call shtns_init_sh_*( lmax, mmax, mres, nlat, nphi) \endcode
 /// Initializes spherical harmonic transforms of given size using Gauss algorithm and no approximation
 void shtns_init_sh_gauss_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-    shtns_init(sht_gauss | *layout, 0, *lmax, *mmax, *mres, *nlat, *nphi);
+	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_precompute(sht_gauss | *layout, 0, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transforms of given size using Fastest available algorithm and polar optimization.
 void shtns_init_sh_auto_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-    shtns_init(sht_auto | *layout, 1.e-10, *lmax, *mmax, *mres, *nlat, *nphi);
+	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_precompute(sht_auto | *layout, 1.e-10, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transforms of given size using a regular grid and agressive optimizations.
 void shtns_init_sh_reg_fast_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-    shtns_init(sht_reg_fast | *layout, 1.e-6, *lmax, *mmax, *mres, *nlat, *nphi);
+	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_precompute(sht_reg_fast | *layout, 1.e-6, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transform SYNTHESIS ONLY of given size using a regular grid including poles.
 void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-    shtns_init(sht_reg_poles | *layout, 0, *lmax, *mmax, *mres, *nlat, *nphi);
+	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_precompute(sht_reg_poles | *layout, 0, *nlat, *nphi);
 }
 
 /// Defines the size and convention of the transform.
@@ -60,9 +67,9 @@ void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm, int *cs_phase)
 
 /// Precompute matrices for synthesis and analysis.
 /// Allow to choose polar optimization threshold and algorithm type.
-void shtns_precompute_(int *flags, double *eps, int *nlat, int *nphi)
+void shtns_precompute_(int *type, int *layout, double *eps, int *nlat, int *nphi)
 {
-	shtns_precompute(*flags, *eps, *nlat, *nphi);
+	shtns_precompute(*type | *layout, *eps, *nlat, *nphi);
 }
 //@}
 
@@ -149,6 +156,7 @@ void shtns_qst_to_spat_(complex double *Qlm, complex double *Slm, complex double
     SHsphtor_to_spat(Slm, Tlm, Vt, Vp);
 }
 //@}
+
 
 /** \name Point evaluation of Spherical Harmonics
 Evaluate at a given point (\f$cos(\theta)\f$ and \f$\phi\f$) a spherical harmonic representation.

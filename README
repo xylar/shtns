@@ -132,7 +132,7 @@ Allocation for a SH description is simply done with :
 
 \section norm Normalization
 
-The spherical harmonics used in SHTns are orthonormalized (like in the GSL) :
+The spherical harmonics used in SHTns are orthonormalized by default (like in the GSL) :
 
 \f[ Y_l^m(\theta, \phi) = \sqrt{\frac{2l+1}{4\pi}} \sqrt{\frac{(l-m)!}{(l+m)!}} \, P_l^m(\cos \theta) \, \exp(im\phi) \f]
 
@@ -157,6 +157,7 @@ spectral fields, no matter what normalization you choose.
 If you have problem in getting your spherical harmonic coefficient right, you may check the following :
  - Schmit semi-normalization ? try multiplying or dividing by \f$ \sqrt{2l+1} \f$
  - Condon-Shortley phase ? try multiplying by \f$ (-1)^m \f$
+ - Real or Complex ? try multiplying or dividing the m>0 coefficients by \f$ \sqrt{2} \f$
  - Does the array include l=0 ?
 
 */

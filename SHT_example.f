@@ -2,6 +2,7 @@
       PROGRAM SHT_example
 
       IMPLICIT NONE
+      include 'shtns.f'
 
       Integer*4 lmax, mmax, mres
       integer*4 nlat, nphi
@@ -24,7 +25,7 @@ c compute sizes required for arrays.
       print*,'NLM=',nlm
 
 c init SHT
-      layout=512
+      layout = SHT_PHI_CONTIGUOUS
       call shtns_init_sh_gauss(layout, lmax, mmax, mres, nlat, nphi)
 
 c allocate memory for spectral and spatial representation
