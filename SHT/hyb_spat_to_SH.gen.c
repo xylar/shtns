@@ -63,14 +63,6 @@ Q	    fftw_execute_dft_r2c(fft,Vr, BrF);
 V	    fftw_execute_dft_r2c(fft,Vt, BtF);
 V	    fftw_execute_dft_r2c(fft,Vp, BpF);
 	}
-  #else
-	if (NPHI > 1) {		// TODO avoid this with some precomputing !
-		i=0;	do {
-V			Vt[i] *= NPHI; 	Vp[i] *= NPHI;
-Q			Vr[i] *= NPHI;
-			i++;
-		} while (i<NLAT);
-	}
   #endif
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
@@ -92,8 +84,13 @@ V		fftw_execute_r2r(dct_m0,(double *) BpF, BP0);		// DCT out-of-place.
 Q		#define BR0	((double *)BrF)
 V		#define BT0	((double *)BtF)
 V		#define BP0	((double *)BpF)
+Q		if (NPHI > 1) {
+Q			i=0;	do {
+Q				BR0[i] *= NPHI;
+Q			} while (i<NLAT);
+Q		}
 V		i=0;	do {
-V			BT0[i] *= st_1[i]; 	BP0[i] *= st_1[i];
+V			BT0[i] *= st_1[i]*NPHI; 	BP0[i] *= st_1[i]*NPHI;
 V			i++;
 V		} while (i<NLAT);
 Q		fftw_execute_r2r(dct_r1,(double *) BrF, (double *) BrF);	// DCT in-place.
@@ -164,9 +161,6 @@ V		BtF += NLAT;	BpF += NLAT;
   #endif
   #ifndef SHT_AXISYM
 		i0 = (NPHI==1) ? 1 : 2;		// stride of source data.
-  #else
-		i0 = 1;
-  #endif
 		i=0;	l=NLAT-1;
  B		do {	// compute symmetric and antisymmetric parts.
 QB			re0 = ((double*)BrF)[i*i0] + ((double*)BrF)[l*i0];
@@ -177,6 +171,18 @@ VB			pe0 = ((double*)BpF)[i*i0] + ((double*)BpF)[l*i0];
 VB			po0 = ((double*)BpF)[i*i0] - ((double*)BpF)[l*i0];
  B			i++;	l--;
  B		} while(i<=l);
+  #else
+		i=0;	l=NLAT-1;
+ B		do {	// compute symmetric and antisymmetric parts.
+QB			re0 = ( ((double*)BrF)[i] + ((double*)BrF)[l] )*NPHI;
+QB			ro0 = ( ((double*)BrF)[i] - ((double*)BrF)[l] )*NPHI;
+VB			te0 = ( ((double*)BtF)[i] + ((double*)BtF)[l] )*NPHI;
+VB			to0 = ( ((double*)BtF)[i] - ((double*)BtF)[l] )*NPHI;
+VB			pe0 = ( ((double*)BpF)[i] + ((double*)BpF)[l] )*NPHI;
+VB			po0 = ( ((double*)BpF)[i] - ((double*)BpF)[l] )*NPHI;
+ B			i++;	l--;
+ B		} while(i<=l);
+  #endif
 Q		l=0;
 V		l=1;		// l=0 is zero for the vector transform.
 Q		Ql = Qlm;		// virtual pointer for l=0 and im

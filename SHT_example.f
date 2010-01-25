@@ -2,6 +2,7 @@
       PROGRAM SHT_example
 
       IMPLICIT NONE
+c import useful parameters for shtns initialization
       include 'shtns.f'
 
       Integer*4 lmax, mmax, mres
@@ -24,7 +25,7 @@ c compute sizes required for arrays.
       call shtns_calc_nlm(nlm, lmax, mmax, mres)
       print*,'NLM=',nlm
 
-c init SHT
+c init SHT. SHT_PHI_CONTIGUOUS is defined in 'shtns.f'
       layout = SHT_PHI_CONTIGUOUS
       call shtns_init_sh_gauss(layout, lmax, mmax, mres, nlat, nphi)
 

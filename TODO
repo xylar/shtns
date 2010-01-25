@@ -57,3 +57,4 @@ DCT is about 25% faster than GAUSS for xshells dj_ref case (axisym).
 Using long double for computing the legendre associated functions does not improve precision
 (if SHT are computed in double precisions !)
 
+QGdynamo now successfully uses SHTns : the speedup is quite impressive x2.2 for a reasonable size.

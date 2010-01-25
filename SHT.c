@@ -212,6 +212,12 @@ void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp)
 	#include "SHT/SHt_to_spat.c"
 }
 
+void SHqst_to_spat(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp)
+{
+    SH_to_spat(Qlm, Vr);
+    SHsphtor_to_spat(Slm, Tlm, Vt, Vp);
+}
+
 /////////////////////////////////////////////////////
 /// Forward Vector Spherical Harmonics Transform : (theta,phi) vector field components to Spheroidal/Toroidal scalars.
 /// \param[in] Vt/Vp : theta/phi components of vector field. double array of size NLAT*(NPHI/2+1)*2
@@ -220,6 +226,13 @@ void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex doubl
 {
 	#include "SHT/spat_to_SHst.c"
 }
+
+void spat_to_SHqst(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm)
+{
+    spat_to_SHsphtor(Vt, Vp, Slm, Tlm);
+    spat_to_SH(Vr, Qlm);
+}
+
 
 /// Evaluate scalar SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
 double SH_to_point(complex double *Qlm, double cost, double phi)
