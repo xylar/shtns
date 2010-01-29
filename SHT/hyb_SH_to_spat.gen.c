@@ -333,24 +333,18 @@ V			k=0;	do {		// m=0
 V				((double *)BtF)[2*k] *= st_1[k];		((double *)BpF)[2*k] *= st_1[k];
 V				k++;
 V			} while(k<NLAT);
-			if (MRES & 1) {		// odd m's must be multiplied by sin(theta) which was removed from ylm's
+Q			if (MRES & 1) {		// odd m's must be divided by sin(theta)
 Q				for (im=1; im<=MTR_DCT; im+=2) {	// odd m's
 Q					k=0;	do {	BrF[im*NLAT + k] *= st_1[k];	k++;	} while(k<NLAT);
 Q				}
-V				for (im=2; im<=MTR_DCT; im+=2) {	//even m's
-V					k=0;	do {
-V						BtF[im*NLAT + k] *= st_1[k];	BpF[im*NLAT + k] *= st_1[k];
-V						k++;
-V					} while(k<NLAT);
-V				}
-V			} else {	// only even m's
-V				for (im=1; im<=MTR_DCT; im++) {
-V					k=0;	do {
-V						BtF[im*NLAT + k] *= st_1[k];	BpF[im*NLAT + k] *= st_1[k];
-V						k++;
-V					} while(k<NLAT);
-V				}
-			}
+Q			}
+V			l = (MRES & 1) + 1;		// im-stride (l=1 if MRES even, l=2 if MRES odd)
+V			for (im=l; im<=MTR_DCT; im+=l) {	//even m's must be divided by sin(theta)
+V				k=0;	do {
+V					BtF[im*NLAT + k] *= st_1[k];	BpF[im*NLAT + k] *= st_1[k];
+V					k++;
+V				} while(k<NLAT);
+V			}
 		}
     #endif
 Q		fftw_execute_dft_c2r(ifft, BrF, Vr);
