@@ -236,3 +236,15 @@ can choose to do so using the adequate \ref shtns_type when calling \ref shtns_i
 
 
 */
+
+/** \page f77 Using SHTns with Fortran 77 
+
+SHTns provides an interface to Fortran language (compatible with gfortran).
+See the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
+
+\example SHT_example.f
+  \brief A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
+  Compile using : \code make SHT_fort_ex \endcode
+
+*/
+

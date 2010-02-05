@@ -46,6 +46,7 @@ V	#define BP0 ((double *)BpF)
 V  	double sgn_sph, sgn_tor;
 	long int llim;
 	long int k,im,m,l;
+	int im_parity = 2;	// both parities.
 
 	llim = LTR;	// copy LTR to a local variable for faster access (inner loop limit)
 Q	BrF = (complex double *) Vr;
@@ -67,6 +68,7 @@ V		sgn_tor = 1.0;		sgn_sph = -1.0;
 V	}
 
 	im=0;	m=0;
+	if ((im_parity & 1) == 0) {		// compute even m's
 Q		Ql = Qlm + parity;
 S		Sl = Slm;
 T		Tl = Tlm;
@@ -99,26 +101,27 @@ V			BP0[k] = pe * sgn_tor;	// Bp = - dT/dt
 Q			yl  += (LMAX-LTR);
 V			dyl0 += (LMAX-LTR);
 		} while (k < NLAT_2);
-
+		im++;
+Q		BrF += NLAT_2;
+V		BtF += NLAT_2;	BpF += NLAT_2;
+	}
   #ifndef SHT_AXISYM
-	im=1;
-Q	BrF += NLAT_2;
-V	BtF += NLAT_2;	BpF += NLAT_2;
-	while(im<=MTR) {	// regular for MTR_DCT < im <= MTR
+	im_parity = 1-im_parity;	// 0 => 1;	1 => 0;	2 => -1;
+	while (im<=MTR) {
 		m = im*MRES;
+		l = ( (im&1) == im_parity ) ? NLAT_2 : tm[im];
 Q		Ql = &Qlm[LiM(0,im)] + parity;	// virtual pointer for l=0 and im
 V		Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 V		Tl = &Tlm[LiM(0,im)];
-		k=0;
-		while (k<tm[im]) {	// polar optimization
+		k = 0;
+		while ( k < l ) {	// polar optimization + zero-out if not selected.
 Q			BrF[k] = 0.0;
-V			BtF[k] = 0.0;
-V			BpF[k] = 0.0;
+V			BtF[k] = 0.0;	BpF[k] = 0.0;
 			k++;
 		}
 Q		yl  = ylm[im] + parity;
 V		dyl = dylm[im];
-		do {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
+		while (k< NLAT_2) {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 Q			re = 0.0;
 V			dto = 0.0;	pe = 0.0;	dpe = 0.0;	to = 0.0;
@@ -146,7 +149,7 @@ V			BpF[k] = I*pe + dpe*sgn_tor;		// Bp = I.m/sint *S - dT/dt
 			k++;
 Q			yl  += (LMAX-LTR);
 V			dyl += (LMAX-LTR);
-		} while (k < NLAT_2);
+		}
 		im++;
 Q		BrF += NLAT_2;
 V		BtF += NLAT_2;	BpF += NLAT_2;

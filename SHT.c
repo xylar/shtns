@@ -5,117 +5,21 @@
 
 /// \file SHT.c main source file for SHTns.
 
-/* FLAGS */
-//#define SHT_AXISYM
-//#define SHT_NO_DCT
-//#define SHT_EO
-
-/// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
-#define SHT_VERBOSE 1
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <complex.h>
-#include <math.h>
-// FFTW la derivee d/dx = ik	(pas de moins !)
-#include <fftw3.h>
+
+// global variables definitions
+#include "sht_private.h"
+
 // cycle counter from FFTW
 #include "cycle.h"
-
-#include "SHT.h"
-
-/// Minimum performance improve for DCT in sht_auto mode. If not atained, we switch back to gauss.
-#define MIN_PERF_IMPROVE_DCT 0.95
-/// Try to enforce at least this accuracy for DCT in sht_auto mode.
-#define MIN_ACCURACY_DCT 1.e-8
-
-long int SHT_FFT = 0;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
 
 /// sizes for SHT, in a structure to avoid problems with conflicting names.
 struct sht_sze shtns;
 
-// define shortcuts to sizes + allow compile-time optimizations when SHT_AXISYM is defined.
-#define LMAX shtns.lmax
-#define NLAT shtns.nlat
-#define NLAT_2 shtns.nlat_2
-#ifndef SHT_AXISYM
-  #define NPHI shtns.nphi
-  #define MMAX shtns.mmax
-  #define MRES shtns.mres
-#else
-  #define NPHI 1
-  #define MMAX 0
-  #define MRES 1
-#endif
-#define NLM shtns.nlm
-#define MTR_DCT shtns.mtr_dct
-
-
-#ifndef M_PI
-# define M_PI 3.1415926535897932384626433832795
-#endif
-#ifndef M_PIl
-# define M_PIl 3.1415926535897932384626433832795L
-#endif
-
-/*
-struct SHTdef {
-	long int nlm;
-	long int lmax,nlat,nlat_2;
-	long int mmax,mres,nphi;
-	long int mtr_dct;
-
-	double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
-	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
-	int *li;
-
-	int *lmidx;		// (virtual) index in SH array of given im.
-	int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-
-	double** ylm;		// matrix for inverse transform (synthesis)
-	double** zlm;		// matrix for direct transform (analysis)
-	double** ykm_dct;	// matrix for inverse transform (synthesis) using dct.
-	double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
-
-	fftw_plan ifft, fft;	// plans for FFTW.
-	fftw_plan idct, dctm0;
-}
-
-struct VSHTdef {
-	long int nlm;
-	long int lmax,nlat,nlat_2;
-	long int mmax,mres,nphi;
-	long int mtr_dct;
-
-	double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
-	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
-	int *li;
-
-	int *lmidx;		// (virtual) index in SH array of given im.
-	int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-
-	struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
-	struct DtDp** dzlm;
-	struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix
-
-	fftw_plan ifft, fft;	// plans for FFTW.
-	fftw_plan idct;
-
-	spat_to_SH
-	SH_to_spat
-}
-*/
-
-struct DtDp {		// theta and phi derivatives stored together.
-	double t, p;
-};
-
 double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
 double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 int *li = NULL;				// used as flag for shtns_set_size
-
-// LM(l,m) : index in the Spherical Harmonic coefficient array [ (l,m) space ]
-#define LiM(l,im) ( shtns.lmidx[im] + l )
 
 int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
@@ -134,7 +38,7 @@ fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
 fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 
-#define SSE __attribute__((aligned (16)))
+
 
 /// Abort program with error message.
 void shtns_runerr(const char * error_text)
@@ -168,71 +72,6 @@ double sh11_st() {
 // truncation at LMAX and MMAX
 #define LTR LMAX
 #define MTR MMAX
-#undef SHT_VAR_LTR
-
-/////////////////////////////////////////////////////
-///   Scalar Spherical Harmonics Transform : spatial field BrF is converted to SH representation Qlm.
-/// \param[in] Vr = spatial data : double array of size NLAT*(NPHI/2+1)*2
-/// \param[out] Qlm = spherical harmonics coefficients : complex double array of size NLM
-void spat_to_SH(double *Vr, complex double *Qlm)
-{
-	#include "SHT/spat_to_SH.c"
-}
-
-/////////////////////////////////////////////////////
-///   Backward Scalar Spherical Harmonics Transform : SH representation Qlm is converted to spatial field BrF.
-/// \param[in] Qlm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
-/// \param[out] Vr = spatial data : double array of size NLAT*(NPHI/2+1)*2
-void SH_to_spat(complex double *Qlm, double *Vr)
-{
-	#include "SHT/SH_to_spat.c"
-}
-
-//void SH_to_grad_spat(complex double *Slm, complex double *BtF, complex double *BpF)
-// "grad_spat" and "sph_to_spat" are the same : so we alias them.
-//#include "SHT/S_to_spat.c"
-#define SH_to_grad_spat(S,Gt,Gp) SHsph_to_spat(S, Gt, Gp)
-
-/////////////////////////////////////////////////////
-/// Backward Vector Spherical Harmonics Transform : Spheroidal/Toroidal to (theta,phi) vector components.
-/// \param[in] Slm/Tlm : SH array of Spheroidal/Toroidal scalar. complex size NLM
-/// \param[out] Vt/Vp : theta/phi components of vector field. double array of size NLAT*(NPHI/2+1)*2
-void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
-{
-	#include "SHT/SHst_to_spat.c"
-}
-
-void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp)
-{
-	#include "SHT/SHs_to_spat.c"
-}
-
-void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp)
-{
-	#include "SHT/SHt_to_spat.c"
-}
-
-void SHqst_to_spat(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp)
-{
-    SH_to_spat(Qlm, Vr);
-    SHsphtor_to_spat(Slm, Tlm, Vt, Vp);
-}
-
-/////////////////////////////////////////////////////
-/// Forward Vector Spherical Harmonics Transform : (theta,phi) vector field components to Spheroidal/Toroidal scalars.
-/// \param[in] Vt/Vp : theta/phi components of vector field. double array of size NLAT*(NPHI/2+1)*2
-/// \param[out] Slm/Tlm : SH array of Spheroidal/Toroidal scalar. complex size NLM
-void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
-{
-	#include "SHT/spat_to_SHst.c"
-}
-
-void spat_to_SHqst(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm)
-{
-    spat_to_SHsphtor(Vt, Vp, Slm, Tlm);
-    spat_to_SH(Vr, Qlm);
-}
-
 
 /// Evaluate scalar SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
 double SH_to_point(complex double *Qlm, double cost, double phi)
@@ -306,6 +145,10 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	*vt = vtp + vst;	// Bt = I.m/sint *T  + dS/dt
 	*vp = vsp - vtt;	// Bp = I.m/sint *S  - dT/dt
 }
+
+#undef LTR
+#undef MTR
+
 
 /*
 	SYNTHESIS AT A GIVEN LATITUDE
@@ -387,64 +230,6 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 	fftw_execute_dft_c2r(ifft_lat,vpc,vp);
 //	free(ylm_lat);
 }
-
-/*
-	SHT FUNCTIONS with variable LTR truncation.
-*/
-
-// truncation at function parameter LTR
-#undef LTR
-#define SHT_VAR_LTR
-
-/// spatial field Vr is converted to SH representation Qlm with maximum degree LTR
-void spat_to_SH_l(double *Vr, complex double *Qlm, int LTR)
-{
-	#include "SHT/spat_to_SH.c"
-}
-
-/////////////////////////////////////////////////////
-//   Scalar inverse Spherical Harmonics Transform
-// input  : Qlm = spherical harmonics coefficients : complex double array of size NLM [unmodified]
-// output : Vr = spatial data : double array of size NLAT*(NPHI/2+1)*2
-
-void SH_to_spat_l(complex double *Qlm, double *Vr, int LTR)
-{
-	#include "SHT/SH_to_spat.c"
-}
-
-//void SH_to_grad_spat(complex double *Slm, complex double *BtF, complex double *BpF)
-// "grad_spat" and "sph_to_spat" are the same : so we alias them.
-//#include "SHT/S_to_spat.c"
-#define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat(S, Gt, Gp, ltr)
-
-/////////////////////////////////////////////////////
-//   Spheroidal/Toroidal to (theta,phi) components inverse Spherical Harmonics Transform
-// input  : Slm,Tlm = spherical harmonics coefficients of Spheroidal and Toroidal scalars : 
-//          complex double array of size NLM [unmodified]
-// output : Vt, Vp = theta, and phi vector components, spatial data : 
-//          double array of size NLAT*(NPHI/2+1)*2
-void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int LTR)
-{
-	#include "SHT/SHst_to_spat.c"
-}
-
-void SHsph_to_spat_l(complex double *Slm, double *Vt, double *Vp, int LTR)
-{
-#include "SHT/SHs_to_spat.c"
-}
-
-void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR)
-{
-#include "SHT/SHt_to_spat.c"
-}
-
-void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR)
-{
-	#include "SHT/spat_to_SHst.c"
-}
-
-#undef MTR
-#undef SHT_VAR_LTR
 
 
 /*
@@ -1688,78 +1473,103 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 */
 int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
 {
-	shtns_set_size(lmax, mmax, mres, sht_orthonormal);
+	shtns_set_size(lmax, mmax, mres, SHTNS_DEFAULT_NORM);
 	return shtns_precompute(flags, eps, nlat, nphi);
 }
 
 
-/*
-	SHT FUNCTIONS for m=0 only (axisymmetric)
+#ifdef SHT_F77_API
+
+/** \addtogroup fortapi Fortran API
+* Call from fortran without the trailing '_'.
+* see the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
 */
-
-#define SHT_AXISYM
-// truncation at LMAX and MMAX
-#define LTR LMAX
-#define MTR MMAX
-#undef SHT_VAR_LTR
-
-void spat_to_SH_m0(double *Vr, complex double *Qlm)
+//@{
+	
+/// Initializes spherical harmonic transforms of given size using Gauss algorithm and no approximation
+void shtns_init_sh_gauss_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	#include "SHT/spat_to_SH.c"
+	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_precompute(sht_gauss | *layout, 0, *nlat, *nphi);
 }
 
-void SH_to_spat_m0(complex double *Qlm, double *Vr)
+/// Initializes spherical harmonic transforms of given size using Fastest available algorithm and polar optimization.
+void shtns_init_sh_auto_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	#include "SHT/SH_to_spat.c"
+	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_precompute(sht_auto | *layout, 1.e-10, *nlat, *nphi);
 }
 
-void SHsphtor_to_spat_m0(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
+/// Initializes spherical harmonic transforms of given size using a regular grid and agressive optimizations.
+void shtns_init_sh_reg_fast_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	#include "SHT/SHst_to_spat.c"
+	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_precompute(sht_reg_fast | *layout, 1.e-6, *nlat, *nphi);
 }
 
-void SHsph_to_spat_m0(complex double *Slm, double *Vt)
+/// Initializes spherical harmonic transform SYNTHESIS ONLY of given size using a regular grid including poles.
+void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	#include "SHT/SHs_to_spat.c"
+	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_precompute(sht_reg_poles | *layout, 0, *nlat, *nphi);
 }
 
-void SHtor_to_spat_m0(complex double *Tlm, double *Vp)
+/// Defines the size and convention of the transform.
+/// Allow to choose the normalization and whether or not to include the Condon-Shortley phase.
+void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm, int *cs_phase)
 {
-	#include "SHT/SHt_to_spat.c"
+	if (*cs_phase)
+		shtns_set_size(*lmax, *mmax, *mres, *norm);
+	else
+		shtns_set_size(*lmax, *mmax, *mres, *norm | SHT_NO_CS_PHASE);
 }
 
-void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
+/// Precompute matrices for synthesis and analysis.
+/// Allow to choose polar optimization threshold and algorithm type.
+void shtns_precompute_(int *type, int *layout, double *eps, int *nlat, int *nphi)
 {
-	#include "SHT/spat_to_SHst.c"
+	shtns_precompute(*type | *layout, *eps, *nlat, *nphi);
 }
 
-#undef SHT_AXISYM
+/// returns nlm, the number of complex*16 elements in an SH array.
+/// call from fortran using \code call shtns_get_nlm(nlm, lmax, mmax, mres) \endcode
+void shtns_calc_nlm_(int *nlm, int *lmax, int *mmax, int *mres)
+{
+    *nlm = nlm_calc(*lmax, *mmax, *mres);
+}
 
-/*
-	SHT FUNCTIONS with assumed equatorial symmetry
+/// returns lm, the index in an SH array of mode (l,m).
+/// call from fortran using \code call shtns_get_lmidx(lm, l, m) \endcode
+void shtns_lmidx_(int *lm, int *l, int *m)
+{
+    *lm = LM(*l, *m) + 1;
+}
+
+/// fills the given array with the cosine of the co-latitude angle (NLAT real*8)
+void shtns_cos_array_(double *costh)
+{
+	int i;	
+	for (i=0; i<shtns.nlat; i++)
+		costh[i] = ct[i];
+}
+
+/** \name Point evaluation of Spherical Harmonics
+Evaluate at a given point (\f$cos(\theta)\f$ and \f$\phi\f$) a spherical harmonic representation.
+\see spat_to_SH and for argument description
 */
-
-#define SHT_NO_DCT
-#define LTR LMAX
-#define MTR MMAX
-#undef SHT_VAR_LTR
-
-void SHeo_to_spat(complex double *Qlm, double *Vr, int parity)
+//@{
+void shtns_sh_to_point_(double *spat, complex double *Qlm, double *cost, double *phi)
 {
-	#include "SHT/SHeo_to_spat.c"
+	*spat = SH_to_point(Qlm, *cost, *phi);
 }
 
-void spat_to_SHeo(double *Vr, complex double *Qlm, int parity)
+void shtns_qst_to_point_(double *vr, double *vt, double *vp,
+		complex double *Qlm, complex double *Slm, complex double *Tlm, double *cost, double *phi)
 {
-	#include "SHT/spat_to_SHeo.c"
+	SHqst_to_point(Qlm, Slm, Tlm, *cost, *phi, vr, vt, vp);
 }
+//@}
 
-void SHeo_sphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int parity)
-{
-	#include "SHT/SHeost_to_spat.c"
-}
+//@}
 
-void spat_to_SHeo_sphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int parity)
-{
-	#include "SHT/spat_to_SHeost.c"
-}
+#endif

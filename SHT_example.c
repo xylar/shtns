@@ -27,7 +27,7 @@ int main()
 	long int i,im,lm;
 	double t;
 
-	lmax = 5;	nlat = 8;
+	lmax = 5;	nlat = 32;
 	mmax = 3;	nphi = 10;
 	mres = 1;
 	NLM = shtns_init( sht_gauss, POLAR_OPT_THR, lmax, mmax, mres, nlat, nphi );
@@ -46,16 +46,20 @@ int main()
 							Slm[lm] = 0.0;	Tlm[lm] = 0.0;
 						} */
 
-	Slm[LM(1,1)] = sh11_st();				// access to SH coefficient
+//	Slm[LM(1,1)] = sh11_st();				// access to SH coefficient
+	Slm[LM(2,0)] = 1.0;
 // 	Slm[LiM(1,0)] = sh10_ct();
 //	Slm[LiM(0,0)] = 0.5*sh00_1();
-	SH_to_spat(Slm,Sh);
+//	SH_to_spat(Slm,Sh);
+	SHtor_to_spat_m0(Slm,Sh);
 	write_vect("ylm",(double *) Slm,NLM*2);
 	write_mx("spat",Sh,nphi,nlat);
 
 // compute value of SH expansion at a given physical point.
-	t = SH_to_point(Slm, ct[nlat/3], 2.*M_PI/(mres*nphi));
-	printf("check if SH_to_point coincides with SH_to_spat : %f = %f\n",t,Sh[nlat/3 + nlat]);
+ 	double t2;
+	SHqst_to_point(Tlm, Tlm, Slm, ct[nlat/3], 2.*M_PI/(mres*nphi),&t2,&t2,&t);
+	printf("check if SH_to_point coincides with SH_to_spat : %f = %f\n",t,Sh[nlat/3]);
+	printf("ct*st = %f\n",ct[nlat/3]*st[nlat/3]);
 
 // check non-linear behaviour
 	for (im=0;im<nphi;im++) {

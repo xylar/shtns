@@ -33,6 +33,7 @@ struct sht_sze {
 
 	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
 	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	long int sht_fft;		///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
 
 	enum shtns_norm norm;	///< store the normalization of the Spherical Harmonics.
 };
@@ -86,6 +87,8 @@ extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 
 // FUNCTIONS //
 
+/// \name initialization
+//@{
 /// defines the sizes of the spectral description.
 int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm);
 /// precompute everything for a given spatial grid.
@@ -97,12 +100,13 @@ int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, 
 long int nlm_calc(long int lmax, long int mmax, long int mres);
 void Set_MTR_DCT(int m);
 int Get_MTR_DCT();
+//@}
 
 /// \name special values
 //@{
 double sh00_1();	///< returns the spherical harmonic representation of 1 (l=0,m=0)
 double sh10_ct();	///< returns the spherical harmonic representation of cos(theta) (l=1,m=0)
-double sh11_st();	///< spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
+double sh11_st();	///< returns the spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
 //@}
 
 /// \name Scalar transforms
@@ -113,25 +117,24 @@ void SH_to_spat(complex double *Qlm, double *Vr);
 
 /// \name Vector transforms
 //@{
+void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
 void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
 void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp);
 void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp);
-
-void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
 //@}
 #define SH_to_grad_spat(S,Gt,Gp) SHsph_to_spat(S, Gt, Gp)
 
-/// \name Evalution of a SH representation at a given point in physical space.
+/// \name Partial evalutions of a SH representation :
 //@{
 double SH_to_point(complex double *Qlm, double cost, double phi);
 void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm,
 					double cost, double phi, double *vr, double *vt, double *vp);
-//@}
 
 /// synthesis at a given latitude, on nphi equispaced longitude points.
 /// vr, vt, and vp arrays must have nphi+2 doubles allocated (fftw requirement)
 void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
+//@}
 
 /// \name Truncated transforms at given degree l
 //@{
@@ -143,10 +146,10 @@ void SHsph_to_spat_l(complex double *Slm, double *Vt, double *Vp, int LTR);
 void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR);
 void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR);
 //@}
-#define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat(S, Gt, Gp, ltr)
+#define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat_l(S, Gt, Gp, ltr)
 
 /*! \name Axisymmetric transforms m=0 only
- * these work for any MMAX, and will only transform MMAX=0, to/from a vector with NLAT contiguous theta-values.
+ * these work for any MMAX, and will only transform m=0, to/from arrays with NLAT contiguous theta-values.
  *///@{
 void spat_to_SH_m0(double *Vr, complex double *Qlm);
 void SH_to_spat_m0(complex double *Qlm, double *Vr);
@@ -155,7 +158,7 @@ void SHsph_to_spat_m0(complex double *Slm, double *Vt);
 void SHtor_to_spat_m0(complex double *Tlm, double *Vp);
 void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
 //@}
-#define SH_to_grad_spat_m0(S,Gt,Gp,ltr) SHsph_to_spat_m0(S, Gt, ltr)
+#define SH_to_grad_spat_m0(S,Gt) SHsph_to_spat_m0(S, Gt)
 
 /*! \name SHT transforms with assumed equatorial symmetry (parity = 0 or 1)
  * these work with (NLAT+1)/2 latitudinal points, and do not overwrite SH coefficients of other parity

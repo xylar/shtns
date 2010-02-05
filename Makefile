@@ -3,7 +3,7 @@ HGID=`hg id -ti`
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= -O3 -std=gnu99 -ffast-math -D_GNU_SOURCE -D_HGID_="\"$(HGID)\""
+go= -O3 -std=gnu99 -ffast-math -D_GNU_SOURCE
 
 ## compiler :
 ## generic gcc
@@ -24,9 +24,14 @@ cmd = gcc $(go)
 # intel compiler (lower performance for vector transform as of 23/11/2009, icc 9.1 vs gcc 4.1.2)
 #cmd = icc -axT -xT -msse3 -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
 
-shtfiles = SHT.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
+shtfiles = SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
 
-default : SHT.o
+hfiles = sht_private.h sht_config.h SHT.h
+
+default : libshtns.a
+
+libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
+	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) SH_to_spat.c -C SHT
@@ -37,36 +42,34 @@ SHT/SHeo_to_spat.c : SHT/sparse_SH_to_spat.gen.c SHT/Makefile
 SHT/spat_to_SHeo.c : SHT/sparse_spat_to_SH.gen.c SHT/Makefile
 	$(MAKE) spat_to_SHeo.c -C SHT
 
-SHT.o : SHT.c Makefile $(shtfiles)
-	$(cmd) -c SHT.c -o SHT.o
-#	ar -cr libshtns.a SHT.o
+SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
+	$(cmd) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
 
-SHTg.o : SHT.c Makefile $(shtfiles)
-	$(cmd) -c -DSHT_NO_DCT SHT.c -o SHTg.o
-
-SHTaxi.o : SHT.c Makefile $(shtfiles)
-	$(cmd) -c -DSHT_AXISYM SHT.c -o SHTaxi.o
+sht_std.o : sht_std.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
+	$(cmd) -c sht_std.c -o sht_std.o
+sht_ltr.o : sht_ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
+	$(cmd) -c sht_ltr.c -o sht_ltr.o
+sht_m0.o : sht_m0.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
+	$(cmd) -c sht_m0.c -o sht_m0.o
+sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
+	$(cmd) -c sht_m0ltr.c -o sht_m0ltr.o
+sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
+	$(cmd) -c sht_eo.c -o sht_eo.o
 
 time_SHT : SHT.h time_SHT.c SHT.o Makefile
-	$(cmd) time_SHT.c SHT.o -lfftw3 -lm -o time_SHT
+	$(cmd) time_SHT.c libshtns.a -lfftw3 -lm -o time_SHT
 
-time_SHTg : SHT.h time_SHT.c SHTg.o Makefile
-	$(cmd) time_SHT.c SHTg.o -lfftw3 -lm -o time_SHTg
+SHT_example : SHT_example.c libshtns.a Makefile SHT.h
+	$(cmd) SHT_example.c libshtns.a -lfftw3 -lm -o SHT_example
 
-time_SHTaxi : SHT.h time_SHT.c SHTaxi.o Makefile
-	$(cmd) -DSHT_AXISYM time_SHT.c SHTaxi.o -lfftw3 -lm -o time_SHTaxi
-
-SHT_example : SHT_example.c SHT.o Makefile
-	$(cmd) SHT_example.c SHT.o -lfftw3 -lm -o SHT_example
-
-
-SHTf77.o : SHTf77.c SHT.h Makefile
-	gcc -c SHTf77.c
 SHT_fort_ex : SHT_example.f SHT.o SHTf77.o Makefile
 	gfortran -fdefault-real-8 SHT_example.f SHT.o SHTf77.o -lfftw3 -lm -lc -o SHT_fort_ex
 
 docs :
 	doxygen doxygen.conf
+
+clean :
+	rm -rf *.o
 
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000
