@@ -11,11 +11,28 @@
 # T : line for vector transform, toroidal component.
 
 /////////////////////////////////////////////////////
-//   Inverse Spherical Harmonic Transform (Synthesis) using DCT on a regular theta grid.
-// input  : Qlm,Slm,Tlm = spherical harmonics coefficients of Scalar, Spheroidal and Toroidal scalars : 
-//          complex double array of size NLM [unmodified]
-// output : Vr, Vt, Vp = r, theta, phi vector components, spatial data : 
-//          double array of size NLAT*(NPHI/2+1)*2
+  #ifdef SHT_AXISYM
+/// Only the \b axisymmetric (m=0) component is transformed, and the resulting spatial fields have size NLAT.
+  #endif
+
+/// Truncation and spatial discretization are defined by \ref shtns_set_size and \ref shtns_precompute.
+Q/// \param[in] Qlm = spherical harmonics coefficients :
+Q/// complex double arrays of size NLM [unmodified].
+S/// \param[in] Slm = spherical harmonics coefficients of \b Spheroidal scalar :
+S/// complex double array of size NLM [unmodified].
+T/// \param[in] Tlm = spherical harmonics coefficients of \b Toroidal scalar :
+T/// complex double array of size NLM [unmodified].
+Q/// \param[out] Vr = spatial scalar field : double array.
+  #ifndef SHT_AXISYM
+V/// \param[out] Vt, Vp = (theta,phi)-components of spatial vector : double arrays.
+  #else
+S/// \param[out] Vt = theta-component of spatial vector : double array.
+T/// \param[out] Vp = phi-component of spatial vector : double array.  
+  #endif
+  #ifdef SHT_VAR_LTR
+/// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are ignored. 
+  #endif
+
 // MTR_DCT : -1 => no dct
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
@@ -130,9 +147,9 @@ Q		fftw_execute_r2r(idct_r1,Vr, Vr);		// iDCT m=0
 S		fftw_execute_r2r(idct_r1,Vt, Vt);		// iDCT m=0
 T		fftw_execute_r2r(idct_r1,Vp, Vp);		// iDCT m=0
 V		k=0;	do {
-S			Vt[k] *= st_1[k];
-T		 	Vp[k] *= st_1[k];
-V			k++;
+S			Vt[k] *= st_1[k];	Vt[k+1] *= st_1[k+1];
+T		 	Vp[k] *= st_1[k];	Vp[k+1] *= st_1[k+1];
+V			k+=2;		// NLAT is even
 V		} while (k<NLAT);
     #endif
 	} else {

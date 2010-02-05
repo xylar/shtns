@@ -6,9 +6,21 @@
 # to keep or remove the line depending on the function to build. (Q for scalar, V for vector, # for comment)
 #
 //////////////////////////////////////////////////
-//  Spherical Harmonics Transform
-// input  : Vr, Vt, Vp = spatial data : double array of size NLAT*(NPHI/2+1)*2
-// output : Qlm, Slm, Tlm = spherical harmonics coefficients : complex double array of size NLM
+  #ifdef SHT_AXISYM
+/// The spatial field is assumed to be \b axisymmetric (spatial size NLAT), and only the m=0 harmonics are written to output.
+  #endif
+
+/// Truncation and spatial discretization are defined by \ref shtns_set_size and \ref shtns_precompute.
+Q/// \param[in] Vr = spatial scalar field : double array.
+V/// \param[in] Vt, Vp = spatial (theta, phi) vector components : double arrays.
+Q/// \param[out] Qlm = spherical harmonics coefficients :
+Q/// complex double arrays of size NLM.
+V/// \param[out] Slm,Tlm = spherical harmonics coefficients of \b Spheroidal and \b Toroidal scalars :
+V/// complex double arrays of size NLM.
+  #ifdef SHT_VAR_LTR
+/// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
+  #endif
+
 #Q void spat_to_SH(double *Vr, complex double *Qlm)
 #V void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
 # {
@@ -86,7 +98,8 @@ V		#define BT0	((double *)BtF)
 V		#define BP0	((double *)BpF)
 Q		if (NPHI > 1) {
 Q			i=0;	do {
-Q				BR0[i] *= NPHI;
+Q				BR0[i] *= NPHI;		BR0[i+1] *= NPHI;
+Q				i+=2;		// NLAT is even
 Q			} while (i<NLAT);
 Q		}
 V		i=0;	do {
@@ -162,7 +175,7 @@ V		BtF += NLAT;	BpF += NLAT;
   #ifndef SHT_AXISYM
 		i0 = (NPHI==1) ? 1 : 2;		// stride of source data.
 		i=0;	l=NLAT-1;
- B		do {	// compute symmetric and antisymmetric parts.
+ B		do {	// compute symmetric and antisymmetric parts. Warning : re0,... contain variable i !!
 QB			re0 = ((double*)BrF)[i*i0] + ((double*)BrF)[l*i0];
 QB			ro0 = ((double*)BrF)[i*i0] - ((double*)BrF)[l*i0];
 VB			te0 = ((double*)BtF)[i*i0] + ((double*)BtF)[l*i0];
