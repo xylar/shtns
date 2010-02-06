@@ -110,11 +110,16 @@ Q		fftw_execute_r2r(dct_r1,(double *) BrF, (double *) BrF);	// DCT in-place.
 V		fftw_execute_r2r(dct_r1,(double *) BtF, (double *) BtF);	// DCT in-place.
 V		fftw_execute_r2r(dct_r1,(double *) BpF, (double *) BpF);	// DCT in-place.
 	#endif
+		long int klim = shtns.klim;
 Q		l=0;
 V		l=1;
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
-Q		zl = zlm_dct0;
 V		Sl = Slm;	Tl = Tlm;
+	#ifdef SHT_VAR_LTR
+		i = (LTR * SHT_NL_ORDER) + 2;		// sum truncation
+		if (i < klim) klim = i;
+	#endif
+Q		zl = zlm_dct0;
 V		dzl0 = dzlm_dct0;
 V		Sl[0] = 0.0;	Tl[0] = 0.0;
 #		qs0 = 0.0;	qs1 = 0.0;			// sum of first Ql's
@@ -135,7 +140,11 @@ V				t1 -= BP0[i+1] * dzl0[1];
 Q				zl+=2;
 V				dzl0+=2;
 				i+=2;
-			} while(i<NLAT);	// this may be reduced to the maximum l, if known (ex:2*LTR for a quadratic term).
+			} while(i<klim);
+	#ifdef SHT_VAR_LTR
+Q			zl += (shtns.klim-i);
+V			dzl0 += (shtns.klim-i);
+	#endif
 Q			Ql[l] = q0;	Ql[l+1] = q1;
 V			Sl[l] = s0;	Sl[l+1] = s1;
 V			Tl[l] = t0;	Tl[l+1] = t1;
@@ -153,7 +162,7 @@ V				t0 -= BP0[i] * dzl0[0];
 Q				zl+=2;
 V				dzl0+=2;
 				i+=2;
-			} while(i<NLAT);
+			} while(i<klim);
 Q			Ql[l] = q0;
 V			Sl[l] = s0;	Tl[l] = t0;
 			l++;

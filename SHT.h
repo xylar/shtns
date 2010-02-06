@@ -34,6 +34,7 @@ struct sht_sze {
 	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
 	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
 	long int sht_fft;		///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
+	long int klim;			///< Limit to k for non-linear terms.
 
 	enum shtns_norm norm;	///< store the normalization of the Spherical Harmonics.
 };

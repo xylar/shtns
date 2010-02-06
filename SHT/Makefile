@@ -94,4 +94,4 @@ $(SCEO) : $(GSPEO) Makefile
 	@echo "sparse_spat_to_SH* code generated."
 
 clean:
-	rm $(ST) $(Q) $(S) $(T) $(STEO) $(QEO) $(SEO) $(TEO) $(SC) $(VE) $(SCEO) $(VEEO)
+	rm -f $(ST) $(Q) $(S) $(T) $(STEO) $(QEO) $(SEO) $(TEO) $(SC) $(VE) $(SCEO) $(VEEO)

@@ -33,6 +33,7 @@ default : libshtns.a
 libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 
+# codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) SH_to_spat.c -C SHT
 SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
@@ -42,6 +43,7 @@ SHT/SHeo_to_spat.c : SHT/sparse_SH_to_spat.gen.c SHT/Makefile
 SHT/spat_to_SHeo.c : SHT/sparse_spat_to_SH.gen.c SHT/Makefile
 	$(MAKE) spat_to_SHeo.c -C SHT
 
+# objects :
 SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
 	$(cmd) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
 
@@ -56,20 +58,23 @@ sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c 
 sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
 	$(cmd) -c sht_eo.c -o sht_eo.o
 
-time_SHT : SHT.h time_SHT.c SHT.o Makefile
+# programs :
+time_SHT : SHT.h time_SHT.c libshtns.a Makefile
 	$(cmd) time_SHT.c libshtns.a -lfftw3 -lm -o time_SHT
 
 SHT_example : SHT_example.c libshtns.a Makefile SHT.h
 	$(cmd) SHT_example.c libshtns.a -lfftw3 -lm -o SHT_example
 
-SHT_fort_ex : SHT_example.f SHT.o SHTf77.o Makefile
-	gfortran -fdefault-real-8 SHT_example.f SHT.o SHTf77.o -lfftw3 -lm -lc -o SHT_fort_ex
+SHT_fort_ex : SHT_example.f libshtns.a SHTf77.o Makefile
+	gfortran -fdefault-real-8 SHT_example.f libshtns.a SHTf77.o -lfftw3 -lm -lc -o SHT_fort_ex
 
+#documentation :
 docs :
 	doxygen doxygen.conf
 
 clean :
-	rm -rf *.o
+	$(MAKE) clean -C SHT
+	rm -f *.o
 
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000

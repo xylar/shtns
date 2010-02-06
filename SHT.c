@@ -1145,9 +1145,13 @@ void init_SH_dct(int analysis)
 	
 	// compact yk to zlm_dct0
 	if (analysis) {
+		long int klim = (LMAX * SHT_NL_ORDER) + 2;		// max k needed for nl-terms...
+		klim = (klim/2)*2;		// must be even...
+		if (klim > 2*NLAT_2) klim = 2*NLAT_2;		// but no more than 2*NLAT_2.
+		shtns.klim = klim;		// store for use in codelets.
 		yg = zlm_dct0;
 		for (l=0; l<=LMAX; l+=2) {
-			for (it=l; it<2*NLAT_2; it++) {	// for m=0, zl coeff with i<l are zeros.
+			for (it=l; it<klim; it++) {	// for m=0, zl coeff with i<l are zeros.
 				*yg = yk0[it];
 				yg++;
 			}
@@ -1155,7 +1159,7 @@ void init_SH_dct(int analysis)
 		}
 		yg = dzlm_dct0;
 		for (l=1; l<=LMAX; l+=2) {
-			for (it=l-1; it<2*NLAT_2; it++) {	// for m=0, dzl coeff with i<l-1 are zeros.
+			for (it=l-1; it<klim; it++) {	// for m=0, dzl coeff with i<l-1 are zeros.
 				*yg = dyk0[it];
 				yg++;
 			}
@@ -1377,7 +1381,10 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 
 	zlm_dct0 = NULL;		// used as a flag.
   #if SHT_VERBOSE > 0
-	if (2*NLAT <= 3*LMAX) printf("     !! Warning : anti-aliasing condition in theta direction not met.\n");
+	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition in theta direction not met.\n");
+	#ifndef SHT_NO_DCT
+		if (NLAT <= SHT_NL_ORDER *LMAX) printf("     !! Warning : DCT anti-aliasing condition in theta direction not met.\n");
+	#endif
   #endif
 
 #ifndef SHT_NO_DCT
