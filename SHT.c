@@ -1426,6 +1426,11 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 	#if SHT_VERBOSE > 0
 				printf("        => switching back to Gauss Grid for higher accuracy.\n");
 	#endif
+				for (im=1; im<=MMAX; im++) {	//	im >= 1
+					m = im*MRES;
+					ylm[im]  -= tm[im]*(LMAX-m+1);		// restore pointers altered by OptimizeMatrices().
+					dylm[im] -= tm[im]*(LMAX-m+1);
+				}
 			}
 		}
   #endif
