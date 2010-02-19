@@ -33,6 +33,10 @@ default : libshtns.a
 libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 
+install :
+	cp libshtns.a $(HOME)/lib
+	cp SHT.h $(HOME)/include
+
 # codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) SH_to_spat.c -C SHT
