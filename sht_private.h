@@ -32,6 +32,9 @@
 #define NLM shtns.nlm
 #define MTR_DCT shtns.mtr_dct
 
+// SHT_NORM without CS_PHASE
+#define SHT_NORM (shtns.norm & 0x0FF)
+
 #ifndef M_PI
 # define M_PI 3.1415926535897932384626433832795
 #endif

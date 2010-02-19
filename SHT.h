@@ -36,7 +36,7 @@ struct sht_sze {
 	long int sht_fft;		///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
 	long int klim;			///< Limit to k for non-linear terms.
 
-	enum shtns_norm norm;	///< store the normalization of the Spherical Harmonics.
+	int norm;				///< store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
 };
 
 // GLOBAL VARIABLES : do not modify, they are set by the call to init_SH. //

@@ -648,7 +648,7 @@ void init_SH_gauss()
 	long double xg[NLAT], wg[NLAT];	// gauss points and weights.
 	double wgd[NLAT_2];		// gauss weights, double precision.
 
- 	if ((shtns.norm == sht_fourpi)||(shtns.norm == sht_schmidt)) {
+ 	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
  		iylm_fft_norm = 0.5/NPHI;		// FFT/SHT normalization for zlm (4pi normalized)
 	} else {
  		iylm_fft_norm = 2.0*M_PIl/NPHI;		// FFT/SHT normalization for zlm (orthonormalized)
@@ -699,7 +699,7 @@ void init_SH_gauss()
 			double nz0, nz1;
 			nz0 = wgd[it];	nz1 = wgd[it];
 			for (l=m;l<LMAX;l+=2) {
-				if (shtns.norm == sht_schmidt) {
+				if (SHT_NORM == sht_schmidt) {
 					nz0 = wgd[it]*(2*l+1);	nz1 = wgd[it]*(2*l+3);
 				}
 				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * nz0;
@@ -714,7 +714,7 @@ void init_SH_gauss()
 				}
 			}
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
-				if (shtns.norm == sht_schmidt)
+				if (SHT_NORM == sht_schmidt)
 					nz0 = wgd[it]*(2*l+1);
 				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * nz0;
 				dzlm[im][(l-m)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
@@ -851,7 +851,7 @@ void init_SH_dct(int analysis)
 	double Z[2*NLAT_2], dZt[2*NLAT_2], dZp[2*NLAT_2];		// equally spaced theta points.
 	double is1[NLAT];		// tabulate values for integrals.
 
-	if ((shtns.norm == sht_fourpi)||(shtns.norm == sht_schmidt)) {
+	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
  		iylm_fft_norm = 0.5/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm (4pi)
 	} else {
  		iylm_fft_norm = 2.0*M_PI/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm (orthonormal)
@@ -1025,7 +1025,7 @@ void init_SH_dct(int analysis)
 			double Jik, yy, dyy;
 			double lnorm = iylm_fft_norm;
 
-			if (shtns.norm == sht_schmidt)	lnorm *= (2*l+1);		// Schmidt semi-normalization
+			if (SHT_NORM == sht_schmidt)	lnorm *= (2*l+1);		// Schmidt semi-normalization
 
 			k0 = (l-m)&1;	k1 = 1-k0;
 			for(k=0; k<NLAT; k++) {	Z[k] = 0.0;		dZt[k] = 0.0;	dZp[k] = 0.0; }
@@ -1270,12 +1270,11 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 		return(NLM);
 	}
 
-	if (norm & SHT_NO_CS_PHASE)
-		with_cs_phase = 0;
-	norm = norm & 0x0F;		// keep only the normalization part.
-
 	// copy to global variables.
 	shtns.norm = norm;
+	if (norm & SHT_NO_CS_PHASE)
+		with_cs_phase = 0;
+
 #ifdef SHT_AXISYM
 	shtns.mmax = 0;		shtns.mres = 2;		shtns.nphi = 1;
 	if (mmax != 0) shtns_runerr("axisymmetric version : only Mmax=0 allowed");
@@ -1288,8 +1287,8 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
 	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d  [",LMAX,MMAX*MRES,MRES,NLM);
 	if (!with_cs_phase) printf("no Condon-Shortley phase, ");
-	if (norm == sht_fourpi) printf("4.pi normalized]\n");
-	else if (norm == sht_schmidt) printf("Schmidt semi-normalized]\n");
+	if (SHT_NORM == sht_fourpi) printf("4.pi normalized]\n");
+	else if (SHT_NORM == sht_schmidt) printf("Schmidt semi-normalized]\n");
 	else printf("orthonormalized]\n");
 #endif
 	if (MMAX*MRES > LMAX) shtns_runerr("MMAX*MRES should not exceed LMAX");
@@ -1315,9 +1314,9 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	if (lm != NLM) shtns_runerr("unexpected error");
 
 	// this quickly precomputes some values for the legendre recursion.
-	legendre_precomp(norm, with_cs_phase);
+	legendre_precomp(SHT_NORM, with_cs_phase);
 
-	switch(norm) {
+	switch(SHT_NORM) {
 		case sht_schmidt:
 			Y00_1 = 1.0;		Y10_ct = 1.0;
 			Y11_st = sqrt(0.5);

@@ -1,5 +1,7 @@
 ## "version" identification string
 HGID=`hg id -ti`
+## path prefix for make install (installs to $(PREFIX)/lib and $(PREFIX)/include)
+PREFIX=$(HOME)
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
@@ -21,7 +23,7 @@ cmd = gcc $(go)
 ## r2d2
 #cmd = gcc $(go) -march=core2 -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
 
-# intel compiler (lower performance for vector transform as of 23/11/2009, icc 9.1 vs gcc 4.1.2)
+# intel compiler
 #cmd = icc -axT -xT -msse3 -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
 
 shtfiles = SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
@@ -34,8 +36,8 @@ libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 
 install :
-	cp libshtns.a $(HOME)/lib
-	cp SHT.h $(HOME)/include
+	cp libshtns.a $(PREFIX)/lib
+	cp SHT.h $(PREFIX)/include
 
 # codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
@@ -69,8 +71,8 @@ time_SHT : SHT.h time_SHT.c libshtns.a Makefile
 SHT_example : SHT_example.c libshtns.a Makefile SHT.h
 	$(cmd) SHT_example.c libshtns.a -lfftw3 -lm -o SHT_example
 
-SHT_fort_ex : SHT_example.f libshtns.a SHTf77.o Makefile
-	gfortran -fdefault-real-8 SHT_example.f libshtns.a SHTf77.o -lfftw3 -lm -lc -o SHT_fort_ex
+SHT_fort_ex : SHT_example.f libshtns.a Makefile shtns.f
+	gfortran -fdefault-real-8 SHT_example.f libshtns.a -lfftw3 -lm -lc -o SHT_fort_ex
 
 #documentation :
 docs :
@@ -79,6 +81,7 @@ docs :
 clean :
 	$(MAKE) clean -C SHT
 	rm -f *.o
+	rm -rf doc/
 
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000
