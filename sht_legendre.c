@@ -1,4 +1,4 @@
-/** \file sht_legendre.c
+/** \internal \file sht_legendre.c
  \brief Compute legendre polynomials and associated functions.
  
  - Normalization of the associated functions for various spherical harmonics conventions are possible, with or without Condon-Shortley phase.

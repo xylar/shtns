@@ -1,5 +1,5 @@
 Run "make docs" to generate documentation with doxygen.
-
+Then browse the html documentation starting with doc/html/index.html
 
 /** \mainpage SHTns : Spherical Harmonic Transform for numerical simulations.
  * 
@@ -30,16 +30,17 @@ Run "make docs" to generate documentation with doxygen.
 
 
 
-/** \page compil Compiling SHTns
+/** \page compil Compiling and installing SHTns
 
-type \c make to compile SHTns. It will produce the object file SHT.o
+\li type \code make \endcode to compile SHTns. it will produce the library \c libshtns.a
+
+\li type \code make PREFIX=/usr/local install \endcode to install the library in your system (set PREFIX to the desired location, default is $HOME).
+
+\li type \code make docs \endcode to generate this documentation, placed in the doc/html/ subdirectory.
 
 \section cflags Compilation flags and options
 
-These symbol can be defined at compile time :
- - \c SHT_NO_DCT : disables DCT at compile time (smaller, simpler and maybe faster code for gauss SHT)
- - \c SHT_AXISYM : axysimmetric version of SHTns (m=0 only), which is supposed to be a little faster than setting MMAX=0 at runtime.
- - \c SHT_VERBOSE : sets the quantity of information to print during execution. Usefull for debugging.
+A few compilation options can be set in \ref sht_config.h
 
 */
 
@@ -131,17 +132,32 @@ Allocation for a SH description is simply done with :
 
 \section norm Normalization
 
-The spherical harmonics used in SHTns are orthonormalized by default (like in the GSL) :
+Several normalizations for the spherical harmonics exist (<a href="http://en.wikipedia.org/wiki/Spherical_harmonics#Conventions">details on wikipedia</a>).
+SHTns lets you choose one of the following :
+<ul>
+<li><b>Orthonormalized</b> is the default (also used in the <a href="http://www.gnu.org/software/gsl/">GSL</a>)
 
 \f[ Y_l^m(\theta, \phi) = \sqrt{\frac{2l+1}{4\pi}} \sqrt{\frac{(l-m)!}{(l+m)!}} \, P_l^m(\cos \theta) \, \exp(im\phi) \f]
 
-and the legendre associated function include the Condon-Shortley phase \f$ (-1)^m \f$ :
+</li><li><b>Four-pi normalized</b>
+
+\f[ Y_l^m(\theta, \phi) = \sqrt{2l+1} \sqrt{\frac{(l-m)!}{(l+m)!}} \, P_l^m(\cos \theta) \, \exp(im\phi) \f]
+
+</li><li><b>Schmidt semi-normalized</b>
+
+\f[ Y_l^m(\theta, \phi) = \sqrt{\frac{(l-m)!}{(l+m)!}} \, P_l^m(\cos \theta) \, \exp(im\phi) \f]
+
+</li></ul>
+
+To choose the normalization, use \ref shtns_set_size. The legendre associated functions are defined by :
 
 \f[ P_l^m (x) = (-1)^m\ (1-x^2)^{m/2}\ \frac{d^m}{dx^m}P_l(x) \f]
 
-You can also use other normalizations and you can drop the Condon-Shortley phase 
-by using \ref shtns_set_size.
-For more details, see \ref sht_legendre.c.
+which includes the Condon-Shortley phase \f$ (-1)^m \f$ by default.
+Use \ref shtns_set_size with \ref SHT_NO_CS_PHASE to disable the Condon-Shortley phase.
+For example, to initialize a Schmidt semi-normalized transform of maximum degree 16 without Condon-Shortrley phase, use
+\code shtns_set_size(16, 16, 1, sht_schmidt | SHT_NO_CS_PHASE); \endcode
+
 Also, function \ref SH_to_point gives an explicit implementation of the inverse SH transform (synthesis).
 
 A few useful examples, for orthonormal spherical harmonics :
@@ -239,11 +255,14 @@ can choose to do so using the adequate \ref shtns_type when calling \ref shtns_i
 /** \page f77 Using SHTns with Fortran 77 
 
 SHTns provides an interface to Fortran language (compatible with gfortran).
-See the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
+
+\see See The full reference of the \ref fortapi
+\see See the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
 
 \example SHT_example.f
   \brief A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
   Compile using : \code make SHT_fort_ex \endcode
+  \see fortapi
 
 */
 

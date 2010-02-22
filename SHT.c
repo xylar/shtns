@@ -3,7 +3,10 @@
  *    written by Nathanael Schaeffer / LGIT,CNRS                    *
  ********************************************************************/
 
-/// \file SHT.c main source file for SHTns.
+/** \internal \file SHT.c
+ * \brief main source file for SHTns.
+ * This files contains initialization code and also some partial transforms (point or latitudinal evaluations)
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1527,6 +1530,7 @@ void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nla
 
 /// Defines the size and convention of the transform.
 /// Allow to choose the normalization and whether or not to include the Condon-Shortley phase.
+/// \see shtns_set_size
 void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm, int *cs_phase)
 {
 	if (*cs_phase)
@@ -1537,20 +1541,21 @@ void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm, int *cs_phase)
 
 /// Precompute matrices for synthesis and analysis.
 /// Allow to choose polar optimization threshold and algorithm type.
+/// \see shtns_precompute
 void shtns_precompute_(int *type, int *layout, double *eps, int *nlat, int *nphi)
 {
 	shtns_precompute(*type | *layout, *eps, *nlat, *nphi);
 }
 
 /// returns nlm, the number of complex*16 elements in an SH array.
-/// call from fortran using \code call shtns_get_nlm(nlm, lmax, mmax, mres) \endcode
+/// call from fortran using \code call shtns_calc_nlm(nlm, lmax, mmax, mres) \endcode
 void shtns_calc_nlm_(int *nlm, int *lmax, int *mmax, int *mres)
 {
     *nlm = nlm_calc(*lmax, *mmax, *mres);
 }
 
 /// returns lm, the index in an SH array of mode (l,m).
-/// call from fortran using \code call shtns_get_lmidx(lm, l, m) \endcode
+/// call from fortran using \code call shtns_lmidx(lm, l, m) \endcode
 void shtns_lmidx_(int *lm, int *l, int *m)
 {
     *lm = LM(*l, *m) + 1;
@@ -1566,14 +1571,15 @@ void shtns_cos_array_(double *costh)
 
 /** \name Point evaluation of Spherical Harmonics
 Evaluate at a given point (\f$cos(\theta)\f$ and \f$\phi\f$) a spherical harmonic representation.
-\see spat_to_SH and for argument description
 */
 //@{
+/// \see SH_to_point for argument description
 void shtns_sh_to_point_(double *spat, complex double *Qlm, double *cost, double *phi)
 {
 	*spat = SH_to_point(Qlm, *cost, *phi);
 }
 
+/// \see SHqst_to_point for argument description
 void shtns_qst_to_point_(double *vr, double *vt, double *vp,
 		complex double *Qlm, complex double *Slm, complex double *Tlm, double *cost, double *phi)
 {

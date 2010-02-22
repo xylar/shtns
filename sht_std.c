@@ -12,7 +12,7 @@
 #undef SHT_VAR_LTR
 
 /** \addtogroup shtbase Basic Spherical Harmonic Transform functions.
- * This is the definition
+ * Spherical Harmonic transforms for sizes set by \ref shtns_init, \ref shtns_set_size and \ref shtns_precompute
 */
 //@{
 #include "SHT/sht_generic.c"

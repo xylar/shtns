@@ -18,7 +18,7 @@
   #define SUPARG2
 #endif
 
-/// \name scalar transforms.
+/// \name scalar transforms
 //@{
 
 /// \b Scalar Spherical Harmonics Transform (analysis) : convert a spatial scalar field to its spherical harmonic representation.
@@ -36,19 +36,14 @@ void GEN(SH_to_spat,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 //@}
 
 
-/** \name vector transforms
+/** \name 2D vector transforms
  * These functions use the toroidal/spheroidal representation for vectors on a sphere \f$ (v_\theta,v_\phi) \f$:
  * \f[ v_\theta = \frac{1}{\sin\theta} \frac{\partial T}{\partial \phi} + \frac{\partial S}{\partial \theta} \f]
  * \f[ v_\phi = \frac{1}{\sin\theta} \frac{\partial S}{\partial \phi} - \frac{\partial T}{\partial \theta} \f]
+ * or \f$ \mathbf{v} = \nabla \times (T \mathbf{r}) + \nabla S \f$
  * where T and S are respectively the toroidal and spheroidal scalar.
  */
-/*
- * For a divergenceless 3D vector \f$ (v_r,v_\theta,v_\phi) \f$, the radial scalar \f$ Q = v_r \f$ and the spheroidal scalar S can be derived from the same poloidal scalar P :
- * \f[ Q = \frac{l(l+1)}{r} P \f]
- * \f[ S = \frac{1}{r} \frac{\partial \, rP}{\partial r} \f]
- * which corresponds to the poloidal/toroidal decomposition :
- * \f[ \mathbf{v} = \nabla \times (T \mathbf{r}) + \nabla \times \nabla \times (P \mathbf{r}) \f]
-*/
+
 //@{
 
 /// Backward \b Vector Spherical Harmonic Transform (synthesis).
@@ -83,18 +78,30 @@ void GEN(SHtor_to_spat,SUFFIX)(complex double *Tlm, double *Vp SUPARG)
 }
 #endif
 
+
+/// \b Vector Spherical Harmonics Transform (analysis) : convert a spatial vector field (theta,phi components) to its spheroidal/toroidal spherical harmonic representation.
+void GEN(spat_to_SHsphtor,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
+{
+	#include "spat_to_SHst.c"
+}
+
+//@}
+
+/** \name 3D vector transforms
+ * 3D vectors can be handled as 2D vectors + a scalar radial component.
+  * For a divergenceless 3D vector \f$ (v_r,v_\theta,v_\phi) \f$, the radial scalar \f$ Q = v_r \f$ and the spheroidal scalar S can be derived from the same poloidal scalar P :
+ * \f[ Q = \frac{l(l+1)}{r} P \f]
+ * \f[ S = \frac{1}{r} \frac{\partial \, rP}{\partial r} \f]
+ * which corresponds to the poloidal/toroidal decomposition : \f$ \mathbf{v} = \nabla \times (T \mathbf{r}) + \nabla \times \nabla \times (P \mathbf{r}) \f$
+*/
+//@{
+
 /// Backward \b 3D Vector Spherical Harmonic Transform (synthesis).
 /// This is basically a shortcut to call both SH_to_spat* and SHsphtor_to spat*
 void GEN(SHqst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
     GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARG2);
     GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARG2);
-}
-
-/// \b Vector Spherical Harmonics Transform (analysis) : convert a spatial vector field (theta,phi components) to its spheroidal/toroidal spherical harmonic representation.
-void GEN(spat_to_SHsphtor,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
-{
-	#include "spat_to_SHst.c"
 }
 
 /// \b 3D Vector Spherical Harmonics Transform (analysis) : convert a 3D vector field (r,theta,phi components) to its radial/spheroidal/toroidal spherical harmonic representation.
@@ -111,10 +118,7 @@ void GEN(spat_to_SHqst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex doubl
 // Fortran 77 api
 #ifdef SHT_F77_API
 
-/**  \name Fortran API 
-* Call from fortran without the trailing '_'.
-* see the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
-*/
+// Fortran API : Call from fortran without the trailing '_'
 //@{
 
 #ifdef SUFFIX

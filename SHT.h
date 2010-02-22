@@ -3,6 +3,7 @@
 **/
 
 /// different Spherical Harmonic normalizations.
+/// see also section \ref norm for details.
 enum shtns_norm {
 	sht_orthonormal,	///< orthonormalized spherical harmonics (default).
 	sht_fourpi,			///< Geodesy and spectral analysis : 4.pi normalization.

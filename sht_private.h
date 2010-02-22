@@ -3,7 +3,7 @@
  *    written by Nathanael Schaeffer / LGIT,CNRS                    *
  ********************************************************************/
 
-/// \file sht_private.h private data used by sht transform functions.
+/// \internal \file sht_private.h private data used by sht transform functions.
 
 #include <complex.h>
 #include <math.h>
