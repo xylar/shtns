@@ -38,6 +38,7 @@ libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 install :
 	cp libshtns.a $(PREFIX)/lib
 	cp SHT.h $(PREFIX)/include
+	cp shtns.f $(PREFIX)/include
 
 # codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
