@@ -8,7 +8,7 @@
 #include <math.h>
 #include <fftw3.h>
 
-#include "SHT.h"
+#include "shtns.h"
 
 /// a simple function that writes a vector to a file
 void write_vect(char *fn, double *vec, int N);

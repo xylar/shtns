@@ -12,7 +12,7 @@
 
 #include "sht_config.h"
 
-#include "SHT.h"
+#include "shtns.h"
 
 // define shortcuts to sizes + allow compile-time optimizations when SHT_AXISYM is defined.
 #define LMAX shtns.lmax

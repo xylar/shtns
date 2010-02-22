@@ -12,7 +12,7 @@
 // cycle counter from FFTW
 #include "cycle.h"
 
-#include "SHT.h"
+#include "shtns.h"
 
 complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
 complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m

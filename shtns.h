@@ -1,5 +1,5 @@
-/** \file SHT.h
- \brief SHT.h is the definition file for SHTns : include this file in your source code to use SHTns.
+/** \file shtns.h
+ \brief shtns.h is the definition file for SHTns : include this file in your source code to use SHTns.
 **/
 
 /// different Spherical Harmonic normalizations.

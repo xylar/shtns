@@ -28,7 +28,7 @@ cmd = gcc $(go)
 
 shtfiles = SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
 
-hfiles = sht_private.h sht_config.h SHT.h
+hfiles = sht_private.h sht_config.h shtns.h
 
 default : libshtns.a
 
@@ -37,7 +37,7 @@ libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 
 install :
 	cp libshtns.a $(PREFIX)/lib
-	cp SHT.h $(PREFIX)/include
+	cp shtns.h $(PREFIX)/include
 	cp shtns.f $(PREFIX)/include
 
 # codelets :
@@ -66,10 +66,10 @@ sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
 	$(cmd) -c sht_eo.c -o sht_eo.o
 
 # programs :
-time_SHT : SHT.h time_SHT.c libshtns.a Makefile
+time_SHT : shtns.h time_SHT.c libshtns.a Makefile
 	$(cmd) time_SHT.c libshtns.a -lfftw3 -lm -o time_SHT
 
-SHT_example : SHT_example.c libshtns.a Makefile SHT.h
+SHT_example : SHT_example.c libshtns.a Makefile shtns.h
 	$(cmd) SHT_example.c libshtns.a -lfftw3 -lm -o SHT_example
 
 SHT_fort_ex : SHT_example.f libshtns.a Makefile shtns.f

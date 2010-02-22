@@ -20,7 +20,7 @@ Then browse the html documentation starting with doc/html/index.html
  * 
  * It uses the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms, and is distributed under the GPL License.
  *
- * \see SHT.h for the definitions of variables, macros and functions.
+ * \see shtns.h for the definitions of variables, macros and functions.
  * \see The example programs (in \link SHT_example.f Fortran \endlink and \link SHT_example.c C \endlink) to get started.
  * \see The organisation of data used by SHTns is described in \ref spat.
  * \see The description of \ref opt.
