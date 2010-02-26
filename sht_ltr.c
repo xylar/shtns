@@ -3,8 +3,6 @@
  *    written by Nathanael Schaeffer / LGIT,CNRS                    *
  ********************************************************************/
 
-// \file sht_ltr.c SHT functions with variable harmonic degree truncation.
-
 // global variables definitions
 #include "sht_private.h"
 

@@ -32,6 +32,9 @@ Then browse the html documentation starting with doc/html/index.html
 
 /** \page compil Compiling and installing SHTns
 
+You should edit the Makefile to adapt it to your architecture and compiler. In particular, using gcc or icc will not lead to the same performance, and you
+should test on your system what gives the best result.
+
 \li type \code make \endcode to compile SHTns. it will produce the library \c libshtns.a
 
 \li type \code make PREFIX=/usr/local install \endcode to install the library in your system (set PREFIX to the desired location, default is $HOME).
@@ -177,15 +180,17 @@ If you have problem in getting your spherical harmonic coefficient right, you ma
 
 */
 
+
+
 /** \page opt Optimizations implemented in SHTns
 
-SHTns is an implementation of the Spherical Harmonic Transform which aims at beiing accurate and fast,
+SHTns is an implementation of the Spherical Harmonic Transform which aims at being accurate and fast,
 with direct numerical simulations in mind. As such, the following optimizations are implemented :
 
 \section opt_fft Use the Fast-Fourier Transform
 
 Any serious SHT should use the FFT, as it improves accuracy and speed.
-SHTns uses the FFTW library for the fast Fourier transform, a portable, 
+SHTns uses the <a href="http://www.fftw.org/">FFTW library</a> for the fast Fourier transform, a portable, 
 flexible and blazingly fast FFT implementation.
 
 \section opt_mirror Take advantage of mirror symmetry
@@ -197,7 +202,7 @@ transforms.
 \section opt_polar Polar optimization
 
 A less common, but still classic optimization : high m's spherical harmonics have their magnitude descrease exponentially
-when aproaching the poles. SHTns use a threshold below which the SH is take to be zero.
+when aproaching the poles. SHTns use a threshold below which the SH is taken to be zero.
 You can choose this threshold, with the \c eps parameter of the \ref shtns_init function, trading some accuracy for more speed.
 Around 5% to 15% speed increase are typical values for a SHT with a large MMAX.
 

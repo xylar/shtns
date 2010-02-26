@@ -23,8 +23,10 @@ cmd = gcc $(go)
 ## r2d2
 #cmd = gcc $(go) -march=core2 -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
 
-# intel compiler
-#cmd = icc -axT -xT -msse3 -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
+# intel compiler is used for codelets (leads to faster code)
+shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
+# if icc is not available, use gcc instead by uncommenting the following line.
+shtcc = $(cmd)
 
 shtfiles = SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
 
@@ -55,15 +57,15 @@ SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
 	$(cmd) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
 
 sht_std.o : sht_std.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
-	$(cmd) -c sht_std.c -o sht_std.o
+	$(shtcc) -c sht_std.c -o sht_std.o
 sht_ltr.o : sht_ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
-	$(cmd) -c sht_ltr.c -o sht_ltr.o
+	$(shtcc) -c sht_ltr.c -o sht_ltr.o
 sht_m0.o : sht_m0.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
-	$(cmd) -c sht_m0.c -o sht_m0.o
+	$(shtcc) -c sht_m0.c -o sht_m0.o
 sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
-	$(cmd) -c sht_m0ltr.c -o sht_m0ltr.o
+	$(shtcc) -c sht_m0ltr.c -o sht_m0ltr.o
 sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
-	$(cmd) -c sht_eo.c -o sht_eo.o
+	$(shtcc) -c sht_eo.c -o sht_eo.o
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile

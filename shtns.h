@@ -124,16 +124,16 @@ void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, doub
 void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp);
 void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp);
 //@}
+/// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat
 #define SH_to_grad_spat(S,Gt,Gp) SHsph_to_spat(S, Gt, Gp)
 
-/// \name Partial evalutions of a SH representation :
+/// \name Local and partial evalutions of a SH representation :
+/// Does not require a call to \ref shtns_precompute
 //@{
 double SH_to_point(complex double *Qlm, double cost, double phi);
 void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm,
 					double cost, double phi, double *vr, double *vt, double *vp);
 
-/// synthesis at a given latitude, on nphi equispaced longitude points.
-/// vr, vt, and vp arrays must have nphi+2 doubles allocated (fftw requirement)
 void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
 //@}
@@ -148,6 +148,7 @@ void SHsph_to_spat_l(complex double *Slm, double *Vt, double *Vp, int LTR);
 void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR);
 void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR);
 //@}
+/// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat_l(S, Gt, Gp, ltr)
 
 /*! \name Axisymmetric transforms m=0 only
@@ -160,6 +161,7 @@ void SHsph_to_spat_m0(complex double *Slm, double *Vt);
 void SHtor_to_spat_m0(complex double *Tlm, double *Vp);
 void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
 //@}
+/// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_m0
 #define SH_to_grad_spat_m0(S,Gt) SHsph_to_spat_m0(S, Gt)
 
 /*! \name SHT transforms with assumed equatorial symmetry (parity = 0 or 1)

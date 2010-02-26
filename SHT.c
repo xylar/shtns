@@ -76,6 +76,11 @@ double sh11_st() {
 #define LTR LMAX
 #define MTR MMAX
 
+/** \addtogroup local Local and partial evaluation of SH fields.
+ * These do only require a call to \ref shtns_set_size, but not to \ref shtns_precompute.
+*/
+//@{
+
 /// Evaluate scalar SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
 double SH_to_point(complex double *Qlm, double cost, double phi)
 {
@@ -148,7 +153,8 @@ void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tl
 	*vt = vtp + vst;	// Bt = I.m/sint *T  + dS/dt
 	*vp = vsp - vtt;	// Bp = I.m/sint *S  - dT/dt
 }
-
+//@}
+	
 #undef LTR
 #undef MTR
 
@@ -166,6 +172,9 @@ double ct_lat = 2.0;
 double st_lat;
 
 /// synthesis at a given latitude, on nphi equispaced longitude points.
+/// vr, vt, and vp arrays must have nphi+2 doubles allocated (fftw requirement).
+/// It does not require a previous call to shtns_precompute
+/// \ingroup local
 void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr)
 {
@@ -192,7 +201,7 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 		dylm_lat = ylm_lat + NLM;
 	}
 	if (cost != ct_lat) {		// don't recompute if same latitude (ie equatorial disc rendering)
-		st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)	
+		st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)
 		for (m=0,j=0; m<=mtr; m++) {
 			legendre_sphPlm_deriv_array(ltr, m, cost, st_lat, &ylm_lat[j], &dylm_lat[j]);
 			j += LMAX -m*MRES +1;
@@ -267,8 +276,9 @@ void alloc_SHTarrays()
 #endif
 }
 
-/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to init_SH
+/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to \ref shtns_init or \ref shtns_set_size
 /*! \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
+/// \ingroup init
 long int nlm_calc(long int lmax, long int mmax, long int mres)
 {
 	if (mmax*mres > lmax) mmax = lmax/mres;
@@ -1252,6 +1262,10 @@ double SHT_error()
   #define _HGID_ "unknown"
 #endif
 
+/** \addtogroup init Initialization functions.
+*/
+//@{
+
 /*! This sets the description of spherical harmonic coefficients.
  * It tells SHTns how to interpret spherical harmonic coefficient arrays, and it sets usefull arrays.
  * \param lmax : maximum SH degree that we want to describe.
@@ -1491,10 +1505,12 @@ int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, 
 	return shtns_precompute(flags, eps, nlat, nphi);
 }
 
+//@}
+
 
 #ifdef SHT_F77_API
 
-/** \addtogroup fortapi Fortran API
+/** \addtogroup fortapi Fortran API.
 * Call from fortran without the trailing '_'.
 * see the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
 */
