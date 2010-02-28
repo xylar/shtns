@@ -86,5 +86,12 @@ clean :
 	rm -f *.o
 	rm -rf doc/
 
+# build a python interface using SWIG.
+# use it with "from shtns import *" in a python program/shell
+python : shtns.h shtns.i
+	swig -python shtns.i
+	gcc -fpic -I/usr/include/python2.6 -c shtns_wrap.c 
+	gcc -shared /usr/lib/libfftw3.so SHT.o sht_*.o shtns_wrap.o -o _shtns.so
+
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000
