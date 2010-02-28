@@ -152,7 +152,10 @@ SHTns lets you choose one of the following :
 
 </li></ul>
 
-To choose the normalization, use \ref shtns_set_size. The legendre associated functions are defined by :
+\ref shtns_init uses the default (defined by \ref SHT_DEFAULT_NORM) but you can choose another normalization
+by calling \ref shtns_set_size instead.
+
+The legendre associated functions are defined by :
 
 \f[ P_l^m (x) = (-1)^m\ (1-x^2)^{m/2}\ \frac{d^m}{dx^m}P_l(x) \f]
 
@@ -203,7 +206,9 @@ transforms.
 
 A less common, but still classic optimization : high m's spherical harmonics have their magnitude descrease exponentially
 when aproaching the poles. SHTns use a threshold below which the SH is taken to be zero.
-You can choose this threshold, with the \c eps parameter of the \ref shtns_init function, trading some accuracy for more speed.
+The default value for this threshold is defined by \ref SHT_DEFAULT_POLAR_OPT,
+but you can also choose it with the \c eps parameter of the \ref shtns_precompute function,
+trading some accuracy for more speed.
 Around 5% to 15% speed increase are typical values for a SHT with a large MMAX.
 
 \section opt_cache Cache optimizations
@@ -251,15 +256,35 @@ is then suitable for performing many transforms (as in a direct numerical simula
 The default mode used by SHTns is to measure performance of the different algorithms, and choose
 the one that performs best (it will also check that the accuracy is good enough).
 However, there are situation where either the Gauss-Legendre algorithm or a regular grid is required, and you
-can choose to do so using the adequate \ref shtns_type when calling \ref shtns_init.
-
-
+can choose to do so using the adequate \ref shtns_type when calling \ref shtns_init or \ref shtns_precompute.
 
 */
 
-/** \page f77 Using SHTns with Fortran 77 
+/** \page usage Using SHTns in a C program
+
+First of all you need to initialize SHTns. There are two ways to do this :
+\li calling \ref shtns_init function,
+\li or calling \ref shtns_set_size followed by \ref shtns_precompute. This way lets you choose normalization and optimization.
+
+Note that you can call initialization function(s) only once.
+Then you must allocate some memory, and finaly you can perform some spherical harmonic transforms.
+
+\see Look at shtns.h for the function definitions and documentation.
+\see See the \link SHT_example.c C example \endlink for a simple usage of SHTns in a C program.
+
+*/
+
+
+/** \page f77 Using SHTns with Fortran 77
 
 SHTns provides an interface to Fortran language (compatible with gfortran).
+
+First of all you need to initialize SHTns. There are two ways to do this :
+\li calling one of the shtns_init_* subroutines,
+\li or calling shtns_set_size followed by shtns_precompute. This way lets you choose normalization and optimization.
+
+Note that you can call initialization function(s) only once.
+Then you must allocate some memory, and finaly you can perform some spherical harmonic transforms.
 
 \see See The full reference of the \ref fortapi
 \see See the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
@@ -268,6 +293,19 @@ SHTns provides an interface to Fortran language (compatible with gfortran).
   \brief A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
   Compile using : \code make SHT_fort_ex \endcode
   \see fortapi
+
+*/
+
+/** \page python Using SHTns with Python
+
+SHTns provides a Python interface, for interactive use of the spherical harmonic transform.
+It uses swig to generate the Python interface.
+
+\li Compile using \code make python \endcode
+
+\li Use within a python script or shell in the same directory \code from shtns import * \endcode
+
+The functions available are the same as the \link usage C interface \endlink, plus some memory allocation functions...
 
 */
 

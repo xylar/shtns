@@ -276,10 +276,9 @@ void alloc_SHTarrays()
 #endif
 }
 
-/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to \ref shtns_init or \ref shtns_set_size
-/*! \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
+/// \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
 /// \ingroup init
-long int nlm_calc(long int lmax, long int mmax, long int mres)
+int nlm_calc(int lmax, int mmax, int mres)
 {
 	if (mmax*mres > lmax) mmax = lmax/mres;
 	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
@@ -1488,21 +1487,20 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 	return(NLM);	// returns the number of modes to describe a SHT.
 }
 
-/*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
- * This function sets all global variables by calling \ref shtns_set_size followed by \ref shtns_precompute.
+/*! Simple initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
+ * This function sets all global variables by calling \ref shtns_set_size followed by \ref shtns_precompute, with the
+ * default normalization and the default polar optimization (see \ref sht_config.h).
  * returns the number of modes to describe a scalar field.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
  * \param nlat,nphi : respectively the number of latitudinal and longitudinal grid points.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
- * \param eps : polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
- *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
 */
-int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi)
+int shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nlat, int nphi)
 {
-	shtns_set_size(lmax, mmax, mres, SHTNS_DEFAULT_NORM);
-	return shtns_precompute(flags, eps, nlat, nphi);
+	shtns_set_size(lmax, mmax, mres, SHT_DEFAULT_NORM);
+	return shtns_precompute(flags, SHT_DEFAULT_POLAR_OPT, nlat, nphi);
 }
 
 //@}
@@ -1519,28 +1517,28 @@ int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, 
 /// Initializes spherical harmonic transforms of given size using Gauss algorithm and no approximation
 void shtns_init_sh_gauss_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_set_size(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
 	shtns_precompute(sht_gauss | *layout, 0, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transforms of given size using Fastest available algorithm and polar optimization.
 void shtns_init_sh_auto_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_set_size(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
 	shtns_precompute(sht_auto | *layout, 1.e-10, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transforms of given size using a regular grid and agressive optimizations.
 void shtns_init_sh_reg_fast_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_set_size(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
 	shtns_precompute(sht_reg_fast | *layout, 1.e-6, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transform SYNTHESIS ONLY of given size using a regular grid including poles.
 void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_set_size(*lmax, *mmax, *mres, SHTNS_DEFAULT_NORM);
+	shtns_set_size(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
 	shtns_precompute(sht_reg_poles | *layout, 0, *nlat, *nphi);
 }
 

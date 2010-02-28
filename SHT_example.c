@@ -16,8 +16,6 @@ void write_vect(char *fn, double *vec, int N);
 /// a simple function that writes a matrix to a file.
 void write_mx(char *fn, double *mx, int N1, int N2);
 
-// polar optimization threshold
-#define POLAR_OPT_THR 0
 
 int main()
 {
@@ -30,7 +28,7 @@ int main()
 	lmax = 5;	nlat = 32;
 	mmax = 3;	nphi = 10;
 	mres = 1;
-	NLM = shtns_init( sht_gauss, POLAR_OPT_THR, lmax, mmax, mres, nlat, nphi );
+	NLM = shtns_init( sht_gauss, lmax, mmax, mres, nlat, nphi );
 
 // allocate spatial fields.
 	Sh = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double));

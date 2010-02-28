@@ -418,7 +418,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
 	}
 
-//	NLM = shtns_init(shtmode | layout, polaropt, LMAX, MMAX, MRES, NLAT, NPHI);
+//	NLM = shtns_init(shtmode | layout, LMAX, MMAX, MRES, NLAT, NPHI);
 	NLM = shtns_set_size(LMAX, MMAX, MRES, shtnorm);
 	shtns_precompute(shtmode | layout, polaropt, NLAT, NPHI);
 	

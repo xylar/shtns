@@ -35,7 +35,7 @@
 
 int shtns_set_size(int lmax, int mmax, int mres, int norm);
 int shtns_precompute(int flags, double eps, int nlat, int nphi);
-int shtns_init(int flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi);
+int shtns_init(int flags, int lmax, int mmax, int mres, int nlat, int nphi);
 long int nlm_calc(long int lmax, long int mmax, long int mres);
 void Set_MTR_DCT(int m);
 int Get_MTR_DCT();

@@ -22,22 +22,22 @@ enum shtns_type {
 
 /// structure containing useful information about the SHT.
 struct sht_sze {
-	long int lmax;			///< maximum degree (lmax) of spherical harmonics.
-	long int mmax;			///< maximum order (mmax*mres) of spherical harmonics.
-	long int mres;			///< the periodicity along the phi axis.
-	long int nlm;			///< total number of (l,m) spherical harmonics components.
+	int lmax;		///< maximum degree (lmax) of spherical harmonics.
+	int mmax;		///< maximum order (mmax*mres) of spherical harmonics.
+	int mres;		///< the periodicity along the phi axis.
+	int nlm;		///< total number of (l,m) spherical harmonics components.
 
-	long int nlat;			///< number of spatial points in Theta direction (latitude) ...
-	long int nphi;			///< number of spatial points in Phi direction (longitude)
+	int nlat;		///< number of spatial points in Theta direction (latitude) ...
+	int nphi;		///< number of spatial points in Phi direction (longitude)
 
-	int *lmidx;				///< (virtual) index in SH array of given im.
+	int *lmidx;		///< (virtual) index in SH array of given im.
 
-	long int mtr_dct;		///< m truncation for dct. -1 means no dct at all.
-	long int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
-	long int sht_fft;		///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
-	long int klim;			///< Limit to k for non-linear terms.
+	int mtr_dct;	///< m truncation for dct. -1 means no dct at all.
+	int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	int sht_fft;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
+	int klim;		///< Limit to k for non-linear terms.
 
-	int norm;				///< store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
+	int norm;		///< store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
 };
 
 // GLOBAL VARIABLES : do not modify, they are set by the call to init_SH. //
@@ -91,15 +91,15 @@ extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 
 /// \name initialization
 //@{
-/// defines the sizes of the spectral description.
+/// Simple initialization of the spherical harmonic transforms of given size. Calls \ref shtns_set_size and \ref shtns_precompute.
+int shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nlat, int nphi);
+/// defines the sizes of the spectral description. Use for advanced initialization.
 int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm);
-/// precompute everything for a given spatial grid.
+/// precompute everything for a given spatial grid. Use for advanced initialization, after \ref shtns_set_size.
 int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi);
-/// Initializes spherical harmonic transforms of given size, and sets all global variables.
-int shtns_init(enum shtns_type flags, double eps, int lmax, int mmax, int mres, int nlat, int nphi);
 
 /// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to init_SH
-long int nlm_calc(long int lmax, long int mmax, long int mres);
+int nlm_calc(int lmax, int mmax, int mres);
 void Set_MTR_DCT(int m);
 int Get_MTR_DCT();
 //@}
