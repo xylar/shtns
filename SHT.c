@@ -339,7 +339,7 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 
 #if SHT_VERBOSE > 0
 	printf("        using FFTW : Mmax=%d, Nphi=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,phi_inc,theta_inc,phi_embed);
-	if (NPHI < 3*MMAX) printf("     !! Warning : 2/3 rule for anti-aliasing not met !\n");
+	if (NPHI <= 3*MMAX) printf("     !! Warning : 2/3 rule (Nphi > 3*Mmax) for anti-aliasing not met !\n");
 	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
 #endif
 
