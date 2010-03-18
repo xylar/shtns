@@ -339,7 +339,7 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 
 #if SHT_VERBOSE > 0
 	printf("        using FFTW : Mmax=%d, Nphi=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,phi_inc,theta_inc,phi_embed);
-	if (NPHI <= 3*MMAX) printf("     !! Warning : 2/3 rule (Nphi > 3*Mmax) for anti-aliasing not met !\n");
+	if (NPHI <= (SHT_NL_ORDER+1)*MMAX) printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
 	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
 #endif
 
@@ -385,6 +385,7 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 	dct_r1 = NULL;	idct_r1 = NULL;
 }
 
+#ifndef SHT_NO_DCT
 /// initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
 void planDCT()
 {
@@ -455,10 +456,12 @@ void planDCT()
 	fftw_free(Sh);
 #endif
 }
+#endif
 
 /// SET MTR_DCT and updates fftw_plan for DCT's
 void Set_MTR_DCT(int m)
 {
+#ifndef SHT_NO_DCT
 	if ((zlm_dct0 == NULL)||(m == MTR_DCT)) return;
 	if ( m < 0 ) {	// don't use dct
 		MTR_DCT = -1;
@@ -467,6 +470,7 @@ void Set_MTR_DCT(int m)
 		MTR_DCT = m;
 		planDCT();
 	}
+#endif
 }
 
 int Get_MTR_DCT() {
@@ -849,6 +853,7 @@ inline eval_dct_cplx(complex double *val, complex double *dct, long int n, doubl
 }
 */
 
+#ifndef SHT_NO_DCT
 /// Computes the matrices required for SH transform on a regular grid (with or without DCT).
 /// \param analysis : 0 => synthesis only.
 void init_SH_dct(int analysis)
@@ -870,6 +875,7 @@ void init_SH_dct(int analysis)
 	}
 
 #if SHT_VERBOSE > 0
+	if (NLAT <= SHT_NL_ORDER *LMAX) printf("     !! Warning : DCT anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER);
 	printf("        => using Equaly Spaced Nodes with DCT acceleration\n");
 #endif
 	if ((NLAT_2)*2 <= LMAX+1) shtns_runerr("NLAT_2*2 should be at least LMAX+2 (DCT)");
@@ -1187,7 +1193,7 @@ void init_SH_dct(int analysis)
 	free(dyk);	free(yk);
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
-
+#endif
 
 /// return the max error for a back-and-forth SHT transform.
 /// this function is used to internally measure the accuracy.
@@ -1396,10 +1402,7 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 
 	zlm_dct0 = NULL;		// used as a flag.
   #if SHT_VERBOSE > 0
-	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition in theta direction not met.\n");
-	#ifndef SHT_NO_DCT
-		if (NLAT <= SHT_NL_ORDER *LMAX) printf("     !! Warning : DCT anti-aliasing condition in theta direction not met.\n");
-	#endif
+	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition 2*Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
   #endif
 
 #ifndef SHT_NO_DCT
