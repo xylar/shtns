@@ -413,7 +413,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
 		if (strcmp(name,"reg") == 0) shtmode = sht_reg_fast;	// force regular grid.
 		if (strcmp(name,"schmidt") == 0) shtnorm = sht_schmidt | SHT_NO_CS_PHASE;
-		if (strcmp(name,"4pi") == 0) shtnorm = sht_fourpi;
+		if (strcmp(name,"4pi") == 0) shtnorm = sht_fourpi | SHT_REAL_NORM;
 		if (strcmp(name,"oop") == 0) layout = SHT_THETA_CONTIGUOUS;
 		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
 	}

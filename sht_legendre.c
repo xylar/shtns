@@ -213,7 +213,9 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 /// For the same conventions as GSL, use \c legendre_precomp(sht_orthonormal,1);
 /// \param[in] norm : normalization of the associated legendre functions (\ref shtns_norm).
 /// \param[in] with_cs_phase : Condon-Shortley phase (-1)^m is included (1) or not (0)
-void legendre_precomp(enum shtns_norm norm, int with_cs_phase)
+/// \param[in] mpos_renorm : Optional renormalization for m>0.
+///  1.0 (no renormalization) is the "complex" convention, while 0.5 leads to the "real" convention (with FFTW).
+void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
 {
 	long int im, m, l, lm;
 	LEG_FLOAT_TYPE t1, t2;
@@ -270,6 +272,7 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase)
 		t1 = 0.25L/M_PIl;
 		alm[0] = LEG_SQRT(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
 	}
+	t1 *= mpos_renorm;		// renormalization for m>0
 	for (im=1, m=0; im<=MMAX; im++) {
 		while(m<im*MRES) {
 			m++;

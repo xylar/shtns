@@ -82,6 +82,7 @@ extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 #define SHT_PHI_CONTIGUOUS (256*2)	///< use \ref phi_fast
 
 #define SHT_NO_CS_PHASE (256*4)	///< don't include Condon-Shortley phase (add to last argument of \ref shtns_set_size)
+#define SHT_REAL_NORM (256*8)	///< use a "real" normalization. (add to last argument of \ref shtns_set_size)
 
 /// total number of 'doubles' required for a spatial field (includes FFTW reserved space).
 /// only the first shtns.nlat*shtns.nphi are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat

@@ -161,16 +161,28 @@ The legendre associated functions are defined by :
 \f[ P_l^m (x) = (-1)^m\ (1-x^2)^{m/2}\ \frac{d^m}{dx^m}P_l(x) \f]
 
 which includes the Condon-Shortley phase \f$ (-1)^m \f$ by default.
-Use \ref shtns_set_size with \ref SHT_NO_CS_PHASE to disable the Condon-Shortley phase.
+
+For reference, function \ref SH_to_point gives a simple explicit implementation of the inverse SH transform (synthesis).
+
+\subsection norm_opt Normalization variations
+
+Use \ref shtns_set_size with \ref SHT_NO_CS_PHASE to disable the <b>Condon-Shortley phase</b>.
 For example, to initialize a Schmidt semi-normalized transform of maximum degree 16 without Condon-Shortrley phase, use
 \code shtns_set_size(16, 16, 1, sht_schmidt | SHT_NO_CS_PHASE); \endcode
 
-Also, function \ref SH_to_point gives an explicit implementation of the inverse SH transform (synthesis).
+By default, SHTns uses "complex" spherical harmonic normalization. However, as it deals only with real functions,
+the m<0 coefficients are not stored, since they are complex conjugate of the m>0 ones.
+Thus, one must pay attention, that the m>0 coefficient have to be counted twice in a total energy calculation.
+
+An alternative to this "complex" normalization is the "real" normalization, for which the energy is simply
+the sum of the coefficients (m>=0) squared. Use \ref shtns_set_size with \ref SHT_REAL_NORM to use a "real" spherical harmonic normalization.
+This is the usual "real" spherical harmonics, if one takes the complex conjugate of the coefficients.
 
 A few useful examples, for orthonormal spherical harmonics :
  - a constant unit value on the sphere is represented by the coefficient \f$ c_0^0 = \sqrt{4\pi} \f$.
  - \f$ \cos \theta \f$ is represented by the coefficient \f$ c_1^0 = \sqrt{4\pi/3} \f$.
  - \f$ \sin \theta \, \cos \phi \f$ is represented by \f$ c_1^1 =  -\sqrt{2\pi/3} \f$ (with Condon-Shortley phase)
+ - with a "real" normalization instead, one would have \f$ c_1^1 = -\sqrt{4\pi/3} = -c_1^0 \f$.
 
 The functions \ref sh00_1(), \ref sh10_ct(), \ref sh11_st() will help to build simple
 spectral fields, no matter what normalization you choose.
@@ -180,6 +192,7 @@ If you have problem in getting your spherical harmonic coefficient right, you ma
  - Schmit semi-normalization ? try multiplying or dividing by \f$ \sqrt{2l+1} \f$
  - Condon-Shortley phase ? try multiplying by \f$ (-1)^m \f$
  - Real or Complex ? try multiplying or dividing the m>0 coefficients by \f$ \sqrt{2} \f$
+ - Relative sign ? try to take the complex conjugate of the coefficients.
  - Does the array include l=0 ?
 
 */

@@ -712,11 +712,13 @@ void init_SH_gauss()
 //		zlm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT_2);
 //		dzlm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT_2);
 		for (it=0;it<NLAT_2;it++) {
-			double nz0, nz1;
-			nz0 = wgd[it];	nz1 = wgd[it];
+			double nz0, nz1, norm;
+			norm = wgd[it];
+			if ( (m>0) && (shtns.norm & SHT_REAL_NORM) )	norm *= 2;		// "Real" norm : zlm must be doubled for m>0
+			nz0 = norm;		nz1 = norm;
 			for (l=m;l<LMAX;l+=2) {
 				if (SHT_NORM == sht_schmidt) {
-					nz0 = wgd[it]*(2*l+1);	nz1 = wgd[it]*(2*l+3);
+					nz0 = norm*(2*l+1);		nz1 = norm*(2*l+3);
 				}
 				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * nz0;
 				zlm[im][(l-m)*NLAT_2 + it*2 +1] =  ylm[im][it*(LMAX-m+1) + (l+1-m)] * nz1;
@@ -731,7 +733,7 @@ void init_SH_gauss()
 			}
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
 				if (SHT_NORM == sht_schmidt)
-					nz0 = wgd[it]*(2*l+1);
+					nz0 = norm*(2*l+1);
 				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * nz0;
 				dzlm[im][(l-m)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
 				dzlm[im][(l-m)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
@@ -1044,6 +1046,7 @@ void init_SH_dct(int analysis)
 			double lnorm = iylm_fft_norm;
 
 			if (SHT_NORM == sht_schmidt)	lnorm *= (2*l+1);		// Schmidt semi-normalization
+			if ( (m>0) && (shtns.norm & SHT_REAL_NORM) )	lnorm *= 2;		// "real" norm : zlm must be doubled for m>0
 
 			k0 = (l-m)&1;	k1 = 1-k0;
 			for(k=0; k<NLAT; k++) {	Z[k] = 0.0;		dZt[k] = 0.0;	dZp[k] = 0.0; }
@@ -1277,12 +1280,14 @@ double SHT_error()
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
  * \param norm : define the normalization of the spherical harmonics (\ref shtns_norm)
- * and optionnaly disable Condon-Shortley phase (ex: sht_schmidt | SHT_NO_CS_PHASE)
+ * + optionaly disable Condon-Shortley phase (ex: sht_schmidt | SHT_NO_CS_PHASE)
+ * + optionaly use a 'real' normalization (ex: sht_fourpi | SHT_REAL_NORM)
 */
 int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 {
 	int im, m, l, lm;
 	int with_cs_phase = 1;		/// Condon-Shortley phase (-1)^m is used by default.
+	double mpos_renorm = 1.0;	/// renormalization of m>0.
 
 	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
 //	if (lmax < 2) shtns_runerr("lmax must be at least 2");
@@ -1296,6 +1301,8 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	shtns.norm = norm;
 	if (norm & SHT_NO_CS_PHASE)
 		with_cs_phase = 0;
+	if (norm & SHT_REAL_NORM)
+		mpos_renorm = 0.5;		// normalization for 'real' spherical harmonics.
 
 #ifdef SHT_AXISYM
 	shtns.mmax = 0;		shtns.mres = 2;		shtns.nphi = 1;
@@ -1308,6 +1315,7 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 #if SHT_VERBOSE > 0
 	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
 	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d  [",LMAX,MMAX*MRES,MRES,NLM);
+	if (norm & SHT_REAL_NORM) printf("'real' norm, ");
 	if (!with_cs_phase) printf("no Condon-Shortley phase, ");
 	if (SHT_NORM == sht_fourpi) printf("4.pi normalized]\n");
 	else if (SHT_NORM == sht_schmidt) printf("Schmidt semi-normalized]\n");
@@ -1336,22 +1344,21 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	if (lm != NLM) shtns_runerr("unexpected error");
 
 	// this quickly precomputes some values for the legendre recursion.
-	legendre_precomp(SHT_NORM, with_cs_phase);
+	legendre_precomp(SHT_NORM, with_cs_phase, mpos_renorm);
 
 	switch(SHT_NORM) {
 		case sht_schmidt:
 			Y00_1 = 1.0;		Y10_ct = 1.0;
-			Y11_st = sqrt(0.5);
 			break;
 		case sht_fourpi:
 			Y00_1 = 1.0;		Y10_ct = sqrt(1./3.);
-			Y11_st = sqrt(1./6.);
 			break;
 		case sht_orthonormal:
 		default:
 			Y00_1 = sqrt(4.*M_PI);		Y10_ct = sqrt(4.*M_PI/3.);
-			Y11_st = sqrt(2.*M_PI/3.);		// orthonormal :  \f$ \sin\theta\cos\phi/(Y_1^1 + Y_1^{-1}) = -\sqrt{2 \pi /3} \f$
+//			Y11_st = sqrt(2.*M_PI/3.);		// orthonormal :  \f$ \sin\theta\cos\phi/(Y_1^1 + Y_1^{-1}) = -\sqrt{2 \pi /3} \f$
 	}
+	Y11_st = Y10_ct * sqrt(0.5/mpos_renorm);
 	if (with_cs_phase)	Y11_st *= -1.0;		// correct Condon-Shortley phase
 
 	return(NLM);
