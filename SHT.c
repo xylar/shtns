@@ -1555,12 +1555,9 @@ void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nla
 /// Defines the size and convention of the transform.
 /// Allow to choose the normalization and whether or not to include the Condon-Shortley phase.
 /// \see shtns_set_size
-void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm, int *cs_phase)
+void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm)
 {
-	if (*cs_phase)
-		shtns_set_size(*lmax, *mmax, *mres, *norm);
-	else
-		shtns_set_size(*lmax, *mmax, *mres, *norm | SHT_NO_CS_PHASE);
+	shtns_set_size(*lmax, *mmax, *mres, *norm);
 }
 
 /// Precompute matrices for synthesis and analysis.
