@@ -98,6 +98,8 @@ int shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nlat, in
 int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm);
 /// precompute everything for a given spatial grid. Use for advanced initialization, after \ref shtns_set_size.
 int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi);
+/// precompute everything and choose the optimal nlat and nphi for a given non-linear order.
+int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi);
 
 /// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to init_SH
 int nlm_calc(int lmax, int mmax, int mres);

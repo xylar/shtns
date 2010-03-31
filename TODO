@@ -5,9 +5,15 @@
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 + Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
 
+- There is a bug to fix : sparse SHT does not work with out-of-place FFT.
+
 *** TODO ***
 Compare speed with spherepack.
-Split init routines and transform routines + combine them in a lib.
+
+new functions :
+  precompute_auto() will choose size (and maybe in-place/out-of-place) according to nl_order.
+  precompute_advanced() allow to set a complex layout.
+  suggest_size() will suggest sizes for nphi and nlat.
 
 *** Optimizations ***
 

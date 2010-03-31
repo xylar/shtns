@@ -63,6 +63,13 @@ double sh10_ct() {
 double sh11_st() {
 	return Y11_st;
 }
+/// returns the l=1, m=1 SH coefficient corresponding to unit energy.
+double shlm_e1(int l, int m) {
+	double x = Y00_1/sqrt(4.*M_PI);
+	if (SHT_NORM == sht_schmidt) x *= sqrt(2*l+1);
+	if ((m!=0)&&((shtns.norm & SHT_REAL_NORM)==0)) x *= sqrt(0.5);
+	return(x);
+}
 
 
 /*  LEGENDRE FUNCTIONS  */
@@ -312,7 +319,7 @@ void EqualPolarGrid()
 		st_1[j] = 1.0/st[j];
 	}
 #if SHT_VERBOSE > 0
-	printf("     !! Warning : only synthesis (inverse transform) supported so far for this grid !\n");
+	printf("     !! Warning : only synthesis (inverse transform) supported this grid !\n");
 #endif
 }
 
@@ -1265,6 +1272,42 @@ double SHT_error()
 	return(err);		// return max error.
 }
 
+/// return the smallest power of 2 larger than n.
+int next_power_of_2(int n)
+{
+	int f = 1;
+	if ( (n<=0) || (n>(1<<(sizeof(int)*8-2))) ) return 0;
+	while (f<n) f*=2;
+	return f;
+}
+
+/// find the closest integer that is larger than n and that contains only factors up to fmax.
+/// fmax is 7 for optimal FFTW fourier transforms.
+/// return only even integers for n>fmax.
+int fft_int(int n, int fmax)
+{
+	int k,f;
+
+	if (n<=fmax) return n;
+	if (fmax<=1) return 0;
+
+	n -= 2-(n&1);		// only even n
+	do {
+		n+=2;	f=2;
+		while ((2*f <= n) && ((n&f)==0)) f *= 2;		// no divisions for factor 2.
+		k=3;
+		while ((k<=fmax) &&  (k*f <= n)) {
+			while ((k*f <= n) && (n%(k*f)==0)) f *= k;
+			k+=2;
+		}
+	} while (f != n);
+
+	k = next_power_of_2(n);			// what is the closest power of 2 ?
+	if ((k-n)*33 < n) return k;		// rather choose power of 2 if not too far (3%)
+
+	return n;
+}
+
 
 #ifndef _HGID_
   #define _HGID_ "unknown"
@@ -1276,6 +1319,7 @@ double SHT_error()
 
 /*! This sets the description of spherical harmonic coefficients.
  * It tells SHTns how to interpret spherical harmonic coefficient arrays, and it sets usefull arrays.
+ * returns the number of modes (complex double) to describe a scalar field.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
@@ -1366,7 +1410,7 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables.
- * returns the number of modes to describe a scalar field.
+ * returns the required number of doubles to be allocated for a spatial field.
  * \param nlat,nphi : respectively the number of latitudinal and longitudinal grid points.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
  * \param eps : polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
@@ -1387,7 +1431,7 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 		case SHT_PHI_CONTIGUOUS :	phi_inc=1;  theta_inc=nphi;  phi_embed=nphi;  break;
 	}
 	flags = flags & 255;	// clear higher bits.
-
+	
 	// copy to global variables.
 #ifdef SHT_AXISYM
 	shtns.nphi = 1;
@@ -1494,7 +1538,29 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 		if (t > 1.e-3) shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
   #endif
 	}
-	return(NLM);	// returns the number of modes to describe a SHT.
+	return(phi_embed * nlat);	// returns the number of doubles to be allocated for a spatial field.
+}
+
+/** Same as \ref shtns_precompute, but with optimal selection of nlat and nphi (if they are 0) for a given non-linear order.
+*/
+int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi)
+{
+	int n;
+
+	if (*nphi == 0) {
+		*nphi = fft_int((nl_order+1)*MMAX+1, 7);
+	}
+	if (*nlat == 0) {
+		n = ((nl_order+1)*LMAX)/2 +1;		// gauss
+		if (((flags&255) == sht_auto)||((flags&255) == sht_reg_fast)) n = fft_int(nl_order*LMAX+1, 7);		// dct
+		*nlat = n + (n&1);		// even is better.
+	}
+
+/*	if ((*nlat < 200) && ((flags & 0xFFFF00) == SHT_NATIVE_LAYOUT)) {
+		flags = ((flags & 0xFF) | SHT_PHI_CONTIGUOUS);
+	}	// \todo we should time out-of-place and in-place, and chose the fastest.
+*/
+	return( shtns_precompute(flags, eps, *nlat, *nphi) );
 }
 
 /*! Simple initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
@@ -1566,6 +1632,12 @@ void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm)
 void shtns_precompute_(int *type, int *layout, double *eps, int *nlat, int *nphi)
 {
 	shtns_precompute(*type | *layout, *eps, *nlat, *nphi);
+}
+
+/// Same as shtns_precompute_ but choose optimal nlat and/or nphi.
+void shtns_precompute_auto_(int *type, int *layout, double *eps, int *nl_order, int *nlat, int *nphi)
+{
+	shtns_precompute_auto(*type | *layout, *eps, *nl_order, nlat, nphi);
 }
 
 /// returns nlm, the number of complex*16 elements in an SH array.
