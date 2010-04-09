@@ -36,6 +36,7 @@ struct sht_sze {
 	int nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
 	int sht_fft;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
 	int klim;		///< Limit to k for non-linear terms.
+	int nlorder;	///< order of non-linear terms to be resolved by SH transform.
 
 	int norm;		///< store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
 };

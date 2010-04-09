@@ -31,6 +31,7 @@
 #endif
 #define NLM shtns.nlm
 #define MTR_DCT shtns.mtr_dct
+#define SHT_NL_ORDER shtns.nlorder
 
 // SHT_NORM without CS_PHASE
 #define SHT_NORM (shtns.norm & 0x0FF)

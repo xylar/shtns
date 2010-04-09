@@ -283,6 +283,12 @@ void alloc_SHTarrays()
 #endif
 }
 
+void free_SHTarrays()
+{
+	fftw_free(dzlm[0]);		fftw_free(zlm[0]);		fftw_free(dylm[0]);		fftw_free(ylm[0]);
+	fftw_free(dylm);		fftw_free(ylm);		fftw_free(ct);
+}
+
 /// \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
 /// \ingroup init
 int nlm_calc(int lmax, int mmax, int mres)
@@ -324,16 +330,26 @@ void EqualPolarGrid()
 }
 
 
-/// initialize FFTs using FFTW. stride = NLAT, (contiguous l)
-/// \param[in] theta_inc,phi_inc are the increments to go from one data value to the next in theta and phi direction respectively.
-/// \param[in] phi_embed is the size of array in which the nphi elements are embedded (if phi_embed > (NPHI/2+1)*2, in-place fft may be used)
-void planFFT(int theta_inc, int phi_inc, int phi_embed)
+/// initialize FFTs using FFTW.
+/// \param[in] layout defines the spatial layout (see \ref spat).
+/// returns the number of double to be allocated for a spatial field.
+/// \todo we should time out-of-place and in-place, and chose the fastest.
+/// \todo even/odd transform do not work with out-of-place FFT (segfault).
+int planFFT(int layout)
 {
 	complex double *ShF;
 	double *Sh;
 	int nfft, ncplx, nreal;
+	int theta_inc, phi_inc, phi_embed;
 
 	if (NPHI <= 2*MMAX) shtns_runerr("the sampling condition Nphi > 2*Mmax is not met.");
+
+	switch (layout) {
+		case SHT_NATIVE_LAYOUT : 	theta_inc=1;  phi_inc=NLAT;  phi_embed=2*(NPHI/2+1);  break;
+		case SHT_THETA_CONTIGUOUS :	theta_inc=1;  phi_inc=NLAT;  phi_embed=NPHI;  break;
+		default :
+		case SHT_PHI_CONTIGUOUS :	phi_inc=1;  theta_inc=NPHI;  phi_embed=NPHI;  break;
+	}
 
   if (NPHI>1) {
 	SHT_FFT = 1;		// yes, do some fft
@@ -345,7 +361,7 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 	}
 
 #if SHT_VERBOSE > 0
-	printf("        using FFTW : Mmax=%d, Nphi=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,phi_inc,theta_inc,phi_embed);
+	printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc,phi_embed);
 	if (NPHI <= (SHT_NL_ORDER+1)*MMAX) printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
 	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
 #endif
@@ -382,14 +398,15 @@ void planFFT(int theta_inc, int phi_inc, int phi_embed)
 	if (SHT_FFT > 1) fftw_free(Sh);
 	fftw_free(ShF);
   } else {
-	if (theta_inc != 1) shtns_runerr("only contiguous spatial data is supported for NPHI=1");
+	if (theta_inc != 1) shtns_runerr("only contiguous spatial data is supported for Nphi=1");
 #if SHT_VERBOSE > 0
-	printf("        => no fft for NPHI=1.\n");
+	printf("        => no fft : Mmax=0, Nphi=1, Nlat=%d\n",NLAT);
 #endif
 	SHT_FFT = 0;	// no fft.
   }
 	dct_m0 = NULL;	idct = NULL;		// set dct plans to uninitialized.
 	dct_r1 = NULL;	idct_r1 = NULL;
+	return(phi_embed * NLAT);
 }
 
 #ifndef SHT_NO_DCT
@@ -677,7 +694,8 @@ void init_SH_gauss()
  		iylm_fft_norm = 2.0*M_PIl/NPHI;		// FFT/SHT normalization for zlm (orthonormalized)
 	}
 #if SHT_VERBOSE > 0
-	printf("        => using Gauss Nodes\n");
+	printf("        => using Gauss nodes\n");
+	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition 2*Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
 #endif
 	gauss_nodes(xg,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
@@ -862,6 +880,11 @@ inline eval_dct_cplx(complex double *val, complex double *dct, long int n, doubl
 }
 */
 
+void free_SH_dct()
+{
+	fftw_free(dzlm_dct0);	fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);		fftw_free(ykm_dct[0]);
+}
+
 #ifndef SHT_NO_DCT
 /// Computes the matrices required for SH transform on a regular grid (with or without DCT).
 /// \param analysis : 0 => synthesis only.
@@ -884,8 +907,8 @@ void init_SH_dct(int analysis)
 	}
 
 #if SHT_VERBOSE > 0
+	printf("        => using equaly spaced nodes with DCT acceleration\n");
 	if (NLAT <= SHT_NL_ORDER *LMAX) printf("     !! Warning : DCT anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER);
-	printf("        => using Equaly Spaced Nodes with DCT acceleration\n");
 #endif
 	if ((NLAT_2)*2 <= LMAX+1) shtns_runerr("NLAT_2*2 should be at least LMAX+2 (DCT)");
 	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
@@ -1408,53 +1431,57 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	return(NLM);
 }
 
+
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
- * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables.
+ * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables and internal data.
  * returns the required number of doubles to be allocated for a spatial field.
- * \param nlat,nphi : respectively the number of latitudinal and longitudinal grid points.
+ * \param nlat,nphi pointers to the number of latitudinal and longitudinal grid points respectively. If 0, they are set to optimal values.
+ * \param nl_order defines the maximum SH degree to be resolved by analysis : lmax_analysis = lmax*nl_order. It is used to set an optimal and anti-aliasing nlat. If 0, the default SHT_DEFAULT_NL_ORDER is used.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
- * \param eps : polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
+ * \param eps polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
  *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
 */
-int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
+int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi)
 {
 	double t;
 	int im,m,l,lm;
-	int theta_inc, phi_inc, phi_embed;
+	int layout, nspat;
+	int n_gauss = 0;
 
+	if (nl_order <= 0) nl_order = SHT_DEFAULT_NL_ORDER;
+	shtns.nlorder = nl_order;
 	shtns.mtr_dct = -1;
-
-	switch (flags & 0xFFFF00) {
-		case SHT_NATIVE_LAYOUT : 	theta_inc=1;  phi_inc=nlat;  phi_embed=2*(nphi/2+1);  break;
-		case SHT_THETA_CONTIGUOUS :	theta_inc=1;  phi_inc=nlat;  phi_embed=nphi;  break;
-		default :
-		case SHT_PHI_CONTIGUOUS :	phi_inc=1;  theta_inc=nphi;  phi_embed=nphi;  break;
-	}
+	layout = flags & 0xFFFF00;
 	flags = flags & 255;	// clear higher bits.
-	
-	// copy to global variables.
-#ifdef SHT_AXISYM
-	shtns.nphi = 1;
-	if (nphi != 1) shtns_runerr("axisymmetric version : only Nphi=1 allowed");
-#else
-	NPHI = nphi;
-#endif
-	NLAT_2 = (nlat+1)/2;	NLAT = nlat;
-	if ((NLAT_2)*2 <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
-  #if SHT_VERBOSE > 0
-	printf("[SHTns] precomputing for Nlat=%d, Nphi=%d\n",NLAT,NPHI);
-  #endif
-
-	alloc_SHTarrays();		// allocate dynamic arrays
 
 	if ((flags == sht_reg_poles)||(flags == sht_quick_init))
 		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init
-	planFFT(theta_inc, phi_inc, phi_embed);		// initialize fftw
 
+	if (*nphi == 0) {
+		*nphi = fft_int((nl_order+1)*MMAX+1, 7);		// required fft nodes
+	}
+	if (*nlat == 0) {
+		n_gauss = ((nl_order+1)*LMAX)/2 +1;		// required gauss nodes
+		n_gauss += (n_gauss&1);		// even is better.
+		if ((flags == sht_auto)||(flags == sht_reg_fast)) {
+			m = fft_int(nl_order*LMAX+1, 7);		// required dct nodes
+			*nlat = m + (m&1);		// even is better.
+		} else *nlat = n_gauss;
+	}
+
+	// copy to global variables.
+#ifdef SHT_AXISYM
+	shtns.nphi = 1;
+	if (*nphi != 1) shtns_runerr("axisymmetric version : only Nphi=1 allowed");
+#else
+	NPHI = *nphi;
+#endif
+	NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
+	if ((NLAT_2)*2 <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
+
+	alloc_SHTarrays();		// allocate dynamic arrays
+	nspat = planFFT(layout);		// initialize fftw
 	zlm_dct0 = NULL;		// used as a flag.
-  #if SHT_VERBOSE > 0
-	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition 2*Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
-  #endif
 
 #ifndef SHT_NO_DCT
 	if (flags == sht_reg_dct) {		// pure dct.
@@ -1473,6 +1500,7 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
   #if SHT_VERBOSE > 0
 		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
   #endif
+  		if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) NLAT)/n_gauss;	// we can revert to gauss with a smaller nlat.
 		if (t > MIN_PERF_IMPROVE_DCT) {
 			Set_MTR_DCT(-1);		// turn off DCT.
 		} else {
@@ -1486,19 +1514,29 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 		}
   #if SHT_VERBOSE < 2
 		if (MTR_DCT == -1) {			// free memory used by DCT and disables DCT.
-			fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);	fftw_free(ykm_dct[0]);		// free now useless arrays.
+			free_SH_dct();			// free now useless arrays.
 			zlm_dct0 = NULL;		// this disables DCT completely.
 			if (idct != NULL) fftw_destroy_plan(idct);	// free unused dct plans
 			if (dct_m0 != NULL) fftw_destroy_plan(dct_m0);
 			if (flags == sht_auto) {
 				flags = sht_gauss;		// switch to gauss grid, even better accuracy.
 	#if SHT_VERBOSE > 0
-				printf("        => switching back to Gauss Grid for higher accuracy.\n");
+				printf("        => switching back to Gauss Grid\n");
 	#endif
 				for (im=1; im<=MMAX; im++) {	//	im >= 1
 					m = im*MRES;
 					ylm[im]  -= tm[im]*(LMAX-m+1);		// restore pointers altered by OptimizeMatrices().
 					dylm[im] -= tm[im]*(LMAX-m+1);
+				}
+				if (n_gauss > 0) {		// we should use the optimal size for gauss-legendre
+					if (NPHI>1) {
+						fftw_destroy_plan(fft_eo);  fftw_destroy_plan(ifft_eo);		fftw_destroy_plan(fft);  fftw_destroy_plan(ifft);
+					}
+					free_SHTarrays();
+					*nlat = n_gauss;
+					NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
+					alloc_SHTarrays();
+					nspat = planFFT(layout);		// fft must be replanned because NLAT has changed.
 				}
 			}
 		}
@@ -1538,30 +1576,24 @@ int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 		if (t > 1.e-3) shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
   #endif
 	}
-	return(phi_embed * nlat);	// returns the number of doubles to be allocated for a spatial field.
+	return(nspat);	// returns the number of doubles to be allocated for a spatial field.
 }
 
-/** Same as \ref shtns_precompute, but with optimal selection of nlat and nphi (if they are 0) for a given non-linear order.
+
+/*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
+ * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables.
+ * returns the required number of doubles to be allocated for a spatial field.
+ * \param nlat,nphi respectively the number of latitudinal and longitudinal grid points.
+ * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
+ * \param eps polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
+ *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
 */
-int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi)
+int shtns_precompute(enum shtns_type flags, double eps, int nlat, int nphi)
 {
-	int n;
-
-	if (*nphi == 0) {
-		*nphi = fft_int((nl_order+1)*MMAX+1, 7);
-	}
-	if (*nlat == 0) {
-		n = ((nl_order+1)*LMAX)/2 +1;		// gauss
-		if (((flags&255) == sht_auto)||((flags&255) == sht_reg_fast)) n = fft_int(nl_order*LMAX+1, 7);		// dct
-		*nlat = n + (n&1);		// even is better.
-	}
-
-/*	if ((*nlat < 200) && ((flags & 0xFFFF00) == SHT_NATIVE_LAYOUT)) {
-		flags = ((flags & 0xFF) | SHT_PHI_CONTIGUOUS);
-	}	// \todo we should time out-of-place and in-place, and chose the fastest.
-*/
-	return( shtns_precompute(flags, eps, *nlat, *nphi) );
+	if ((nlat == 0)||(nphi == 0)) shtns_runerr("nlat or nphi is zero !");
+	return( shtns_precompute_auto(flags, eps, 0, &nlat, &nphi) );
 }
+
 
 /*! Simple initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * This function sets all global variables by calling \ref shtns_set_size followed by \ref shtns_precompute, with the

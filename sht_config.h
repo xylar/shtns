@@ -30,7 +30,7 @@
 #define SHT_DEFAULT_NORM ( sht_orthonormal )
 //#define SHT_DEFAULT_NORM ( sht_schmidt | SHT_NO_CS_PHASE )
 
-/// The maximum order of non-linear terms to be resolved by SH transform.
+/// The maximum order of non-linear terms to be resolved by SH transform by default.
 /// 1 : no non-linear terms. 2 : quadratic non-linear terms (default), 3 : triadic, ...
 /// must be larger or equal to 1.
-#define SHT_NL_ORDER 2
+#define SHT_DEFAULT_NL_ORDER 2

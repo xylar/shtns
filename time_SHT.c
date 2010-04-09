@@ -18,7 +18,9 @@ complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
 complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
-long int LMAX,MMAX,NLAT,MRES,NPHI,NLM;
+int LMAX,MMAX,MRES,NLM;
+int NLAT = 0;
+int NPHI = 0;
 
 // number of SH iterations
 long int SHT_ITER = 50;		// do 50 iterations by default
@@ -375,6 +377,7 @@ void usage()
 	printf(" -reg : force regular grid\n");
 	printf(" -oop : force out-of-place transform\n");
 	printf(" -transpose : force transpose data (ie phi varies fastest)\n");
+	printf(" -nlorder : define non-linear order to be resolved.\n");
 }
 
 int main(int argc, char *argv[])
@@ -389,6 +392,7 @@ int main(int argc, char *argv[])
 	enum shtns_type shtmode = sht_auto;		// default to "auto" (fastest) mode.
 	enum shtns_norm shtnorm = sht_orthonormal;		// default to "orthonormal" SH.
 	int layout = SHT_NATIVE_LAYOUT;
+	int nlorder = 0;
 	char name[20];
 
 	srand( time(NULL) );	// initialise les nombres.
@@ -400,7 +404,7 @@ int main(int argc, char *argv[])
 
 //	first argument is lmax, and is mandatory.
 	sscanf(argv[1],"%lf",&t);	LMAX=t;
-	MMAX=LMAX;	MRES=1;	NLAT=LMAX+2+(LMAX&1);	NPHI=(MMAX+1)*2;		//defaults
+	MMAX=LMAX;	MRES=1;			//defaults
 
 	for (i=2; i<argc; i++) {		// parse command line
 		sscanf(argv[i],"-%[^=]=%lf",name,&t);
@@ -416,12 +420,12 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"4pi") == 0) shtnorm = sht_fourpi | SHT_REAL_NORM;
 		if (strcmp(name,"oop") == 0) layout = SHT_THETA_CONTIGUOUS;
 		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
+		if (strcmp(name,"nlorder") == 0) nlorder = t;
 	}
 
-//	NLM = shtns_init(shtmode | layout, LMAX, MMAX, MRES, NLAT, NPHI);
 	NLM = shtns_set_size(LMAX, MMAX, MRES, shtnorm);
-	shtns_precompute(shtmode | layout, polaropt, NLAT, NPHI);
-	
+	shtns_precompute_auto(shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
+
 	m_opt = Get_MTR_DCT();
 
 	t1 = 1.0+2.0*I;
