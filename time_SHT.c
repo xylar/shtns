@@ -404,7 +404,7 @@ int main(int argc, char *argv[])
 
 //	first argument is lmax, and is mandatory.
 	sscanf(argv[1],"%lf",&t);	LMAX=t;
-	MMAX=LMAX;	MRES=1;			//defaults
+	MMAX=-1;	MRES=1;
 
 	for (i=2; i<argc; i++) {		// parse command line
 		sscanf(argv[i],"-%[^=]=%lf",name,&t);
@@ -423,6 +423,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"nlorder") == 0) nlorder = t;
 	}
 
+	if (MMAX == -1) MMAX=LMAX/MRES;
 	NLM = shtns_set_size(LMAX, MMAX, MRES, shtnorm);
 	shtns_precompute_auto(shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
 

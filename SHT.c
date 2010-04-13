@@ -75,6 +75,44 @@ double shlm_e1(int l, int m) {
 /*  LEGENDRE FUNCTIONS  */
 #include "sht_legendre.c"
 
+
+/// return the smallest power of 2 larger than n.
+int next_power_of_2(int n)
+{
+	int f = 1;
+	if ( (n<=0) || (n>(1<<(sizeof(int)*8-2))) ) return 0;
+	while (f<n) f*=2;
+	return f;
+}
+
+/// find the closest integer that is larger than n and that contains only factors up to fmax.
+/// fmax is 7 for optimal FFTW fourier transforms.
+/// return only even integers for n>fmax.
+int fft_int(int n, int fmax)
+{
+	int k,f;
+
+	if (n<=fmax) return n;
+	if (fmax<2) return 0;
+	if (fmax==2) return next_power_of_2(n);
+
+	n -= 2-(n&1);		// only even n
+	do {
+		n+=2;	f=2;
+		while ((2*f <= n) && ((n&f)==0)) f *= 2;		// no divisions for factor 2.
+		k=3;
+		while ((k<=fmax) &&  (k*f <= n)) {
+			while ((k*f <= n) && (n%(k*f)==0)) f *= k;
+			k+=2;
+		}
+	} while (f != n);
+
+	k = next_power_of_2(n);			// what is the closest power of 2 ?
+	if ((k-n)*33 < n) return k;		// rather choose power of 2 if not too far (3%)
+
+	return n;
+}
+
 /*
 	SHT FUNCTIONS
 */
@@ -362,7 +400,8 @@ int planFFT(int layout)
 
 #if SHT_VERBOSE > 0
 	printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc,phi_embed);
-	if (NPHI <= (SHT_NL_ORDER+1)*MMAX) printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
+	if (NPHI <= (SHT_NL_ORDER+1)*MMAX)	printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
+	if (NPHI != fft_int(NPHI,7))		printf("     !! Warning : Nphi is not optimal for FFTW !\n");
 	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
 #endif
 
@@ -908,7 +947,8 @@ void init_SH_dct(int analysis)
 
 #if SHT_VERBOSE > 0
 	printf("        => using equaly spaced nodes with DCT acceleration\n");
-	if (NLAT <= SHT_NL_ORDER *LMAX) printf("     !! Warning : DCT anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER);
+	if (NLAT <= SHT_NL_ORDER *LMAX)	printf("     !! Warning : DCT anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER);
+	if (NLAT != fft_int(NLAT,7))	printf("     !! Warning : Nlat is not optimal for FFTW !\n");
 #endif
 	if ((NLAT_2)*2 <= LMAX+1) shtns_runerr("NLAT_2*2 should be at least LMAX+2 (DCT)");
 	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
@@ -1294,43 +1334,6 @@ double SHT_error()
 #endif
 	return(err);		// return max error.
 }
-
-/// return the smallest power of 2 larger than n.
-int next_power_of_2(int n)
-{
-	int f = 1;
-	if ( (n<=0) || (n>(1<<(sizeof(int)*8-2))) ) return 0;
-	while (f<n) f*=2;
-	return f;
-}
-
-/// find the closest integer that is larger than n and that contains only factors up to fmax.
-/// fmax is 7 for optimal FFTW fourier transforms.
-/// return only even integers for n>fmax.
-int fft_int(int n, int fmax)
-{
-	int k,f;
-
-	if (n<=fmax) return n;
-	if (fmax<=1) return 0;
-
-	n -= 2-(n&1);		// only even n
-	do {
-		n+=2;	f=2;
-		while ((2*f <= n) && ((n&f)==0)) f *= 2;		// no divisions for factor 2.
-		k=3;
-		while ((k<=fmax) &&  (k*f <= n)) {
-			while ((k*f <= n) && (n%(k*f)==0)) f *= k;
-			k+=2;
-		}
-	} while (f != n);
-
-	k = next_power_of_2(n);			// what is the closest power of 2 ?
-	if ((k-n)*33 < n) return k;		// rather choose power of 2 if not too far (3%)
-
-	return n;
-}
-
 
 #ifndef _HGID_
   #define _HGID_ "unknown"
