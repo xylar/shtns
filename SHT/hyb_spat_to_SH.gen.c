@@ -183,27 +183,28 @@ V		BtF += NLAT;	BpF += NLAT;
   #endif
   #ifndef SHT_AXISYM
 		i0 = (NPHI==1) ? 1 : 2;		// stride of source data.
-		i=0;	l=NLAT-1;
+		i=0;
  B		do {	// compute symmetric and antisymmetric parts. Warning : re0,... contain variable i !!
-QB			re0 = ((double*)BrF)[i*i0] + ((double*)BrF)[l*i0];
-QB			ro0 = ((double*)BrF)[i*i0] - ((double*)BrF)[l*i0];
-VB			te0 = ((double*)BtF)[i*i0] + ((double*)BtF)[l*i0];
-VB			to0 = ((double*)BtF)[i*i0] - ((double*)BtF)[l*i0];
-VB			pe0 = ((double*)BpF)[i*i0] + ((double*)BpF)[l*i0];
-VB			po0 = ((double*)BpF)[i*i0] - ((double*)BpF)[l*i0];
- B			i++;	l--;
- B		} while(i<=l);
+QB			double a = ((double*)BrF)[i*i0];		double b = ((double*)BrF)[(NLAT-1)*i0 -i*i0];
+QB			re0 = a+b;		ro0 = a-b;
+VB			double c = ((double*)BtF)[i*i0];		double d = ((double*)BtF)[(NLAT-1)*i0 -i*i0];
+VB			te0 = c+d;		to0 = c-d;
+VB			double e = ((double*)BpF)[i*i0];		double f = ((double*)BpF)[(NLAT-1)*i0 -i*i0];
+VB			pe0 = e+f;		po0 = e-f;
+ B			i++;
+ B		} while(i<ni);
   #else
-		i=0;	l=NLAT-1;
+		i=0;
  B		do {	// compute symmetric and antisymmetric parts.
-QB			re0 = ( ((double*)BrF)[i] + ((double*)BrF)[l] )*NPHI;
-QB			ro0 = ( ((double*)BrF)[i] - ((double*)BrF)[l] )*NPHI;
-VB			te0 = ( ((double*)BtF)[i] + ((double*)BtF)[l] )*NPHI;
-VB			to0 = ( ((double*)BtF)[i] - ((double*)BtF)[l] )*NPHI;
-VB			pe0 = ( ((double*)BpF)[i] + ((double*)BpF)[l] )*NPHI;
-VB			po0 = ( ((double*)BpF)[i] - ((double*)BpF)[l] )*NPHI;
- B			i++;	l--;
- B		} while(i<=l);
+ B			double np = NPHI;
+QB			double a = ((double*)BrF)[i];		double b = ((double*)BrF)[NLAT-1-i];
+QB			re0 = (a+b)*np;		ro0 = (a-b)*np;
+VB			double c = ((double*)BtF)[i];		double d = ((double*)BtF)[NLAT-1-i];
+VB			te0 = (c+d)*np;		to0 = (c-d)*np;
+VB			double e = ((double*)BpF)[i];		double f = ((double*)BpF)[NLAT-1-i];
+VB			pe0 = (e+f)*np;		po0 = (e-f)*np;
+ B			i++;
+ B		} while(i<ni);
   #endif
 Q		l=0;
 V		l=1;		// l=0 is zero for the vector transform.
@@ -284,13 +285,13 @@ V			Sl[l] = 0.0;	Tl[l] = 0.0;
   #ifndef SHT_AXISYM
 	for (im=1;im<=MTR;im++) {
 		i0 = tm[im];
- B		i=i0;	l=NLAT-1-i0;
+ B		i=i0;
  B		do {	// compute symmetric and antisymmetric parts.
-QB			re = BrF[i] + BrF[l];	ro = BrF[i] - BrF[l];
-VB			te = BtF[i] + BtF[l];	to = BtF[i] - BtF[l];
-VB			pe = BpF[i] + BpF[l];	po = BpF[i] - BpF[l];
- B			i++;	l--;
- B		} while (i <= l);
+QB			q0 = BrF[i];	q1 = BrF[NLAT-1-i];		re = q0+q1;	ro = q0-q1;
+VB			t0 = BtF[i];	t1 = BtF[NLAT-1-i];		te = t0+t1;	to = t0-t1;
+VB			s0 = BpF[i];	s1 = BpF[NLAT-1-i];		pe = s0+s1;	po = s0-s1;
+ B			i++;
+ B		} while (i<ni);
 		l=im*MRES;
 Q		Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 V		Sl = &Slm[LiM(0,im)];	Tl = &Tlm[LiM(0,im)];
