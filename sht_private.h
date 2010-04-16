@@ -10,6 +10,14 @@
 // FFTW la derivee d/dx = ik	(pas de moins !)
 #include <fftw3.h>
 
+#ifdef __SSE3__
+  #include <pmmintrin.h>
+#else
+  #ifdef __SSE2__
+  #include <emmintrin.h>
+  #endif
+#endif
+
 #include "sht_config.h"
 
 #include "shtns.h"
@@ -113,3 +121,22 @@ extern fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 
 #define SSE __attribute__((aligned (16)))
 
+#if _GCC_VEC_ && __SSE2__
+	typedef double s2d __attribute__ ((vector_size (16)));
+	typedef double v2d __attribute__ ((vector_size (16)));
+	typedef union {v2d v; complex double c; double d[2]; double r; } vcplx;
+	#define vdup(x) _mm_set1_pd(x)
+	#ifdef __SSE3__
+		#warning "using GCC vector instructions (sse3)"
+		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd(b,b,1))		// a + I*b
+	#else
+		#warning "using GCC vector instructions (sse2)"
+		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(-1.0, 1.0)) )		// a + I*b
+	#endif
+#else
+	typedef double s2d;
+	typedef complex double v2d;
+	typedef union {v2d v; complex double c; double d[2]; double r; } vcplx;
+	#define vdup(x) (x)
+	#define addi(a,b) ((a) + I*(b))
+#endif

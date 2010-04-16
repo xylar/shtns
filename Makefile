@@ -17,16 +17,16 @@ cmd = gcc $(go)
 ## gcc k8 (lgitl3)
 #cmd = gcc $(go) -march=k8
 ## gcc core2 (calcul1&2)
-#cmd = gcc $(go) -march=core2 -mfpmath=sse
+#cmd = gcc $(go) -march=core2
 ## icare 64bits opteron
 #cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
 ## r2d2
 #cmd = gcc $(go) -march=core2 -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
 
-# intel compiler is used for codelets (leads to faster code)
+# intel compiler may be used for codelets
 shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
-# if icc is not available, use gcc instead by uncommenting the following line.
-shtcc = $(cmd)
+# gcc + vector intrinsic leads to faster code.
+shtcc = $(cmd) -D_GCC_VEC_
 
 shtfiles = SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
 
