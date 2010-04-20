@@ -447,10 +447,10 @@ int main(int argc, char *argv[])
 	NLF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	NL = (double *) NLF;
 
-	Tlm0 = (complex double *) malloc(sizeof(complex double)* NLM);
-	Slm0 = (complex double *) malloc(sizeof(complex double)* NLM);
-	Slm = (complex double *) malloc(sizeof(complex double)* NLM);
-	Tlm = (complex double *) malloc(sizeof(complex double)* NLM);
+	Tlm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Slm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 
 // perform fft tests.
 //	init_fft_tests();
