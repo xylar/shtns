@@ -54,10 +54,10 @@ VB	#define pe(i)	tpeo[4*(i)+2]
 VB	#define po(i)	tpeo[4*(i)+3]
 QB	#define re0(i)	reo0[2*(i)]
 QB	#define ro0(i)	reo0[2*(i)+1]
-VB	#define to0(i)	tpeo0[4*(i)]
-VB	#define te0(i)	tpeo0[4*(i)+1]
-VB	#define po0(i)	tpeo0[4*(i)+2]
-VB	#define pe0(i)	tpeo0[4*(i)+3]
+VB	#define te0(i)	tpeo0[4*(i)]
+VB	#define to0(i)	tpeo0[4*(i)+1]
+VB	#define pe0(i)	tpeo0[4*(i)+2]
+VB	#define po0(i)	tpeo0[4*(i)+3]
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 Q    	BrF = (complex double *) Vr;
@@ -253,18 +253,18 @@ VO			t0 = 0.0;	s1 = 0.0;
 			do {
 QE				q0 += zl[0] * re0(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 QO				q1 += zl[1] * ro0(i);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-VE				s0 += dzl0[0] * to0(i);
-VO				t0 -= dzl0[0] * po0(i);
-VO				s1 += dzl0[1] * te0(i);
-VE				t1 -= dzl0[1] * pe0(i);
+VO				s0 += dzl0[0] * te0(i);
+VE				t0 -= dzl0[0] * pe0(i);
+VE				s1 += dzl0[1] * to0(i);
+VO				t1 -= dzl0[1] * po0(i);
 Q				zl +=2;
 V				dzl0 +=2;
 				i++;
 			} while(i < ni);
 QE			Ql[l] = q0;
 QO			Ql[l+1] = q1;
-VE			Sl[l] = s1;	Tl[l+1] = t0;
-VO			Tl[l] = t1;	Sl[l+1] = s0;
+VE			Sl[l] = s0;		Tl[l+1] = t1;
+VO			Tl[l] = t0;		Sl[l+1] = s1;
   #else
 Q			v2d q = vdup(0.0);
 V			v2d s = vdup(0.0);		v2d t = vdup(0.0);
@@ -277,51 +277,38 @@ V				dzl0 +=2;
 				i++;
 			} while(i < ni);
 Q			((v2d*) Ql)[l] = vlo_to_cplx(q);		((v2d*) Ql)[l+1] = vhi_to_cplx(q);
-V			((v2d*) Sl)[l] = vhi_to_cplx(s);		((v2d*) Sl)[l+1] = vlo_to_cplx(s);
-V			((v2d*) Tl)[l] = vhi_to_cplx(t);		((v2d*) Tl)[l+1] = vlo_to_cplx(t);
+V			((v2d*) Sl)[l] = vlo_to_cplx(s);		((v2d*) Sl)[l+1] = vhi_to_cplx(s);
+V			((v2d*) Tl)[l] = vlo_to_cplx(t);		((v2d*) Tl)[l+1] = vhi_to_cplx(t);
   #endif
 			l+=2;
 		}
-		if (l==LMAX) {
+		if (l==LTR) {
+			long int lstride=1;
+	  #ifdef SHT_VAR_LTR
+			if (l != LMAX) lstride=2;
+	  #endif
 QE			q0 = 0.0;
-VE			s1 = 0.0;
-VO			t1 = 0.0;
+VE			s0 = 0.0;
+VO			t0 = 0.0;
 			i=0;	do {
 QE				q0 += zl[0] * re0(i);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				s1 += dzl0[0] * te0(i);
-VO				t1 -= dzl0[0] * pe0(i);
-Q				zl ++;
-V				dzl0 ++;
+VE				s0 += dzl0[0] * te0(i);
+VO				t0 -= dzl0[0] * pe0(i);
+Q				zl += lstride;
+V				dzl0 += lstride;
 				i++;
 			} while(i<ni);
 QE			Ql[l] = q0;
-VE			Sl[l] = s1;
-VO			Tl[l] = t1;
-  #ifdef SHT_VAR_LTR
-		} else {
-		    if (l==LTR) {
-QE			q0 = 0.0;
-VE			s1 = 0.0;
-VO			t1 = 0.0;
-			i=0;	do {
-QE				q0 += zl[0] * re0(i);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VO				s1 += dzl0[1] * te0(i);
-VE				t1 -= dzl0[1] * pe0(i);
-Q				zl +=2;
-V				dzl0 +=2;
-				i++;
-			} while(i<ni);
-QE			Ql[l] = q0;
-VE			Sl[l] = s1;
-VO			Tl[l] = t1;
+VE			Sl[l] = s0;
+VO			Tl[l] = t0;
+	  #ifdef SHT_VAR_LTR
+	  		l++;
+		}
+	    while( l<=LMAX ) {
+Q			((v2d*) Ql)[l] = vdup(0.0);
+V			((v2d*) Sl)[l] = vdup(0.0);	((v2d*) Tl)[l] = vdup(0.0);
 			l++;
-		    }
-		    while( l<=LMAX ) {
-Q			Ql[l] = 0.0;
-V			Sl[l] = 0.0;	Tl[l] = 0.0;
-			l++;
-		    }
-  #endif
+      #endif
 		}
   #ifndef SHT_NO_DCT
 	}
@@ -369,7 +356,11 @@ VE			Sl[l] = addi(s0,s0i);	Tl[l+1] = addi(t1,t1i);
 VO			Tl[l] = addi(t0,t0i);	Sl[l+1] = addi(s1,s1i);
 			l+=2;
 		}
-		if (l==LMAX) {
+		if (l==LTR) {
+			long int lstride=1;
+	  #ifdef SHT_VAR_LTR
+			if (l != LMAX) lstride=2;
+	  #endif
 QE			v2d q0 = vdup(0.0);	// Qlm[LiM(l,im)] = 0.0;
 VE			v2d s0 = vdup(0.0);	v2d s0i = vdup(0.0);
 VO			v2d t0 = vdup(0.0);	v2d t0i = vdup(0.0);
@@ -379,40 +370,21 @@ VE				s0  += vdup(dzl[0].t) *to(i);
 VE				s0i -= vdup(dzl[0].p) *pe(i);
 VO				t0  -= vdup(dzl[0].t) *po(i);
 VO				t0i -= vdup(dzl[0].p) *te(i);
-Q				zl++;
-V				dzl++;
+Q				zl  += lstride;
+V				dzl += lstride;
 				i++;
 			} while(i<ni);
 QE			Ql[l] = q0;
 VE			Sl[l] = addi(s0,s0i);
 VO			Tl[l] = addi(t0,t0i);
-    #ifdef SHT_VAR_LTR
-		} else {
-		    if (l==LTR) {
-QE			v2d q0 = vdup(0.0);
-VE			v2d s0 = vdup(0.0);	v2d s0i = vdup(0.0);
-VO			v2d t0 = vdup(0.0);	v2d t0i = vdup(0.0);
-			i=i0;	do {		// tm[im] : polar optimization
-QE				q0  += vdup(zl[0]) *re(i);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				s0  += vdup(dzl[0].t) *to(i);
-VE				s0i -= vdup(dzl[0].p) *pe(i);
-VO				t0  -= vdup(dzl[0].t) *po(i);
-VO				t0i -= vdup(dzl[0].p) *te(i);
-Q				zl +=2;
-V				dzl +=2;
-				i++;
-			} while (i<ni);
-QE			Ql[l] = q0;
-VE			Sl[l] = addi(s0,s0i);
-VO			Tl[l] = addi(t0,t0i);
-			l++;
-		    }
-		    while( l<=LMAX ) {
+	  #ifdef SHT_VAR_LTR
+	  		l++;
+		}
+	    while( l<=LMAX ) {
 Q			Ql[l] = vdup(0.0);
 V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
 			l++;
-		    }
-    #endif
+      #endif
 		}
 	}
 

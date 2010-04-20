@@ -84,8 +84,8 @@ Q			q0 = 0.0;
 V			s0 = 0.0;	t1 = 0.0;
 			do {
 Q				q0 += zl[0] * re0;	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-V				s0 += dzl0[0] * to0;
-V				t1 += dzl0[1] * pe0;
+V				t1 += dzl0[0] * pe0;
+V				s0 += dzl0[1] * to0;
 Q				zl +=2;
 V				dzl0 +=2;
 				i+=i0;
@@ -117,7 +117,7 @@ Q			}
 Q				q0 = 0.0;
 V				t1 = 0.0;
 V				i=0;	do {
-V					t1 += dzl0[1] * pe0;
+V					t1 += dzl0[0] * pe0;
 V					dzl0 +=2;
 V					i+=i0;
 V				} while(i<ni);

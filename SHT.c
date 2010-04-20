@@ -669,22 +669,25 @@ void OptimizeMatrices(double eps)
 /// Compression of dylm and dzlm for m=0, as .p is 0
 	im=0;	m=0;
 	yg = (double *) dylm[im];
+	int lstride = (LMAX-m+1);
+//	lstride += (lstride & 1);		// we need an even stride here.
 	for (it=0; it<NLAT_2; it++) {
 		for (l=m; l<=LMAX; l++)
-			yg[it*(LMAX-m+1) + (l-m)] = dylm[im][it*(LMAX-m+1) + (l-m)].t;
+			yg[it*lstride + (l-m)] = dylm[im][it*(LMAX-m+1) + (l-m)].t;
+//		if ((LMAX & 1) == 0) yg[it*lstride + (LMAX+1-m)] = 0.0;
 	}
 	yg = (double *) dzlm[im];
 	if (yg != NULL) {	// for sht_reg_poles there is no dzlm defined.
 		for (l=1; l<LMAX-1; l+=2) {		// l=0 is zero, so we start at l=1.
 			for (it=0; it<NLAT_2; it++) {
-				yg[(l-m-1)*NLAT_2 + it*2] = dzlm[im][(l-m+1)*NLAT_2 + it*2].t;		// l+1
-				yg[(l-m-1)*NLAT_2 + it*2+1] = dzlm[im][(l-m-1)*NLAT_2 + it*2+1].t;	// l
+				yg[(l-m-1)*NLAT_2 + it*2] = dzlm[im][(l-m-1)*NLAT_2 + it*2+1].t;	// l
+				yg[(l-m-1)*NLAT_2 + it*2+1] = dzlm[im][(l-m+1)*NLAT_2 + it*2].t;	// l+1
 			}
 		}
 		if (l==LMAX-1) {
 			for (it=0; it<NLAT_2; it++) {
-				yg[(l-m-1)*NLAT_2 + it*2] = dzlm[im][(l-m+1)*NLAT_2 + it].t;		// l+1
-				yg[(l-m-1)*NLAT_2 + it*2+1] = dzlm[im][(l-m-1)*NLAT_2 + it*2+1].t;	// l
+				yg[(l-m-1)*NLAT_2 + it*2] = dzlm[im][(l-m-1)*NLAT_2 + it*2+1].t;	// l
+				yg[(l-m-1)*NLAT_2 + it*2+1] = dzlm[im][(l-m+1)*NLAT_2 + it].t;		// l+1
 			}
 		}
 		if (l==LMAX) {		// last l is stored right away, without interleaving.
@@ -768,7 +771,7 @@ void init_SH_gauss()
 #endif
 
 	init_SH_synth();
-	
+
 // for analysis (decomposition, direct transform) : transpose and multiply by gauss weight and other normalizations.
 // interleave l and l+1 : this stores data in the way it will be read.
 	for (im=0; im<=MMAX; im++) {
@@ -1452,6 +1455,10 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	int n_gauss = 0;
 
 	if (nl_order <= 0) nl_order = SHT_DEFAULT_NL_ORDER;
+/*	shtns.lshift = 0;
+	if (nl_order == 0) nl_order = SHT_DEFAULT_NL_ORDER;
+	if (nl_order < 0) {	shtns.lshift = -nl_order;	nl_order = 1; }		// linear with a shift in l.
+*/
 	shtns.nlorder = nl_order;
 	shtns.mtr_dct = -1;
 	layout = flags & 0xFFFF00;
