@@ -108,59 +108,70 @@ T			Tl[l-1] = 0.0;
   #endif
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {	// dct for m=0.
+	#ifdef _GCC_VEC_
+Q		v2d* Ql = Ql0;
+S		v2d* Sl = Sl0;
+T		v2d* Tl = Tl0;
+    #else
 Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
+    #endif
 Q		yl = ykm_dct[im];
 V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
+V		l = 1;
+		do {
+Q			l = k;
+	#ifndef _GCC_VEC_
 Q			re = 0.0;	ro = 0.0;
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
-		do {
-			l = k;
-			do {
+			while(l<llim) {
 QE				re += yl[0]  * Ql[2*l];
 QO				ro += yl[1]  * Ql[2*l+2];
-SE				to += dyl0[0] * Sl[2*l];
-SO				te += dyl0[1] * Sl[2*l+2];
-TO				po -= dyl0[0] * Tl[2*l];
-TE				pe -= dyl0[1] * Tl[2*l+2];
+SO				te += dyl0[0] * Sl[2*l];
+TE				pe -= dyl0[0] * Tl[2*l];
+SE				to += dyl0[1] * Sl[2*l+2];
+TO				po -= dyl0[1] * Tl[2*l+2];
 				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
-			} while(l<llim);
+			}
 			if (l==llim) {
 QE				re += yl[0]  * Ql[2*l];
-SE				to += dyl0[0] * Sl[2*l];
-TO				po -= dyl0[0] * Tl[2*l];
-Q				yl++;
-V				dyl0++;
+SO				te += dyl0[0] * Sl[2*l];
+TE				pe -= dyl0[0] * Tl[2*l];
+Q				yl+=2;
+V				dyl0+=2;
 			}
 Q			BR0[k] = re;	BR0[k+1] = ro;
 S			BT0[k] = te;	BT0[k+1] = to;
 T			BP0[k] = pe;	BP0[k+1] = po;
+	#else
+Q			v2d r = vdup(0.0);
+S			v2d t = vdup(0.0);
+T			v2d p = vdup(0.0);
+			do {
+Q				r += ((v2d*) yl)[0]   * Ql0[l/2];		// { re, ro }
+S				t += ((v2d*) dyl0)[0] * Sl0[l/2];		// { te, to }
+T				p -= ((v2d*) dyl0)[0] * Tl0[l/2];		// { pe, po }
+				l+=2;
+Q				yl+=2;
+V				dyl0+=2;
+			} while(l<=llim);
+Q			BR0[k] = vlo_to_dbl(r);	BR0[k+1] = vhi_to_dbl(r);
+S			BT0[k] = vlo_to_dbl(t);	BT0[k+1] = vhi_to_dbl(t);
+T			BP0[k] = vlo_to_dbl(p);	BP0[k+1] = vhi_to_dbl(p);
+	#endif
 			k+=2;
 		#ifdef SHT_VAR_LTR
-Q			yl+= (LMAX-LTR);
-V			dyl0+= (LMAX-LTR);
+Q			yl  += (LMAX/2 - LTR/2)*2;
+V			dyl0 += ((LMAX+1)/2 - (LTR+1)/2)*2;
 		#endif
-Q			re = 0.0;	ro = 0.0;
-S			to = 0.0;
-T			po = 0.0;
-SO			te = dyl0[1] * Sl[2*(k-1)];
-TE			pe = -dyl0[1] * Tl[2*(k-1)];
-V			dyl0+=2;
-		} while (k<llim);
-		if (k==llim) {
-QE			re = yl[0] * Ql[2*k];
-SE			to = dyl0[0] * Sl[2*k];
-TO			po = -dyl0[0] * Tl[2*k];
-		}
-Q		BR0[k] = re;	BR0[k+1] = ro;
-S		BT0[k] = te;	BT0[k+1] = to;
-T		BP0[k] = pe;	BP0[k+1] = po;
-		k+=2;
+V			l = k-1;
+Q		} while (k<=llim);
+V		} while (k<=llim+1);
 		while (k<NLAT) {	// dct padding (NLAT is even)
 Q			BR0[k] = 0.0;	BR0[k+1] = 0.0;
 S			BT0[k] = 0.0;	BT0[k+1] = 0.0;

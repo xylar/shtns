@@ -74,7 +74,9 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 		if (t>tmax) { tmax = t; jj = i; }
 	  }
 	}
-	printf("   => max error = %g (l=%.0f,lm=%d)   rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	printf("   => max error = %g (l=%.0f,lm=%d)   rms error = %g",tmax,el[jj],jj,sqrt(n2/NLM));
+	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
+		else printf("\n");
 	return(tmax);
 }
 
@@ -98,7 +100,9 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		if (t>tmax) { tmax = t; jj = i; }
 	  }
 	}
-	printf("   Spheroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	printf("   Spheroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g",tmax,el[jj],jj,sqrt(n2/NLM));
+	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
+		else printf("\n");
 //	write_vect("Slm",Slm,NLM*2);
 
 // compute error :
@@ -116,7 +120,9 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		if (t>tmax) { tmax = t; jj = i; }
 	  }
 	}
-	printf("   Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
+	printf("   Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g",tmax,el[jj],jj,sqrt(n2/NLM));
+	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
+		else printf("\n");
 //	write_vect("Tlm",Tlm,NLM*2);
 }
 

@@ -991,6 +991,7 @@ void init_SH_dct(int analysis)
 		for (it=0; it<= KMAX; it+=2) {
 			l = (it < m) ? m : it-(m&1);
 			sk += LMAX+1 - l;
+			if ((m==0) && ((LMAX & 1) ==0)) sk++;		// SSE padding for m=0
 		}
 		for (it=0; it<= KMAX; it+=2) {
 			l = (it-2 < m) ? m : it-2+(m&1);
@@ -1014,6 +1015,7 @@ void init_SH_dct(int analysis)
 		for (it=0, sk=0; it<= KMAX; it+=2) {
 			l = (it < m) ? m : it-(m&1);
 			sk += LMAX+1 - l;
+			if ((m==0) && ((LMAX & 1) ==0)) sk++;		// SSE padding for m=0
 		}
 		for (it=0, dsk=0; it<= KMAX; it+=2) {
 			l = (it-2 < m) ? m : it-2+(m&1);
@@ -1217,6 +1219,7 @@ void init_SH_dct(int analysis)
 				yg[0] = yk[(it/2)*(LMAX+1-m) + (l-m)];
 				l++;	yg++;
 			}
+			if ((m==0) && ((LMAX & 1) == 0)) {	yg[0] = 0;		yg++;	}		// SSE2 padding.
 		}
 		for (it=0; it<= KMAX; it+=2) {
 			l = (it-2 < m) ? m : it-2+(m&1);
@@ -1226,15 +1229,19 @@ void init_SH_dct(int analysis)
 				l++;	dyg++;
 			}
 		}
-		if (im == 0) {		// compact m=0 dylm because .p = 0 :
+		if (im == 0) {		// compact and reorder m=0 dylm because .p = 0 :
 			dyg = dykm_dct[im];
 			yg = (double *) dykm_dct[im];
 			for (it=0; it<= KMAX; it+=2) {
-				for (l=it-2; l<=LMAX; l++) {
-					if (l>=0) {
+				dyg++;
+				for (l=it-1; l<=LMAX; l++) {
+					if (l>0) {
 						yg[0] = dyg[0].t;
 						yg++;	dyg++;
 					}
+				}
+				if (LMAX&1) {		// padding for SSE2 alignement.
+					yg[0] = 0.0;	yg++;
 				}
 			}
 		}
