@@ -39,9 +39,6 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
 #Q void SH_to_spat(complex double *Qlm, double *Vr)
 #V void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
 # {
-Q	complex double *Ql;
-S	complex double *Sl;
-T	complex double *Tl;
 Q	v2d *BrF;
   #ifndef SHT_AXISYM
 V	v2d *BtF, *BpF;
@@ -66,8 +63,12 @@ Q	double *yl;
 V	double *dyl0;
 	long int llim;
 	long int k,im,m,l;
+  #ifdef _GCC_VEC_
+Q	v2d Ql0[(LTR+2)/2];
+S	v2d Sl0[(LTR+1)/2];
+T	v2d Tl0[(LTR+1)/2];
+  #endif
 
-	llim = LTR;	// copy LTR to a local variable for faster access (inner loop limit)
   #ifndef SHT_AXISYM
 Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
@@ -82,12 +83,34 @@ S	BtF = (v2d*) Vt;
 T	BpF = (v2d*) Vp;
   #endif
 
+	llim = LTR;		// copy LTR to a local variable for faster access (inner loop limit)
 	im=0;	m=0;
-Q		Ql = Qlm;
-S		Sl = Slm;
-T		Tl = Tlm;
+  #ifdef _GCC_VEC_
+  	{	// store the m=0 coefficients in an efficient & vectorizable way.
+Q		l=0;
+V		l=1;
+Q		double* Ql = (double*) &Ql0;
+S		double* Sl = (double*) &Sl0;
+T		double* Tl = (double*) &Tl0;
+		do {		// for m=0, compress the complex S,T to double
+Q			Ql[l] = (double) Qlm[l];	//	Ql[l+1] = (double) Qlm[l+1];
+S			Sl[l-1] = (double) Slm[l];	//	Sl[l] = (double) Slm[l+1];
+T			Tl[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
+			l++;
+		} while(l<=llim);
+		if (l & 1) {
+Q			Ql[l] = 0.0;
+		} else {
+S			Sl[l-1] = 0.0;
+T			Tl[l-1] = 0.0;
+		}
+	}
+  #endif
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {	// dct for m=0.
+Q		double* Ql = (double*) Qlm;
+S		double* Sl = (double*) Slm;
+T		double* Tl = (double*) Tlm;
 Q		yl = ykm_dct[im];
 V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
@@ -97,20 +120,20 @@ T			pe = 0.0;	po = 0.0;
 		do {
 			l = k;
 			do {
-QE				re += yl[0]  * (double) Ql[l];
-QO				ro += yl[1]  * (double) Ql[l+1];
-SE				to += dyl0[0] * (double) Sl[l];
-SO				te += dyl0[1] * (double) Sl[l+1];
-TO				po -= dyl0[0] * (double) Tl[l];
-TE				pe -= dyl0[1] * (double) Tl[l+1];
+QE				re += yl[0]  * Ql[2*l];
+QO				ro += yl[1]  * Ql[2*l+2];
+SE				to += dyl0[0] * Sl[2*l];
+SO				te += dyl0[1] * Sl[2*l+2];
+TO				po -= dyl0[0] * Tl[2*l];
+TE				pe -= dyl0[1] * Tl[2*l+2];
 				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
 			} while(l<llim);
 			if (l==llim) {
-QE				re += yl[0]  * (double) Ql[l];
-SE				to += dyl0[0] * (double) Sl[l];
-TO				po -= dyl0[0] * (double) Tl[l];
+QE				re += yl[0]  * Ql[2*l];
+SE				to += dyl0[0] * Sl[2*l];
+TO				po -= dyl0[0] * Tl[2*l];
 Q				yl++;
 V				dyl0++;
 			}
@@ -118,19 +141,21 @@ Q			BR0[k] = re;	BR0[k+1] = ro;
 S			BT0[k] = te;	BT0[k+1] = to;
 T			BP0[k] = pe;	BP0[k+1] = po;
 			k+=2;
+		#ifdef SHT_VAR_LTR
 Q			yl+= (LMAX-LTR);
 V			dyl0+= (LMAX-LTR);
+		#endif
 Q			re = 0.0;	ro = 0.0;
 S			to = 0.0;
 T			po = 0.0;
-SO			te = dyl0[1] * (double) Sl[k-1];
-TE			pe = -dyl0[1] * (double) Tl[k-1];
+SO			te = dyl0[1] * Sl[2*(k-1)];
+TE			pe = -dyl0[1] * Tl[2*(k-1)];
 V			dyl0+=2;
 		} while (k<llim);
 		if (k==llim) {
-QE			re = yl[0] * (double) Ql[k];
-SE			to = dyl0[0] * (double) Sl[k];
-TO			po = -dyl0[0] * (double) Tl[k];
+QE			re = yl[0] * Ql[2*k];
+SE			to = dyl0[0] * Sl[2*k];
+TO			po = -dyl0[0] * Tl[2*k];
 		}
 Q		BR0[k] = re;	BR0[k+1] = ro;
 S		BT0[k] = te;	BT0[k+1] = to;
@@ -161,41 +186,88 @@ V		} while (k<NLAT_2);
     #endif
 	} else {
   #endif
+	#ifdef _GCC_VEC_
+Q		v2d* Ql = Ql0;
+S		v2d* Sl = Sl0;
+T		v2d* Tl = Tl0;
+    #else
+Q		double* Ql = (double*) Qlm;
+S		double* Sl = (double*) Slm;
+T		double* Tl = (double*) Tlm;
+    #endif
 		k=0;
 Q		yl  = ylm[im];
 V		dyl0 = (double *) dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
 		do {	// ops : NLAT_2 * [ (lmax-m+1) + 4]	: almost twice as fast.
-			l=0;
+	#ifndef _GCC_VEC_
+Q			l=0;
+V			l=1;
 Q			re = 0.0;	ro = 0.0;
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
 			do {	// compute even and odd parts
-Q				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-QB				ro += yl[1] * (double) Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
-TB				po += dyl0[0] * (double) Tl[l];	// m=0 : everything is real.
-S				to += dyl0[0] * (double) Sl[l];
-T				pe += dyl0[1] * (double) Tl[l+1];
-SB				te += dyl0[1] * (double) Sl[l+1];
+Q				re += yl[0] * Ql[2*l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+QB				ro += yl[1] * Ql[2*l+2];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
+T				pe -= dyl0[0] * Tl[2*l];	// m=0 : everything is real.
+SB				te += dyl0[0] * Sl[2*l];
+TB				po -= dyl0[1] * Tl[2*l+2];
+S				to += dyl0[1] * Sl[2*l+2];
 				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
 			} while (l<llim);
 			if (l==llim) {
-Q				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-TB				po += dyl0[0] * (double) Tl[l];
-S				to += dyl0[0] * (double) Sl[l];
-Q				yl++;
-V				dyl0++;
+Q				re += yl[0] * Ql[2*l];
+TB				pe -= dyl0[0] * Tl[2*l];
+S				te += dyl0[0] * Sl[2*l];
+Q				yl+=2;
+V				dyl0+=2;
 			}
 Q			BR0[k] = re + ro;
 S			BT0[k] = te + to;			// Bt = dS/dt
-T			BP0[k] = -(pe+po);			// Bp = - dT/dt
+T			BP0[k] = pe + po;			// Bp = - dT/dt
 			k++;
 QB			BR0[NLAT-k] = re - ro;
 SB			BT0[NLAT-k] = te - to;
-TB			BP0[NLAT-k] = -(pe-po);
-Q			yl  += (LMAX-LTR);
-V			dyl0 += (LMAX-LTR);
+TB			BP0[NLAT-k] = pe - po;
+	#else
+			l=0;
+Q			v2d r = vdup(0.0);
+S			v2d t = vdup(0.0);
+T			v2d p = vdup(0.0);
+			do {
+Q				r += ((v2d*) yl)[0]   * Ql0[l/2];		// { re, ro }
+S				t += ((v2d*) dyl0)[0] * Sl0[l/2];		// { te, to }
+T				p -= ((v2d*) dyl0)[0] * Tl0[l/2];		// { pe, po }
+				l+=2;
+Q				yl+=2;
+V				dyl0+=2;
+Q			} while (l<=llim);
+V			} while (l<llim);
+	/*	alternate code, which may be faster (slightly) on SSE3.
+Q			r = addi(r,r);		// { re-ro , re+ro }
+S			t = addi(t,t);		// { te-to , te+to }
+T			p = addi(p,p);		// { pe-po , pe+po }
+Q			BR0[k] = vhi_to_dbl(r);
+S			BT0[k] = vhi_to_dbl(t);	// Bt = dS/dt
+T			BP0[k] = vhi_to_dbl(p);	// Bp = - dT/dt
+			k++;
+QB			BR0[NLAT-k] = vlo_to_dbl(r);
+SB			BT0[NLAT-k] = vlo_to_dbl(t);
+TB			BP0[NLAT-k] = vlo_to_dbl(p);
+	*/
+Q			BR0[k] = vhi_to_dbl(r) + vlo_to_dbl(r);
+S			BT0[k] = vhi_to_dbl(t) + vlo_to_dbl(t);	// Bt = dS/dt
+T			BP0[k] = vhi_to_dbl(p) + vlo_to_dbl(p);	// Bp = - dT/dt
+			k++;
+QB			BR0[NLAT-k] = vlo_to_dbl(r) - vhi_to_dbl(r);
+SB			BT0[NLAT-k] = vlo_to_dbl(t) - vhi_to_dbl(t);
+TB			BP0[NLAT-k] = vlo_to_dbl(p) - vhi_to_dbl(p);
+	#endif
+		#ifdef SHT_VAR_LTR
+Q			yl  += (LMAX/2 - LTR/2)*2;
+V			dyl0 += ((LMAX+1)/2 - (LTR+1)/2)*2;
+		#endif
 		} while (k < NLAT_2);
   #ifndef SHT_NO_DCT
 	}
@@ -247,8 +319,10 @@ V			BtF[k] = addi(te, dte);		BtF[k+1] = addi(to, dto);
 V			BpF[k] = addi(pe, dpe);		BpF[k+1] = addi(po, dpo);
 V			l = (k < m) ? m : k+(m&1);
 			k+=2;
+		#ifdef SHT_VAR_LTR
 Q			yl+= (LMAX-LTR);
 V			dyl+= (LMAX-LTR);
+		#endif
 Q			l = (k < m) ? m : k-(m&1);
 V		} while (k<=llim+1-(m&1));
 Q		} while (k<=llim);
@@ -319,8 +393,10 @@ V			BpF[k] = addi(dpe+dpo, pe+po);		// Bp = I.m/sint * S - dT/dt
 QB			BrF[NLAT-k] = re - ro;
 VB			BtF[NLAT-k] = addi(dte-dto, te-to);
 VB			BpF[NLAT-k] = addi(dpe-dpo, pe-po);
+		#ifdef SHT_VAR_LTR
 Q			yl  += (LMAX-LTR);
 V			dyl += (LMAX-LTR);
+		#endif
 		} while (k < NLAT_2);
 		im++;
 Q		BrF += NLAT;

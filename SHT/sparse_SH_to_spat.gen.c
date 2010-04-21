@@ -76,13 +76,14 @@ T		Tl = Tlm;
 Q		yl  = ylm[im] + parity;
 V		dyl0 = (double *) dylm[im];
 		do {	// ops : 
-			l = 0;
+Q			l = 0;
+V			l = 1;
 Q			re = 0.0;
 V			to = 0.0;		pe = 0.0;
 			do {
 Q				re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-S				to += dyl0[0] * (double) Sl[l];
-T				pe += dyl0[1] * (double) Tl[l+1];
+T				pe += dyl0[0] * (double) Tl[l];
+S				to += dyl0[1] * (double) Sl[l+1];
 				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
@@ -90,16 +91,18 @@ V				dyl0+=2;
 			if (l==llim) {
 Q				if (parity == 0)
 Q					re += yl[0] * (double) Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-S				to += dyl0[0] * (double) Sl[l];
-Q				yl++;
-V				dyl0++;
+T				pe += dyl0[0] * (double) Tl[l];
+Q				yl+=2;
+V				dyl0+=2;
 			}
 Q			BR0[k] = re;
 V			BT0[k] = to * sgn_sph;	// Bt = dS/dt
 V			BP0[k] = pe * sgn_tor;	// Bp = - dT/dt
 			k++;
-Q			yl  += (LMAX-LTR);
-V			dyl0 += (LMAX-LTR);
+		#ifdef SHT_VAR_LTR
+Q			yl  += (LMAX/2 - LTR/2)*2;
+V			dyl0 += ((LMAX+1)/2 - (LTR+1)/2)*2;
+		#endif
 		} while (k < NLAT_2);
 		im++;
 Q		BrF += NLAT_2;
@@ -147,8 +150,10 @@ Q			BrF[k] = re;
 V			BtF[k] = I*to + dto*sgn_sph;		// Bt = I.m/sint *T + dS/dt
 V			BpF[k] = I*pe + dpe*sgn_tor;		// Bp = I.m/sint *S - dT/dt
 			k++;
+		#ifdef SHT_VAR_LTR
 Q			yl  += (LMAX-LTR);
 V			dyl += (LMAX-LTR);
+		#endif
 		}
 		im++;
 Q		BrF += NLAT_2;

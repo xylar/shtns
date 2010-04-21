@@ -104,6 +104,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
+	  if (li[i] <= ltr) {
 		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
 			Tlm[i] = creal(Tlm[i]- Tlm0[i]);
 			t = fabs(creal(Tlm[i]));
@@ -113,6 +114,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		}
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
+	  }
 	}
 	printf("   Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g\n",tmax,el[jj],jj,sqrt(n2/NLM));
 //	write_vect("Tlm",Tlm,NLM*2);
@@ -186,6 +188,26 @@ int test_SHT_l(int ltr)
 	return (int) tcpu;
 }
 
+int test_SHT_vect_l(int ltr)
+{
+	int jj,i;
+	clock_t tcpu;
+
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
+	}
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		SHsphtor_to_spat_l(Slm,Tlm,Sh,Th,ltr);
+		spat_to_SHsphtor_l(Sh,Th,Slm,Tlm, ltr);
+	}
+	tcpu = clock() - tcpu;
+	printf("   iSHT + SHT x%d with L-truncation at %d. time : %d\n", SHT_ITER, ltr, (int) tcpu);
+
+	vect_error(Slm, Tlm, Slm0, Tlm0, ltr);
+	return (int) tcpu;
+}
+
 int test_SHT_vect()
 {
 	int jj,i;
@@ -196,13 +218,8 @@ int test_SHT_vect()
 	}
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
-	#ifndef _SHT_EO_
 		SHsphtor_to_spat(Slm,Tlm,Sh,Th);
 		spat_to_SHsphtor(Sh,Th,Slm,Tlm);
-	#else
-		SHsphtor_to_spat(Slm,Slm,Sh,Th);
-		spat_to_SHsphtor(Sh,Th, Slm,Slm);
-	#endif
 	}
 	tcpu = clock() - tcpu;
 	printf("   iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
@@ -231,6 +248,26 @@ int test_SHT_vect_parity(int eo)
 	return (int) tcpu;
 }
 
+int test_SHT_vect_m0()
+{
+	int jj,i;
+	clock_t tcpu;
+
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
+	}
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		SHsph_to_spat_m0(Slm,Sh);
+		SHtor_to_spat_m0(Tlm,Th);
+		spat_to_SHsphtor_m0(Sh,Th,Slm,Tlm);
+	}
+	tcpu = clock() - tcpu;
+	printf("   iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
+
+	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
+	return (int) tcpu;
+}
 
 int test_SHT_m0()
 {
@@ -428,7 +465,7 @@ int main(int argc, char *argv[])
 	shtns_precompute_auto(shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
 
 	m_opt = Get_MTR_DCT();
-
+/*
 	t1 = 1.0+2.0*I;
 	t2 = 1.0-I;
 	printf("test : %f, %f, %f, %f\n",creal(t1),cimag(t1), creal(t2),cimag(t2));
@@ -436,7 +473,7 @@ int main(int argc, char *argv[])
 	(double) t1 = 8.0 +I;
 	(double) t2 = 8.1;
 	printf("test : %f, %f, %f, %f\n",creal(t1),cimag(t1), creal(t2),cimag(t2));
-
+*/
 	write_vect("cost",ct,NLAT);
 	write_vect("sint",st,NLAT);
 
@@ -570,10 +607,25 @@ int main(int argc, char *argv[])
 	Set_MTR_DCT(-1);
 	test_SHT_vect();
 
+	printf(":: OPTIMAL with LTR\n");
+	Set_MTR_DCT(m_opt);
+	test_SHT_vect_l(LMAX/2);
+	printf(":: FULL DCT with LTR\n");
+	Set_MTR_DCT(MMAX);
+	test_SHT_vect_l(LMAX/2);
+	printf(":: NO DCT with LTR\n");
+	Set_MTR_DCT(-1);
+	test_SHT_vect_l(LMAX/2);
+
+	printf(":: vector m=0\n");
+	Set_MTR_DCT(m_opt);
+	test_SHT_vect_m0();
+
 	printf(":: vector even\n");
 	test_SHT_vect_parity(0);
 	printf(":: vector odd\n");
 	test_SHT_vect_parity(1);
+
 #endif
 
 }

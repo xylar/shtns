@@ -135,10 +135,12 @@ extern fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd(b,b,1))		// a + I*b
 	#else
 		#warning "using GCC vector instructions (sse2)"
-		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(-1.0, 1.0)) )		// a + I*b
+		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
 	#endif
 	#define vlo_to_cplx(a) _mm_shuffle_pd(a, vdup(0.0), 0)
 	#define vhi_to_cplx(a) _mm_shuffle_pd(a, vdup(0.0), 1)
+	#define vlo_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 0)
+	#define vhi_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 1)
 #else
 	#undef _GCC_VEC_
 	typedef double s2d;

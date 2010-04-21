@@ -296,6 +296,7 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 void alloc_SHTarrays()
 {
 	long int im,m;
+	long int lstride;
 
 	ct = (double *) fftw_malloc(sizeof(double) * NLAT*3);
 	st = ct + NLAT;		st_1 = ct + 2*NLAT;
@@ -305,13 +306,15 @@ void alloc_SHTarrays()
 	dzlm = dylm + (MMAX+1);		dykm_dct = dylm + (MMAX+1)*2;
 
 // Allocate legendre functions lookup tables.
-	ylm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
+	lstride = (LMAX+1);		lstride += (lstride&1);		// even stride.
+	ylm[0] = (double *) fftw_malloc(sizeof(double)* (NLM-(LMAX+1)+lstride)*NLAT_2);
 	dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
 	zlm[0] = (double *) fftw_malloc(sizeof(double)* NLM*NLAT_2);
 	dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
-		ylm[im+1] = ylm[im] + NLAT_2*(LMAX+1 -m);
+		if (im>0) lstride = (LMAX+1 -m);
+		ylm[im+1] = ylm[im] + NLAT_2*lstride;
 		dylm[im+1] = dylm[im] + NLAT_2*(LMAX+1 -m);
 		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m);
 		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -m);
@@ -620,7 +623,8 @@ void OptimizeMatrices(double eps)
 
 /// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
 	if (eps > 0.0) {
-		for (im=0;im<=MMAX;im++) {
+		tm[0] = 0;
+		for (im=1;im<=MMAX;im++) {
 			m = im*MRES;
 			tm[im] = NLAT_2;
 			for (l=m;l<=LMAX;l++) {
@@ -669,12 +673,11 @@ void OptimizeMatrices(double eps)
 /// Compression of dylm and dzlm for m=0, as .p is 0
 	im=0;	m=0;
 	yg = (double *) dylm[im];
-	int lstride = (LMAX-m+1);
-//	lstride += (lstride & 1);		// we need an even stride here.
+	long int lstride = LMAX + (LMAX & 1);	// we need an even stride here, for SSE2 alignement.
 	for (it=0; it<NLAT_2; it++) {
-		for (l=m; l<=LMAX; l++)
-			yg[it*lstride + (l-m)] = dylm[im][it*(LMAX-m+1) + (l-m)].t;
-//		if ((LMAX & 1) == 0) yg[it*lstride + (LMAX+1-m)] = 0.0;
+		for (l=1; l<=LMAX; l++)		// start at l=1, as l=0 is null.
+			yg[it*lstride + (l-1)] = dylm[im][it*(LMAX+1) + l].t;
+		if (LMAX & 1) yg[it*lstride + LMAX] = 0.0;	// add some zero here for vectorization.
 	}
 	yg = (double *) dzlm[im];
 	if (yg != NULL) {	// for sht_reg_poles there is no dzlm defined.
@@ -704,18 +707,20 @@ void init_SH_synth()
 {
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
 	long int it,im,m,l;
+	long int lstride;
 
-// Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT_2 points required.
-// for synthesis (inverse transform)
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
+		lstride = LMAX-m+1;
+		if (im==0) lstride += (lstride&1);		// even stride for m=0.
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(LMAX, im, ct[it], st[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array(LMAX, im, ct[it], st[it], ylm[im] + it*lstride, dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
-				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m;	// 1/sint(t) dYlm/dphi
-				if (m>0) ylm[im][it*(LMAX-m+1) + (l-m)] *= st[it];
+				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*lstride + (l-m)] *m;	// 1/sint(t) dYlm/dphi
+				if (m>0) ylm[im][it*lstride + (l-m)] *= st[it];
 			}
+			if ((im==0) && ((LMAX&1) == 0)) ylm[im][it*lstride + LMAX+1] = 0.0;	// add one zero for padding.
 		}
 	}
 }
@@ -776,8 +781,9 @@ void init_SH_gauss()
 // interleave l and l+1 : this stores data in the way it will be read.
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-//		zlm[im] = (double *) fftw_malloc(sizeof(double)* (LMAX+1-m)*NLAT_2);
-//		dzlm[im] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (LMAX+1-m)*NLAT_2);
+		long int lstride = LMAX-m+1;
+		if (im==0) lstride += (lstride&1);		// even stride for m=0.
+
 		for (it=0;it<NLAT_2;it++) {
 			double nz0, nz1, norm;
 			norm = wgd[it];
@@ -787,8 +793,8 @@ void init_SH_gauss()
 				if (SHT_NORM == sht_schmidt) {
 					nz0 = norm*(2*l+1);		nz1 = norm*(2*l+3);
 				}
-				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * nz0;
-				zlm[im][(l-m)*NLAT_2 + it*2 +1] =  ylm[im][it*(LMAX-m+1) + (l+1-m)] * nz1;
+				zlm[im][(l-m)*NLAT_2 + it*2]    =  ylm[im][it*lstride + (l-m)]   * nz0;
+				zlm[im][(l-m)*NLAT_2 + it*2 +1] =  ylm[im][it*lstride + (l+1-m)] * nz1;
 				dzlm[im][(l-m)*NLAT_2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
 				dzlm[im][(l-m)*NLAT_2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
 				dzlm[im][(l-m)*NLAT_2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * nz1 /((l+1)*(l+2));
@@ -801,7 +807,7 @@ void init_SH_gauss()
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
 				if (SHT_NORM == sht_schmidt)
 					nz0 = norm*(2*l+1);
-				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*(LMAX-m+1) + (l-m)]   * nz0;
+				zlm[im][(l-m)*NLAT_2 + it]    =  ylm[im][it*lstride + (l-m)]   * nz0;
 				dzlm[im][(l-m)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
 				dzlm[im][(l-m)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
 			}
@@ -1038,16 +1044,13 @@ void init_SH_dct(int analysis)
 		dyk0 = yk0 + (LMAX/2+1)*(2*NLAT_2);
 	}
 
+	init_SH_synth();
+
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
-		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(LMAX, im, ct[it], st[it], ylm[im] + it*(LMAX-m+1), dtylm);	// fixed im legendre functions lookup table.
-			for (l=m; l<=LMAX; l++) {
-				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
-				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*(LMAX-m+1) + (l-m)] *m;	// 1/sint(t) dYlm/dphi
-				if (m>0) ylm[im][it*(LMAX-m+1) + (l-m)] *= st[it];
-			}
-		}
+		long int lstride = LMAX-m+1;
+		if (im==0) lstride += (lstride&1);		// even stride for m=0.
+
 	// go to DCT space
 		for (it=0;it<=KMAX;it+=2) {
 			for(l=m; l<=LMAX; l++) {
@@ -1059,15 +1062,15 @@ void init_SH_dct(int analysis)
 		for (l=m; l<=LMAX; l++) {
 			if (m & 1) {	// m odd
 				for (it=0; it<NLAT_2; it++) {
-					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * st[it];	// P[l+1](x)	*st
+					Z[it] = ylm[im][it*lstride + (l-m)] * st[it];	// P[l+1](x)	*st
 					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t;	// P[l](x)	*1
 					dZp[it] = dylm[im][it*(LMAX-m+1) + (l-m)].p;		// P[l-1](x)	*1
 				}
 			} else {	// m even
 				for (it=0; it<NLAT_2; it++) {
-					Z[it] = ylm[im][it*(LMAX-m+1) + (l-m)];		// P[l](x)	*1
+					Z[it] = ylm[im][it*lstride + (l-m)];		// P[l](x)	*1
 					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t *st[it];	// P[l+1](x)	*st
-					dZp[it] = ylm[im][it*(LMAX-m+1) + (l-m)] * m;	// P[l](x)	*st
+					dZp[it] = ylm[im][it*lstride + (l-m)] * m;	// P[l](x)	*st
 				}
 			}
 			if ((l-m)&1) {	// odd
