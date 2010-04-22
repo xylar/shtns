@@ -104,11 +104,12 @@ Q				i++;
 Q			} while (i<ni);
 Q		}
 V		i=0;	do {
+V			s2d np = vdup(NPHI);
 V		#ifdef _GCC_VEC_
-V			v2d sin_1 = ((v2d *)st_1)[i] * vdup(NPHI);
+V			v2d sin_1 = ((v2d *)st_1)[i] * np;
 V			((v2d*) BtF)[i] *= sin_1; 	((v2d*) BpF)[i] *= sin_1;
 V		#else
-V			double sin_1 = st_1[2*i]; 	double sin_2 = st_1[2*i+1];
+V			double sin_1 = st_1[2*i] * np;		double sin_2 = st_1[2*i+1] * np;
 V			BT0[2*i] *= sin_1;		BT0[2*i+1] *= sin_2;
 V			BP0[2*i] *= sin_1;		BP0[2*i+1] *= sin_2;
 V		#endif
