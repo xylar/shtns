@@ -10,6 +10,8 @@ sph=-e "/^[QT\#]/d" -e "s/^[VS]//"
 tor=-e "/^[QS\#]/d" -e "s/^[VT]//"
 # Scalar component (Q)
 scal=-e "/^[VST\#]/d" -e "s/^Q//"
+# 3D Vector component (VQST)
+v3d=-e "/^[\#]/d" -e "s/^[QVST]//"
 
 # second char : 1BEO
 # even (1,E)
@@ -25,6 +27,7 @@ ST=SHst_to_spat.c
 Q=SH_to_spat.c
 S=SHs_to_spat.c
 T=SHt_to_spat.c
+V3=SHqst_to_spat.c
 GSHEO=sparse_SH_to_spat.gen.c
 STEO=SHeost_to_spat.c
 QEO=SHeo_to_spat.c
@@ -52,11 +55,13 @@ $(Q) : $(GSH) Makefile
 	@cp $(ST) $(S)
 	@cp $(ST) $(T)
 	@cp $(ST) $(Q)
+	@cp $(ST) $(V3)
 #EVEN/ODD
-	@sed $(eo) $(vect)  $(GSH) >> $(ST)
+	@sed $(eo) $(vect) $(GSH) >> $(ST)
 	@sed $(eo) $(sph)  $(GSH) >> $(S)
 	@sed $(eo) $(tor)  $(GSH) >> $(T)
-	@sed $(eo) $(scal)  $(GSH) >> $(Q)
+	@sed $(eo) $(scal) $(GSH) >> $(Q)
+	@sed $(eo) $(v3d)  $(GSH) >> $(V3)
 	@echo "SH*_to_spat code generated."
 
 # spat_to_SH generation

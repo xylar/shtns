@@ -100,8 +100,11 @@ void GEN(spat_to_SHsphtor,SUFFIX)(double *Vt, double *Vp, complex double *Slm, c
 /// This is basically a shortcut to call both SH_to_spat* and SHsphtor_to spat*
 void GEN(SHqst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
-    GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARG2);
-    GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARG2);
+    //	GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARG2);
+    //	GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARG2);
+    #define SHT_3COMP
+    #include "SHqst_to_spat.c"
+    #undef SHT_3COMP
 }
 
 /// \b 3D Vector Spherical Harmonics Transform (analysis) : convert a 3D vector field (r,theta,phi components) to its radial/spheroidal/toroidal spherical harmonic representation.
@@ -176,8 +179,9 @@ void GENF(tor_to_spat,SUFFIX)(complex double *Tlm, double *Vp SUPARGF) {
 /// \ingroup fortapi
 void GENF(qst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARGF)
 {
-    GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARGF2);
-    GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARGF2);
+	GEN(SHqst_to_spat,SUFFIX)(Qlm, Slm, Tlm, Vr, Vt, Vp SUPARGF2);
+//    GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARGF2);
+//    GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARGF2);
 }
 
 /// \ingroup fortapi

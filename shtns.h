@@ -37,6 +37,7 @@ struct sht_sze {
 	int sht_fft;	///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
 	int klim;		///< Limit to k for non-linear terms.
 	int nlorder;	///< order of non-linear terms to be resolved by SH transform.
+//	int lshift;		///< for linear calculations, the non-linear terms often reduce to a constant shift.
 
 	int norm;		///< store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
 };
@@ -130,6 +131,12 @@ void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp);
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat
 #define SH_to_grad_spat(S,Gt,Gp) SHsph_to_spat(S, Gt, Gp)
+
+/// \name 3D transforms (combine Scalar and Vector)
+//@{
+void spat_to_SHqst(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm);
+void SHqst_to_spat(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp);
+//@}
 
 /// \name Local and partial evalutions of a SH representation :
 /// Does not require a call to \ref shtns_precompute

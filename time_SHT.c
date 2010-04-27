@@ -14,7 +14,7 @@
 
 #include "shtns.h"
 
-complex double *Slm, *Slm0, *Tlm, *Tlm0;	// spherical harmonics l,m space
+complex double *Slm, *Slm0, *Tlm, *Tlm0, *Qlm;	// spherical harmonics l,m space
 complex double *ShF, *ThF, *NLF;	// Fourier space : theta,m
 double *Sh, *Th, *NL;		// real space : theta,phi (alias of ShF)
 
@@ -293,6 +293,28 @@ int test_SHT_m0()
 	return (int) tcpu;
 }
 
+int test_SHT_vect3d()
+{
+	int jj,i;
+	clock_t tcpu;
+	
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
+	}
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		SHqst_to_spat(Qlm,Slm,Tlm,NL,Sh,Th);
+		spat_to_SHsphtor(Sh,Th,Slm,Tlm);
+		spat_to_SH(NL,Qlm);
+	}
+	tcpu = clock() - tcpu;
+	printf("   iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
+
+	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
+	scal_error(Qlm, Tlm0, LMAX);
+	return (int) tcpu;
+}
+
 
 /*
 fftw_plan ifft_in, ifft_out;
@@ -494,6 +516,7 @@ int main(int argc, char *argv[])
 	Slm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Qlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 
 // perform fft tests.
 //	init_fft_tests();
@@ -631,6 +654,9 @@ int main(int argc, char *argv[])
 	test_SHT_vect_parity(0);
 	printf(":: vector odd\n");
 	test_SHT_vect_parity(1);
+	
+	printf(":: 3D vector\n");
+	test_SHT_vect3d();
 
 #endif
 
