@@ -5,7 +5,7 @@
 	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
 + Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
 
-- There is a bug to fix : sparse SHT does not work with out-of-place FFT.
++ Fixed bug : sparse SHT did not work with out-of-place FFT.
 
 - We rely on fftw to allocate aligned memory. This only works if fftw has been compiled with sse2 support !!
   => we should therefore use our own aligned memory allocation ... (or use autoconf ?)
@@ -34,6 +34,7 @@ for m=3, z[k] is constant up to l-2
 + cache optimization have been performed for m=0 and are quite impressive at high LMAX.
 + cache optimizations associated with polar optimization for m>0.
 + vector instructions (sse2 or sse3) are used, 5 to 15% speedup with gcc.
++ tested transposed version of gauss algorithm. It does not perform much better (speedup <2% for "time_SHT -transpose")
 
 TIP:
 + LM_LOOP : translating an integer to a double is SLOW. So if l or l(l+1) is used in the computation, using an array is faster.

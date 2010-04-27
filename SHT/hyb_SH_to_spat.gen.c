@@ -77,9 +77,15 @@ T	v2d Tl0[(LTR+2)/2];
 Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
-Q		BrF = fftw_malloc( (NPHI/2+1)*NLAT * sizeof(complex double) );
-V		BtF = fftw_malloc( 2* (NPHI/2+1)*NLAT * sizeof(complex double) );
-V		BpF = BtF + (NPHI/2+1)*NLAT;
+		long int nspat = (NPHI/2+1)*NLAT;
+	  #ifndef SHT_3COMP
+Q		BrF = fftw_malloc( nspat * sizeof(complex double) );
+V		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+V		BpF = BtF + nspat;
+	  #else
+Q		BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
+V		BtF = BrF + nspat;		BpF = BtF + nspat;
+	  #endif
 	}
   #else
 Q	BrF = (v2d*) Vr;
@@ -454,8 +460,8 @@ V			fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
 V			fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
 V			k=0;	do {		// m=0
 V				double sin_1 = st_1[k];		double sin_2 = st_1[k+1];
-V				((double *)BtF)[2*k] *= sin_1;		((double *)BpF)[2*k] *= sin_1;
-V				((double *)BtF)[2*k+2] *= sin_2;		((double *)BpF)[2*k+2] *= sin_2;
+V				((double *)BtF)[2*k] *= sin_1;   	((double *)BpF)[2*k] *= sin_1;
+V				((double *)BtF)[2*k+2] *= sin_2; 	((double *)BpF)[2*k+2] *= sin_2;
 V				k+=2;
 V			} while(k<NLAT);
 Q			if (MRES & 1) {		// odd m's must be divided by sin(theta)
@@ -481,8 +487,10 @@ Q		fftw_execute_dft_c2r(ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(ifft, (complex double *) BpF, Vp);
 		if (SHT_FFT > 1) {		// free memory
-Q		    fftw_free(BrF);
-V		    fftw_free(BtF);	// this frees also BpF.
+Q			fftw_free(BrF);
+V		  #ifndef SHT_3COMP
+V			fftw_free(BtF);	// this frees also BpF.
+V		  #endif
 		}
     } else {
 		k=1;	do {	// compress complex to real

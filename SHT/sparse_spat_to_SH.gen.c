@@ -227,9 +227,9 @@ V				Sl[l] = 0.0;
 	}
 
   	if (SHT_FFT > 1) {		// free memory
-Q	    fftw_free(BrF - NLAT_2*(MTR+1));
+Q	    fftw_free(BrF - NLAT_2*MTR);
 V		if (parity) BtF = BpF;			// free the correct memory location.
-V	    fftw_free(BtF - NLAT_2*(MTR+1));	// this frees also BpF.
+V	    fftw_free(BtF - NLAT_2*MTR);	// this frees also BpF.
 	}
   #endif
 
