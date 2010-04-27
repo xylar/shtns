@@ -21,6 +21,10 @@ V/// complex double arrays of size NLM.
 /// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
   #endif
 
+  #ifdef SHT_3COMP
+    #define SHT_NO_DCT
+  #endif
+
 #Q void spat_to_SH(double *Vr, complex double *Qlm)
 #V void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
 # {
@@ -52,8 +56,8 @@ VB	#define te(i)	tpeo[4*(i)]
 VB	#define to(i)	tpeo[4*(i)+1]
 VB	#define pe(i)	tpeo[4*(i)+2]
 VB	#define po(i)	tpeo[4*(i)+3]
-QB	#define re0(i)	reo0[2*(i)]
-QB	#define ro0(i)	reo0[2*(i)+1]
+QB	#define re0(i)	reo0[2*(i)+1]
+QB	#define ro0(i)	reo0[2*(i)]
 VB	#define te0(i)	tpeo0[4*(i)]
 VB	#define to0(i)	tpeo0[4*(i)+1]
 VB	#define pe0(i)	tpeo0[4*(i)+2]
@@ -210,50 +214,53 @@ Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	} else {
   #endif
+		i=0;
+QE		double r0 = 0.0;
+Q		zl = zlm[0];
   #ifndef SHT_AXISYM
 		i0 = (NPHI==1) ? 1 : 2;		// stride of source data.
-		i=0;
  B		do {	// compute symmetric and antisymmetric parts.
 QB			double a = ((double*)BrF)[i*i0];		double b = ((double*)BrF)[(NLAT-1)*i0 -i*i0];
-QB			re0(i) = a+b;		ro0(i) = a-b;
+QB			ro0(i) = a-b;		re0(i) = a+b;
+QB			r0 += zl[i] * (a+b);
 VB			double c = ((double*)BtF)[i*i0];		double d = ((double*)BtF)[(NLAT-1)*i0 -i*i0];
-VB			to0(i) = c-d;		te0(i) = c+d;
+VB			te0(i) = c+d;		to0(i) = c-d;
 VB			double e = ((double*)BpF)[i*i0];		double f = ((double*)BpF)[(NLAT-1)*i0 -i*i0];
-VB			po0(i) = e-f;		pe0(i) = e+f;
+VB			pe0(i) = e+f;		po0(i) = e-f;
  B			i++;
  B		} while(i<ni);
   #else
-		i=0;
  B		do {	// compute symmetric and antisymmetric parts.
  B			double np = NPHI;
 QB			double a = ((double*)BrF)[i];		double b = ((double*)BrF)[NLAT-1-i];
-QB			re0(i) = (a+b)*np;		ro0(i) = (a-b)*np;
+QB			ro0(i) = (a-b)*np;		re0(i) = (a+b)*np;
+QB			r0 += zl[i] * ((a+b)*np);
 VB			double c = ((double*)BtF)[i];		double d = ((double*)BtF)[NLAT-1-i];
-VB			to0(i) = (c-d)*np;		te0(i) = (c+d)*np;
+VB			te0(i) = (c+d)*np;		to0(i) = (c-d)*np;
 VB			double e = ((double*)BpF)[i];		double f = ((double*)BpF)[NLAT-1-i];
-VB			po0(i) = (e-f)*np;		pe0(i) = (e+f)*np;
+VB			pe0(i) = (e+f)*np;		po0(i) = (e-f)*np;
  B			i++;
  B		} while(i<ni);
   #endif
-Q		l=0;
-V		l=1;		// l=0 is zero for the vector transform.
+Q		zl += ni + (ni&1);		// SSE alignement
+		l=1;			// l=0 is zero for the vector transform.
 Q		Ql = Qlm;		// virtual pointer for l=0 and im
 V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
-Q		zl = zlm[im];
-V		dzl0 = (double *) dzlm[im];		// only theta derivative (d/dphi = 0 for m=0)
+V		dzl0 = (double *) dzlm[0];		// only theta derivative (d/dphi = 0 for m=0)
 QB		BrF += NLAT;
 VB		BtF += NLAT;	BpF += NLAT;
-V		Sl[0] = 0.0;	Tl[0] = 0.0;
+Q		Ql[0] = r0;
+V		Sl[0] = 0.0;	Tl[0] = 0.0;	// l=0 is zero for the vector transform.
 		while(l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			i=0;
   #ifndef _GCC_VEC_
-QE			q0 = 0.0;
-QO			q1 = 0.0;
-VE			s0 = 0.0;	t1 = 0.0;
-VO			t0 = 0.0;	s1 = 0.0;
+QE			double q0 = 0.0;
+QO			double q1 = 0.0;
+VE			double s0 = 0.0;	double t1 = 0.0;
+VO			double t0 = 0.0;	double s1 = 0.0;
 			do {
-QE				q0 += zl[0] * re0(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				q1 += zl[1] * ro0(i);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+QE				q0 += zl[0] * ro0(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+QO				q1 += zl[1] * re0(i);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
 VO				s0 += dzl0[0] * te0(i);
 VE				t0 -= dzl0[0] * pe0(i);
 VE				s1 += dzl0[1] * to0(i);
@@ -288,11 +295,11 @@ V			((v2d*) Tl)[l] = vlo_to_cplx(t);		((v2d*) Tl)[l+1] = vhi_to_cplx(t);
 	  #ifdef SHT_VAR_LTR
 			if (l != LMAX) lstride=2;
 	  #endif
-QE			q0 = 0.0;
-VE			s0 = 0.0;
-VO			t0 = 0.0;
+QE			double q0 = 0.0;
+VE			double s0 = 0.0;
+VO			double t0 = 0.0;
 			i=0;	do {
-QE				q0 += zl[0] * re0(i);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+QE				q0 += zl[0] * ro0(i);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 VE				s0 += dzl0[0] * te0(i);
 VO				t0 -= dzl0[0] * pe0(i);
 Q				zl += lstride;
@@ -319,12 +326,20 @@ V			((v2d*) Sl)[l] = vdup(0.0);	((v2d*) Tl)[l] = vdup(0.0);
 		i0 = tm[im];
  B		i=i0;
  B		do {	// compute symmetric and antisymmetric parts.
-QB			v2d q0 = ((v2d *)BrF)[i];	v2d q1 = ((v2d *)BrF)[NLAT-1-i];		re(i) = q0+q1;	ro(i) = q0-q1;
+		  #ifdef SHT_3COMP
+QB			s2d sin = vdup(st[i]);
+QB			v2d q0 = ((v2d *)BrF)[i];	v2d q1 = ((v2d *)BrF)[NLAT-1-i];		re(i) = (q0+q1)*sin;	ro(i) = (q0-q1)*sin;
+		  #else
+QB			v2d q0 = ((v2d *)BrF)[i];	v2d q1 = ((v2d *)BrF)[NLAT-1-i];		re(i) = q0+q1;	ro(i) = q0-q1;		  
+		  #endif
 VB			v2d t0 = ((v2d *)BtF)[i];	v2d t1 = ((v2d *)BtF)[NLAT-1-i];		te(i) = t0+t1;	to(i) = t0-t1;
 VB			v2d s0 = ((v2d *)BpF)[i];	v2d s1 = ((v2d *)BpF)[NLAT-1-i];		pe(i) = s0+s1;	po(i) = s0-s1;
  B			i++;
  B		} while (i<ni);
 		l=im*MRES;
+	#ifdef SHT_3COMP
+Q		double m_1 = 1.0/l;
+	#endif
 Q		v2d* Ql = (v2d*) &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 V		v2d* Sl = (v2d*) &Slm[LiM(0,im)];		v2d* Tl = (v2d*) &Tlm[LiM(0,im)];
 Q		zl = zlm[im];
@@ -337,8 +352,13 @@ QO			v2d q1 = vdup(0.0);
 VE			v2d s0 = vdup(0.0);	v2d t1 = vdup(0.0);		v2d s0i = vdup(0.0);	v2d t1i = vdup(0.0);
 VO			v2d t0 = vdup(0.0);	v2d s1 = vdup(0.0);		v2d t0i = vdup(0.0);	v2d s1i = vdup(0.0);
 			i=i0;	do {		// tm[im] : polar optimization
+			  #ifndef SHT_3COMP
 QE				q0  += re(i) * vdup(zl[0]);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 QO				q1  += ro(i) * vdup(zl[1]);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+			  #else
+QE				q0  += re(i) * vdup(dzl[0].p);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+QO				q1  += ro(i) * vdup(dzl[1].p);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+			  #endif
 VE				s0  += vdup(dzl[0].t) *to(i);		// ref: these E. Dormy p 72.
 VE				s0i -= vdup(dzl[0].p) *pe(i);
 VO				t0  -= vdup(dzl[0].t) *po(i);
@@ -351,10 +371,14 @@ Q				zl +=2;
 V				dzl +=2;
 				i++;
 			} while (i < ni);
-QE			Ql[l] = q0;
-QO			Ql[l+1] = q1;
+		  #ifdef SHT_3COMP
+Q			q0 *= vdup((l*(l+1))*m_1);
+Q			q1 *= vdup(((l+1)*(l+2))*m_1);
+		  #endif
 VE			Sl[l] = addi(s0,s0i);	Tl[l+1] = addi(t1,t1i);
 VO			Tl[l] = addi(t0,t0i);	Sl[l+1] = addi(s1,s1i);
+QE			Ql[l] = q0;
+QO			Ql[l+1] = q1;
 			l+=2;
 		}
 		if (l==LTR) {
@@ -366,7 +390,11 @@ QE			v2d q0 = vdup(0.0);	// Qlm[LiM(l,im)] = 0.0;
 VE			v2d s0 = vdup(0.0);	v2d s0i = vdup(0.0);
 VO			v2d t0 = vdup(0.0);	v2d t0i = vdup(0.0);
 			i=i0;	do {		// tm[im] : polar optimization
-QE				q0  += vdup(zl[0]) * re(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+			  #ifndef SHT_3COMP
+QE				q0  += re(i) * vdup(zl[0]);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+			  #else
+QE				q0  += vdup(dzl[0].p) * re(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+			  #endif
 VE				s0  += vdup(dzl[0].t) *to(i);
 VE				s0i -= vdup(dzl[0].p) *pe(i);
 VO				t0  -= vdup(dzl[0].t) *po(i);
@@ -375,9 +403,12 @@ Q				zl  += lstride;
 V				dzl += lstride;
 				i++;
 			} while(i<ni);
-QE			Ql[l] = q0;
+		#ifdef SHT_3COMP
+Q			q0 *= vdup((l*(l+1))*m_1);
+		#endif
 VE			Sl[l] = addi(s0,s0i);
 VO			Tl[l] = addi(t0,t0i);
+QE			Ql[l] = q0;
 	  #ifdef SHT_VAR_LTR
 	  		l++;
 		}

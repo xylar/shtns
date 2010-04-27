@@ -15,6 +15,7 @@ Then browse the html documentation starting with doc/html/index.html
  * - can be used from fortran or c/c++ programs
  * - a highly efficient Gauss algorithm working with gauss nodes (based on Gauss-Legendre quadrature)
  * - an even faster algorithm using DCT for regular nodes (based on a generalized Fejer quadrature)
+ * - support for SSE2 & SSE3 vectorization with gcc.
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
  *
  * Using DCT acceleration and other classical optimizations, it is intended to be <b>very fast</b>.

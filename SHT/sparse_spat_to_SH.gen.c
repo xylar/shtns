@@ -65,11 +65,9 @@ V		sgn_tor = 2.0;		sgn_sph = -2.0;
 V	}
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
-Q		l=0;
-V		l=1;
-Q		Ql = Qlm + parity;		// virtual pointer for l=0 and im
+Q		Ql = Qlm + (1-parity);		// virtual pointer for l=0 and im
 V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
-Q		zl = zlm[im] + parity;
+Q		zl = zlm[im] + parity*NLAT_2;
 V		dzl0 = (double *) dzlm[im];		// only theta derivative (d/dphi = 0 for m=0)
 V		Sl[0] = 0.0;
   #ifndef SHT_AXISYM
@@ -78,6 +76,19 @@ V		Sl[0] = 0.0;
 		i0 = 1;
   #endif
 		ni = NLAT_2*i0;		// copy NLAT_2 to a local variable for faster access (inner loop limit)
+Q		if (parity == 0) {
+Q			i=0;
+Q			q0 = 0.0;
+Q			do {
+Q				q0 += zl[0] * re0;	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+Q				zl ++;
+Q				i+=i0;
+Q			} while(i < ni);
+Q			Qlm[0] = q0 + q0;
+Q			zl ++;
+Q		}
+Q		zl += (NLAT_2 & 1);
+		l=1;
 		do {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 			i=0;
 Q			q0 = 0.0;

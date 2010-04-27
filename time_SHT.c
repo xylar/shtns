@@ -304,8 +304,7 @@ int test_SHT_vect3d()
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHqst_to_spat(Qlm,Slm,Tlm,NL,Sh,Th);
-		spat_to_SHsphtor(Sh,Th,Slm,Tlm);
-		spat_to_SH(NL,Qlm);
+		spat_to_SHqst(NL,Sh,Th,Qlm,Slm,Tlm);
 	}
 	tcpu = clock() - tcpu;
 	printf("   iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);

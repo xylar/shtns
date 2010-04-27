@@ -35,6 +35,7 @@ for m=3, z[k] is constant up to l-2
 + cache optimizations associated with polar optimization for m>0.
 + vector instructions (sse2 or sse3) are used, 5 to 15% speedup with gcc.
 + tested transposed version of gauss algorithm. It does not perform much better (speedup <2% for "time_SHT -transpose")
++ the combined 3-component transforms are up to 25% faster than sacalar+vector with SSE.
 
 TIP:
 + LM_LOOP : translating an integer to a double is SLOW. So if l or l(l+1) is used in the computation, using an array is faster.

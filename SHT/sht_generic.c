@@ -97,22 +97,31 @@ void GEN(spat_to_SHsphtor,SUFFIX)(double *Vt, double *Vp, complex double *Slm, c
 //@{
 
 /// Backward \b 3D Vector Spherical Harmonic Transform (synthesis).
-/// This is basically a shortcut to call both SH_to_spat* and SHsphtor_to spat*
+/// This is basically a shortcut to call both SH_to_spat* and SHsphtor_to spat* but may be significantly faster.
 void GEN(SHqst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
-    //	GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARG2);
-    //	GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARG2);
-    #define SHT_3COMP
-    #include "SHqst_to_spat.c"
-    #undef SHT_3COMP
+	if (MTR_DCT < 0) {
+		#define SHT_3COMP
+		#include "SHqst_to_spat.c"
+		#undef SHT_3COMP
+	} else {
+		GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARG2);
+		GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARG2);
+	}
 }
 
 /// \b 3D Vector Spherical Harmonics Transform (analysis) : convert a 3D vector field (r,theta,phi components) to its radial/spheroidal/toroidal spherical harmonic representation.
-/// This is basically a shortcut to call both spat_to_SH* and spat_to_SHsphtor*
+/// This is basically a shortcut to call both spat_to_SH* and spat_to_SHsphtor* but may be significantly faster.
 void GEN(spat_to_SHqst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
 {
-    GEN(spat_to_SHsphtor,SUFFIX)(Vt, Vp, Slm, Tlm SUPARG2);
-    GEN(spat_to_SH,SUFFIX)(Vr, Qlm SUPARG2);
+	if (MTR_DCT < 0) {
+		#define SHT_3COMP
+		#include "spat_to_SHqst.c"
+		#undef SHT_3COMP
+	} else {
+		GEN(spat_to_SHsphtor,SUFFIX)(Vt, Vp, Slm, Tlm SUPARG2);
+		GEN(spat_to_SH,SUFFIX)(Vr, Qlm SUPARG2);
+	}
 }
 //@}
 
