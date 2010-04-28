@@ -158,6 +158,9 @@ void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, double *Vt, do
 void SHsph_to_spat_l(complex double *Slm, double *Vt, double *Vp, int LTR);
 void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR);
 void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR);
+
+void spat_to_SHqst_l(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, int LTR);
+void SHqst_to_spat_l(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, int LTR);
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_l(S,Gt,Gp,ltr) SHsph_to_spat_l(S, Gt, Gp, ltr)

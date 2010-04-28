@@ -70,9 +70,15 @@ V    	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 0) {
 	    if (SHT_FFT > 1) {		// alloc memory for the FFT
-Q	    	BrF = fftw_malloc( (NPHI/2+1)*NLAT * sizeof(complex double) );
-V	    	BtF = fftw_malloc( 2* (NPHI/2+1)*NLAT * sizeof(complex double) );
-V	    	BpF = BtF + (NPHI/2+1)*NLAT;
+	    	long int nspat = (NPHI/2+1)*NLAT;
+		  #ifndef SHT_3COMP
+Q	    	BrF = fftw_malloc( nspat * sizeof(complex double) );
+V	    	BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+V	    	BpF = BtF + nspat;
+		  #else
+Q	    	BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
+V	    	BtF = BrF + nspat;		BpF = BtF + nspat;
+		  #endif
 	    }
 Q	    fftw_execute_dft_r2c(fft,Vr, BrF);
 V	    fftw_execute_dft_r2c(fft,Vt, BtF);
@@ -352,6 +358,14 @@ QO			v2d q1 = vdup(0.0);
 VE			v2d s0 = vdup(0.0);	v2d t1 = vdup(0.0);		v2d s0i = vdup(0.0);	v2d t1i = vdup(0.0);
 VO			v2d t0 = vdup(0.0);	v2d s1 = vdup(0.0);		v2d t0i = vdup(0.0);	v2d s1i = vdup(0.0);
 			i=i0;	do {		// tm[im] : polar optimization
+VE				s0  += vdup(dzl[0].t) *to(i);		// ref: these E. Dormy p 72.
+VO				t0  -= vdup(dzl[0].t) *po(i);
+VO				s1  += vdup(dzl[1].t) *te(i);
+VE				t1  -= vdup(dzl[1].t) *pe(i);
+VE				s0i -= vdup(dzl[0].p) *pe(i);
+VO				t0i -= vdup(dzl[0].p) *te(i);
+VO				s1i -= vdup(dzl[1].p) *po(i);
+VE				t1i -= vdup(dzl[1].p) *to(i);
 			  #ifndef SHT_3COMP
 QE				q0  += re(i) * vdup(zl[0]);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 QO				q1  += ro(i) * vdup(zl[1]);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
@@ -359,14 +373,6 @@ QO				q1  += ro(i) * vdup(zl[1]);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 
 QE				q0  += re(i) * vdup(dzl[0].p);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 QO				q1  += ro(i) * vdup(dzl[1].p);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
 			  #endif
-VE				s0  += vdup(dzl[0].t) *to(i);		// ref: these E. Dormy p 72.
-VE				s0i -= vdup(dzl[0].p) *pe(i);
-VO				t0  -= vdup(dzl[0].t) *po(i);
-VO				t0i -= vdup(dzl[0].p) *te(i);
-VO				s1  += vdup(dzl[1].t) *te(i);
-VO				s1i -= vdup(dzl[1].p) *po(i);
-VE				t1  -= vdup(dzl[1].t) *pe(i);
-VE				t1i -= vdup(dzl[1].p) *to(i);
 Q				zl +=2;
 V				dzl +=2;
 				i++;
@@ -390,15 +396,15 @@ QE			v2d q0 = vdup(0.0);	// Qlm[LiM(l,im)] = 0.0;
 VE			v2d s0 = vdup(0.0);	v2d s0i = vdup(0.0);
 VO			v2d t0 = vdup(0.0);	v2d t0i = vdup(0.0);
 			i=i0;	do {		// tm[im] : polar optimization
+VE				s0  += vdup(dzl[0].t) *to(i);
+VO				t0  -= vdup(dzl[0].t) *po(i);
+VE				s0i -= vdup(dzl[0].p) *pe(i);
+VO				t0i -= vdup(dzl[0].p) *te(i);
 			  #ifndef SHT_3COMP
 QE				q0  += re(i) * vdup(zl[0]);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 			  #else
 QE				q0  += vdup(dzl[0].p) * re(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 			  #endif
-VE				s0  += vdup(dzl[0].t) *to(i);
-VE				s0i -= vdup(dzl[0].p) *pe(i);
-VO				t0  -= vdup(dzl[0].t) *po(i);
-VO				t0i -= vdup(dzl[0].p) *te(i);
 Q				zl  += lstride;
 V				dzl += lstride;
 				i++;
@@ -422,7 +428,9 @@ V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
 
   	if (SHT_FFT > 1) {		// free memory
 Q	    fftw_free(BrF - NLAT*(MTR+1));
+V	  #ifndef SHT_3COMP
 V	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
+V	  #endif
 	}
   #endif
 
