@@ -13,20 +13,20 @@ cmd = gcc $(go)
 ## profiling
 #cmd = gcc $(go) -p -fno-inline
 ## recent gcc with native support
-#cmd = gcc $(go) -march=native -mfpmath=sse
+#cmd = gcc $(go) -march=native
 ## gcc k8 (lgitl3)
 #cmd = gcc $(go) -march=k8
 ## gcc core2 (calcul1&2)
-#cmd = gcc $(go) -march=core2
+#cmd = gcc $(go) -march=core2 -I$(PREFIX)/include -L$(PREFIX)/lib
 ## icare 64bits opteron
-#cmd = cc -fast -xarch=amd64 -I/users/nschaeff/include -L/users/nschaeff/lib
+#cmd = cc -fast -xarch=amd64 -I$(PREFIX)/include -L$(PREFIX)/lib
 ## r2d2
-#cmd = gcc $(go) -march=core2 -m64 -I/home/ciment/nschaeff/include -L/home/ciment/nschaeff/lib
+#cmd = gcc $(go) -march=core2 -m64 -I$(PREFIX)/include -L$(PREFIX)/lib
 
 # intel compiler may be used for codelets
-shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
-# gcc + vector intrinsic leads to faster code.
-shtcc = $(cmd) -D_GCC_VEC_
+#shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
+# gcc + vector intrinsic leads to faster code (with _GCC_VEC_ set to 1 in sht_config.h)
+shtcc = $(cmd)
 
 shtfiles = SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
 

@@ -144,7 +144,7 @@ V		Sl[0] = 0.0;	Tl[0] = 0.0;
 #		qs0 = 0.0;	qs1 = 0.0;			// sum of first Ql's
 		while(l<LTR) {
 Q			i=l;	// l < NLAT
-V			i=l-1;	// l > 0
+V			i=l-1;	// l > 0 and odd => i >= 0 and even
 	  #ifndef _GCC_VEC_
 Q			q0 = 0.0;	q1 = 0.0;
 V			s0 = 0.0;	t1 = 0.0;	t0 = 0.0;	s1 = 0.0;
@@ -171,17 +171,18 @@ V			Tl[l] = t0;	Tl[l+1] = t1;
 	  #else
 Q			v2d q = vdup(0.0);
 V			v2d s = vdup(0.0);		v2d t = vdup(0.0);
+			i >>= 1;	// i = i/2
 			do {
-Q				q += ((v2d*) zl)[0] * ((v2d*) BR0)[i/2];
-V				s += ((v2d*) dzl0)[0] * ((v2d*) BT0)[i/2];
-V				t -= ((v2d*) dzl0)[0] * ((v2d*) BP0)[i/2];
+Q				q += ((v2d*) zl)[0] * ((v2d*) BR0)[i];
+V				s += ((v2d*) dzl0)[0] * ((v2d*) BT0)[i];
+V				t -= ((v2d*) dzl0)[0] * ((v2d*) BP0)[i];
 Q				zl +=2;
 V				dzl0 +=2;
-				i+=2;
-			} while(i < klim);
+				i++;
+			} while(2*i < klim);
 		#ifdef SHT_VAR_LTR
-Q			zl += (shtns.klim-i);
-V			dzl0 += (shtns.klim-i);
+Q			zl += (shtns.klim-2*i);
+V			dzl0 += (shtns.klim-2*i);
 		#endif
 Q			((v2d*) Ql)[l] = vlo_to_cplx(q);		((v2d*) Ql)[l+1] = vhi_to_cplx(q);
 V			((v2d*) Sl)[l] = vlo_to_cplx(s);		((v2d*) Sl)[l+1] = vhi_to_cplx(s);

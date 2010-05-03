@@ -47,6 +47,10 @@ should test on your system what gives the best result.
 
 A few compilation options can be set in \ref sht_config.h
 
+
+<b> SHTns uses FFTW. If FFTW has not been compiled and tuned carefuly for your machine, you may get bad performance with SHTns (down to 50% slower !).
+Look at the FFTW manual for compilation advice.</b>
+
 */
 
 

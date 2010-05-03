@@ -34,3 +34,6 @@
 /// 1 : no non-linear terms. 2 : quadratic non-linear terms (default), 3 : triadic, ...
 /// must be larger or equal to 1.
 #define SHT_DEFAULT_NL_ORDER 2
+
+/// I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 is supported) !
+#define _GCC_VEC_ 1

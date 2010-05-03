@@ -115,15 +115,11 @@ T		Tl[l-1] = 0.0;
   #endif
   #ifndef SHT_NO_DCT
 	if (MTR_DCT >= 0) {	// dct for m=0.
-	#ifdef _GCC_VEC_
-Q		v2d* Ql = Ql0;
-S		v2d* Sl = Sl0;
-T		v2d* Tl = Tl0;
-    #else
+	#ifndef _GCC_VEC_
 Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
-    #endif
+	#endif
 Q		yl = ykm_dct[im];
 V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
@@ -159,14 +155,16 @@ T			BP0[k] = pe;	BP0[k+1] = po;
 Q			v2d r = vdup(0.0);
 S			v2d t = vdup(0.0);
 T			v2d p = vdup(0.0);
+			l >>= 1;	// l = l/2;
 			do {
-Q				r += ((v2d*) yl)[0]   * Ql0[l/2];		// { re, ro }
-S				t += ((v2d*) dyl0)[0] * Sl0[l/2];		// { te, to }
-T				p -= ((v2d*) dyl0)[0] * Tl0[l/2];		// { pe, po }
-				l+=2;
+Q				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
+S				t += ((v2d*) dyl0)[0] * Sl0[l];		// { te, to }
+T				p -= ((v2d*) dyl0)[0] * Tl0[l];		// { pe, po }
+				l++;
 Q				yl+=2;
 V				dyl0+=2;
-			} while(l<=llim);
+Q			} while(2*l <= llim);
+V			} while(2*l < llim);
 Q			BR0[k] = vlo_to_dbl(r);	BR0[k+1] = vhi_to_dbl(r);
 S			BT0[k] = vlo_to_dbl(t);	BT0[k+1] = vhi_to_dbl(t);
 T			BP0[k] = vlo_to_dbl(p);	BP0[k+1] = vhi_to_dbl(p);
@@ -204,15 +202,11 @@ V		} while (k<NLAT_2);
     #endif
 	} else {
   #endif
-	#ifdef _GCC_VEC_
-Q		v2d* Ql = Ql0;
-S		v2d* Sl = Sl0;
-T		v2d* Tl = Tl0;
-    #else
+	#ifndef _GCC_VEC_
 Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
-    #endif
+	#endif
 		k=0;
 Q		yl  = ylm[im];
 V		dyl0 = (double *) dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
@@ -255,19 +249,19 @@ Q			v2d r = vdup(0.0);
 S			v2d t = vdup(0.0);
 T			v2d p = vdup(0.0);
 			do {
-Q				r += ((v2d*) yl)[0]   * Ql0[l/2];		// { re, ro }
-S				t += ((v2d*) dyl0)[0] * Sl0[l/2];		// { te, to }
-T				p -= ((v2d*) dyl0)[0] * Tl0[l/2];		// { pe, po }
-				l+=2;
+Q				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
+S				t += ((v2d*) dyl0)[0] * Sl0[l];		// { te, to }
+T				p -= ((v2d*) dyl0)[0] * Tl0[l];		// { pe, po }
+				l++;
 Q				yl+=2;
 V				dyl0+=2;
 		#ifndef SHT_3COMP
-Q			} while (l<=llim);
-V			} while (l<llim);
+Q			} while (2*l <= llim);
+V			} while (2*l < llim);
 		#else
-			} while (l<llim);
-Q			if (l==llim) {
-Q				r += ((v2d*) yl)[0]   * Ql0[l/2];		// { re, ro }
+			} while (2*l < llim);
+Q			if (2*l == llim) {
+Q				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
 Q				yl+=2;
 Q			}
 		#endif
