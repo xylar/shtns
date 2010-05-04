@@ -143,7 +143,7 @@ extern fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 	#undef _GCC_VEC_
 	typedef double s2d;
 	typedef complex double v2d;
-	typedef union {v2d v; complex double c; double d[2]; double r; } vcplx;
+	// typedef union {v2d v; complex double c; double d[2]; double r; } vcplx;
 	#define vdup(x) (x)
 	#define addi(a,b) ((a) + I*(b))
 #endif

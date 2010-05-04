@@ -1376,8 +1376,8 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	int with_cs_phase = 1;		/// Condon-Shortley phase (-1)^m is used by default.
 	double mpos_renorm = 1.0;	/// renormalization of m>0.
 
-	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
-//	if (lmax < 2) shtns_runerr("lmax must be at least 2");
+//	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
+	if (lmax < 2) shtns_runerr("lmax must be at least 2");
 	if (li != NULL) {
 		if ( (lmax != LMAX)||(mmax != MMAX)||(mres != MRES) )
 			shtns_runerr("different size already set");

@@ -21,15 +21,9 @@ V/// complex double arrays of size NLM.
 /// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
   #endif
 
-  #ifdef SHT_3COMP
-    #define SHT_NO_DCT
-  #endif
-
 #Q void spat_to_SH(double *Vr, complex double *Qlm)
 #V void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
 # {
-Q	complex double *Ql;		// virtual pointers for given im
-V	complex double *Sl, *Tl;	// virtual pointers for given im
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	double *zl;
@@ -130,26 +124,28 @@ V		fftw_execute_r2r(dct_r1,(double *) BtF, (double *) BtF);	// DCT in-place.
 V		fftw_execute_r2r(dct_r1,(double *) BpF, (double *) BpF);	// DCT in-place.
 	#endif
 		long int klim = shtns.klim;
-Q		l=0;
-V		l=1;
-Q		Ql = Qlm;		// virtual pointer for l=0 and im
-V		Sl = Slm;	Tl = Tlm;
+		l=0;
+Q		v2d* Ql = (v2d*) Qlm;
+V		v2d* Sl = (v2d*) Slm;	v2d* Tl = (v2d*) Tlm;
+Q		zl = zlm_dct0;
+V		dzl0 = dzlm_dct0;
+V	#ifndef _GCC_VEC_
+V		s1 = 0.0;	t1 = 0.0;		// l=0 : Sl = Tl = 0
+V	#else
+V		v2d s = vdup(0.0);		v2d t = vdup(0.0);		// l=0 : Sl = Tl = 0
+V	#endif
 	#ifdef SHT_VAR_LTR
 		i = (LTR * SHT_NL_ORDER) + 2;		// sum truncation
 		if (i < klim) klim = i;
+		while(l < LTR) {
+	#else
+		do {		// l < LMAX
 	#endif
-Q		zl = zlm_dct0;
-V		dzl0 = dzlm_dct0;
-V		Sl[0] = 0.0;	Tl[0] = 0.0;
-#		qs0 = 0.0;	qs1 = 0.0;			// sum of first Ql's
-		while(l<LTR) {
-Q			i=l;	// l < NLAT
-V			i=l-1;	// l > 0 and odd => i >= 0 and even
+			i=l;	// l < klim
 	  #ifndef _GCC_VEC_
+V			Sl[l] = s1;		Tl[l] = t1;
 Q			q0 = 0.0;	q1 = 0.0;
 V			s0 = 0.0;	t1 = 0.0;	t0 = 0.0;	s1 = 0.0;
-#			qs0 += BR0[l];	qs1 += BR0[l+1];
-#			q0 = qs0*zl[i];	q1 = qs1*zl[i+1];
 			do {
 Q				q0 += BR0[i]   * zl[0];
 Q				q1 += BR0[i+1] * zl[1];
@@ -165,12 +161,12 @@ V				dzl0+=2;
 Q			zl += (shtns.klim-i);
 V			dzl0 += (shtns.klim-i);
 		#endif
-Q			Ql[l] = q0;	Ql[l+1] = q1;
-V			Sl[l] = s0;	Sl[l+1] = s1;
-V			Tl[l] = t0;	Tl[l+1] = t1;
+Q			Ql[l] = q0;		Ql[l+1] = q1;
+V			Sl[l+1] = s0;	Tl[l+1] = t0;
 	  #else
+V			Sl[l] = vhi_to_cplx(s);		Tl[l] = vhi_to_cplx(t);
 Q			v2d q = vdup(0.0);
-V			v2d s = vdup(0.0);		v2d t = vdup(0.0);
+V			s = vdup(0.0);		t = vdup(0.0);
 			i >>= 1;	// i = i/2
 			do {
 Q				q += ((v2d*) zl)[0] * ((v2d*) BR0)[i];
@@ -184,27 +180,29 @@ V				dzl0 +=2;
 Q			zl += (shtns.klim-2*i);
 V			dzl0 += (shtns.klim-2*i);
 		#endif
-Q			((v2d*) Ql)[l] = vlo_to_cplx(q);		((v2d*) Ql)[l+1] = vhi_to_cplx(q);
-V			((v2d*) Sl)[l] = vlo_to_cplx(s);		((v2d*) Sl)[l+1] = vhi_to_cplx(s);
-V			((v2d*) Tl)[l] = vlo_to_cplx(t);		((v2d*) Tl)[l+1] = vhi_to_cplx(t);
+Q			Ql[l]   = vlo_to_cplx(q);		Ql[l+1] = vhi_to_cplx(q);
+V			Sl[l+1] = vlo_to_cplx(s);		Tl[l+1] = vlo_to_cplx(t);
 	  #endif
 			l+=2;
+	#ifndef SHT_VAR_LTR
+		} while(l<LTR);
+	#else
 		}
+	#endif
 		if (l == LTR) {
+V	#ifndef _GCC_VEC_
+V			Sl[l] = s1;		Tl[l] = t1;
+V	#else
+V			((v2d*) Sl)[l] = vhi_to_cplx(s);		((v2d*) Tl)[l] = vhi_to_cplx(t);
+V	#endif
 Q			q0 = 0.0;
-V			s0 = 0.0;	t0 = 0.0;
-Q			i=l;	// l < NLAT
-V			i=l-1;
-			do {
+Q			i=l;	// l < klim
+Q			do {
 Q				q0 += BR0[i] * zl[0];
-V				s0 += BT0[i] * dzl0[0];
-V				t0 -= BP0[i] * dzl0[0];
 Q				zl+=2;
-V				dzl0+=2;
-				i+=2;
-			} while(i<klim);
-Q			Ql[l] = q0;
-V			Sl[l] = s0;	Tl[l] = t0;
+Q				i+=2;
+Q			} while(i<klim);
+Q			((complex double *) Ql)[l] = q0;
 			l++;
 		}
 Q	#undef BR0
@@ -212,8 +210,8 @@ V	#undef BT0
 V	#undef BP0
   #ifdef SHT_VAR_LTR
 		while( l<=LMAX ) {
-Q			Ql[l] = 0.0;
-V			Sl[l] = 0.0;	Tl[l] = 0.0;
+Q			Ql[l] = vdup(0.0);
+V			Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
 			l++;
 		}
   #endif
@@ -251,14 +249,18 @@ VB			pe0(i) = (e+f)*np;		po0(i) = (e-f)*np;
   #endif
 Q		zl += ni + (ni&1);		// SSE alignement
 		l=1;			// l=0 is zero for the vector transform.
-Q		Ql = Qlm;		// virtual pointer for l=0 and im
-V		Sl = Slm;	Tl = Tlm;		// virtual pointer for l=0 and im
+Q		v2d* Ql = (v2d*) Qlm;		// virtual pointer for l=0 and im
+V		v2d* Sl = (v2d*) Slm;	v2d* Tl = (v2d*) Tlm;		// virtual pointer for l=0 and im
 V		dzl0 = (double *) dzlm[0];		// only theta derivative (d/dphi = 0 for m=0)
 QB		BrF += NLAT;
 VB		BtF += NLAT;	BpF += NLAT;
-Q		Ql[0] = r0;
-V		Sl[0] = 0.0;	Tl[0] = 0.0;	// l=0 is zero for the vector transform.
-		while(l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+Q		((complex double *)Ql)[0] = r0;
+V		Sl[0] = vdup(0.0);	Tl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
+	#ifdef SHT_VAR_LTR
+		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+	#else
+		do {
+	#endif
 			i=0;
   #ifndef _GCC_VEC_
 QE			double q0 = 0.0;
@@ -291,12 +293,16 @@ Q				zl +=2;
 V				dzl0 +=2;
 				i++;
 			} while(i < ni);
-Q			((v2d*) Ql)[l] = vlo_to_cplx(q);		((v2d*) Ql)[l+1] = vhi_to_cplx(q);
-V			((v2d*) Sl)[l] = vlo_to_cplx(s);		((v2d*) Sl)[l+1] = vhi_to_cplx(s);
-V			((v2d*) Tl)[l] = vlo_to_cplx(t);		((v2d*) Tl)[l+1] = vhi_to_cplx(t);
+Q			Ql[l] = vlo_to_cplx(q);		Ql[l+1] = vhi_to_cplx(q);
+V			Sl[l] = vlo_to_cplx(s);		Sl[l+1] = vhi_to_cplx(s);
+V			Tl[l] = vlo_to_cplx(t);		Tl[l+1] = vhi_to_cplx(t);
   #endif
 			l+=2;
+	#ifndef SHT_VAR_LTR
+		} while (l<LTR);
+	#else
 		}
+	#endif
 		if (l==LTR) {
 			long int lstride=1;
 	  #ifdef SHT_VAR_LTR
@@ -313,15 +319,15 @@ Q				zl += lstride;
 V				dzl0 += lstride;
 				i++;
 			} while(i<ni);
-QE			Ql[l] = q0;
-VE			Sl[l] = s0;
-VO			Tl[l] = t0;
+QE			((complex double *)Ql)[l] = q0;
+VE			((complex double *)Sl)[l] = s0;
+VO			((complex double *)Tl)[l] = t0;
 	  #ifdef SHT_VAR_LTR
 	  		l++;
 		}
 	    while( l<=LMAX ) {
-Q			((v2d*) Ql)[l] = vdup(0.0);
-V			((v2d*) Sl)[l] = vdup(0.0);	((v2d*) Tl)[l] = vdup(0.0);
+Q			Ql[l] = vdup(0.0);
+V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
 			l++;
       #endif
 		}

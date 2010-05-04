@@ -28,6 +28,9 @@ for m=2, z[k] is constant up to l-1
          dtz[k] is constant up to l-2
 for m=3, z[k] is constant up to l-2
 
+- there is a need for a merged (3 components) DCT version
+- there is a need for transposed version !!
+
 - Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
 - Using CUDA may be interesting !
 
