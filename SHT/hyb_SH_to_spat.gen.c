@@ -68,16 +68,16 @@ V	double *dyl0;
 	long int llim;
 	long int k,im,m,l;
   #ifdef _GCC_VEC_
-Q	v2d Ql0[(LTR+3)/2];		// we need some zero-padding.
-S	v2d Sl0[(LTR+2)/2];
-T	v2d Tl0[(LTR+2)/2];
+Q	v2d Ql0[(LTR+3)>>1];		// we need some zero-padding.
+S	v2d Sl0[(LTR+2)>>1];
+T	v2d Tl0[(LTR+2)>>1];
   #endif
 
   #ifndef SHT_AXISYM
 Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
-		long int nspat = (NPHI/2+1)*NLAT;
+		long int nspat = ((NPHI>>1) +1)*NLAT;
 	  #ifndef SHT_3COMP
 Q		BrF = fftw_malloc( nspat * sizeof(complex double) );
 V		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
@@ -165,14 +165,20 @@ Q				yl+=2;
 V				dyl0+=2;
 Q			} while(2*l <= llim);
 V			} while(2*l < llim);
-Q			BR0[k] = vlo_to_dbl(r);	BR0[k+1] = vhi_to_dbl(r);
-S			BT0[k] = vlo_to_dbl(t);	BT0[k+1] = vhi_to_dbl(t);
-T			BP0[k] = vlo_to_dbl(p);	BP0[k+1] = vhi_to_dbl(p);
+		#ifndef SHT_AXISYM
+Q			((v2d*)BR0)[k] = vlo_to_cplx(r);	((v2d*)BR0)[k+1] = vhi_to_cplx(r);
+S			((v2d*)BT0)[k] = vlo_to_cplx(t);	((v2d*)BT0)[k+1] = vhi_to_cplx(t);
+T			((v2d*)BP0)[k] = vlo_to_cplx(p);	((v2d*)BP0)[k+1] = vhi_to_cplx(p);
+		#else
+Q			*((v2d*)(BR0 +k)) = r;
+S			*((v2d*)(BT0 +k)) = t;
+T			*((v2d*)(BP0 +k)) = p;
+		#endif
 	#endif
 			k+=2;
 		#ifdef SHT_VAR_LTR
-Q			yl  += (LMAX/2 - LTR/2)*2;
-V			dyl0 += ((LMAX+1)/2 - (LTR+1)/2)*2;
+Q			yl  += ((LMAX>>1) - (LTR>>1))*2;
+V			dyl0 += (((LMAX+1)>>1) - ((LTR+1)>>1))*2;
 		#endif
 V			l = k-1;
 Q		} while (k<=llim);
@@ -265,10 +271,12 @@ Q				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
 Q				yl+=2;
 Q			}
 		#endif
-	/*	alternate code, which may be faster (slightly) on SSE3.
+		#if __SSE3__
+	/*	alternate code, which may be faster (slightly) on SSE3.	*/
 Q			r = addi(r,r);		// { re-ro , re+ro }
 S			t = addi(t,t);		// { te-to , te+to }
 T			p = addi(p,p);		// { pe-po , pe+po }
+		  #ifdef SHT_AXISYM
 Q			BR0[k] = vhi_to_dbl(r);
 S			BT0[k] = vhi_to_dbl(t);	// Bt = dS/dt
 T			BP0[k] = vhi_to_dbl(p);	// Bp = - dT/dt
@@ -276,7 +284,16 @@ T			BP0[k] = vhi_to_dbl(p);	// Bp = - dT/dt
 QB			BR0[NLAT-k] = vlo_to_dbl(r);
 SB			BT0[NLAT-k] = vlo_to_dbl(t);
 TB			BP0[NLAT-k] = vlo_to_dbl(p);
-	*/
+		  #else
+Q			((v2d*)BR0)[k] = vhi_to_cplx(r);
+S			((v2d*)BT0)[k] = vhi_to_cplx(t);	// Bt = dS/dt
+T			((v2d*)BP0)[k] = vhi_to_cplx(p);	// Bp = - dT/dt
+			k++;
+QB			((v2d*)BR0)[NLAT-k] = vlo_to_cplx(r);
+SB			((v2d*)BT0)[NLAT-k] = vlo_to_cplx(t);
+TB			((v2d*)BP0)[NLAT-k] = vlo_to_cplx(p);
+		  #endif
+		#else
 Q			BR0[k] = vhi_to_dbl(r) + vlo_to_dbl(r);
 S			BT0[k] = vhi_to_dbl(t) + vlo_to_dbl(t);	// Bt = dS/dt
 T			BP0[k] = vhi_to_dbl(p) + vlo_to_dbl(p);	// Bp = - dT/dt
@@ -284,10 +301,11 @@ T			BP0[k] = vhi_to_dbl(p) + vlo_to_dbl(p);	// Bp = - dT/dt
 QB			BR0[NLAT-k] = vlo_to_dbl(r) - vhi_to_dbl(r);
 SB			BT0[NLAT-k] = vlo_to_dbl(t) - vhi_to_dbl(t);
 TB			BP0[NLAT-k] = vlo_to_dbl(p) - vhi_to_dbl(p);
+		#endif
 	#endif
 		#ifdef SHT_VAR_LTR
-Q			yl  += (LMAX/2 - LTR/2)*2;
-V			dyl0 += ((LMAX+1)/2 - (LTR+1)/2)*2;
+Q			yl  += ((LMAX>>1) - (LTR>>1))*2;
+V			dyl0 += (((LMAX+1)>>1) - ((LTR+1)>>1))*2;
 		#endif
 		} while (k < NLAT_2);
   #ifndef SHT_NO_DCT
@@ -439,7 +457,7 @@ V			dyl += (LMAX-LTR);
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
-	for (k=0; k < NLAT*(NPHI/2 -MTR); k++) {	// padding for high m's
+	for (k=0; k < NLAT*((NPHI>>1) -MTR); k++) {	// padding for high m's
 Q			BrF[k] = vdup(0.0);
 V			BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
 	}

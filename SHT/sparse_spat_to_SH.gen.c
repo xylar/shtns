@@ -40,9 +40,10 @@ V	sgn_tor = -2.0;		sgn_sph = 2.0;		// factor 2 to compensate summing only on hal
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 0) {
 	    if (SHT_FFT > 1) {		// alloc memory for the FFT
-Q	    	BrF = fftw_malloc( (NPHI/2+1)*NLAT_2 * sizeof(complex double) );
-V	    	BtF = fftw_malloc( 2* (NPHI/2+1)*NLAT_2 * sizeof(complex double) );
-V	    	BpF = BtF + (NPHI/2+1)*NLAT_2;
+	    	long int nspat = ((NPHI>>1) +1)*NLAT_2;
+Q	    	BrF = fftw_malloc( nspat * sizeof(complex double) );
+V	    	BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+V	    	BpF = BtF + nspat;
 	    }
 Q	    fftw_execute_dft_r2c(fft_eo,Vr, BrF);
 V	    fftw_execute_dft_r2c(fft_eo,Vt, BtF);

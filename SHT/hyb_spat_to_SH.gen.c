@@ -64,7 +64,7 @@ V    	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 0) {
 	    if (SHT_FFT > 1) {		// alloc memory for the FFT
-	    	long int nspat = (NPHI/2+1)*NLAT;
+	    	long int nspat = ((NPHI>>1) +1)*NLAT;
 		  #ifndef SHT_3COMP
 Q	    	BrF = fftw_malloc( nspat * sizeof(complex double) );
 V	    	BtF = fftw_malloc( 2* nspat * sizeof(complex double) );

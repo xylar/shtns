@@ -55,9 +55,10 @@ V	sgn_tor = -1.0;		sgn_sph = 1.0;
 
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
-Q		BrF = fftw_malloc( (NPHI/2+1)*NLAT_2 * sizeof(complex double) );
-V		BtF = fftw_malloc( 2* (NPHI/2+1)*NLAT_2 * sizeof(complex double) );
-V		BpF = BtF + (NPHI/2+1)*NLAT_2;
+		long int nspat = ((NPHI>>1) +1)*NLAT_2;
+Q		BrF = fftw_malloc( nspat * sizeof(complex double) );
+V		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+V		BpF = BtF + nspat;
 	}
   #endif
 
@@ -100,8 +101,8 @@ V			BT0[k] = to * sgn_sph;	// Bt = dS/dt
 V			BP0[k] = pe * sgn_tor;	// Bp = - dT/dt
 			k++;
 		#ifdef SHT_VAR_LTR
-Q			yl  += (LMAX/2 - LTR/2)*2;
-V			dyl0 += ((LMAX+1)/2 - (LTR+1)/2)*2;
+Q			yl  += ((LMAX>>1) - (LTR>>1))*2;
+V			dyl0 += (((LMAX+1)>>1) - ((LTR+1)>>1))*2;
 		#endif
 		} while (k < NLAT_2);
 		im++;
@@ -159,7 +160,7 @@ V			dyl += (LMAX-LTR);
 Q		BrF += NLAT_2;
 V		BtF += NLAT_2;	BpF += NLAT_2;
 	}
-	for (k=0; k < NLAT_2*(NPHI/2 -MTR); k++) {	// padding for high m's
+	for (k=0; k < NLAT_2*((NPHI>>1) -MTR); k++) {	// padding for high m's
 Q			BrF[k] = 0.0;
 V			BtF[k] = 0.0;	BpF[k] = 0.0;
 	}
