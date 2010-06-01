@@ -1,3 +1,20 @@
+c
+c  Copyright (c) 2010 Centre National de la Recherche Scientifique.
+c  written by Nathanael Schaeffer (CNRS, LGIT, Grenoble, France).
+c  
+c  nathanael.schaeffer@ujf-grenoble.fr
+c  
+c  This software is governed by the CeCILL license under French law and
+c  abiding by the rules of distribution of free software. You can use,
+c  modify and/or redistribute the software under the terms of the CeCILL
+c  license as circulated by CEA, CNRS and INRIA at the following URL
+c  "http://www.cecill.info".
+c  
+c  The fact that you are presently reading this means that you have had
+c  knowledge of the CeCILL license and that you accept its terms.
+c  
+
+
 * A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns
       PROGRAM SHT_example
 

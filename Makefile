@@ -36,11 +36,13 @@ default : libshtns.a
 
 libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
+	@cat copyright
 
 install :
 	cp libshtns.a $(PREFIX)/lib
 	cp shtns.h $(PREFIX)/include
 	cp shtns.f $(PREFIX)/include
+	@cat copyright
 
 # codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
@@ -92,6 +94,29 @@ python : shtns.h shtns.i
 	swig -python shtns.i
 	gcc -fpic -I/usr/include/python2.6 -c shtns_wrap.c 
 	gcc -shared /usr/lib/libfftw3.so SHT.o sht_*.o shtns_wrap.o -o _shtns.so
+
+# update the copyright notice
+updatecpy : copyright
+	./update-copyright.sh shtns.h
+	./update-copyright.sh SHT.c
+	./update-copyright.sh sht_legendre.c
+	./update-copyright.sh sht_config.h
+	./update-copyright.sh sht_private.h
+	./update-copyright.sh sht_std.c
+	./update-copyright.sh sht_ltr.c
+	./update-copyright.sh sht_m0.c
+	./update-copyright.sh sht_m0ltr.c
+	./update-copyright.sh sht_eo.c
+	./update-copyright.sh SHT/sht_generic.c
+	./update-copyright.sh SHT/hyb_SH_to_spat.gen.c
+	./update-copyright.sh SHT/hyb_spat_to_SH.gen.c
+	./update-copyright.sh SHT/sparse_SH_to_spat.gen.c
+	./update-copyright.sh SHT/sparse_spat_to_SH.gen.c
+	./update-copyright.sh time_SHT.c
+	./update-copyright.sh SHT_example.c
+	./update-copyright.sh -fortran SHT_example.f
+	./update-copyright.sh -fortran shtns.f
+	./update-copyright.sh shtns.i
 
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000

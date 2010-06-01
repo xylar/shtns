@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2010 Centre National de la Recherche Scientifique.
+ * written by Nathanael Schaeffer (CNRS, LGIT, Grenoble, France).
+ * 
+ * nathanael.schaeffer@ujf-grenoble.fr
+ * 
+ * This software is governed by the CeCILL license under French law and
+ * abiding by the rules of distribution of free software. You can use,
+ * modify and/or redistribute the software under the terms of the CeCILL
+ * license as circulated by CEA, CNRS and INRIA at the following URL
+ * "http://www.cecill.info".
+ * 
+ * The fact that you are presently reading this means that you have had
+ * knowledge of the CeCILL license and that you accept its terms.
+ * 
+ */
+
 /// \file time_SHT.c This program performs some spherical harmonic transforms, and displays timings and accuracy.
 /// \c make \c time_SHT to compile, and then run.
 
@@ -480,6 +497,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"iter") == 0) SHT_ITER = t;
 		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
 		if (strcmp(name,"reg") == 0) shtmode = sht_reg_fast;	// force regular grid.
+		if (strcmp(name,"quickinit") == 0) shtmode = sht_quick_init;	// Gauss grid and fast initialization time, but suboptimal fourier transforms.
 		if (strcmp(name,"schmidt") == 0) shtnorm = sht_schmidt | SHT_NO_CS_PHASE;
 		if (strcmp(name,"4pi") == 0) shtnorm = sht_fourpi | SHT_REAL_NORM;
 		if (strcmp(name,"oop") == 0) layout = SHT_THETA_CONTIGUOUS;

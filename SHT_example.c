@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2010 Centre National de la Recherche Scientifique.
+ * written by Nathanael Schaeffer (CNRS, LGIT, Grenoble, France).
+ * 
+ * nathanael.schaeffer@ujf-grenoble.fr
+ * 
+ * This software is governed by the CeCILL license under French law and
+ * abiding by the rules of distribution of free software. You can use,
+ * modify and/or redistribute the software under the terms of the CeCILL
+ * license as circulated by CEA, CNRS and INRIA at the following URL
+ * "http://www.cecill.info".
+ * 
+ * The fact that you are presently reading this means that you have had
+ * knowledge of the CeCILL license and that you accept its terms.
+ * 
+ */
+
 /** \example SHT_example.c
  \brief An example program that performs backward and forward Spherical Harmonic Transforms using SHTns
 **/
@@ -29,6 +46,8 @@ int main()
 	mmax = 3;	nphi = 10;
 	mres = 1;
 	NLM = shtns_init( sht_gauss, lmax, mmax, mres, nlat, nphi );
+//	NLM = shtns_set_size(lmax, mmax, mres, sht_orthonormal | SHT_REAL_NORM);
+//	shtns_precompute( sht_gauss, 0.0, nlat, nphi);
 
 // Memory allocation : the use of fftw_malloc is required because we need proper 16-byte alignement.
 // allocate spatial fields.
