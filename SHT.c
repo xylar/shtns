@@ -63,7 +63,7 @@ double sh10_ct() {
 double sh11_st() {
 	return Y11_st;
 }
-/// returns the l=1, m=1 SH coefficient corresponding to unit energy.
+/// returns the l,m SH coefficient corresponding to unit energy.
 double shlm_e1(int l, int m) {
 	double x = Y00_1/sqrt(4.*M_PI);
 	if (SHT_NORM == sht_schmidt) x *= sqrt(2*l+1);

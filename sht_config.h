@@ -36,4 +36,5 @@
 #define SHT_DEFAULT_NL_ORDER 2
 
 /// I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 is supported) !
+/// (set to zero to disable, may be useful for calling from Fortran)
 #define _GCC_VEC_ 1

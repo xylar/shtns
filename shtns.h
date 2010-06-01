@@ -114,6 +114,7 @@ int Get_MTR_DCT();
 double sh00_1();	///< returns the spherical harmonic representation of 1 (l=0,m=0)
 double sh10_ct();	///< returns the spherical harmonic representation of cos(theta) (l=1,m=0)
 double sh11_st();	///< returns the spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
+double shlm_e1(int l, int m);		///< returns the l,m SH coefficient corresponding to unit energy.
 //@}
 
 /// \name Scalar transforms

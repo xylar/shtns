@@ -72,10 +72,10 @@ time_SHT : shtns.h time_SHT.c libshtns.a Makefile
 	$(cmd) time_SHT.c libshtns.a -lfftw3 -lm -o time_SHT
 
 SHT_example : SHT_example.c libshtns.a Makefile shtns.h
-	$(cmd) SHT_example.c libshtns.a -lfftw3 -lm -o SHT_example
+	$(cmd) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c -lshtns -lfftw3 -lm -o SHT_example
 
 SHT_fort_ex : SHT_example.f libshtns.a Makefile shtns.f
-	gfortran -fdefault-real-8 SHT_example.f libshtns.a -lfftw3 -lm -lc -o SHT_fort_ex
+	gfortran -fdefault-real-8 -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.f -lshtns -lfftw3 -lm -lc -o SHT_fort_ex
 
 #documentation :
 docs :

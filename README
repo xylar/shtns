@@ -6,6 +6,9 @@ Then browse the html documentation starting with doc/html/index.html
  * SHTns is a library for Spherical Harmonic Transform written in C, aimed at 
  * numerical simulation (fluid flows, mhd, ...) in spherical geometries.
  * 
+ * Available soon under <a href="http://www.cecill.info/index.en.html">CeCILL Licence</a> (GPL compatible french Licence).
+ * Send an email to nathanael.schaeffer@ujf-grenoble.fr to be informed on release or request a pre-version.
+ * 
  * Main features :
  * - both scalar and vector transforms
  * - backward and forward (synthesis and analysis) functions
@@ -17,10 +20,11 @@ Then browse the html documentation starting with doc/html/index.html
  * - an even faster algorithm using DCT for regular nodes (based on a generalized Fejer quadrature)
  * - support for SSE2 & SSE3 vectorization with gcc.
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
+ * - ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
  *
  * Using DCT acceleration and other classical optimizations, it is intended to be <b>very fast</b>.
  * 
- * It uses the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms, and is distributed under the GPL License.
+ * It uses the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms, and is distributed under the open source CeCILL License.
  *
  * \see shtns.h for the definitions of variables, macros and functions.
  * \see The example programs (in \link SHT_example.f Fortran \endlink and \link SHT_example.c C \endlink) to get started.
@@ -33,6 +37,9 @@ Then browse the html documentation starting with doc/html/index.html
 
 
 /** \page compil Compiling and installing SHTns
+
+To compile SHTns, you need a C compiler and the FFTW library version 3.0 or later carefully installed.
+We recommend using GCC 4.0 or later as it will produce the fastest vectorized code on x86_64 architecture.
 
 You should edit the Makefile to adapt it to your architecture and compiler. In particular, using gcc or icc will not lead to the same performance, and you
 should test on your system what gives the best result.
@@ -149,7 +156,8 @@ in combination of the arrays \ref li, \ref el and \ref l2 which give the degree 
 
 \section Allocation
 Allocation for a SH description is simply done with :
-\code Alm = malloc( NLM * sizeof(complex double) );\endcode
+\code Alm = fftw_malloc( NLM * sizeof(complex double) );\endcode
+The use of fftw_malloc ensures proper alignement of data for SSE vectorization.
 
 \section norm Normalization
 
@@ -247,6 +255,13 @@ Around 5% to 15% speed increase are typical values for a SHT with a large MMAX.
 Cache optimizations have been carried out throughout the code.
 This means ordering coefficients and stripping out systematic zeros.
 
+\section opt_size Spatial Size optimization
+
+When using \ref shtns_precompute_auto, you can let SHTns choose the optimal spatial sizes for
+the spherical harmonic truncation you specified with \ref shtns_set_size.
+The spatial sizes are chosen so that no aliasing occurs, and ensuring FFTW will perform as fast
+as possible.
+
 \section opt_dct Discrete Cosine Transform optimization
 
 This is a non-trivial optimization mostly efficient on small m's,
@@ -293,15 +308,28 @@ can choose to do so using the adequate \ref shtns_type when calling \ref shtns_i
 
 /** \page usage Using SHTns in a C program
 
+To make SHTns known by your C program, add
+\code
+#include <fftw3.h>
+#include <shtns.h>
+\endcode
+in the preamble of your source file.
+
 First of all you need to initialize SHTns. There are two ways to do this :
 \li calling \ref shtns_init function,
 \li or calling \ref shtns_set_size followed by \ref shtns_precompute. This way lets you choose normalization and optimization.
 
 Note that you can call initialization function(s) only once.
-Then you must allocate some memory, and finaly you can perform some spherical harmonic transforms.
+Then you must allocate some memory (with fftw_malloc so that the memory is properly aligned for vectorized code),
+and finaly you can perform some spherical harmonic transforms.
 
 \see Look at shtns.h for the function definitions and documentation.
 \see See the \link SHT_example.c C example \endlink for a simple usage of SHTns in a C program.
+
+When your program is ready, compile it adding these options to the compiler (gcc) :
+\code
+-L/path/to/lib/ -I/path/to/include/ -lshtns -lfftw3 -lm
+\endcode
 
 */
 
@@ -324,13 +352,20 @@ Then you must allocate some memory, and finaly you can perform some spherical ha
   \brief A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
   Compile using : \code make SHT_fort_ex \endcode
   \see fortapi
+  
+When your program is ready, compile it adding these options to the compiler (gfortran) :
+\code
+-L/path/to/lib/ -I/path/to/include/ -lshtns -lfftw3 -lm -lc
+\endcode
 
 */
 
 /** \page python Using SHTns with Python
 
+<b>This is a preliminary Python interface, do not expect too much !</b>
 SHTns provides a Python interface, for interactive use of the spherical harmonic transform.
 It uses swig to generate the Python interface.
+
 
 \li Compile using \code make python \endcode
 

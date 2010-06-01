@@ -8,7 +8,7 @@
 #include <math.h>
 #include <fftw3.h>
 
-#include "shtns.h"
+#include <shtns.h>
 
 /// a simple function that writes a vector to a file
 void write_vect(char *fn, double *vec, int N);
@@ -30,13 +30,14 @@ int main()
 	mres = 1;
 	NLM = shtns_init( sht_gauss, lmax, mmax, mres, nlat, nphi );
 
+// Memory allocation : the use of fftw_malloc is required because we need proper 16-byte alignement.
 // allocate spatial fields.
 	Sh = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double));
 	Th = (double *) fftw_malloc( NSPAT_ALLOC * sizeof(double));
 
 // allocate SH representations.
-	Slm = (complex double *) malloc( NLM * sizeof(complex double));
-	Tlm = (complex double *) malloc( NLM * sizeof(complex double));
+	Slm = (complex double *) fftw_malloc( NLM * sizeof(complex double));
+	Tlm = (complex double *) fftw_malloc( NLM * sizeof(complex double));
 
 // SH_to_spat
 	LM_LOOP( Slm[lm]=0.0;  Tlm[lm] = 0.0; )		/* this is the same as :
