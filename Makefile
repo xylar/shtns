@@ -36,13 +36,15 @@ default : libshtns.a
 
 libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
-	@cat copyright
+	@echo " "
+	@cat COPYRIGHT
 
 install :
 	cp libshtns.a $(PREFIX)/lib
 	cp shtns.h $(PREFIX)/include
 	cp shtns.f $(PREFIX)/include
-	@cat copyright
+	@echo " "
+	@cat COPYRIGHT
 
 # codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile

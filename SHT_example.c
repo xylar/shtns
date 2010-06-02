@@ -16,7 +16,10 @@
  */
 
 /** \example SHT_example.c
- \brief An example program that performs backward and forward Spherical Harmonic Transforms using SHTns
+ \brief An example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
+
+  Compile using : \code make SHT_example \endcode
+  \see \ref usage
 **/
 
 #include <stdio.h>

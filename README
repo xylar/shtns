@@ -368,15 +368,17 @@ Then you must allocate some memory, and finaly you can perform some spherical ha
 \see See The full reference of the \ref fortapi
 \see See the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
 
-\example SHT_example.f
-  \brief A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
-  Compile using : \code make SHT_fort_ex \endcode
-  \see fortapi
-
 When your program is ready, compile it adding these options to the compiler (gfortran) :
 \code
 -L/path/to/lib/ -I/path/to/include/ -lshtns -lfftw3 -lm -lc
 \endcode
+
+\example SHT_example.f
+  \brief A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
+
+  Compile using : \code make SHT_fort_ex \endcode
+  \see fortapi
+  \see \ref f77
 
 */
 
