@@ -178,12 +178,13 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 	dyl[0] = dy0;
 	if (lmax==m) return;		// done.
 
+  #ifndef _GCC_VEC_
 	y1 = alm[lm+1] * x * y0;
 	dy1 = alm[lm+1]*( x*dy0 - st*y0 );
 	yl[1] = y1;		// l=m+1
 	dyl[1] = dy1;
-	lm+=2;
 	if (lmax==m+1) return;		// done.
+	lm+=2;
 
 	yl -= m;	dyl -= m;			// shift pointers
 	for (l=m+2; l<lmax; l+=2) {
@@ -199,6 +200,28 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 		yl[l] = alm[lm+1]*x*y1 + alm[lm]*y0;
 		dyl[l] = alm[lm+1]*(x*dy1 - y1*st) + alm[lm]*dy0;
 	}
+  #else
+  	v2d vy1 = vset(dy0, y0);
+  	v2d vx = vdup(x);
+  	v2d vst = vset(st, 0.0);
+
+  	v2d vty = vxchg(vy1);		// swap
+  	vty = vdup(alm[lm+1]) * ( vx*vy1 - vst*vty );
+
+	yl[1] = vlo_to_dbl(vty);		// l=m+1
+	dyl[1] = vhi_to_dbl(vty);
+	lm+=2;
+
+	yl -= m;	dyl -= m;			// shift pointers
+	for (l=m+2; l<=lmax; l++) {		// vectorized loop : 4* and 2+ (instead of 7* and 3+)
+		v2d vy0 = vy1;
+		vy1 = vty;
+		vty = vxchg(vty);		// swap
+		vty = vdup(alm[lm])*vy0  +  vdup(alm[lm+1]) * (vx*vy1 - vst*vty);
+		yl[l] = vlo_to_dbl(vty);		dyl[l] = vhi_to_dbl(vty);
+		lm+=2;
+	}
+  #endif
 
 /*	// Simple loop, without temporary variables.
 	yl -= m;	dyl -= m;			// shift pointers

@@ -150,8 +150,12 @@ extern fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 		#warning "using GCC vector instructions (sse2)"
 		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
 	#endif
+	// vset(hi,lo) takes two doubles and pack them in a vector
+	#define vset(hi, lo) _mm_set_pd(hi, lo)
 	// vdup(x) takes a double and duplicate it to a vector of 2 doubles.
 	#define vdup(x) _mm_set1_pd(x)
+	// vxchg(a) exchange hi and lo component of vector a
+	#define vxchg(a) _mm_shuffle_pd(a,a,1)
 	#define vlo_to_cplx(a) _mm_shuffle_pd(a, vdup(0.0), 0)
 	#define vhi_to_cplx(a) _mm_shuffle_pd(a, vdup(0.0), 1)
 	#define vlo_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 0)
