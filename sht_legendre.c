@@ -396,3 +396,143 @@ void gauss_nodes(long double *x, long double *w, int n)
 	printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);
 #endif
 }
+
+
+void SH_to_spat_fly(complex double *Qlm, double *Vr)
+{
+	v2d *BrF;
+	long int llim;
+	long int k,im,m,l,lm;
+
+  #ifndef SHT_AXISYM
+	#define BR0 ((complex double *)BrF)
+	BrF = (v2d *) Vr;
+	if (SHT_FFT > 1) {		// alloc memory for the FFT
+		long int nspat = ((NPHI>>1) +1)*NLAT;
+		BrF = fftw_malloc( nspat * sizeof(complex double) );
+	}
+  #else
+	#define BR0 ((double *)BrF)
+	BrF = (v2d*) Vr;
+  #endif
+
+	llim = LMAX;		// copy LTR to a local variable for faster access (inner loop limit)
+	im=0;	m=0;
+	double* Ql = (double*) Qlm;
+		k=0;
+		do {
+			l=0;	lm=0;
+			s2d cost = *((s2d*)(ct+k));
+			s2d ymm = vdup(alm[lm]);
+			s2d rer = ymm * vdup(Ql[0]);
+			s2d ymmp1 = ymm * vdup(alm[lm+1]) * cost;		// l=m+1
+			s2d ror = ymmp1 * vdup(Ql[2]);
+			lm+=2;	l+=2;
+			while(l<llim) {
+				ymm   = vdup(alm[lm+1])*cost*ymmp1 + vdup(alm[lm])*ymm;
+				rer += ymm * vdup(Ql[2*l]);
+				ymmp1 = vdup(alm[lm+3])*cost*ymm + vdup(alm[lm+2])*ymmp1;
+				ror += ymmp1 * vdup(Ql[2*l+2]);
+				lm+=4;	l+=2;
+			}
+			if (l==llim) {
+				ymm   = vdup(alm[lm+1])*cost*ymmp1 + vdup(alm[lm])*ymm;
+				rer += ymm * vdup(Ql[2*l]);
+			}
+		#if _GCC_VEC_
+			BR0[k] = vlo_to_dbl(rer+ror);
+			BR0[k+1] = vhi_to_dbl(rer+ror);
+			BR0[NLAT-k-2] = vhi_to_dbl(rer-ror);
+			BR0[NLAT-k-1] = vlo_to_dbl(rer-ror);
+			k+=2;
+		#else
+			BR0[k] = (rer+ror);
+			BR0[NLAT-k-1] = (rer-ror);
+			k++;
+		#endif
+		} while (k < NLAT_2);
+
+  #ifndef SHT_AXISYM
+	im=1;
+	BrF += NLAT;
+	while(im<=MMAX) {	// regular for MTR_DCT < im <= MTR
+		m = im*MRES;
+		complex double* Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
+		k=0;	l=tm[im];
+	#if _GCC_VEC_
+		l=(l>>1)*2;		// stay on a 16 byte boundary
+	#endif
+		while (k<l) {	// polar optimization
+			BrF[k] = vdup(0.0);
+			BrF[NLAT-l + k] = vdup(0.0);	// south pole zeroes <=> BrF[im*NLAT + NLAT-(k+1)] = 0.0;
+			k++;
+		}
+		do {
+			lm = mmidx[im];
+			s2d cost  = *((s2d*)(st+k));
+			s2d ymm = vdup(alm[lm]);
+			l=m;	while(1) {
+				if (l&1) ymm *= cost;
+				l >>= 1;
+				if (l==0) break;
+				cost *= cost;
+			};
+			l=m;
+			cost = *((s2d*)(ct+k));
+			s2d	ror = vdup(0.0);
+			s2d	roi = vdup(0.0);
+			s2d rer = ymm * vdup(creal(Ql[l]));
+			s2d rei = ymm * vdup(cimag(Ql[l]));
+		  if (l<llim) {
+			s2d ymmp1 = ymm * vdup(alm[lm+1]) * cost;		// l=m+1
+			ror = ymmp1 * vdup(creal(Ql[l+1]));
+			roi = ymmp1 * vdup(cimag(Ql[l+1]));
+			lm+=2;	l+=2;
+			while (l<llim) {	// compute even and odd parts
+				ymm   = vdup(alm[lm+1])*cost*ymmp1 + vdup(alm[lm])*ymm;
+				rer += ymm * vdup(creal(Ql[l]));
+				rei += ymm * vdup(cimag(Ql[l]));
+				ymmp1 = vdup(alm[lm+3])*cost*ymm + vdup(alm[lm+2])*ymmp1;
+				ror += ymmp1 * vdup(creal(Ql[l+1]));
+				roi += ymmp1 * vdup(cimag(Ql[l+1]));
+				lm+=4;	l+=2;
+			}
+			if (l==llim) {
+				ymm   = vdup(alm[lm+1])*cost*ymmp1 + vdup(alm[lm])*ymm;
+				rer += ymm * vdup(creal(Ql[l]));
+				rei += ymm * vdup(cimag(Ql[l]));
+			}
+		  }
+		#if _GCC_VEC_
+			((complex double *)BrF)[k] = vlo_to_dbl(rer+ror) +I*vlo_to_dbl(rei+roi);
+			((complex double *)BrF)[k+1] = vhi_to_dbl(rer+ror) +I*vhi_to_dbl(rei+roi);
+			((complex double *)BrF)[NLAT-k-2] = vhi_to_dbl(rer-ror) +I*vhi_to_dbl(rei-roi);
+			((complex double *)BrF)[NLAT-k-1] = vlo_to_dbl(rer-ror) +I*vlo_to_dbl(rei-roi);
+			k += 2;
+		#else
+			((complex double *)BrF)[k] = (rer+ror) +I*(rei+roi);
+			((complex double *)BrF)[NLAT-k-1] = (rer-ror) +I*(rei-roi);
+			k++;
+		#endif
+		} while (k < NLAT_2);
+		im++;
+		BrF += NLAT;
+	}
+	for (k=0; k < NLAT*((NPHI>>1) -MMAX); k++) {	// padding for high m's
+			BrF[k] = vdup(0.0);
+	}
+	BrF -= NLAT*(MMAX+1);		// restore original pointer
+
+    if (NPHI>1) {
+		fftw_execute_dft_c2r(ifft, (complex double *) BrF, Vr);
+		if (SHT_FFT > 1) {		// free memory
+			fftw_free(BrF);
+		}
+    } else {
+		k=1;	do {	// compress complex to real
+			Vr[k] = ((double *)BrF)[2*k];
+			k++;
+		} while(k<NLAT);
+    }
+  #endif
+}

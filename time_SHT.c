@@ -143,6 +143,33 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 //	write_vect("Tlm",Tlm,NLM*2);
 }
 
+void SH_to_spat_fly(complex double *Qlm, double *Vr);
+
+int test_SHT_fly()
+{
+	long int jj,i, nlm_cplx;
+	clock_t tcpu;
+
+	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+// synthese (inverse legendre)
+		SH_to_spat_fly(Slm,Sh);
+//		SH_to_spat(Tlm,Th);
+//		for (i=0; i< NLAT*NPHI; i++) {
+//			ThF[i] *= ShF[i];
+//		}
+// analyse (direct legendre)
+		spat_to_SH(Sh,Slm);
+	}
+	tcpu = clock() - tcpu;
+	printf("   2iSHT + NL + SHT x%d time : %d\n", SHT_ITER, (int )tcpu);
+
+	scal_error(Slm, Slm0, LMAX);
+	return (int) tcpu;
+}
+
+
 int test_SHT()
 {
 	long int jj,i, nlm_cplx;
@@ -610,6 +637,8 @@ int main(int argc, char *argv[])
 	printf(":: NO DCT\n");
 	Set_MTR_DCT(-1);
 	test_SHT();
+	printf(":: ON THE FLY\n");
+	test_SHT_fly();
 
 	printf(":: OPTIMAL with LTR\n");
 	Set_MTR_DCT(m_opt);

@@ -315,8 +315,9 @@ void alloc_SHTarrays()
 	long int im,m, l0;
 	long int lstride;
 
-	ct = (double *) fftw_malloc(sizeof(double) * NLAT*3);
-	st = ct + NLAT;		st_1 = ct + 2*NLAT;
+	l0 = ((NLAT+1)>>1)*2;		// round up to even
+	ct = (double *) fftw_malloc(sizeof(double) * l0*3);
+	st = ct + l0;		st_1 = ct + 2*l0;
 	ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );
 	zlm = ylm + (MMAX+1);		ykm_dct = ylm + (MMAX+1)*2;
 	dylm = (struct DtDp **) fftw_malloc( sizeof(struct DtDp *) * (MMAX+1)*3);
