@@ -664,7 +664,8 @@ void OptimizeMatrices(double eps)
 			m = im*MRES;
 			ylm[im]  += tm[im]*(LMAX-m+1);		// shift pointers (still one block for each m)
 			dylm[im] += tm[im]*(LMAX-m+1);
-			for (l=m; l<LMAX; l+=2) {
+			if (zlm[0] != NULL) {
+			  for (l=m; l<LMAX; l+=2) {
 				for (it=0; it<NLAT_2-tm[im]; it++) {	// copy data to avoid cache misses.
 					zlm[im][(l-m)*(NLAT_2-tm[im]) + it*2]   = zlm[im][(l-m)*NLAT_2 + (it+tm[im])*2];
 					zlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1] = zlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1];
@@ -673,13 +674,14 @@ void OptimizeMatrices(double eps)
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1].t;
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1].p;
 				}
-			}
-			if (l==LMAX) {
+			  }
+			  if (l==LMAX) {
 				for (it=0; it<NLAT_2-tm[im]; it++) {
 					zlm[im][(l-m)*(NLAT_2-tm[im]) + it]   = zlm[im][(l-m)*NLAT_2 + (it+tm[im])];
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])].t;
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])].p;
 				}
+			  }
 			}
 		  }
 		}
@@ -696,8 +698,8 @@ void OptimizeMatrices(double eps)
 			yg[it*lstride + (l-1)] = dylm[im][it*(LMAX+1) + l].t;
 		if (LMAX & 1) yg[it*lstride + LMAX] = 0.0;	// add some zero here for vectorization.
 	}
-	yg = (double *) dzlm[im];
-	if (yg != NULL) {	// for sht_reg_poles there is no dzlm defined.
+	if (dzlm[0] != NULL) {		// for sht_reg_poles there is no dzlm defined.
+		yg = (double *) dzlm[im];
 		for (l=1; l<LMAX; l+=2) {		// l=0 is zero, so we start at l=1.
 			for (it=0; it<NLAT_2; it++) {
 				yg[(l-1)*NLAT_2 + it*2] = dzlm[im][(l-1)*NLAT_2 + it*2].t;	// l
@@ -1599,7 +1601,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 		dzlm[0] = NULL;		zlm[0] = NULL;		// mark as unused.
 		EqualPolarGrid();
 		init_SH_synth();
-		OptimizeMatrices(eps);
+		OptimizeMatrices(0.0);
 	}
 	if (flags == sht_quick_init)
 	{
