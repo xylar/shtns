@@ -35,27 +35,16 @@
 // range checking for legendre functions. Comment out for slightly faster legendre function generation.
 //#define LEG_RANGE_CHECK
 
-// it appears that long double precision does not help the precision of the SHT (if the SHT itself is computed in double precision)
-//#define LEG_LONG_DOUBLE
-
-#ifdef LEG_LONG_DOUBLE
-  #define LEG_FLOAT_TYPE long double
-  #define LEG_SQRT(a) sqrtl(a)
-#else
-  #define LEG_FLOAT_TYPE double
-  #define LEG_SQRT(a) sqrt(a)
-#endif
-
 #if SHT_VERBOSE > 1
   #define LEG_RANGE_CHECK
 #endif
 
 /// computes sin(t)^n from cos(t). ie returns (1-x^2)^(n/2), with x = cos(t)
-inline LEG_FLOAT_TYPE sint_pow_n(LEG_FLOAT_TYPE cost, int n)
+inline double sint_pow_n(double cost, int n)
 {
-	LEG_FLOAT_TYPE val = 1.0;
-	LEG_FLOAT_TYPE s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
-	if (n&1) val *= LEG_SQRT(s2);	// = sin(t)
+	double val = 1.0;
+	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
+	if (n&1) val *= sqrt(s2);	// = sin(t)
 	n >>= 1;
 	while(n>0) {
 		if (n&1) val *= s2;
@@ -65,16 +54,13 @@ inline LEG_FLOAT_TYPE sint_pow_n(LEG_FLOAT_TYPE cost, int n)
 	return val;		// = sint(t)^n
 }
 
-int *mmidx;				///< index array (size MMAX+1)
-LEG_FLOAT_TYPE *alm;	///< coefficient list for recurrence (size 2*NLM)
-
 /// Returns the value of a legendre polynomial of degree l and order im*MRES, noramalized for spherical harmonics, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
 double legendre_sphPlm(const int l, const int im, double x)
 {
 	long int i,m,lm;
-	LEG_FLOAT_TYPE ymm, ymmp1;
+	double ymm, ymmp1;
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
@@ -109,7 +95,7 @@ double legendre_sphPlm(const int l, const int im, double x)
 void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 {
 	long int l,m,lm;
-	LEG_FLOAT_TYPE ymm, ymmp1;
+	double ymm, ymmp1;
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
@@ -153,7 +139,7 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
 {
 	long int l,m,lm;
-	LEG_FLOAT_TYPE st, y0, y1, dy0, dy1;
+	double st, y0, y1, dy0, dy1;
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
@@ -258,29 +244,28 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
 {
 	long int im, m, l, lm;
-	LEG_FLOAT_TYPE t1, t2;
+	double t1, t2;
 
 #if SHT_VERBOSE > 1
-	printf("        > using custom fast recurrence for legendre polynomials\n");
 	printf("        > Condon-Shortley phase = %d, normalization = %d\n", with_cs_phase, norm);
 #endif
 
 	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
 
 	mmidx = (int *) malloc( (MMAX+1) * sizeof(int) );
-	alm = (LEG_FLOAT_TYPE *) malloc( 2*NLM * sizeof(LEG_FLOAT_TYPE) );
+	alm = (double *) malloc( 2*NLM * sizeof(double) );
 
 /// - Precompute the factors alm and blm of the recurrence relation :
   if (norm == sht_schmidt) {
 	for (im=0, lm=0; im<=MMAX; im++) {		/// <b> For Schmidt semi-normalized </b>
 		m = im*MRES;
 		mmidx[im] = lm;
-		t2 = LEG_SQRT(2*m+1);
+		t2 = sqrt(2*m+1);
 		alm[lm] = 1.0/t2;		/// starting value will be divided by \f$ \sqrt{2m+1} \f$ 
 		alm[lm+1] = t2;		// l=m+1
 		lm+=2;
 		for (l=m+2; l<=LMAX; l++) {
-			t1 = LEG_SQRT((l+m)*(l-m));
+			t1 = sqrt((l+m)*(l-m));
 			alm[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
 			alm[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
 			t2 = t1;	lm+=2;
@@ -292,12 +277,12 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 		mmidx[im] = lm;
 		t2 = 2*m+1;
 		alm[lm] = 1.0;		// will contain the starting value.
-		alm[lm+1] = LEG_SQRT(2*m+3);		// l=m+1
+		alm[lm+1] = sqrt(2*m+3);		// l=m+1
 		lm+=2;
 		for (l=m+2; l<=LMAX; l++) {
 			t1 = (l+m)*(l-m);
-			alm[lm+1] = LEG_SQRT(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
-			alm[lm] = - LEG_SQRT(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
+			alm[lm+1] = sqrt(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
+			alm[lm] = - sqrt(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
 			t2 = t1;	lm+=2;
 		}
 	}
@@ -310,15 +295,15 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 		alm[0] = t1;		/// \f$ Y_0^0 = 1 \f$  for Schmidt or 4pi-normalized 
 	} else {
 		t1 = 0.25L/M_PIl;
-		alm[0] = LEG_SQRT(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
+		alm[0] = sqrt(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
 	}
 	t1 *= mpos_renorm;		// renormalization for m>0
 	for (im=1, m=0; im<=MMAX; im++) {
 		while(m<im*MRES) {
 			m++;
-			t1 *= ((LEG_FLOAT_TYPE)m + 0.5)/m;	// t1 *= (m+0.5)/m;
+			t1 *= ((double)m + 0.5)/m;	// t1 *= (m+0.5)/m;
 		}
-		t2 = LEG_SQRT(t1);
+		t2 = sqrt(t1);
 		if ( m & with_cs_phase ) t2 = -t2;		/// optional \f$ (-1)^m \f$ Condon-Shortley phase.
 		alm[mmidx[im]] *= t2;
 	}
@@ -329,7 +314,7 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 double legendre_Pl(const int l, double x)
 {
 	long int i;
-	LEG_FLOAT_TYPE p1, p2, p3;
+	double p1, p2, p3;
 
 	if ((l==0)||(x==1.0)) return ( 1. );
 	if (x==-1.0) return ( (l&1) ? -1. : 1. );
@@ -422,33 +407,54 @@ void SH_to_spat_fly(complex double *Qlm, double *Vr)
 		k=0;
 		do {
 			l=0;	lm=0;
-			s2d cost = *((s2d*)(ct+k));
-			s2d ymm = vdup(alm[lm]);
-			s2d rer = ymm * vdup(Ql[0]);
-			s2d ymmp1 = ymm * vdup(alm[lm+1]) * cost;		// l=m+1
-			s2d ror = ymmp1 * vdup(Ql[2]);
+			s2d cta = *((s2d*)(ct+k));
+		#ifdef _GCC_VEC_
+			s2d ctb = *((s2d*)(ct+k+2));	// 4 latitudes/iteration with SSE2
+		#else
+			s2d ctb = *((s2d*)(ct+k+1));	// 2 latitudes/iteration with SSE2
+		#endif
+			s2d y0a = vdup(alm[lm]);
+			s2d y0b = y0a;
+			s2d rer  = y0a * vdup(Ql[0]);
+			s2d rerb = y0b * vdup(Ql[0]);
+			s2d y1a = y0a * vdup(alm[lm+1]) * cta;		// l=m+1
+			s2d y1b = y0b * vdup(alm[lm+1]) * ctb;		// l=m+1
+			s2d ror = y1a * vdup(Ql[2]);
+			s2d rorb = y1b * vdup(Ql[2]);
 			lm+=2;	l+=2;
 			while(l<llim) {
-				ymm   = vdup(alm[lm+1])*cost*ymmp1 + vdup(alm[lm])*ymm;
-				rer += ymm * vdup(Ql[2*l]);
-				ymmp1 = vdup(alm[lm+3])*cost*ymm + vdup(alm[lm+2])*ymmp1;
-				ror += ymmp1 * vdup(Ql[2*l+2]);
+				y0a   = vdup(alm[lm+1])*cta*y1a + vdup(alm[lm])*y0a;
+				y0b   = vdup(alm[lm+1])*ctb*y1b + vdup(alm[lm])*y0b;
+				rer += y0a * vdup(Ql[2*l]);
+				rerb += y0b * vdup(Ql[2*l]);
+				y1a = vdup(alm[lm+3])*cta*y0a + vdup(alm[lm+2])*y1a;
+				y1b = vdup(alm[lm+3])*ctb*y0b + vdup(alm[lm+2])*y1b;
+				ror += y1a * vdup(Ql[2*l+2]);
+				rorb += y1b * vdup(Ql[2*l+2]);
 				lm+=4;	l+=2;
 			}
 			if (l==llim) {
-				ymm   = vdup(alm[lm+1])*cost*ymmp1 + vdup(alm[lm])*ymm;
-				rer += ymm * vdup(Ql[2*l]);
+				y0a   = vdup(alm[lm+1])*cta*y1a + vdup(alm[lm])*y0a;
+				y0b   = vdup(alm[lm+1])*ctb*y1b + vdup(alm[lm])*y0b;
+				rer += y0a * vdup(Ql[2*l]);
+				rerb += y0b * vdup(Ql[2*l]);
 			}
-		#if _GCC_VEC_
+		#ifdef _GCC_VEC_
 			BR0[k] = vlo_to_dbl(rer+ror);
 			BR0[k+1] = vhi_to_dbl(rer+ror);
+			BR0[k+2] = vlo_to_dbl(rerb+rorb);
+			BR0[k+3] = vhi_to_dbl(rerb+rorb);
+			BR0[NLAT-k-4] = vhi_to_dbl(rerb-rorb);
+			BR0[NLAT-k-3] = vlo_to_dbl(rerb-rorb);
 			BR0[NLAT-k-2] = vhi_to_dbl(rer-ror);
 			BR0[NLAT-k-1] = vlo_to_dbl(rer-ror);
-			k+=2;
+			k+=4;
 		#else
 			BR0[k] = (rer+ror);
+			BR0[k+1] = (rerb+rorb);
+			BR0[NLAT-k-2] = (rerb-rorb);
 			BR0[NLAT-k-1] = (rer-ror);
-			k++;
+			k+=2;
 		#endif
 		} while (k < NLAT_2);
 
@@ -459,7 +465,7 @@ void SH_to_spat_fly(complex double *Qlm, double *Vr)
 		m = im*MRES;
 		complex double* Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 		k=0;	l=tm[im];
-	#if _GCC_VEC_
+	#ifdef _GCC_VEC_
 		l=(l>>1)*2;		// stay on a 16 byte boundary
 	#endif
 		while (k<l) {	// polar optimization
@@ -470,48 +476,63 @@ void SH_to_spat_fly(complex double *Qlm, double *Vr)
 		do {
 			lm = mmidx[im];
 			s2d cost  = *((s2d*)(st+k));
-			s2d ymm = vdup(alm[lm]);
+			s2d y0 = vdup(alm[lm]);
 			l=m;	while(1) {
-				if (l&1) ymm *= cost;
+				if (l&1) y0 *= cost;
 				l >>= 1;
 				if (l==0) break;
 				cost *= cost;
 			};
 			l=m;
 			cost = *((s2d*)(ct+k));
-			s2d	ror = vdup(0.0);
-			s2d	roi = vdup(0.0);
-			s2d rer = ymm * vdup(creal(Ql[l]));
-			s2d rei = ymm * vdup(cimag(Ql[l]));
+			v2d q = ((v2d*)Ql)[l];
+			v2d re  = y0 * q;
+			v2d	ro = vdup(0.0);
+		#ifdef _GCC_VEC_
+			v2d rex = y0 * vxchg(q);
+			v2d	rox = vdup(0.0);
+		#endif
 		  if (l<llim) {
-			s2d ymmp1 = ymm * vdup(alm[lm+1]) * cost;		// l=m+1
-			ror = ymmp1 * vdup(creal(Ql[l+1]));
-			roi = ymmp1 * vdup(cimag(Ql[l+1]));
+			s2d y1 = y0 * vdup(alm[lm+1]) * cost;		// l=m+1
+			q= ((v2d*)Ql)[l+1];
+			ro  = y1 * q;
+		#ifdef _GCC_VEC_
+			rox = y1 * vxchg(q);
+		#endif
 			lm+=2;	l+=2;
 			while (l<llim) {	// compute even and odd parts
-				ymm   = vdup(alm[lm+1])*cost*ymmp1 + vdup(alm[lm])*ymm;
-				rer += ymm * vdup(creal(Ql[l]));
-				rei += ymm * vdup(cimag(Ql[l]));
-				ymmp1 = vdup(alm[lm+3])*cost*ymm + vdup(alm[lm+2])*ymmp1;
-				ror += ymmp1 * vdup(creal(Ql[l+1]));
-				roi += ymmp1 * vdup(cimag(Ql[l+1]));
+				y0   = vdup(alm[lm+1])*cost*y1 + vdup(alm[lm])*y0;
+				q = ((v2d*)Ql)[l];
+				re  += y0 * q;
+		#ifdef _GCC_VEC_
+				rex += y0 * vxchg(q);
+		#endif
+				y1 = vdup(alm[lm+3])*cost*y0 + vdup(alm[lm+2])*y1;
+				q= ((v2d*)Ql)[l+1];
+				ro  += y1 * q;
+		#ifdef _GCC_VEC_
+				rox += y1 * vxchg(q);
+		#endif
 				lm+=4;	l+=2;
 			}
 			if (l==llim) {
-				ymm   = vdup(alm[lm+1])*cost*ymmp1 + vdup(alm[lm])*ymm;
-				rer += ymm * vdup(creal(Ql[l]));
-				rei += ymm * vdup(cimag(Ql[l]));
+				y0   = vdup(alm[lm+1])*cost*y1 + vdup(alm[lm])*y0;
+				q = ((v2d*)Ql)[l];
+				re  += y0 * q;
+		#ifdef _GCC_VEC_
+				rex += y0 * vxchg(q);
+		#endif
 			}
 		  }
-		#if _GCC_VEC_
-			((complex double *)BrF)[k] = vlo_to_dbl(rer+ror) +I*vlo_to_dbl(rei+roi);
-			((complex double *)BrF)[k+1] = vhi_to_dbl(rer+ror) +I*vhi_to_dbl(rei+roi);
-			((complex double *)BrF)[NLAT-k-2] = vhi_to_dbl(rer-ror) +I*vhi_to_dbl(rei-roi);
-			((complex double *)BrF)[NLAT-k-1] = vlo_to_dbl(rer-ror) +I*vlo_to_dbl(rei-roi);
+		#ifdef _GCC_VEC_
+			((complex double *)BrF)[k] = vlo_to_dbl(re+ro) +I*vlo_to_dbl(rex+rox);
+			((complex double *)BrF)[k+1] = vhi_to_dbl(rex+rox) +I*vhi_to_dbl(re+ro);
+			((complex double *)BrF)[NLAT-k-2] = vhi_to_dbl(rex-rox) +I*vhi_to_dbl(re-ro);
+			((complex double *)BrF)[NLAT-k-1] = vlo_to_dbl(re-ro) +I*vlo_to_dbl(rex-rox);
 			k += 2;
 		#else
-			((complex double *)BrF)[k] = (rer+ror) +I*(rei+roi);
-			((complex double *)BrF)[NLAT-k-1] = (rer-ror) +I*(rei-roi);
+			((complex double *)BrF)[k] = (re+ro);
+			((complex double *)BrF)[NLAT-k-1] = (re-ro);
 			k++;
 		#endif
 		} while (k < NLAT_2);

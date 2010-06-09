@@ -112,6 +112,8 @@ struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };
 
+extern double *alm;		// legendre recursion coefficients.
+extern int *mmidx;		// index into alm for given im.
 extern int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 extern double** ylm;		// matrix for inverse transform (synthesis)
 extern struct DtDp** dylm;	// theta and phi derivative of Ylm matrix

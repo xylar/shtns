@@ -37,9 +37,10 @@
 /// sizes for SHT, in a structure to avoid problems with conflicting names.
 struct sht_sze shtns;
 
+double *alm;		// coefficient list for Legendre function recurrence (size 2*NLM)
+int *mmidx;			// index array in Legendre recurrence list (size MMAX+1)
+
 double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
-double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
-int *li = NULL;				// used as flag for shtns_set_size
 
 int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
@@ -51,6 +52,9 @@ double** ykm_dct;	// matrix for inverse transform (synthesis) using dct.
 struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix
 double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
 double* dzlm_dct0;
+
+double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
+int *li = NULL;				// used as flag for shtns_set_size
 
 fftw_plan ifft, fft;	// plans for FFTW.
 fftw_plan idct, dct_m0;			// (I)DCT for NPHI>1
