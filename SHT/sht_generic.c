@@ -50,6 +50,11 @@ void GEN(SH_to_spat,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 	#include "SH_to_spat.c"
 }
 
+void GEN(SH_to_spat_fly,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
+{
+	#include "SH_to_spat_fly.c"
+}
+
 //@}
 
 
@@ -67,6 +72,11 @@ void GEN(SH_to_spat,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 void GEN(SHsphtor_to_spat,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
 	#include "SHst_to_spat.c"
+}
+
+void GEN(SHsphtor_to_spat_fly,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
+{
+	#include "SHst_to_spat_fly.c"
 }
 
 #ifndef SHT_AXISYM
@@ -136,6 +146,14 @@ void GEN(SHqst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex
 		#undef SHT_3COMP
 	}
 }
+
+void GEN(SHqst_to_spat_fly,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
+{
+	#define SHT_3COMP
+	#include "SHqst_to_spat_fly.c"
+	#undef SHT_3COMP
+}
+
 //@}
 
 //@}

@@ -143,8 +143,6 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 //	write_vect("Tlm",Tlm,NLM*2);
 }
 
-void SH_to_spat_fly(complex double *Qlm, double *Vr);
-
 int test_SHT_fly()
 {
 	long int jj,i, nlm_cplx;
@@ -278,6 +276,26 @@ int test_SHT_vect()
 	return (int) tcpu;
 }
 
+int test_SHT_vect_fly()
+{
+	int jj,i;
+	clock_t tcpu;
+
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
+	}
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		SHsphtor_to_spat_fly(Slm,Tlm,Sh,Th);
+		spat_to_SHsphtor(Sh,Th,Slm,Tlm);
+	}
+	tcpu = clock() - tcpu;
+	printf("   iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
+
+	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
+	return (int) tcpu;
+}
+
 int test_SHT_vect_parity(int eo)
 {
 	int jj,i;
@@ -348,6 +366,27 @@ int test_SHT_vect3d()
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHqst_to_spat(Qlm,Slm,Tlm,NL,Sh,Th);
+		spat_to_SHqst(NL,Sh,Th,Qlm,Slm,Tlm);
+	}
+	tcpu = clock() - tcpu;
+	printf("   iSHT + SHT x%d time : %d\n", SHT_ITER, (int) tcpu);
+
+	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
+	scal_error(Qlm, Tlm0, LMAX);
+	return (int) tcpu;
+}
+
+int test_SHT_vect3d_fly()
+{
+	int jj,i;
+	clock_t tcpu;
+	
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
+	}
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		SHqst_to_spat_fly(Qlm,Slm,Tlm,NL,Sh,Th);
 		spat_to_SHqst(NL,Sh,Th,Qlm,Slm,Tlm);
 	}
 	tcpu = clock() - tcpu;
@@ -681,6 +720,8 @@ int main(int argc, char *argv[])
 	printf(":: NO DCT\n");
 	Set_MTR_DCT(-1);
 	test_SHT_vect();
+	printf(":: ON THE FLY\n");
+	test_SHT_vect_fly();
 
 	printf(":: OPTIMAL with LTR\n");
 	Set_MTR_DCT(m_opt);
@@ -703,6 +744,8 @@ int main(int argc, char *argv[])
 	
 	printf(":: 3D vector\n");
 	test_SHT_vect3d();
+	printf(":: ON THE FLY\n");
+	test_SHT_vect3d_fly();
 
 #endif
 

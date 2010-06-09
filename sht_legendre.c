@@ -382,7 +382,7 @@ void gauss_nodes(long double *x, long double *w, int n)
 #endif
 }
 
-
+/*
 void SH_to_spat_fly(complex double *Qlm, double *Vr)
 {
 	v2d *BrF;
@@ -557,3 +557,4 @@ void SH_to_spat_fly(complex double *Qlm, double *Vr)
     }
   #endif
 }
+*/
