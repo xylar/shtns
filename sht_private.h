@@ -147,10 +147,12 @@ extern fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 		#include <pmmintrin.h>
 		#warning "using GCC vector instructions (sse3)"
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd(b,b,1))		// a + I*b
+		#define subadd(a,b) _mm_addsub_pd(a, b)		// [al-bl, ah+bh]
 	#else
 		#include <emmintrin.h>
 		#warning "using GCC vector instructions (sse2)"
 		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
+		#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
 	#endif
 	// vset(hi,lo) takes two doubles and pack them in a vector
 	#define vset(hi, lo) _mm_set_pd(hi, lo)

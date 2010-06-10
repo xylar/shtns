@@ -156,41 +156,39 @@ V			BtF[NLAT-l + k] = zero;		BpF[NLAT-l + k] = zero;	// south pole zeroes
 		do {
 			al = alm + mmidx[im];
 			s2d cost  = *((s2d*)(st+k));
-V			s2d st2 = cost*cost;
+V			s2d st2 = cost*cost*vdup(1.0/m);
 			s2d y0 = vdup(al[0]);
-			l=m-1;	while(l>0) {
+Q			l=m;
+V			l=m-1;	y0 *= vdup(m);		// for the vector transform, compute ylm*m/sint
+			while(l>0) {
 				if (l&1) y0 *= cost;
 				l >>= 1;
 				cost *= cost;
 			};
 			cost = *((s2d*)(ct+k));
 			l=m;
-V			s2d dy0 = vdup(m)*cost*y0;
+V			s2d dy0 = cost*y0;
 Q			v2d q = ((v2d*)Ql)[l];
 S			v2d s = ((v2d*)Sl)[l];
 T			v2d t = ((v2d*)Tl)[l];
 Q			v2d re  = y0 * q;
 S			v2d pe  = y0 * s;
-S			v2d dto  = dy0 * s;
-T			v2d dpo  = -dy0 * t;
-T			v2d te  = y0 * t;
-		#if _GCC_VEC_
-Q			v2d rex = y0 * vxchg(q);
-S			v2d pex = y0 * vxchg(s);
-S			v2d dtox  = dy0 * vxchg(s);
-T			v2d dpox = -dy0 * vxchg(t);
-T			v2d tex  = y0 * vxchg(t);
-Q			v2d rox = vdup(0.0);
-S			v2d pox = vdup(0.0);
-S			v2d dtex = vdup(0.0);
-T			v2d dpex = vdup(0.0);
-T			v2d tox = vdup(0.0);
-		#endif
-Q			v2d ro = vdup(0.0);
-S			v2d po = vdup(0.0);
-S			v2d dte = vdup(0.0);
+S			v2d dto = dy0 * s;
+T			v2d dpo = -dy0 * t;
+T			v2d te  = -y0 * t;
 T			v2d dpe = vdup(0.0);
 T			v2d to = vdup(0.0);
+S			v2d po = vdup(0.0);
+S			v2d dte = vdup(0.0);
+Q			v2d ro = vdup(0.0);
+		#if _GCC_VEC_
+Q			v2d rox = vdup(0.0);
+Q			v2d rex = y0 * vxchg(q);
+S			dpe = subadd(dpe, y0 * vxchg(s));
+S			to  = subadd(to, dy0 * vxchg(s));
+T			po  = subadd(po, dy0 * vxchg(t));
+T			dte = subadd(dte, y0 * vxchg(t));
+		#endif
 			if (l>=llim) goto lloop_end;
 			s2d y1 = y0 * vdup(al[1]) * cost;		// l=m+1
 V			s2d dy1 = vdup(al[1]) * ( cost*dy0 - st2*y0 );
@@ -198,16 +196,16 @@ Q			q = ((v2d*)Ql)[l+1];
 S			s = ((v2d*)Sl)[l+1];
 T			t = ((v2d*)Tl)[l+1];
 Q			ro  = y1 * q;
-S			po  = y1 * s;
-S			dte  = dy1 * s;
-T			dpe  = -dy1 * t;
-T			to  = y1 * t;
+S			po  += y1 * s;
+S			dte += dy1 * s;
+T			dpe -= dy1 * t;
+T			to  -= y1 * t;
 		#if _GCC_VEC_
 Q			rox = y1 * vxchg(q);
-S			pox  = y1 * vxchg(s);
-S			dtex  = dy1 * vxchg(s);
-T			dpex  = -dy1 * vxchg(t);
-T			tox  = y1 * vxchg(t);
+S			dpo = subadd(dpo, y1 * vxchg(s));
+S			te  = subadd(te, dy1 * vxchg(s));
+T			pe  = subadd(pe, dy1 * vxchg(t));
+T			dto = subadd(dto, y1 * vxchg(t));
 		#endif
 			al+=2;	l+=2;
 			while (l<llim) {	// compute even and odd parts
@@ -218,15 +216,15 @@ S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
 Q				re  += y0 * q;
 S				pe  += y0 * s;
-S				dto  += dy0 * s;
-T				dpo  -= dy0 * t;
-T				te  += y0 * t;
+S				dto += dy0 * s;
+T				dpo -= dy0 * t;
+T				te  -= y0 * t;
 		#if _GCC_VEC_
 Q				rex += y0 * vxchg(q);
-S				pex += y0 * vxchg(s);
-S				dtox  += dy0 * vxchg(s);
-T				dpox -= dy0 * vxchg(t);
-T				tex  += y0 * vxchg(t);
+S				dpe = subadd(dpe, y0 * vxchg(s));
+S				to  = subadd(to, dy0 * vxchg(s));
+T				po  = subadd(po, dy0 * vxchg(t));
+T				dte = subadd(dte, y0 * vxchg(t));
 		#endif
 				y1 = vdup(al[3])*cost*y0 + vdup(al[2])*y1;
 V				dy1 = vdup(al[3])*(cost*dy0 - y0*st2) + vdup(al[2])*dy1;
@@ -235,15 +233,15 @@ S				s = ((v2d*)Sl)[l+1];
 T				t = ((v2d*)Tl)[l+1];
 Q				ro  += y1 * q;
 S				po  += y1 * s;
-S				dte  += dy1 * s;
-T				dpe  -= dy1 * t;
-T				to  += y1 * t;
+S				dte += dy1 * s;
+T				dpe -= dy1 * t;
+T				to  -= y1 * t;
 		#if _GCC_VEC_
 Q				rox += y1 * vxchg(q);
-S				pox  += y1 * vxchg(s);
-S				dtex  += dy1 * vxchg(s);
-T				dpex  -= dy1 * vxchg(t);
-T				tox  += y1 * vxchg(t);
+S				dpo = subadd(dpo, y1 * vxchg(s));
+S				te  = subadd(te, dy1 * vxchg(s));
+T				pe  = subadd(pe, dy1 * vxchg(t));
+T				dto = subadd(dto, y1 * vxchg(t));
 		#endif
 				al+=4;	l+=2;
 			}
@@ -255,54 +253,47 @@ S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
 Q				re  += y0 * q;
 S				pe  += y0 * s;
-S				dto  += dy0 * s;
-T				dpo  += -dy0 * t;
-T				te  += y0 * t;
+S				dto += dy0 * s;
+T				dpo -= dy0 * t;
+T				te  -= y0 * t;
 		#if _GCC_VEC_
 Q				rex += y0 * vxchg(q);
-S				pex += y0 * vxchg(s);
-S				dtox  += dy0 * vxchg(s);
-T				dpox += -dy0 * vxchg(t);
-T				tex  += y0 * vxchg(t);
+S				dpe = subadd(dpe, y0 * vxchg(s));
+S				to  = subadd(to, dy0 * vxchg(s));
+T				po  = subadd(po, dy0 * vxchg(t));
+T				dte = subadd(dte, y0 * vxchg(t));
 		#endif
 			}
 	lloop_end:
+Q		#ifdef SHT_3COMP
 Q			cost  = *((s2d*)(st+k));
+Q			cost *= vdup(1.0/m);
 Q			re *= cost;		ro *= cost;
-V			pe *= vdup(m);	po *= vdup(m);
-V			te *= vdup(m);	to *= vdup(m);
+Q		#endif
 		#if _GCC_VEC_
+Q		  #ifdef SHT_3COMP
 Q			rex *= cost;		rox *= cost;
-V			pex *= vdup(m);		pox *= vdup(m);
-V			tex *= vdup(m);		tox *= vdup(m);
+Q		  #endif
 Q			((complex double *)BrF)[k] = vlo_to_dbl(re+ro) +I*vlo_to_dbl(rex+rox);
 Q			((complex double *)BrF)[k+1] = vhi_to_dbl(rex+rox) +I*vhi_to_dbl(re+ro);
 Q			((complex double *)BrF)[NLAT-k-2] = vhi_to_dbl(rex-rox) +I*vhi_to_dbl(re-ro);
 Q			((complex double *)BrF)[NLAT-k-1] = vlo_to_dbl(re-ro) +I*vlo_to_dbl(rex-rox);
 
-V			((complex double *)BtF)[k] = I*vlo_to_dbl(te+to) - vlo_to_dbl(tex+tox)
-V									   + vlo_to_dbl(dte+dto) +I*vlo_to_dbl(dtex+dtox);
-V			((complex double *)BtF)[k+1] = I*vhi_to_dbl(tex+tox) - vhi_to_dbl(te+to)
-V										+ vhi_to_dbl(dtex+dtox) +I*vhi_to_dbl(dte+dto);
-V			((complex double *)BtF)[NLAT-k-2] = I*vhi_to_dbl(tex-tox) - vhi_to_dbl(te-to)
-V										+ vhi_to_dbl(dtex-dtox) +I*vhi_to_dbl(dte-dto);
-V			((complex double *)BtF)[NLAT-k-1] = I*vlo_to_dbl(te-to) -vlo_to_dbl(tex-tox)
-V										+ vlo_to_dbl(dte-dto) +I*vlo_to_dbl(dtex-dtox);
+V			((complex double *)BtF)[k] = -I*vlo_to_dbl(te+to) + vlo_to_dbl(dte+dto);
+V			((complex double *)BtF)[k+1] = vhi_to_dbl(te+to) + I*vhi_to_dbl(dte+dto);
+V			((complex double *)BtF)[NLAT-k-2] = vhi_to_dbl(te-to) + I*vhi_to_dbl(dte-dto);
+V			((complex double *)BtF)[NLAT-k-1] = -I*vlo_to_dbl(te-to) + vlo_to_dbl(dte-dto);
 
-V			((complex double *)BpF)[k] = I*vlo_to_dbl(pe+po) - vlo_to_dbl(pex+pox)
-V									   + vlo_to_dbl(dpe+dpo) +I*vlo_to_dbl(dpex+dpox);
-V			((complex double *)BpF)[k+1] = I*vhi_to_dbl(pex+pox) - vhi_to_dbl(pe+po)
-V										+ vhi_to_dbl(dpex+dpox) +I*vhi_to_dbl(dpe+dpo);
-V			((complex double *)BpF)[NLAT-k-2] = I*vhi_to_dbl(pex-pox) - vhi_to_dbl(pe-po)
-V										+ vhi_to_dbl(dpex-dpox) +I*vhi_to_dbl(dpe-dpo);
-V			((complex double *)BpF)[NLAT-k-1] = I*vlo_to_dbl(pe-po) -vlo_to_dbl(pex-pox)
-V										+ vlo_to_dbl(dpe-dpo) +I*vlo_to_dbl(dpex-dpox);
+V			((complex double *)BpF)[k] = I*vlo_to_dbl(pe+po) + vlo_to_dbl(dpe+dpo);
+V			((complex double *)BpF)[k+1] = -vhi_to_dbl(pe+po) + I*vhi_to_dbl(dpe+dpo);
+V			((complex double *)BpF)[NLAT-k-2] = -vhi_to_dbl(pe-po) + I*vhi_to_dbl(dpe-dpo);
+V			((complex double *)BpF)[NLAT-k-1] = I*vlo_to_dbl(pe-po) + vlo_to_dbl(dpe-dpo);
 			k += 2;
 		#else
 Q			BrF[k] = (re+ro);
 Q			BrF[NLAT-k-1] = (re-ro);
-V			BtF[k] = addi(dte+dto, te+to);		// Bt = dS/dt       + I.m/sint *T
-VB			BtF[NLAT-1-k] = addi(dte-dto, te-to);
+V			BtF[k] = addi(dte+dto, -(te+to));		// Bt = dS/dt       + I.m/sint *T
+VB			BtF[NLAT-1-k] = addi(dte-dto, -(te-to));
 V			BpF[k] = addi(dpe+dpo, pe+po);		// Bp = I.m/sint * S - dT/dt
 VB			BpF[NLAT-1-k] = addi(dpe-dpo, pe-po);
 			k++;
