@@ -54,14 +54,11 @@ Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
 		long int nspat = ((NPHI>>1) +1)*NLAT;
-	  #ifndef SHT_3COMP
-Q		BrF = fftw_malloc( nspat * sizeof(complex double) );
-V		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
-V		BpF = BtF + nspat;
-	  #else
-Q		BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
-V		BtF = BrF + nspat;		BpF = BtF + nspat;
-	  #endif
+QX		BrF = fftw_malloc( nspat * sizeof(complex double) );
+VX		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+VX		BpF = BtF + nspat;
+3		BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
+3		BtF = BrF + nspat;		BpF = BtF + nspat;
 	}
   #else
 Q	BrF = (v2d*) Vr;
@@ -83,41 +80,60 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 		do {
 			l=0;	al = al0;
 			s2d cost = *((s2d*)(ct+k));
+QX		#ifdef _GCC_VEC_
+QX			s2d ctb = *((s2d*)(ct+k+2));	// 4 latitudes/iteration with SSE2
+QX		#else
+QX			s2d ctb = *((s2d*)(ct+k+1));	// 2 latitudes/iteration without SSE2
+QX		#endif
 V			s2d sint = *((s2d*)(st+k));
 			s2d y0 = vdup(al[0]);
+QX			s2d y0b = y0;
 V			s2d dy0 = vdup(0.0);
 Q			s2d re = y0 * vdup(Ql0[0]);
+QX			s2d reb = y0b * vdup(Ql0[0]);
 S			s2d to = dy0;
 T			s2d po = dy0;
 			s2d y1 = vdup(al[1]) * cost * y0;
+QX			s2d y1b = vdup(al[1]) * ctb * y0b;
 V			s2d dy1 = -vdup(al[1]) * sint * y0;
 Q			s2d ro = y1 * vdup(Ql0[1]);
+QX			s2d rob = y1b * vdup(Ql0[1]);
 S			s2d te = dy1 * vdup(Sl0[0]);
 T			s2d pe = -dy1 * vdup(Tl0[0]);
 			al+=2;	l+=2;
 			while(l<llim) {
 				y0  = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
+QX				y0b  = vdup(al[1])*ctb*y1b + vdup(al[0])*y0b;
 V				dy0 = vdup(al[1])*(cost*dy1 - y1*sint) + vdup(al[0])*dy0;
 Q				re += y0 * vdup(Ql0[l]);
+QX				reb += y0b * vdup(Ql0[l]);
 S				to += dy0 * vdup(Sl0[l-1]);
 T				po -= dy0 * vdup(Tl0[l-1]);
 				y1  = vdup(al[3])*cost*y0 + vdup(al[2])*y1;
+QX				y1b  = vdup(al[3])*ctb*y0b + vdup(al[2])*y1b;
 V				dy1 = vdup(al[3])*(cost*dy0 - y0*sint) + vdup(al[2])*dy1;
 Q				ro += y1 * vdup(Ql0[l+1]);
+QX				rob += y1b * vdup(Ql0[l+1]);
 S				te += dy1 * vdup(Sl0[l]);
 T				pe -= dy1 * vdup(Tl0[l]);
 				al+=4;	l+=2;
 			}
 			if (l==llim) {
 				y0  = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
+QX				y0b  = vdup(al[1])*ctb*y1b + vdup(al[0])*y0b;
 V				dy0 = vdup(al[1])*(cost*dy1 - y1*sint) + vdup(al[0])*dy0;
 Q				re += y0 * vdup(Ql0[l]);
+QX				reb += y0b * vdup(Ql0[l]);
 S				to += dy0 * vdup(Sl0[l-1]);
 T				po -= dy0 * vdup(Tl0[l-1]);
 			}
 		#if _GCC_VEC_
 Q			BR0[k] = vlo_to_dbl(re+ro);
 Q			BR0[k+1] = vhi_to_dbl(re+ro);
+QX			BR0[k+2] = vlo_to_dbl(reb+rob);
+QX			BR0[k+3] = vhi_to_dbl(reb+rob);
+QX			BR0[NLAT-k-4] = vhi_to_dbl(reb-rob);
+QX			BR0[NLAT-k-3] = vlo_to_dbl(reb-rob);
 Q			BR0[NLAT-k-2] = vhi_to_dbl(re-ro);
 Q			BR0[NLAT-k-1] = vlo_to_dbl(re-ro);
 S			BT0[k] = vlo_to_dbl(te+to);
@@ -129,14 +145,18 @@ T			BP0[k+1] = vhi_to_dbl(pe+po);
 T			BP0[NLAT-k-2] = vhi_to_dbl(pe-po);
 T			BP0[NLAT-k-1] = vlo_to_dbl(pe-po);
 			k+=2;
+QX			k+=2;
 		#else
 Q			BR0[k] = (re+ro);
+QX			BR0[k+1] = (reb+rob);
+QX			BR0[NLAT-k-2] = (reb-rob);
 Q			BR0[NLAT-k-1] = (re-ro);
 S			BT0[k] = (te+to);
 S			BT0[NLAT-k-1] = (te-to);
 T			BP0[k] = (pe+po);
 T			BP0[NLAT-k-1] = (pe-po);
 			k++;
+QX			k++;
 		#endif
 		} while (k < NLAT_2);
 
@@ -161,9 +181,7 @@ V			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zer
 			k++;
 		}
 		do {
-Q		#ifndef SHT_3COMP
-Q			al = alm[im];
-Q		#endif
+QX			al = alm[im];
 V			al = dlm[im];
 			s2d cost  = *((s2d*)(st+k));
 			s2d y0 = vdup(al[0]);
@@ -215,9 +233,7 @@ S				te  = subadd(te, dy * vxchg(s));
 T				pe  = subadd(pe, dy * vxchg(t));
 T				dto = subadd(dto, y1 * vxchg(t));
 		#endif
-Q		#ifndef SHT_3COMP
-Q				al+=2;
-Q		#endif
+QX				al+=2;
 V				al+=4;
 				l++;
 				y0   = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
@@ -237,9 +253,7 @@ S				to  = subadd(to, dy * vxchg(s));
 T				po  = subadd(po, dy * vxchg(t));
 T				dte = subadd(dte, y0 * vxchg(t));
 		#endif
-Q		#ifndef SHT_3COMP
-Q				al+=2;
-Q		#endif
+QX				al+=2;
 V				al+=4;
 				l++;
 			}
@@ -262,15 +276,11 @@ T				pe  = subadd(pe, dy * vxchg(t));
 T				dto = subadd(dto, y1 * vxchg(t));
 		#endif
 			}
-Q		#ifdef SHT_3COMP
-Q			cost  = *((s2d*)(st+k));
-Q			cost *= vdup(1.0/m);
-Q			re *= cost;		ro *= cost;
-Q		#endif
+3			cost  = *((s2d*)(st+k));
+3			cost *= vdup(1.0/m);
+3			re *= cost;		ro *= cost;
 		#if _GCC_VEC_
-Q		  #ifdef SHT_3COMP
-Q			rex *= cost;		rox *= cost;
-Q		  #endif
+3			rex *= cost;		rox *= cost;
 Q			((complex double *)BrF)[k] = vlo_to_dbl(re+ro) +I*vlo_to_dbl(rex+rox);
 Q			((complex double *)BrF)[k+1] = vhi_to_dbl(rex+rox) +I*vhi_to_dbl(re+ro);
 Q			((complex double *)BrF)[NLAT-k-2] = vhi_to_dbl(rex-rox) +I*vhi_to_dbl(re-ro);
@@ -313,9 +323,7 @@ V		fftw_execute_dft_c2r(ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(ifft, (complex double *) BpF, Vp);
 		if (SHT_FFT > 1) {		// free memory
 Q			fftw_free(BrF);
-V		  #ifndef SHT_3COMP
-V			fftw_free(BtF);	// this frees also BpF.
-V		  #endif
+VX			fftw_free(BtF);		// this frees also BpF.
 		}
     } else {
 		k=1;	do {	// compress complex to real

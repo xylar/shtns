@@ -82,14 +82,11 @@ V    	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 	if (SHT_FFT > 0) {
 	    if (SHT_FFT > 1) {		// alloc memory for the FFT
 	    	long int nspat = ((NPHI>>1) +1)*NLAT;
-		  #ifndef SHT_3COMP
-Q	    	BrF = fftw_malloc( nspat * sizeof(complex double) );
-V	    	BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
-V	    	BpF = BtF + nspat;
-		  #else
-Q	    	BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
-V	    	BtF = BrF + nspat;		BpF = BtF + nspat;
-		  #endif
+QX	    	BrF = fftw_malloc( nspat * sizeof(complex double) );
+VX	    	BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+VX	    	BpF = BtF + nspat;
+3	    	BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
+3	    	BtF = BrF + nspat;		BpF = BtF + nspat;
 	    }
 Q	    fftw_execute_dft_r2c(fft,Vr, BrF);
 V	    fftw_execute_dft_r2c(fft,Vt, BtF);
@@ -367,9 +364,7 @@ VB			v2d s0 = ((v2d *)BpF)[i];	v2d s1 = ((v2d *)BpF)[NLAT-1-i];		pe(i) = s0+s1;	
  B			i++;
  B		} while (i<ni);
 		l=im*MRES;
-	#ifdef SHT_3COMP
-Q		double m_1 = 1.0/l;
-	#endif
+3		double m_1 = 1.0/l;
 Q		v2d* Ql = (v2d*) &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 V		v2d* Sl = (v2d*) &Slm[LiM(0,im)];		v2d* Tl = (v2d*) &Tlm[LiM(0,im)];
 Q		zl = zlm[im];
@@ -401,10 +396,8 @@ Q				zl +=2;
 V				dzl +=2;
 				i++;
 			} while (i < ni);
-		  #ifdef SHT_3COMP
-Q			q0 *= vdup((l*(l+1))*m_1);
-Q			q1 *= vdup(((l+1)*(l+2))*m_1);
-		  #endif
+3			q0 *= vdup((l*(l+1))*m_1);
+3			q1 *= vdup(((l+1)*(l+2))*m_1);
 VE			Sl[l] = addi(s0,s0i);	Tl[l+1] = addi(t1,t1i);
 VO			Tl[l] = addi(t0,t0i);	Sl[l+1] = addi(s1,s1i);
 QE			Ql[l] = q0;
@@ -433,9 +426,7 @@ Q				zl  += lstride;
 V				dzl += lstride;
 				i++;
 			} while(i<ni);
-		#ifdef SHT_3COMP
-Q			q0 *= vdup((l*(l+1))*m_1);
-		#endif
+3			q0 *= vdup((l*(l+1))*m_1);
 VE			Sl[l] = addi(s0,s0i);
 VO			Tl[l] = addi(t0,t0i);
 QE			Ql[l] = q0;
@@ -452,9 +443,7 @@ V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
 
   	if (SHT_FFT > 1) {		// free memory
 Q	    fftw_free(BrF - NLAT*(MTR+1));
-V	  #ifndef SHT_3COMP
-V	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
-V	  #endif
+VX	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
 	}
   #endif
 

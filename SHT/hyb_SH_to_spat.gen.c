@@ -95,14 +95,11 @@ Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
 		long int nspat = ((NPHI>>1) +1)*NLAT;
-	  #ifndef SHT_3COMP
-Q		BrF = fftw_malloc( nspat * sizeof(complex double) );
-V		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
-V		BpF = BtF + nspat;
-	  #else
-Q		BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
-V		BtF = BrF + nspat;		BpF = BtF + nspat;
-	  #endif
+QX		BrF = fftw_malloc( nspat * sizeof(complex double) );
+VX		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+VX		BpF = BtF + nspat;
+3		BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
+3		BtF = BrF + nspat;		BpF = BtF + nspat;
 	}
   #else
 Q	BrF = (v2d*) Vr;
@@ -278,16 +275,12 @@ T				p -= ((v2d*) dyl0)[0] * Tl0[l];		// { pe, po }
 				l++;
 Q				yl+=2;
 V				dyl0+=2;
-		#ifndef SHT_3COMP
-Q			} while (2*l <= llim);
+QX			} while (2*l <= llim);
 V			} while (2*l < llim);
-		#else
-			} while (2*l < llim);
-Q			if (2*l == llim) {
-Q				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
-Q				yl+=2;
-Q			}
-		#endif
+3			if (2*l == llim) {
+3				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
+3				yl+=2;
+3			}
 		#if __SSE3__
 	/*	alternate code, which may be faster (slightly) on SSE3.	*/
 Q			r = addi(r,r);		// { re-ro , re+ro }
@@ -400,9 +393,7 @@ V		BtF += NLAT;	BpF += NLAT;
     #endif
 	while(im<=MTR) {	// regular for MTR_DCT < im <= MTR
 		m = im*MRES;
-		#ifdef SHT_3COMP
-Q			double m_1 = 1.0/m;
-		#endif
+3		double m_1 = 1.0/m;
 Q		v2d* Ql = (v2d*) &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
 S		v2d* Sl = (v2d*) &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
 T		v2d* Tl = (v2d*) &Tlm[LiM(0,im)];
@@ -422,6 +413,8 @@ Q			v2d re = vdup(0.0); 	v2d ro = vdup(0.0);
 V			v2d dte = vdup(0.0); 	v2d dto = vdup(0.0); 	v2d pe = vdup(0.0); 	v2d po = vdup(0.0);
 V			v2d dpe = vdup(0.0); 	v2d dpo = vdup(0.0); 	v2d te = vdup(0.0); 	v2d to = vdup(0.0);
 			while (l<llim) {	// compute even and odd parts
+QX				re  += vdup(yl[0]) * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+QX				ro  += vdup(yl[1]) * Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
 TB				dpo -= vdup(dyl[0].t) * Tl[l];
 S				dto += vdup(dyl[0].t) * Sl[l];
 T				dpe -= vdup(dyl[1].t) * Tl[l+1];
@@ -430,34 +423,24 @@ TB				te  += vdup(dyl[0].p) * Tl[l];
 S				pe  += vdup(dyl[0].p) * Sl[l];
 T				to  += vdup(dyl[1].p) * Tl[l+1];
 SB				po  += vdup(dyl[1].p) * Sl[l+1];
-		#ifndef SHT_3COMP
-Q				re  += vdup(yl[0]) * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-QB				ro  += vdup(yl[1]) * Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
-		#else
-Q				re  += vdup(dyl[0].p) * Ql[l];
-QB				ro  += vdup(dyl[1].p) * Ql[l+1];
-		#endif
+3				re  += vdup(dyl[0].p) * Ql[l];
+3				ro  += vdup(dyl[1].p) * Ql[l+1];
 				l+=2;
 Q				yl+=2;
 V				dyl+=2;
 			}
 			if (l==llim) {
+QX				re  += vdup(yl[0]) * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 TO				dpo -= vdup(dyl[0].t) * Tl[l];
 SE				dto += vdup(dyl[0].t) * Sl[l];
 TO				te  += vdup(dyl[0].p) * Tl[l];
 SE				pe  += vdup(dyl[0].p) * Sl[l];
-		#ifndef SHT_3COMP
-QE				re  += vdup(yl[0]) * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-		#else
-Q				re  += vdup(dyl[0].p) * Ql[l];
-		#endif
+3				re  += vdup(dyl[0].p) * Ql[l];
 Q				yl++;
 V				dyl++;
 			}
-		#ifdef SHT_3COMP
-Q			s2d qv = vdup(st[k]*m_1);
-Q			re *= qv;	ro *= qv;
-		#endif
+3			s2d qv = vdup(st[k]*m_1);
+3			re *= qv;	ro *= qv;
 V			BtF[k] = addi(dte+dto, te+to);		// Bt = dS/dt       + I.m/sint *T
 VB			BtF[NLAT-1-k] = addi(dte-dto, te-to);
 V			BpF[k] = addi(dpe+dpo, pe+po);		// Bp = I.m/sint * S - dT/dt
@@ -517,9 +500,7 @@ V		fftw_execute_dft_c2r(ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(ifft, (complex double *) BpF, Vp);
 		if (SHT_FFT > 1) {		// free memory
 Q			fftw_free(BrF);
-V		  #ifndef SHT_3COMP
-V			fftw_free(BtF);	// this frees also BpF.
-V		  #endif
+VX			fftw_free(BtF);	// this frees also BpF.
 		}
     } else {
 		k=1;	do {	// compress complex to real

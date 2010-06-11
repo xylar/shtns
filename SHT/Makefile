@@ -3,15 +3,15 @@
 
 #first char : V,Q,S,T
 # Spheroidal and Toroidal (V,S,T)
-vect=-e "/^[Q\#]/d" -e "s/^[VST]//"
+vect=-e "/^[3Q\#]/d" -e "s/^[VST]X*//"
 # Spheroidal component only (V,S)
-sph=-e "/^[QT\#]/d" -e "s/^[VS]//"
+sph=-e "/^[3QT\#]/d" -e "s/^[VS]X*//"
 # Toroidal component only (V,T)
-tor=-e "/^[QS\#]/d" -e "s/^[VT]//"
+tor=-e "/^[3QS\#]/d" -e "s/^[VT]X*//"
 # Scalar component (Q)
-scal=-e "/^[VST\#]/d" -e "s/^Q//"
-# 3D Vector component (VQST)
-v3d=-e "/^[\#]/d" -e "s/^[QVST]//"
+scal=-e "/^[3VST\#]/d" -e "s/^QX*//"
+# 3D Vector component (VQST3) but not exclusive (.X) lines.
+v3d=-e "/^[\#]/d" -e "/^.X/d" -e "s/^[QVST3]//"
 
 # second char : 1BEO
 # even (1,E)
@@ -20,6 +20,9 @@ ev=-e "s/^\(.\)[1E]/\1/" -e "/^.[BO]/d"
 od=-e "s/^\(.\)[1O]/\1/" -e "/^.[BE]/d"
 # both (B,E,O)
 eo=-e "s/^\(.\)[EOB]/\1/" -e "/^.1/d"
+
+# second char : 3 components or solo.
+
 
 #SH_to_spat
 GSH=hyb_SH_to_spat.gen.c
