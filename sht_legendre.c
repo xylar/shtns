@@ -59,7 +59,8 @@ inline double sint_pow_n(double cost, int n)
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
 double legendre_sphPlm(const int l, const int im, double x)
 {
-	long int i,m,lm;
+	double *al;
+	long int i,m;
 	double ymm, ymmp1;
 
 	m = im*MRES;
@@ -67,21 +68,21 @@ double legendre_sphPlm(const int l, const int im, double x)
 	if ( (l>LMAX) || (l<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
 #endif
 
-	lm = mmidx[im];
-	ymm = alm[lm] * sint_pow_n(x, m);		// l=m
+	al = alm[im];
+	ymm = al[0] * sint_pow_n(x, m);		// l=m
 	if (l==m) return ((double) ymm);
 
-	ymmp1 = ymm * alm[lm+1] * x;				// l=m+1
-	lm+=2;
+	ymmp1 = ymm * al[1] * x;				// l=m+1
+	al+=2;
 	if (l == m+1) return ((double) ymmp1);
 	
 	for (i=m+2; i<l; i+=2) {
-		ymm   = alm[lm+1]*x*ymmp1 + alm[lm]*ymm;
-		ymmp1 = alm[lm+3]*x*ymm + alm[lm+2]*ymmp1;
-		lm+=4;
+		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
+		ymmp1 = al[3]*x*ymm + al[2]*ymmp1;
+		al+=4;
 	}
 	if (i==l) {
-		ymmp1 = alm[lm+1]*x*ymmp1 + alm[lm]*ymm;
+		ymmp1 = al[1]*x*ymmp1 + al[0]*ymm;
 	}
 	return ((double) ymmp1);
 }
@@ -94,7 +95,8 @@ double legendre_sphPlm(const int l, const int im, double x)
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
 void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 {
-	long int l,m,lm;
+	double *al;
+	long int l,m;
 	double ymm, ymmp1;
 
 	m = im*MRES;
@@ -102,26 +104,26 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_array");
 #endif
 
-	lm = mmidx[im];
-	ymm = alm[lm] * sint_pow_n(x, m);	// l=m
+	al = alm[im];
+	ymm = al[0] * sint_pow_n(x, m);	// l=m
 	yl[0] = ymm;
 	if (lmax==m) return;		// done.
 
-	ymmp1 = ymm * alm[lm+1] * x;		// l=m+1
+	ymmp1 = ymm * al[1] * x;		// l=m+1
 	yl[1] = ymmp1;
-	lm+=2;
+	al+=2;
 	if (lmax==m+1) return;		// done.
 
 	yl -= m;			// shift pointer
 	for (l=m+2; l<lmax; l+=2) {
-		ymm   = alm[lm+1]*x*ymmp1 + alm[lm]*ymm;
-		ymmp1 = alm[lm+3]*x*ymm + alm[lm+2]*ymmp1;
+		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
+		ymmp1 = al[3]*x*ymm   + al[2]*ymmp1;
 		yl[l] = ymm;
 		yl[l+1] = ymmp1;
-		lm+=4;
+		al+=4;
 	}
 	if (l==lmax) {
-		yl[l] = alm[lm+1]*x*ymmp1 + alm[lm]*ymm;
+		yl[l] = al[1]*x*ymmp1 + al[0]*ymm;
 	}
 	return;
 }
@@ -138,17 +140,18 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 /// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
 void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
 {
-	long int l,m,lm;
+	double *al;
+	long int l,m;
 	double st, y0, y1, dy0, dy1;
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
-	lm = mmidx[im];
+	al = alm[im];
 
 	st = sint;
-	y0 = alm[lm];
+	y0 = al[0];
 	dy0 = 0.0;
 	if (im>0) {		// m > 0
 		l = m-1;			// compute  sin(theta)^(m-1)
@@ -165,26 +168,26 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 	if (lmax==m) return;		// done.
 
   #ifndef _GCC_VEC_
-	y1 = alm[lm+1] * x * y0;
-	dy1 = alm[lm+1]*( x*dy0 - st*y0 );
+	y1 = al[1] * x * y0;
+	dy1 = al[1]*( x*dy0 - st*y0 );
 	yl[1] = y1;		// l=m+1
 	dyl[1] = dy1;
 	if (lmax==m+1) return;		// done.
-	lm+=2;
+	al+=2;
 
 	yl -= m;	dyl -= m;			// shift pointers
 	for (l=m+2; l<lmax; l+=2) {
-		y0 = alm[lm+1]*x*y1 + alm[lm]*y0;
-		dy0 = alm[lm+1]*(x*dy1 - y1*st) + alm[lm]*dy0;
+		y0 = al[1]*x*y1 + al[0]*y0;
+		dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 		yl[l] = y0;		dyl[l] = dy0;
-		y1 = alm[lm+3]*x*y0 + alm[lm+2]*y1;
-		dy1 = alm[lm+3]*(x*dy0 - y0*st) + alm[lm+2]*dy1;
+		y1 = al[3]*x*y0 + al[2]*y1;
+		dy1 = al[3]*(x*dy0 - y0*st) + al[2]*dy1;
 		yl[l+1] = y1;		dyl[l+1] = dy1;
-		lm+=4;
+		al+=4;
 	}
 	if (l==lmax) {
-		yl[l] = alm[lm+1]*x*y1 + alm[lm]*y0;
-		dyl[l] = alm[lm+1]*(x*dy1 - y1*st) + alm[lm]*dy0;
+		yl[l] = al[1]*x*y1 + al[0]*y0;
+		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 	}
   #else
   	v2d vy1 = vset(dy0, y0);
@@ -192,46 +195,22 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
   	v2d vst = vset(st, 0.0);
 
   	v2d vty = vxchg(vy1);		// swap
-  	vty = vdup(alm[lm+1]) * ( vx*vy1 - vst*vty );
+  	vty = vdup(al[1]) * ( vx*vy1 - vst*vty );
 
 	yl[1] = vlo_to_dbl(vty);		// l=m+1
 	dyl[1] = vhi_to_dbl(vty);
-	lm+=2;
+	al+=2;
 
 	yl -= m;	dyl -= m;			// shift pointers
 	for (l=m+2; l<=lmax; l++) {		// vectorized loop : 4* and 2+ (instead of 7* and 3+)
 		v2d vy0 = vy1;
 		vy1 = vty;
 		vty = vxchg(vty);		// swap
-		vty = vdup(alm[lm])*vy0  +  vdup(alm[lm+1]) * (vx*vy1 - vst*vty);
+		vty = vdup(al[0])*vy0  +  vdup(al[1]) * (vx*vy1 - vst*vty);
 		yl[l] = vlo_to_dbl(vty);		dyl[l] = vhi_to_dbl(vty);
-		lm+=2;
+		al+=2;
 	}
   #endif
-
-/*	// Simple loop, without temporary variables.
-	yl -= m;	dyl -= m;			// shift pointers
-	for (l=m+2; l<=lmax; l++) {
-		yl[l] = alm[lm+1]*x*yl[l-1] + alm[lm]*yl[l-2];
-		dyl[l] = alm[lm+1]*(x*dyl[l-1] - yl[l-1]*st) + alm[lm]*dyl[l-2];
-		lm+=2;
-	}
-
-/*	// Alternative for evaluating the derivative (not better)
-	for (l=m+2; l<=lmax; l++) {
-//		dyl/dx = - (l * x * y[l] - c1 * (l+m) * y[l-1]) / (1-x^2);
-//		=> dyl/dtheta = (l * x * y[l] - c1 * (l+m) * y[l-1]) / sqrt(1-x^2);
-		if (m==0) {
-			const double c1 = sqrt( (2.*l+1.)/(2.*l-1.) );
-			dyl[l] = l*(x*yl[l] - c1*yl[l-1])/st;
-			if ( 1.-fabs(x) < 1.e-15 ) dyl[l] = 0.0;	// -l*(l+1)/2 *sin(theta)
-		} else {
-			const double c1 = sqrt(((2.*l+1.)/(2.*l-1.)) * ((double)(l-m)/(double)(l+m)));
-			dyl[l] = l*x*yl[l] - c1*(l+m)*yl[l-1];
-		}
-	}
-*/
-
 }
 
 /// Precompute constants for the recursive generation of Legendre associated functions, with given normalization.
@@ -243,6 +222,7 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 ///  1.0 (no renormalization) is the "complex" convention, while 0.5 leads to the "real" convention (with FFTW).
 void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
 {
+	double *dl0;
 	long int im, m, l, lm;
 	double t1, t2;
 
@@ -252,37 +232,40 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 
 	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
 
-	mmidx = (int *) malloc( (MMAX+1) * sizeof(int) );
-	alm = (double *) malloc( 2*NLM * sizeof(double) );
+	im = ((MMAX+2)>>1)*2;		// alloc memory for arrays.
+	alm = (double **) malloc( im * sizeof(double *) + (2*NLM)*sizeof(double) );
+	al0 = (double *) (alm + im);
+	dlm = (double **) malloc( im * sizeof(double *) + (4*NLM)*sizeof(double) );
+	dl0 = (double *) (dlm + im);
 
 /// - Precompute the factors alm and blm of the recurrence relation :
   if (norm == sht_schmidt) {
 	for (im=0, lm=0; im<=MMAX; im++) {		/// <b> For Schmidt semi-normalized </b>
 		m = im*MRES;
-		mmidx[im] = lm;
+		alm[im] = al0 + lm;
 		t2 = sqrt(2*m+1);
-		alm[lm] = 1.0/t2;		/// starting value will be divided by \f$ \sqrt{2m+1} \f$ 
-		alm[lm+1] = t2;		// l=m+1
+		al0[lm] = 1.0/t2;		/// starting value will be divided by \f$ \sqrt{2m+1} \f$ 
+		al0[lm+1] = t2;		// l=m+1
 		lm+=2;
 		for (l=m+2; l<=LMAX; l++) {
 			t1 = sqrt((l+m)*(l-m));
-			alm[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
-			alm[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
+			al0[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
+			al0[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
 			t2 = t1;	lm+=2;
 		}
 	}
   } else {
 	for (im=0, lm=0; im<=MMAX; im++) {		/// <b> For orthonormal or 4pi-normalized </b>
 		m = im*MRES;
-		mmidx[im] = lm;
+		alm[im] = al0 + lm;
 		t2 = 2*m+1;
-		alm[lm] = 1.0;		// will contain the starting value.
-		alm[lm+1] = sqrt(2*m+3);		// l=m+1
+		al0[lm] = 1.0;		// will contain the starting value.
+		al0[lm+1] = sqrt(2*m+3);		// l=m+1
 		lm+=2;
 		for (l=m+2; l<=LMAX; l++) {
 			t1 = (l+m)*(l-m);
-			alm[lm+1] = sqrt(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
-			alm[lm] = - sqrt(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
+			al0[lm+1] = sqrt(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
+			al0[lm] = - sqrt(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
 			t2 = t1;	lm+=2;
 		}
 	}
@@ -292,10 +275,10 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 /// \f[  Y_m^m(x) = Y_0^0 \ \sqrt{ \prod_{k=1}^{m} \frac{2k+1}{2k} } \ \ (-1)^m \ (1-x^2)^{m/2}  \f]
 	if ((norm == sht_fourpi)||(norm == sht_schmidt)) {
 		t1 = 1.0;
-		alm[0] = t1;		/// \f$ Y_0^0 = 1 \f$  for Schmidt or 4pi-normalized 
+		al0[0] = t1;		/// \f$ Y_0^0 = 1 \f$  for Schmidt or 4pi-normalized 
 	} else {
 		t1 = 0.25L/M_PIl;
-		alm[0] = sqrt(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
+		al0[0] = sqrt(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
 	}
 	t1 *= mpos_renorm;		// renormalization for m>0
 	for (im=1, m=0; im<=MMAX; im++) {
@@ -305,7 +288,24 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 		}
 		t2 = sqrt(t1);
 		if ( m & with_cs_phase ) t2 = -t2;		/// optional \f$ (-1)^m \f$ Condon-Shortley phase.
-		alm[mmidx[im]] *= t2;
+		alm[im][0] *= t2;
+	}
+
+/// - Compute and store coefficients for computation of derivative also.
+	for (im=1, lm=0; im<=MMAX; im++) {		/// <b> For Schmidt semi-normalized </b>
+		m = im*MRES;
+		t2 = 1.0/m;
+		dlm[im] = dl0 + lm;
+		double *al = alm[im];
+			dl0[lm] = al[0];	// ymm initial value.
+		for (l=m+1; l<=LMAX; l++) {
+			t1 = (l+m)*(l-m);
+			if (norm != sht_schmidt) t1 *= (2*l+1.)/(2*l-1.);
+			dl0[lm] = al[0];	dl0[lm+1] = al[1];		// ylm recursion coeffs
+			dl0[lm+2] = -t2*sqrt(t1);
+			dl0[lm+3] = t2*l;
+			lm+=4;	al+=2;
+		}
 	}
 }
 
@@ -314,17 +314,17 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 double legendre_Pl(const int l, double x)
 {
 	long int i;
-	double p1, p2, p3;
+	double p, p0, p1;
 
 	if ((l==0)||(x==1.0)) return ( 1. );
 	if (x==-1.0) return ( (l&1) ? -1. : 1. );
 
-	p2 = 1.0;		/// \f$  P_0 = 1  \f$
+	p0 = 1.0;		/// \f$  P_0 = 1  \f$
 	p1 = x;			/// \f$  P_1 = x  \f$
 	for (i=2; i<=l; i++) {		 /// recurrence : \f[  l P_l = (2l-1) x P_{l-1} - (l-1) P_{l-2}	 \f] (works ok up to l=100000)
-		p3 = p2;
-		p2 = p1;
-		p1 = (x*(2*i-1)*p2 - (i-1)*p3)/i;
+		p = (x*(2*i-1)*p1 - (i-1)*p0)/i;
+		p0 = p1;
+		p1 = p;
 	}
 	return ((double) p1);
 }

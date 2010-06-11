@@ -37,10 +37,11 @@
 /// sizes for SHT, in a structure to avoid problems with conflicting names.
 struct sht_sze shtns;
 
-double *alm;		// coefficient list for Legendre function recurrence (size 2*NLM)
-int *mmidx;			// index array in Legendre recurrence list (size MMAX+1)
+double *al0;	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
+double **dlm;	// coefficient list for Legendre function and theta derivative recurrence (size 4*NLM)
 
 double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
+double *wg;					// gauss weights (if current grid is a gauss grid).
 
 int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
@@ -56,7 +57,7 @@ double* dzlm_dct0;
 double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 int *li = NULL;				// used as flag for shtns_set_size
 
-fftw_plan ifft, fft;	// plans for FFTW.
+fftw_plan ifft, fft;			// plans for FFTW.
 fftw_plan idct, dct_m0;			// (I)DCT for NPHI>1
 fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
 fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
@@ -750,8 +751,9 @@ void init_SH_gauss()
 	double t,tmax;
 	long int it,im,m,l;
 	long double iylm_fft_norm;
-	long double xg[NLAT], wg[NLAT];	// gauss points and weights.
-	double wgd[NLAT_2];		// gauss weights, double precision.
+	long double xg[NLAT], wgl[NLAT];	// gauss points and weights.
+	
+	wg = malloc(NLAT_2 * sizeof(double));	// gauss weights, double precision.
 
  	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
  		iylm_fft_norm = 0.5/NPHI;		// FFT/SHT normalization for zlm (4pi normalized)
@@ -762,17 +764,17 @@ void init_SH_gauss()
 	printf("        => using Gauss nodes\n");
 	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition 2*Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
 #endif
-	gauss_nodes(xg,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
+	gauss_nodes(xg,wgl,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
 		ct[it] = xg[it];
 		st[it] = sqrtl((1.-xg[it])*(1.+xg[it]));
 		st_1[it] = 1.0/sqrtl((1.-xg[it])*(1.+xg[it]));
 	}
 	for (it=0; it<NLAT_2; it++)
-		wgd[it] = wg[it]*iylm_fft_norm;		// faster double-precision computations.
+		wg[it] = wgl[it]*iylm_fft_norm;		// faster double-precision computations.
 
 	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point.
-		wgd[NLAT_2-1] *= 0.5;
+		wg[NLAT_2-1] *= 0.5;
 	}
 
 #if SHT_VERBOSE > 1
@@ -805,7 +807,7 @@ void init_SH_gauss()
 
 		for (it=0;it<NLAT_2;it++) {
 			double nz0, nz1, norm;
-			norm = wgd[it];
+			norm = wg[it];
 			if ( (m>0) && (shtns.norm & SHT_REAL_NORM) )	norm *= 2;		// "Real" norm : zlm must be doubled for m>0
 			nz0 = norm;		nz1 = norm;
 			long int l0 = m;

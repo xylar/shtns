@@ -29,7 +29,13 @@ for m=2, z[k] is constant up to l-1
 for m=3, z[k] is constant up to l-2
 
 - there is a need for a merged (3 components) DCT version
-- there is a need for transposed version !!
+- *** there is a need for transposed version !! ***
+
+*** On-the-fly ***
++ m=0 : compress complex to real beforehand.
+- m=0 : 2/4-way for scalar only ?
+- spat_to_SH* should be good !
+- rewrite calling for selection of algo at init-time ...
 
 - Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
 - Using CUDA may be interesting !

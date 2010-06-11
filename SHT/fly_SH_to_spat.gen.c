@@ -45,6 +45,9 @@ T	#define BP0 ((double *)BpF)
 	long int llim;
 	long int k,im,m,l;
 	double *al;
+Q	double Ql0[LTR+1];
+S	double Sl0[LTR+1];
+T	double Tl0[LTR];
 
   #ifndef SHT_AXISYM
 Q	BrF = (v2d *) Vr;
@@ -68,44 +71,49 @@ T	BpF = (v2d*) Vp;
 
 	llim = LTR;		// copy LTR to a local variable for faster access (inner loop limit)
 	im=0;	m=0;
-Q		double* Ql = (double*) Qlm;
-S		double* Sl = (double*) Slm;
-T		double* Tl = (double*) Tlm;
+ 		l=1;
+Q		Ql0[0] = (double) Qlm[0];		// l=0
+		do {		// for m=0, compress the complex Q,S,T to double
+Q			Ql0[l] = (double) Qlm[l];	//	Ql[l+1] = (double) Qlm[l+1];
+S			Sl0[l-1] = (double) Slm[l];	//	Sl[l] = (double) Slm[l+1];
+T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
+			l++;
+		} while(l<=llim);
 		k=0;
 		do {
-			l=0;	al = alm;
+			l=0;	al = al0;
 			s2d cost = *((s2d*)(ct+k));
 V			s2d sint = *((s2d*)(st+k));
 			s2d y0 = vdup(al[0]);
 V			s2d dy0 = vdup(0.0);
-Q			s2d re = y0 * vdup(Ql[0]);
+Q			s2d re = y0 * vdup(Ql0[0]);
 S			s2d to = dy0;
 T			s2d po = dy0;
 			s2d y1 = vdup(al[1]) * cost * y0;
-V			s2d dy1 = vdup(al[1]) * ( cost*dy0 - sint*y0 );
-Q			s2d ro = y1 * vdup(Ql[2]);
-S			s2d te = dy1 * vdup(Sl[2]);
-T			s2d pe = -dy1 * vdup(Tl[2]);
+V			s2d dy1 = -vdup(al[1]) * sint * y0;
+Q			s2d ro = y1 * vdup(Ql0[1]);
+S			s2d te = dy1 * vdup(Sl0[0]);
+T			s2d pe = -dy1 * vdup(Tl0[0]);
 			al+=2;	l+=2;
 			while(l<llim) {
 				y0  = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
 V				dy0 = vdup(al[1])*(cost*dy1 - y1*sint) + vdup(al[0])*dy0;
-Q				re += y0 * vdup(Ql[2*l]);
-S				to += dy0 * vdup(Sl[2*l]);
-T				po -= dy0 * vdup(Tl[2*l]);
+Q				re += y0 * vdup(Ql0[l]);
+S				to += dy0 * vdup(Sl0[l-1]);
+T				po -= dy0 * vdup(Tl0[l-1]);
 				y1  = vdup(al[3])*cost*y0 + vdup(al[2])*y1;
 V				dy1 = vdup(al[3])*(cost*dy0 - y0*sint) + vdup(al[2])*dy1;
-Q				ro += y1 * vdup(Ql[2*l+2]);
-S				te += dy1 * vdup(Sl[2*l+2]);
-T				pe -= dy1 * vdup(Tl[2*l+2]);
+Q				ro += y1 * vdup(Ql0[l+1]);
+S				te += dy1 * vdup(Sl0[l]);
+T				pe -= dy1 * vdup(Tl0[l]);
 				al+=4;	l+=2;
 			}
 			if (l==llim) {
 				y0  = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
 V				dy0 = vdup(al[1])*(cost*dy1 - y1*sint) + vdup(al[0])*dy0;
-Q				re += y0 * vdup(Ql[2*l]);
-S				to += dy0 * vdup(Sl[2*l]);
-T				po -= dy0 * vdup(Tl[2*l]);
+Q				re += y0 * vdup(Ql0[l]);
+S				to += dy0 * vdup(Sl0[l-1]);
+T				po -= dy0 * vdup(Tl0[l-1]);
 			}
 		#if _GCC_VEC_
 Q			BR0[k] = vlo_to_dbl(re+ro);
@@ -145,126 +153,115 @@ T		v2d* Tl = (v2d*) &Tlm[LiM(0,im)];
 	#if _GCC_VEC_
 		l=(l>>1)*2;		// stay on a 16 byte boundary
 	#endif
-		s2d zero = vdup(0.0);
 		while (k<l) {	// polar optimization
-Q			BrF[k] = zero;
-Q			BrF[NLAT-l + k] = zero;	// south pole zeroes <=> BrF[im*NLAT + NLAT-(k+1)] = 0.0;
-V			BtF[k] = zero;		BpF[k] = zero;
-V			BtF[NLAT-l + k] = zero;		BpF[NLAT-l + k] = zero;	// south pole zeroes
+Q			BrF[k] = vdup(0.0);
+Q			BrF[NLAT-l + k] = vdup(0.0);	// south pole zeroes <=> BrF[im*NLAT + NLAT-(k+1)] = 0.0;
+V			BtF[k] = vdup(0.0);		BpF[k] = vdup(0.0);
+V			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zeroes
 			k++;
 		}
 		do {
-			al = alm + mmidx[im];
+Q		#ifndef SHT_3COMP
+Q			al = alm[im];
+Q		#endif
+V			al = dlm[im];
 			s2d cost  = *((s2d*)(st+k));
-V			s2d st2 = cost*cost*vdup(1.0/m);
 			s2d y0 = vdup(al[0]);
 Q			l=m;
 V			l=m-1;	y0 *= vdup(m);		// for the vector transform, compute ylm*m/sint
-			while(l>0) {
+			do {
 				if (l&1) y0 *= cost;
-				l >>= 1;
 				cost *= cost;
-			};
+			} while(l >>= 1);
 			cost = *((s2d*)(ct+k));
 			l=m;
-V			s2d dy0 = cost*y0;
+V			s2d dy = cost*y0;
 Q			v2d q = ((v2d*)Ql)[l];
 S			v2d s = ((v2d*)Sl)[l];
 T			v2d t = ((v2d*)Tl)[l];
 Q			v2d re  = y0 * q;
 S			v2d pe  = y0 * s;
-S			v2d dto = dy0 * s;
-T			v2d dpo = -dy0 * t;
+S			v2d dto = dy * s;
+T			v2d dpo = -dy * t;
 T			v2d te  = -y0 * t;
-T			v2d dpe = vdup(0.0);
-T			v2d to = vdup(0.0);
-S			v2d po = vdup(0.0);
-S			v2d dte = vdup(0.0);
+T			v2d dpe = vdup(0.0);	v2d to = vdup(0.0);
+S			v2d po = vdup(0.0);		v2d dte = vdup(0.0);
 Q			v2d ro = vdup(0.0);
 		#if _GCC_VEC_
 Q			v2d rox = vdup(0.0);
 Q			v2d rex = y0 * vxchg(q);
 S			dpe = subadd(dpe, y0 * vxchg(s));
-S			to  = subadd(to, dy0 * vxchg(s));
-T			po  = subadd(po, dy0 * vxchg(t));
+S			to  = subadd(to, dy * vxchg(s));
+T			po  = subadd(po, dy * vxchg(t));
 T			dte = subadd(dte, y0 * vxchg(t));
 		#endif
-			if (l>=llim) goto lloop_end;
-			s2d y1 = y0 * vdup(al[1]) * cost;		// l=m+1
-V			s2d dy1 = vdup(al[1]) * ( cost*dy0 - st2*y0 );
-Q			q = ((v2d*)Ql)[l+1];
-S			s = ((v2d*)Sl)[l+1];
-T			t = ((v2d*)Tl)[l+1];
-Q			ro  = y1 * q;
-S			po  += y1 * s;
-S			dte += dy1 * s;
-T			dpe -= dy1 * t;
-T			to  -= y1 * t;
-		#if _GCC_VEC_
-Q			rox = y1 * vxchg(q);
-S			dpo = subadd(dpo, y1 * vxchg(s));
-S			te  = subadd(te, dy1 * vxchg(s));
-T			pe  = subadd(pe, dy1 * vxchg(t));
-T			dto = subadd(dto, y1 * vxchg(t));
-		#endif
-			al+=2;	l+=2;
+			l++;
+			s2d y1 = vdup(0.0);
 			while (l<llim) {	// compute even and odd parts
-				y0   = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
-V				dy0 = vdup(al[1])*(cost*dy1 - y1*st2) + vdup(al[0])*dy0;
+				y1 = vdup(al[1])*cost*y0 + vdup(al[0])*y1;
+V				dy = vdup(al[3])*cost*y1 + vdup(al[2])*y0;
 Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
-Q				re  += y0 * q;
-S				pe  += y0 * s;
-S				dto += dy0 * s;
-T				dpo -= dy0 * t;
-T				te  -= y0 * t;
-		#if _GCC_VEC_
-Q				rex += y0 * vxchg(q);
-S				dpe = subadd(dpe, y0 * vxchg(s));
-S				to  = subadd(to, dy0 * vxchg(s));
-T				po  = subadd(po, dy0 * vxchg(t));
-T				dte = subadd(dte, y0 * vxchg(t));
-		#endif
-				y1 = vdup(al[3])*cost*y0 + vdup(al[2])*y1;
-V				dy1 = vdup(al[3])*(cost*dy0 - y0*st2) + vdup(al[2])*dy1;
-Q				q = ((v2d*)Ql)[l+1];
-S				s = ((v2d*)Sl)[l+1];
-T				t = ((v2d*)Tl)[l+1];
 Q				ro  += y1 * q;
 S				po  += y1 * s;
-S				dte += dy1 * s;
-T				dpe -= dy1 * t;
+S				dte += dy * s;
+T				dpe -= dy * t;
 T				to  -= y1 * t;
 		#if _GCC_VEC_
 Q				rox += y1 * vxchg(q);
 S				dpo = subadd(dpo, y1 * vxchg(s));
-S				te  = subadd(te, dy1 * vxchg(s));
-T				pe  = subadd(pe, dy1 * vxchg(t));
+S				te  = subadd(te, dy * vxchg(s));
+T				pe  = subadd(pe, dy * vxchg(t));
 T				dto = subadd(dto, y1 * vxchg(t));
 		#endif
-				al+=4;	l+=2;
-			}
-			if (l==llim) {
+Q		#ifndef SHT_3COMP
+Q				al+=2;
+Q		#endif
+V				al+=4;
+				l++;
 				y0   = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
-V				dy0 = vdup(al[1])*(cost*dy1 - y1*st2) + vdup(al[0])*dy0;
+V				dy = vdup(al[3])*cost*y0 + vdup(al[2])*y1;
 Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
 Q				re  += y0 * q;
 S				pe  += y0 * s;
-S				dto += dy0 * s;
-T				dpo -= dy0 * t;
+S				dto += dy * s;
+T				dpo -= dy * t;
 T				te  -= y0 * t;
 		#if _GCC_VEC_
 Q				rex += y0 * vxchg(q);
 S				dpe = subadd(dpe, y0 * vxchg(s));
-S				to  = subadd(to, dy0 * vxchg(s));
-T				po  = subadd(po, dy0 * vxchg(t));
+S				to  = subadd(to, dy * vxchg(s));
+T				po  = subadd(po, dy * vxchg(t));
 T				dte = subadd(dte, y0 * vxchg(t));
 		#endif
+Q		#ifndef SHT_3COMP
+Q				al+=2;
+Q		#endif
+V				al+=4;
+				l++;
 			}
-	lloop_end:
+			if (l==llim) {
+				y1 = vdup(al[1])*cost*y0 + vdup(al[0])*y1;
+V				dy = vdup(al[3])*cost*y1 + vdup(al[2])*y0;
+Q				q = ((v2d*)Ql)[l];
+S				s = ((v2d*)Sl)[l];
+T				t = ((v2d*)Tl)[l];
+Q				ro  += y1 * q;
+S				po  += y1 * s;
+S				dte += dy * s;
+T				dpe -= dy * t;
+T				to  -= y1 * t;
+		#if _GCC_VEC_
+Q				rox += y1 * vxchg(q);
+S				dpo = subadd(dpo, y1 * vxchg(s));
+S				te  = subadd(te, dy * vxchg(s));
+T				pe  = subadd(pe, dy * vxchg(t));
+T				dto = subadd(dto, y1 * vxchg(t));
+		#endif
+			}
 Q		#ifdef SHT_3COMP
 Q			cost  = *((s2d*)(st+k));
 Q			cost *= vdup(1.0/m);
