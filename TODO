@@ -36,6 +36,7 @@ for m=3, z[k] is constant up to l-2
 - m=0 : 2/4-way for scalar only ?
 - spat_to_SH* should be good !
 - rewrite calling for selection of algo at init-time ...
+- split m=0 and m>0 ??
 
 - Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
 - Using CUDA may be interesting !

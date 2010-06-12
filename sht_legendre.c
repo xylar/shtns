@@ -155,11 +155,10 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 	dy0 = 0.0;
 	if (im>0) {		// m > 0
 		l = m-1;			// compute  sin(theta)^(m-1)
-		while(l>0) {
+		do {
 			if (l&1) y0 *= st;
-			l >>= 1;
 			st *= st;
-		}
+		} while(l >>= 1);
 		dy0 = x*m*y0;
 		st = sint*sint;		// st = sin(theta)^2 is used in the recurrence for m>0
 	}
@@ -381,6 +380,7 @@ void gauss_nodes(long double *x, long double *w, int n)
 	printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);
 #endif
 }
+
 
 /*
 void SH_to_spat_fly(complex double *Qlm, double *Vr)

@@ -67,18 +67,18 @@ V	struct DtDp *dyl;
 Q	complex double re,ro;
 V	complex double te,to, pe,po;
 V	complex double dte,dto, dpe,dpo;
-Q	#define BR0 ((complex double *)BrF)
-V	#define BT0 ((complex double *)BtF)
-V	#define BP0 ((complex double *)BpF)
+Q	#define BR0(i) ((double *)BrF)[2*(i)]
+V	#define BT0(i) ((double *)BtF)[2*(i)]
+V	#define BP0(i) ((double *)BpF)[2*(i)]
   #else
 S	v2d *BtF;
 T	v2d *BpF;
 Q	double re,ro;
 S	double te,to;
 T	double pe,po;
-Q	#define BR0 ((double *)BrF)
-S	#define BT0 ((double *)BtF)
-T	#define BP0 ((double *)BpF)
+Q	#define BR0(i) ((double *)BrF)[i]
+S	#define BT0(i) ((double *)BtF)[i]
+T	#define BP0(i) ((double *)BpF)[i]
   #endif
 Q	double *yl;
 V	double *dyl0;
@@ -162,9 +162,9 @@ TE				pe -= dyl0[0] * Tl[2*l];
 Q				yl+=2;
 V				dyl0+=2;
 			}
-Q			BR0[k] = re;	BR0[k+1] = ro;
-S			BT0[k] = te;	BT0[k+1] = to;
-T			BP0[k] = pe;	BP0[k+1] = po;
+Q			BR0(k) = re;	BR0(k+1) = ro;
+S			BT0(k) = te;	BT0(k+1) = to;
+T			BP0(k) = pe;	BP0(k+1) = po;
 	#else
 Q			v2d r = vdup(0.0);
 S			v2d t = vdup(0.0);
@@ -180,13 +180,13 @@ V				dyl0+=2;
 Q			} while(2*l <= llim);
 V			} while(2*l < llim);
 		#ifndef SHT_AXISYM
-Q			((v2d*)BR0)[k] = vlo_to_cplx(r);	((v2d*)BR0)[k+1] = vhi_to_cplx(r);
-S			((v2d*)BT0)[k] = vlo_to_cplx(t);	((v2d*)BT0)[k+1] = vhi_to_cplx(t);
-T			((v2d*)BP0)[k] = vlo_to_cplx(p);	((v2d*)BP0)[k+1] = vhi_to_cplx(p);
+Q			BR0(k) = vlo_to_dbl(r);		BR0(k+1) = vhi_to_dbl(r);
+S			BT0(k) = vlo_to_dbl(t);		BT0(k+1) = vhi_to_dbl(t);
+T			BP0(k) = vlo_to_dbl(p);		BP0(k+1) = vhi_to_dbl(p);
 		#else
-Q			*((v2d*)(BR0 +k)) = r;
-S			*((v2d*)(BT0 +k)) = t;
-T			*((v2d*)(BP0 +k)) = p;
+Q			*((v2d*)(((double*)BrF)+k)) = r;
+S			*((v2d*)(((double*)BtF)+k)) = t;
+T			*((v2d*)(((double*)BpF)+k)) = p;
 		#endif
 	#endif
 			k+=2;
@@ -198,9 +198,9 @@ V			l = k-1;
 Q		} while (k<=llim);
 V		} while (k<=llim+1);
 		while (k<NLAT) {	// dct padding (NLAT is even)
-Q			BR0[k] = 0.0;	BR0[k+1] = 0.0;
-S			BT0[k] = 0.0;	BT0[k+1] = 0.0;
-T			BP0[k] = 0.0;	BP0[k+1] = 0.0;
+Q			BR0(k) = 0.0;	BR0(k+1) = 0.0;
+S			BT0(k) = 0.0;	BT0(k+1) = 0.0;
+T			BP0(k) = 0.0;	BP0(k+1) = 0.0;
 			k+=2;
 		}
     #ifdef SHT_AXISYM
@@ -256,13 +256,13 @@ S				te += dyl0[0] * Sl[2*l];
 V				dyl0+=2;
 			}
 Q			yl++;
-Q			BR0[k] = re + ro;
-S			BT0[k] = te + to;			// Bt = dS/dt
-T			BP0[k] = pe + po;			// Bp = - dT/dt
+Q			BR0(k) = re + ro;
+S			BT0(k) = te + to;			// Bt = dS/dt
+T			BP0(k) = pe + po;			// Bp = - dT/dt
 			k++;
-QB			BR0[NLAT-k] = re - ro;
-SB			BT0[NLAT-k] = te - to;
-TB			BP0[NLAT-k] = pe - po;
+QB			BR0(NLAT-k) = re - ro;
+SB			BT0(NLAT-k) = te - to;
+TB			BP0(NLAT-k) = pe - po;
 	#else
 			l=0;
 Q			v2d r = vdup(0.0);
@@ -286,31 +286,21 @@ V			} while (2*l < llim);
 Q			r = addi(r,r);		// { re-ro , re+ro }
 S			t = addi(t,t);		// { te-to , te+to }
 T			p = addi(p,p);		// { pe-po , pe+po }
-		  #ifdef SHT_AXISYM
-Q			BR0[k] = vhi_to_dbl(r);
-S			BT0[k] = vhi_to_dbl(t);	// Bt = dS/dt
-T			BP0[k] = vhi_to_dbl(p);	// Bp = - dT/dt
+Q			BR0(k) = vhi_to_dbl(r);
+S			BT0(k) = vhi_to_dbl(t);	// Bt = dS/dt
+T			BP0(k) = vhi_to_dbl(p);	// Bp = - dT/dt
 			k++;
-QB			BR0[NLAT-k] = vlo_to_dbl(r);
-SB			BT0[NLAT-k] = vlo_to_dbl(t);
-TB			BP0[NLAT-k] = vlo_to_dbl(p);
-		  #else
-Q			((v2d*)BR0)[k] = vhi_to_cplx(r);
-S			((v2d*)BT0)[k] = vhi_to_cplx(t);	// Bt = dS/dt
-T			((v2d*)BP0)[k] = vhi_to_cplx(p);	// Bp = - dT/dt
-			k++;
-QB			((v2d*)BR0)[NLAT-k] = vlo_to_cplx(r);
-SB			((v2d*)BT0)[NLAT-k] = vlo_to_cplx(t);
-TB			((v2d*)BP0)[NLAT-k] = vlo_to_cplx(p);
-		  #endif
+QB			BR0(NLAT-k) = vlo_to_dbl(r);
+SB			BT0(NLAT-k) = vlo_to_dbl(t);
+TB			BP0(NLAT-k) = vlo_to_dbl(p);
 		#else
-Q			BR0[k] = vhi_to_dbl(r) + vlo_to_dbl(r);
-S			BT0[k] = vhi_to_dbl(t) + vlo_to_dbl(t);	// Bt = dS/dt
-T			BP0[k] = vhi_to_dbl(p) + vlo_to_dbl(p);	// Bp = - dT/dt
+Q			BR0(k) = vhi_to_dbl(r) + vlo_to_dbl(r);
+S			BT0(k) = vhi_to_dbl(t) + vlo_to_dbl(t);	// Bt = dS/dt
+T			BP0(k) = vhi_to_dbl(p) + vlo_to_dbl(p);	// Bp = - dT/dt
 			k++;
-QB			BR0[NLAT-k] = vlo_to_dbl(r) - vhi_to_dbl(r);
-SB			BT0[NLAT-k] = vlo_to_dbl(t) - vhi_to_dbl(t);
-TB			BP0[NLAT-k] = vlo_to_dbl(p) - vhi_to_dbl(p);
+QB			BR0(NLAT-k) = vlo_to_dbl(r) - vhi_to_dbl(r);
+SB			BT0(NLAT-k) = vlo_to_dbl(t) - vhi_to_dbl(t);
+TB			BP0(NLAT-k) = vlo_to_dbl(p) - vhi_to_dbl(p);
 		#endif
 	#endif
 		#ifdef SHT_VAR_LTR

@@ -32,15 +32,15 @@
 Q	v2d *BrF;
   #ifndef SHT_AXISYM
 V	v2d *BtF, *BpF;
-Q	#define BR0 ((complex double *)BrF)
-V	#define BT0 ((complex double *)BtF)
-V	#define BP0 ((complex double *)BpF)
+Q	#define BR0(i) ((double *)BrF)[2*(i)]
+V	#define BT0(i) ((double *)BtF)[2*(i)]
+V	#define BP0(i) ((double *)BpF)[2*(i)]
   #else
 S	v2d *BtF;
 T	v2d *BpF;
-Q	#define BR0 ((double *)BrF)
-S	#define BT0 ((double *)BtF)
-T	#define BP0 ((double *)BpF)
+Q	#define BR0(i) ((double *)BrF)[i]
+S	#define BT0(i) ((double *)BtF)[i]
+T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	long int llim;
 	long int k,im,m,l;
@@ -128,33 +128,44 @@ S				to += dy0 * vdup(Sl0[l-1]);
 T				po -= dy0 * vdup(Tl0[l-1]);
 			}
 		#if _GCC_VEC_
-Q			BR0[k] = vlo_to_dbl(re+ro);
-Q			BR0[k+1] = vhi_to_dbl(re+ro);
-QX			BR0[k+2] = vlo_to_dbl(reb+rob);
-QX			BR0[k+3] = vhi_to_dbl(reb+rob);
-QX			BR0[NLAT-k-4] = vhi_to_dbl(reb-rob);
-QX			BR0[NLAT-k-3] = vlo_to_dbl(reb-rob);
-Q			BR0[NLAT-k-2] = vhi_to_dbl(re-ro);
-Q			BR0[NLAT-k-1] = vlo_to_dbl(re-ro);
-S			BT0[k] = vlo_to_dbl(te+to);
-S			BT0[k+1] = vhi_to_dbl(te+to);
-S			BT0[NLAT-k-2] = vhi_to_dbl(te-to);
-S			BT0[NLAT-k-1] = vlo_to_dbl(te-to);
-T			BP0[k] = vlo_to_dbl(pe+po);
-T			BP0[k+1] = vhi_to_dbl(pe+po);
-T			BP0[NLAT-k-2] = vhi_to_dbl(pe-po);
-T			BP0[NLAT-k-1] = vlo_to_dbl(pe-po);
+		  #ifndef SHT_AXISYM
+Q			BR0(k) = vlo_to_dbl(re+ro);
+Q			BR0(k+1) = vhi_to_dbl(re+ro);
+QX			BR0(k+2) = vlo_to_dbl(reb+rob);
+QX			BR0(k+3) = vhi_to_dbl(reb+rob);
+QX			BR0(NLAT-k-4) = vhi_to_dbl(reb-rob);
+QX			BR0(NLAT-k-3) = vlo_to_dbl(reb-rob);
+Q			BR0(NLAT-k-2) = vhi_to_dbl(re-ro);
+Q			BR0(NLAT-k-1) = vlo_to_dbl(re-ro);
+S			BT0(k) = vlo_to_dbl(te+to);
+S			BT0(k+1) = vhi_to_dbl(te+to);
+S			BT0(NLAT-k-2) = vhi_to_dbl(te-to);
+S			BT0(NLAT-k-1) = vlo_to_dbl(te-to);
+T			BP0(k) = vlo_to_dbl(pe+po);
+T			BP0(k+1) = vhi_to_dbl(pe+po);
+T			BP0(NLAT-k-2) = vhi_to_dbl(pe-po);
+T			BP0(NLAT-k-1) = vlo_to_dbl(pe-po);
+		  #else
+Q			*((v2d*)(((double*)BrF)+k)) = re+ro;
+QX			*((v2d*)(((double*)BrF)+k+2)) = reb+rob;
+QX			*((v2d*)(((double*)BrF)+NLAT-k-4)) = vxchg(reb-rob);
+Q			*((v2d*)(((double*)BrF)+NLAT-k-2)) = vxchg(re-ro);
+S			*((v2d*)(((double*)BtF)+k)) = te+to;
+S			*((v2d*)(((double*)BtF)+NLAT-k-2)) = vxchg(te-to);
+S			*((v2d*)(((double*)BpF)+k)) = pe+po;
+S			*((v2d*)(((double*)BpF)+NLAT-k-2)) = vxchg(pe-po);
+		  #endif
 			k+=2;
 QX			k+=2;
 		#else
-Q			BR0[k] = (re+ro);
-QX			BR0[k+1] = (reb+rob);
-QX			BR0[NLAT-k-2] = (reb-rob);
-Q			BR0[NLAT-k-1] = (re-ro);
-S			BT0[k] = (te+to);
-S			BT0[NLAT-k-1] = (te-to);
-T			BP0[k] = (pe+po);
-T			BP0[NLAT-k-1] = (pe-po);
+Q			BR0(k) = (re+ro);
+QX			BR0(k+1) = (reb+rob);
+QX			BR0(NLAT-k-2) = (reb-rob);
+Q			BR0(NLAT-k-1) = (re-ro);
+S			BT0(k) = (te+to);
+S			BT0(NLAT-k-1) = (te-to);
+T			BP0(k) = (pe+po);
+T			BP0(NLAT-k-1) = (pe-po);
 			k++;
 QX			k++;
 		#endif
