@@ -79,12 +79,8 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 		k=0;
 		do {
 			l=0;	al = al0;
-			s2d cost = *((s2d*)(ct+k));
-QX		#ifdef _GCC_VEC_
-QX			s2d ctb = *((s2d*)(ct+k+2));	// 4 latitudes/iteration with SSE2
-QX		#else
-QX			s2d ctb = *((s2d*)(ct+k+1));	// 2 latitudes/iteration without SSE2
-QX		#endif
+			s2d cost = ((s2d*)(ct+k))[0];
+QX			s2d ctb = ((s2d*)(ct+k))[1];	// 4 latitudes/iteration with SSE2, 2 without.
 V			s2d sint = *((s2d*)(st+k));
 			s2d y0 = vdup(al[0]);
 QX			s2d y0b = y0;
@@ -155,8 +151,8 @@ S			*((v2d*)(((double*)BtF)+NLAT-k-2)) = vxchg(te-to);
 S			*((v2d*)(((double*)BpF)+k)) = pe+po;
 S			*((v2d*)(((double*)BpF)+NLAT-k-2)) = vxchg(pe-po);
 		  #endif
-			k+=2;
-QX			k+=2;
+QX			k+=4;
+V			k+=2;
 		#else
 Q			BR0(k) = (re+ro);
 QX			BR0(k+1) = (reb+rob);
@@ -166,8 +162,8 @@ S			BT0(k) = (te+to);
 S			BT0(NLAT-k-1) = (te-to);
 T			BP0(k) = (pe+po);
 T			BP0(NLAT-k-1) = (pe-po);
-			k++;
-QX			k++;
+QX			k+=2;
+V			k++;
 		#endif
 		} while (k < NLAT_2);
 
