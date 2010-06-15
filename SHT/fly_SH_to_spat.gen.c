@@ -68,6 +68,8 @@ T	BpF = (v2d*) Vp;
 
 	llim = LTR;		// copy LTR to a local variable for faster access (inner loop limit)
 	im=0;	m=0;
+		#undef NWAY
+		#define NWAY 4
  		l=1;
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double
@@ -79,96 +81,99 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 		k=0;
 		do {
 			l=0;	al = al0;
-			s2d cost = ((s2d*)(ct+k))[0];
-QX			s2d ctb = ((s2d*)(ct+k))[1];	// 4 latitudes/iteration with SSE2, 2 without.
-V			s2d sint = *((s2d*)(st+k));
-			s2d y0 = vdup(al[0]);
-QX			s2d y0b = y0;
-V			s2d dy0 = vdup(0.0);
-Q			s2d re = y0 * vdup(Ql0[0]);
-QX			s2d reb = y0b * vdup(Ql0[0]);
-S			s2d to = dy0;
-T			s2d po = dy0;
-			s2d y1 = vdup(al[1]) * cost * y0;
-QX			s2d y1b = vdup(al[1]) * ctb * y0b;
-V			s2d dy1 = -vdup(al[1]) * sint * y0;
-Q			s2d ro = y1 * vdup(Ql0[1]);
-QX			s2d rob = y1b * vdup(Ql0[1]);
-S			s2d te = dy1 * vdup(Sl0[0]);
-T			s2d pe = -dy1 * vdup(Tl0[0]);
+			s2d cost[NWAY], y0[NWAY], y1[NWAY];
+V			s2d sint[NWAY], dy0[NWAY], dy1[NWAY];
+Q			s2d re[NWAY], ro[NWAY];
+S			s2d te[NWAY], to[NWAY];
+T			s2d pe[NWAY], po[NWAY];
+			for (int j=0; j<NWAY; j++) {
+				cost[j] = ((s2d*)(ct+k))[j];
+V				sint[j] = ((s2d*)(st+k))[j];
+				y0[j] = vdup(al[0]);
+V				dy0[j] = vdup(0.0);
+Q				re[j] = y0[j] * vdup(Ql0[0]);
+S				to[j] = dy0[j];
+T				po[j] = dy0[j];
+			}
+			for (int j=0; j<NWAY; j++) {
+				y1[j] = vdup(al[1]) * cost[j] * y0[j];
+V				dy1[j] = -vdup(al[1]) * sint[j] * y0[j];
+Q				ro[j] = y1[j] * vdup(Ql0[1]);
+S				te[j] = dy1[j] * vdup(Sl0[0]);
+T				pe[j] = -dy1[j] * vdup(Tl0[0]);
+			}
 			al+=2;	l+=2;
 			while(l<llim) {
-				y0  = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
-QX				y0b  = vdup(al[1])*ctb*y1b + vdup(al[0])*y0b;
-V				dy0 = vdup(al[1])*(cost*dy1 - y1*sint) + vdup(al[0])*dy0;
-Q				re += y0 * vdup(Ql0[l]);
-QX				reb += y0b * vdup(Ql0[l]);
-S				to += dy0 * vdup(Sl0[l-1]);
-T				po -= dy0 * vdup(Tl0[l-1]);
-				y1  = vdup(al[3])*cost*y0 + vdup(al[2])*y1;
-QX				y1b  = vdup(al[3])*ctb*y0b + vdup(al[2])*y1b;
-V				dy1 = vdup(al[3])*(cost*dy0 - y0*sint) + vdup(al[2])*dy1;
-Q				ro += y1 * vdup(Ql0[l+1]);
-QX				rob += y1b * vdup(Ql0[l+1]);
-S				te += dy1 * vdup(Sl0[l]);
-T				pe -= dy1 * vdup(Tl0[l]);
+				for (int j=0; j<NWAY; j++) {
+					y0[j]  = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
+V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] - y1[j]*sint[j]) + vdup(al[0])*dy0[j];
+Q					re[j] += y0[j] * vdup(Ql0[l]);
+S					to[j] += dy0[j] * vdup(Sl0[l-1]);
+T					po[j] -= dy0[j] * vdup(Tl0[l-1]);
+				}
+				for (int j=0; j<NWAY; j++) {
+					y1[j]  = vdup(al[3])*cost[j]*y0[j] + vdup(al[2])*y1[j];
+V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] - y0[j]*sint[j]) + vdup(al[2])*dy1[j];
+Q					ro[j] += y1[j] * vdup(Ql0[l+1]);
+S					te[j] += dy1[j] * vdup(Sl0[l]);
+T					pe[j] -= dy1[j] * vdup(Tl0[l]);
+				}
 				al+=4;	l+=2;
 			}
 			if (l==llim) {
-				y0  = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
-QX				y0b  = vdup(al[1])*ctb*y1b + vdup(al[0])*y0b;
-V				dy0 = vdup(al[1])*(cost*dy1 - y1*sint) + vdup(al[0])*dy0;
-Q				re += y0 * vdup(Ql0[l]);
-QX				reb += y0b * vdup(Ql0[l]);
-S				to += dy0 * vdup(Sl0[l-1]);
-T				po -= dy0 * vdup(Tl0[l-1]);
+				for (int j=0; j<NWAY; j++) {
+					y0[j]  = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
+V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] - y1[j]*sint[j]) + vdup(al[0])*dy0[j];
+Q					re[j] += y0[j] * vdup(Ql0[l]);
+S					to[j] += dy0[j] * vdup(Sl0[l-1]);
+T					po[j] -= dy0[j] * vdup(Tl0[l-1]);
+				}
 			}
 		#if _GCC_VEC_
 		  #ifndef SHT_AXISYM
-Q			BR0(k) = vlo_to_dbl(re+ro);
-Q			BR0(k+1) = vhi_to_dbl(re+ro);
-QX			BR0(k+2) = vlo_to_dbl(reb+rob);
-QX			BR0(k+3) = vhi_to_dbl(reb+rob);
-QX			BR0(NLAT-k-4) = vhi_to_dbl(reb-rob);
-QX			BR0(NLAT-k-3) = vlo_to_dbl(reb-rob);
-Q			BR0(NLAT-k-2) = vhi_to_dbl(re-ro);
-Q			BR0(NLAT-k-1) = vlo_to_dbl(re-ro);
-S			BT0(k) = vlo_to_dbl(te+to);
-S			BT0(k+1) = vhi_to_dbl(te+to);
-S			BT0(NLAT-k-2) = vhi_to_dbl(te-to);
-S			BT0(NLAT-k-1) = vlo_to_dbl(te-to);
-T			BP0(k) = vlo_to_dbl(pe+po);
-T			BP0(k+1) = vhi_to_dbl(pe+po);
-T			BP0(NLAT-k-2) = vhi_to_dbl(pe-po);
-T			BP0(NLAT-k-1) = vlo_to_dbl(pe-po);
+			for (int j=0; j<NWAY; j++) {
+Q				BR0(k+2*j) = vlo_to_dbl(re[j]+ro[j]);
+Q				BR0(k+2*j+1) = vhi_to_dbl(re[j]+ro[j]);
+Q				BR0(NLAT-k-2-2*j) = vhi_to_dbl(re[j]-ro[j]);
+Q				BR0(NLAT-k-1-2*j) = vlo_to_dbl(re[j]-ro[j]);
+S				BT0(k+2*j) = vlo_to_dbl(te[j]+to[j]);
+S				BT0(k+2*j+1) = vhi_to_dbl(te[j]+to[j]);
+S				BT0(NLAT-k-2-2*j) = vhi_to_dbl(te[j]-to[j]);
+S				BT0(NLAT-k-1-2*j) = vlo_to_dbl(te[j]-to[j]);
+T				BP0(k+2*j) = vlo_to_dbl(pe[j]+po[j]);
+T				BP0(k+2*j+1) = vhi_to_dbl(pe[j]+po[j]);
+T				BP0(NLAT-k-2-2*j) = vhi_to_dbl(pe[j]-po[j]);
+T				BP0(NLAT-k-1-2*j) = vlo_to_dbl(pe[j]-po[j]);
+			}
 		  #else
-Q			*((v2d*)(((double*)BrF)+k)) = re+ro;
-QX			*((v2d*)(((double*)BrF)+k+2)) = reb+rob;
-QX			*((v2d*)(((double*)BrF)+NLAT-k-4)) = vxchg(reb-rob);
-Q			*((v2d*)(((double*)BrF)+NLAT-k-2)) = vxchg(re-ro);
-S			*((v2d*)(((double*)BtF)+k)) = te+to;
-S			*((v2d*)(((double*)BtF)+NLAT-k-2)) = vxchg(te-to);
-S			*((v2d*)(((double*)BpF)+k)) = pe+po;
-S			*((v2d*)(((double*)BpF)+NLAT-k-2)) = vxchg(pe-po);
+			for (int j=0; j<NWAY; j++) {
+Q				((v2d*)(((double*)BrF)+k))[j] = re[j]+ro[j];
+Q				*((v2d*)(((double*)BrF)+NLAT-k-2-2*j)) = vxchg(re[j]-ro[j]);
+S				((v2d*)(((double*)BtF)+k))[j] = te[j]+to[j];
+S				*((v2d*)(((double*)BtF)+NLAT-k-2-2*j)) = vxchg(te[j]-to[j]);
+S				((v2d*)(((double*)BpF)+k))[j] = pe[j]+po[j];
+S				*((v2d*)(((double*)BpF)+NLAT-k-2-2*j)) = vxchg(pe[j]-po[j]);
+			}
 		  #endif
-QX			k+=4;
-V			k+=2;
+			k+=2*NWAY;
 		#else
-Q			BR0(k) = (re+ro);
-QX			BR0(k+1) = (reb+rob);
-QX			BR0(NLAT-k-2) = (reb-rob);
-Q			BR0(NLAT-k-1) = (re-ro);
-S			BT0(k) = (te+to);
-S			BT0(NLAT-k-1) = (te-to);
-T			BP0(k) = (pe+po);
-T			BP0(NLAT-k-1) = (pe-po);
-QX			k+=2;
-V			k++;
+			for (int j=0; j<NWAY; j++) {
+Q				BR0(k+j) = (re[j]+ro[j]);
+Q				BR0(NLAT-k-1-j) = (re[j]-ro[j]);
+S				BT0(k+j) = (te[j]+to[j]);
+S				BT0(NLAT-k-1-j) = (te[j]-to[j]);
+T				BP0(k+j) = (pe[j]+po[j]);
+T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
+			}
+			k+=NWAY;
 		#endif
 		} while (k < NLAT_2);
 
   #ifndef SHT_AXISYM
 	im=1;
+	#undef NWAY
+V	#define NWAY 1
+QX	#define NWAY 2
 Q	BrF += NLAT;
 V	BtF += NLAT;	BpF += NLAT;
 	while(im<=MTR) {	// regular for MTR_DCT < im <= MTR
@@ -188,129 +193,167 @@ V			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zer
 			k++;
 		}
 		do {
-QX			al = alm[im];
-V			al = dlm[im];
-			s2d cost  = *((s2d*)(st+k));
-			s2d y0 = vdup(al[0]);
+			al = alm[im];
+			s2d cost[NWAY], y0[NWAY], y1[NWAY];
+V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
+Q			v2d re[NWAY], ro[NWAY];
+		#if _GCC_VEC_
+Q			v2d rex[NWAY], rox[NWAY];
+		#endif
+S			v2d te[NWAY], to[NWAY], dpe[NWAY], dpo[NWAY];
+T			v2d pe[NWAY], po[NWAY], dte[NWAY], dto[NWAY];
+			for (int j=0; j<NWAY; j++) {
+				cost[j] = ((s2d*)(st+k))[j];
+				y0[j] = vdup(al[0]);
+V				st2[j] = cost[j]*cost[j]*vdup(1.0/m);
+V				y0[j] *= vdup(m);		// for the vector transform, compute ylm*m/sint
+			}
 Q			l=m;
-V			l=m-1;	y0 *= vdup(m);		// for the vector transform, compute ylm*m/sint
+V			l=m-1;
 			do {
-				if (l&1) y0 *= cost;
-				cost *= cost;
+				if (l&1) for (int j=0; j<NWAY; j++) y0[j] *= cost[j];
+				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
 			} while(l >>= 1);
-			cost = *((s2d*)(ct+k));
+			for (int j=0; j<NWAY; j++) cost[j] = ((s2d*)(ct+k))[j];
 			l=m;
-V			s2d dy = cost*y0;
+V			for (int j=0; j<NWAY; j++) dy0[j] = cost[j]*y0[j];
 Q			v2d q = ((v2d*)Ql)[l];
 S			v2d s = ((v2d*)Sl)[l];
 T			v2d t = ((v2d*)Tl)[l];
-Q			v2d re  = y0 * q;
-S			v2d pe  = y0 * s;
-S			v2d dto = dy * s;
-T			v2d dpo = -dy * t;
-T			v2d te  = -y0 * t;
-T			v2d dpe = vdup(0.0);	v2d to = vdup(0.0);
-S			v2d po = vdup(0.0);		v2d dte = vdup(0.0);
-Q			v2d ro = vdup(0.0);
+			for (int j=0; j<NWAY; j++) {
+Q				re[j]  = y0[j] * q;
+S				pe[j]  = y0[j] * s;
+S				dto[j] = dy0[j] * s;
+T				dpo[j] = -dy0[j] * t;
+T				te[j]  = -y0[j] * t;
+T				dpe[j] = vdup(0.0);		to[j] = vdup(0.0);
+S				po[j] = vdup(0.0);		dte[j] = vdup(0.0);
+Q				ro[j] = vdup(0.0);
+			}
 		#if _GCC_VEC_
-Q			v2d rox = vdup(0.0);
-Q			v2d rex = y0 * vxchg(q);
-S			dpe = subadd(dpe, y0 * vxchg(s));
-S			to  = subadd(to, dy * vxchg(s));
-T			po  = subadd(po, dy * vxchg(t));
-T			dte = subadd(dte, y0 * vxchg(t));
+			for (int j=0; j<NWAY; j++) {
+Q				rox[j] = vdup(0.0);
+Q				rex[j] = y0[j] * vxchg(q);
+S				dpe[j] = subadd(dpe[j], y0[j] * vxchg(s));
+S				to[j]  = subadd(to[j], dy0[j] * vxchg(s));
+T				po[j]  = subadd(po[j], dy0[j] * vxchg(t));
+T				dte[j] = subadd(dte[j], y0[j] * vxchg(t));
+			}
 		#endif
 			l++;
-			s2d y1 = vdup(0.0);
+			for (int j=0; j<NWAY; j++) {
+				y1[j] = vdup(0.0);
+V				dy1[j] = vdup(0.0);
+			}
 			while (l<llim) {	// compute even and odd parts
-				y1 = vdup(al[1])*cost*y0 + vdup(al[0])*y1;
-V				dy = vdup(al[3])*cost*y1 + vdup(al[2])*y0;
+				for (int j=0; j<NWAY; j++) {
+					y1[j] = vdup(al[1])*cost[j]*y0[j] + vdup(al[0])*y1[j];
+V					dy1[j] = vdup(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]) + vdup(al[0])*dy1[j];
+				}
 Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
-Q				ro  += y1 * q;
-S				po  += y1 * s;
-S				dte += dy * s;
-T				dpe -= dy * t;
-T				to  -= y1 * t;
+				for (int j=0; j<NWAY; j++) {
+Q					ro[j]  += y1[j] * q;
+S					po[j]  += y1[j] * s;
+S					dte[j] += dy1[j] * s;
+T					dpe[j] -= dy1[j] * t;
+T					to[j]  -= y1[j] * t;
+				}
 		#if _GCC_VEC_
-Q				rox += y1 * vxchg(q);
-S				dpo = subadd(dpo, y1 * vxchg(s));
-S				te  = subadd(te, dy * vxchg(s));
-T				pe  = subadd(pe, dy * vxchg(t));
-T				dto = subadd(dto, y1 * vxchg(t));
+				for (int j=0; j<NWAY; j++) {				
+Q					rox[j] += y1[j] * vxchg(q);
+S					dpo[j] = subadd(dpo[j], y1[j] * vxchg(s));
+S					te[j]  = subadd(te[j], dy1[j] * vxchg(s));
+T					pe[j]  = subadd(pe[j], dy1[j] * vxchg(t));
+T					dto[j] = subadd(dto[j], y1[j] * vxchg(t));
+				}
 		#endif
-QX				al+=2;
-V				al+=4;
+				al+=2;
 				l++;
-				y0   = vdup(al[1])*cost*y1 + vdup(al[0])*y0;
-V				dy = vdup(al[3])*cost*y0 + vdup(al[2])*y1;
+				for (int j=0; j<NWAY; j++) {
+					y0[j] = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
+V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] - y1[j]*st2[j]) + vdup(al[0])*dy0[j];
+				}
 Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
-Q				re  += y0 * q;
-S				pe  += y0 * s;
-S				dto += dy * s;
-T				dpo -= dy * t;
-T				te  -= y0 * t;
+				for (int j=0; j<NWAY; j++) {
+Q					re[j]  += y0[j] * q;
+S					pe[j]  += y0[j] * s;
+S					dto[j] += dy0[j] * s;
+T					dpo[j] -= dy0[j] * t;
+T					te[j]  -= y0[j] * t;
+				}
 		#if _GCC_VEC_
-Q				rex += y0 * vxchg(q);
-S				dpe = subadd(dpe, y0 * vxchg(s));
-S				to  = subadd(to, dy * vxchg(s));
-T				po  = subadd(po, dy * vxchg(t));
-T				dte = subadd(dte, y0 * vxchg(t));
+				for (int j=0; j<NWAY; j++) {				
+Q					rex[j] += y0[j] * vxchg(q);
+S					dpe[j] = subadd(dpe[j], y0[j] * vxchg(s));
+S					to[j]  = subadd(to[j], dy0[j] * vxchg(s));
+T					po[j]  = subadd(po[j], dy0[j] * vxchg(t));
+T					dte[j] = subadd(dte[j], y0[j] * vxchg(t));
+				}
 		#endif
-QX				al+=2;
-V				al+=4;
+				al+=2;
 				l++;
 			}
 			if (l==llim) {
-				y1 = vdup(al[1])*cost*y0 + vdup(al[0])*y1;
-V				dy = vdup(al[3])*cost*y1 + vdup(al[2])*y0;
+				for (int j=0; j<NWAY; j++) {
+					y1[j] = vdup(al[1])*cost[j]*y0[j] + vdup(al[0])*y1[j];
+V					dy1[j] = vdup(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]) + vdup(al[0])*dy1[j];
+				}
 Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
-Q				ro  += y1 * q;
-S				po  += y1 * s;
-S				dte += dy * s;
-T				dpe -= dy * t;
-T				to  -= y1 * t;
+				for (int j=0; j<NWAY; j++) {
+Q					ro[j]  += y1[j] * q;
+S					po[j]  += y1[j] * s;
+S					dte[j] += dy1[j] * s;
+T					dpe[j] -= dy1[j] * t;
+T					to[j]  -= y1[j] * t;
+				}
 		#if _GCC_VEC_
-Q				rox += y1 * vxchg(q);
-S				dpo = subadd(dpo, y1 * vxchg(s));
-S				te  = subadd(te, dy * vxchg(s));
-T				pe  = subadd(pe, dy * vxchg(t));
-T				dto = subadd(dto, y1 * vxchg(t));
+				for (int j=0; j<NWAY; j++) {				
+Q					rox[j] += y1[j] * vxchg(q);
+S					dpo[j] = subadd(dpo[j], y1[j] * vxchg(s));
+S					te[j]  = subadd(te[j], dy1[j] * vxchg(s));
+T					pe[j]  = subadd(pe[j], dy1[j] * vxchg(t));
+T					dto[j] = subadd(dto[j], y1[j] * vxchg(t));
+				}
 		#endif
 			}
-3			cost  = *((s2d*)(st+k));
-3			cost *= vdup(1.0/m);
-3			re *= cost;		ro *= cost;
+3			for (int j=0; j<NWAY; j++) {				
+3				cost[j]  = ((s2d*)(st+k))[j];
+3				cost[j] *= vdup(1.0/m);
+3			}
+3			for (int j=0; j<NWAY; j++) {  re[j] *= cost[j];  ro[j] *= cost[j];  }
 		#if _GCC_VEC_
-3			rex *= cost;		rox *= cost;
-Q			((complex double *)BrF)[k] = vlo_to_dbl(re+ro) +I*vlo_to_dbl(rex+rox);
-Q			((complex double *)BrF)[k+1] = vhi_to_dbl(rex+rox) +I*vhi_to_dbl(re+ro);
-Q			((complex double *)BrF)[NLAT-k-2] = vhi_to_dbl(rex-rox) +I*vhi_to_dbl(re-ro);
-Q			((complex double *)BrF)[NLAT-k-1] = vlo_to_dbl(re-ro) +I*vlo_to_dbl(rex-rox);
-
-V			((complex double *)BtF)[k] = -I*vlo_to_dbl(te+to) + vlo_to_dbl(dte+dto);
-V			((complex double *)BtF)[k+1] = vhi_to_dbl(te+to) + I*vhi_to_dbl(dte+dto);
-V			((complex double *)BtF)[NLAT-k-2] = vhi_to_dbl(te-to) + I*vhi_to_dbl(dte-dto);
-V			((complex double *)BtF)[NLAT-k-1] = -I*vlo_to_dbl(te-to) + vlo_to_dbl(dte-dto);
-
-V			((complex double *)BpF)[k] = I*vlo_to_dbl(pe+po) + vlo_to_dbl(dpe+dpo);
-V			((complex double *)BpF)[k+1] = -vhi_to_dbl(pe+po) + I*vhi_to_dbl(dpe+dpo);
-V			((complex double *)BpF)[NLAT-k-2] = -vhi_to_dbl(pe-po) + I*vhi_to_dbl(dpe-dpo);
-V			((complex double *)BpF)[NLAT-k-1] = I*vlo_to_dbl(pe-po) + vlo_to_dbl(dpe-dpo);
-			k += 2;
+			for (int j=0; j<NWAY; j++) {
+3				rex[j] *= cost[j];  rox[j] *= cost[j];
+Q				((complex double *)BrF)[k+2*j] = vlo_to_dbl(re[j]+ro[j]) +I*vlo_to_dbl(rex[j]+rox[j]);
+Q				((complex double *)BrF)[k+1+2*j] = vhi_to_dbl(rex[j]+rox[j]) +I*vhi_to_dbl(re[j]+ro[j]);
+Q				((complex double *)BrF)[NLAT-k-2-2*j] = vhi_to_dbl(rex[j]-rox[j]) +I*vhi_to_dbl(re[j]-ro[j]);
+Q				((complex double *)BrF)[NLAT-k-1-2*j] = vlo_to_dbl(re[j]-ro[j]) +I*vlo_to_dbl(rex[j]-rox[j]);
+V				((complex double *)BtF)[k+2*j] = -I*vlo_to_dbl(te[j]+to[j]) + vlo_to_dbl(dte[j]+dto[j]);
+V				((complex double *)BtF)[k+1+2*j] = vhi_to_dbl(te[j]+to[j]) + I*vhi_to_dbl(dte[j]+dto[j]);
+V				((complex double *)BtF)[NLAT-k-2-2*j] = vhi_to_dbl(te[j]-to[j]) + I*vhi_to_dbl(dte[j]-dto[j]);
+V				((complex double *)BtF)[NLAT-k-1-2*j] = -I*vlo_to_dbl(te[j]-to[j]) + vlo_to_dbl(dte[j]-dto[j]);
+V				((complex double *)BpF)[k+2*j] = I*vlo_to_dbl(pe[j]+po[j]) + vlo_to_dbl(dpe[j]+dpo[j]);
+V				((complex double *)BpF)[k+1+2*j] = -vhi_to_dbl(pe[j]+po[j]) + I*vhi_to_dbl(dpe[j]+dpo[j]);
+V				((complex double *)BpF)[NLAT-k-2-2*j] = -vhi_to_dbl(pe[j]-po[j]) + I*vhi_to_dbl(dpe[j]-dpo[j]);
+V				((complex double *)BpF)[NLAT-k-1-2*j] = I*vlo_to_dbl(pe[j]-po[j]) + vlo_to_dbl(dpe[j]-dpo[j]);
+			}
+			k += 2*NWAY;
 		#else
-Q			BrF[k] = (re+ro);
-Q			BrF[NLAT-k-1] = (re-ro);
-V			BtF[k] = addi(dte+dto, -(te+to));		// Bt = dS/dt       + I.m/sint *T
-VB			BtF[NLAT-1-k] = addi(dte-dto, -(te-to));
-V			BpF[k] = addi(dpe+dpo, pe+po);		// Bp = I.m/sint * S - dT/dt
-VB			BpF[NLAT-1-k] = addi(dpe-dpo, pe-po);
-			k++;
+			for (int j=0; j<NWAY; j++) {
+Q				BrF[k+j] = (re[j]+ro[j]);
+Q				BrF[NLAT-k-1-j] = (re[j]-ro[j]);
+V				BtF[k+j] = addi(dte[j]+dto[j], -(te[j]+to[j]));		// Bt = dS/dt       + I.m/sint *T
+VB				BtF[NLAT-1-k-j] = addi(dte[j]-dto[j], -(te[j]-to[j]));
+V				BpF[k+j] = addi(dpe[j]+dpo[j], pe[j]+po[j]);		// Bp = I.m/sint * S - dT/dt
+VB				BpF[NLAT-1-k-j] = addi(dpe[j]-dpo[j], pe[j]-po[j]);
+			}
+			k+=NWAY;
 		#endif
 		} while (k < NLAT_2);
 		im++;
