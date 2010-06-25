@@ -389,7 +389,7 @@ void EqualPolarGrid()
 		st_1[j] = 1.0/st[j];
 	}
 #if SHT_VERBOSE > 0
-	printf("     !! Warning : only synthesis (inverse transform) supported this grid !\n");
+	printf("     !! Warning : only synthesis (inverse transform) supported for this grid !\n");
 #endif
 }
 

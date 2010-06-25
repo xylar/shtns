@@ -90,10 +90,10 @@ extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 #define LM(l,m) ( shtns.lmidx[(m)/shtns.mres] + l )
 /// LM_LOOP( action ) : macro that performs "action" for every (l,m), with lm set, but neither l, m nor im.
 /// \c lm must be a declared int and is the loop counter and the SH array index. more info : \ref spec_data
-#define LM_LOOP( action ) for (lm=0; lm<shtns.nlm; lm++) { action }
+#define LM_LOOP( action ) { lm=0; do { action } while(++lm < shtns.nlm); }
 /// LM_L_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined (but NOT m and im).
 /// \c lm and \c m must be declared int's. \c lm is the loop counter and SH array index, while \c l is the SH degree. more info : \ref spec_data
-#define LM_L_LOOP( action ) for (lm=0; lm<shtns.nlm; lm++) { l=li[lm]; { action } }
+#define LM_L_LOOP( action ) { lm=0; do { l=li[lm]; action } while(++lm < shtns.nlm); }
 //@}
 
 #define SHT_NATIVE_LAYOUT 0			///< Tells shtns_init to use \ref native
