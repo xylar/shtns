@@ -291,7 +291,7 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 	}
 
 /// - Compute and store coefficients for computation of derivative also.
-	for (im=1, lm=0; im<=MMAX; im++) {		/// <b> For Schmidt semi-normalized </b>
+	for (im=1, lm=0; im<=MMAX; im++) {
 		m = im*MRES;
 		t2 = 1.0/m;
 		dlm[im] = dl0 + lm;

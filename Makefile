@@ -5,7 +5,7 @@ PREFIX=$(HOME)
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= -O3 -std=gnu99 -ffast-math -D_GNU_SOURCE
+go= -O3 -fomit-frame-pointer -std=gnu99 -ffast-math -D_GNU_SOURCE
 
 ## compiler :
 ## generic gcc

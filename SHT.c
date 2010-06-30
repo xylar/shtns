@@ -1559,7 +1559,9 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
   #if SHT_VERBOSE > 0
 				printf("     !! Not enough accuracy (%.3g) => turning off DCT.\n",t);
   #endif
+  #if SHT_VERBOSE < 2
 				Set_MTR_DCT(-1);		// turn off DCT.
+  #endif
 			}
 		}
   #if SHT_VERBOSE < 2
