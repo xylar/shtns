@@ -166,30 +166,40 @@ Q			BR0(k) = re;	BR0(k+1) = ro;
 S			BT0(k) = te;	BT0(k+1) = to;
 T			BP0(k) = pe;	BP0(k+1) = po;
 	#else
-Q			v2d r = vdup(0.0);
-S			v2d t = vdup(0.0);
-T			v2d p = vdup(0.0);
+			#define NWAY 1
+Q			v2d r[NWAY];
+S			v2d t[NWAY];
+T			v2d p[NWAY];
+			for (int j=0; j<NWAY; j++) {
+Q				r[j] = vdup(0.0);
+S				t[j] = vdup(0.0);
+T				p[j] = vdup(0.0);
+			}
 			l >>= 1;	// l = l/2;
 			do {
-Q				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
-S				t += ((v2d*) dyl0)[0] * Sl0[l];		// { te, to }
-T				p -= ((v2d*) dyl0)[0] * Tl0[l];		// { pe, po }
+				for (int j=0; j<NWAY; j++) {
+Q					r[j] += ((v2d*) yl)[j]   * Ql0[l];		// { re, ro }
+S					t[j] += ((v2d*) dyl0)[j] * Sl0[l];		// { te, to }
+T					p[j] -= ((v2d*) dyl0)[j] * Tl0[l];		// { pe, po }
+				}
 				l++;
-Q				yl+=2;
-V				dyl0+=2;
+Q				yl+=2*NWAY;
+V				dyl0+=2*NWAY;
 Q			} while(2*l <= llim);
 V			} while(2*l < llim);
+			for (int j=0; j<NWAY; j++) {
 		#ifndef SHT_AXISYM
-Q			BR0(k) = vlo_to_dbl(r);		BR0(k+1) = vhi_to_dbl(r);
-S			BT0(k) = vlo_to_dbl(t);		BT0(k+1) = vhi_to_dbl(t);
-T			BP0(k) = vlo_to_dbl(p);		BP0(k+1) = vhi_to_dbl(p);
+Q				BR0(k+2*j) = vlo_to_dbl(r[j]);		BR0(k+1+2*j) = vhi_to_dbl(r[j]);
+S				BT0(k+2*j) = vlo_to_dbl(t[j]);		BT0(k+1+2*j) = vhi_to_dbl(t[j]);
+T				BP0(k+2*j) = vlo_to_dbl(p[j]);		BP0(k+1+2*j) = vhi_to_dbl(p[j]);
 		#else
-Q			*((v2d*)(((double*)BrF)+k)) = r;
-S			*((v2d*)(((double*)BtF)+k)) = t;
-T			*((v2d*)(((double*)BpF)+k)) = p;
+Q				*((v2d*)(((double*)BrF)+k+2*j)) = r[j];
+S				*((v2d*)(((double*)BtF)+k+2*j)) = t[j];
+T				*((v2d*)(((double*)BpF)+k+2*j)) = p[j];
 		#endif
+			}
 	#endif
-			k+=2;
+			k+=2*NWAY;
 		#ifdef SHT_VAR_LTR
 Q			yl  += ((LMAX>>1) - (LTR>>1))*2;
 V			dyl0 += (((LMAX+1)>>1) - ((LTR+1)>>1))*2;
@@ -265,42 +275,57 @@ SB			BT0(NLAT-k) = te - to;
 TB			BP0(NLAT-k) = pe - po;
 	#else
 			l=0;
-Q			v2d r = vdup(0.0);
-S			v2d t = vdup(0.0);
-T			v2d p = vdup(0.0);
+Q			v2d r[NWAY];
+S			v2d t[NWAY];
+T			v2d p[NWAY];
+			for (int j=0; j<NWAY; j++) {
+Q				r[j] = vdup(0.0);
+S				t[j] = vdup(0.0);
+T				p[j] = vdup(0.0);
+			}
 			do {
-Q				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
-S				t += ((v2d*) dyl0)[0] * Sl0[l];		// { te, to }
-T				p -= ((v2d*) dyl0)[0] * Tl0[l];		// { pe, po }
+				for (int j=0; j<NWAY; j++) {
+Q					r[j] += ((v2d*) yl)[j]   * Ql0[l];		// { re, ro }
+S					t[j] += ((v2d*) dyl0)[j] * Sl0[l];		// { te, to }
+T					p[j] -= ((v2d*) dyl0)[j] * Tl0[l];		// { pe, po }
+				}
 				l++;
-Q				yl+=2;
-V				dyl0+=2;
+Q				yl+=2*NWAY;
+V				dyl0+=2*NWAY;
 QX			} while (2*l <= llim);
 V			} while (2*l < llim);
 3			if (2*l == llim) {
-3				r += ((v2d*) yl)[0]   * Ql0[l];		// { re, ro }
-3				yl+=2;
+3				for (int j=0; j<NWAY; j++) {
+3					r[j] += ((v2d*) yl)[j]   * Ql0[l];		// { re, ro }
+3				}
+3				yl+=2*NWAY;
 3			}
 		#if __SSE3__
 	/*	alternate code, which may be faster (slightly) on SSE3.	*/
-Q			r = addi(r,r);		// { re-ro , re+ro }
-S			t = addi(t,t);		// { te-to , te+to }
-T			p = addi(p,p);		// { pe-po , pe+po }
-Q			BR0(k) = vhi_to_dbl(r);
-S			BT0(k) = vhi_to_dbl(t);	// Bt = dS/dt
-T			BP0(k) = vhi_to_dbl(p);	// Bp = - dT/dt
-			k++;
-QB			BR0(NLAT-k) = vlo_to_dbl(r);
-SB			BT0(NLAT-k) = vlo_to_dbl(t);
-TB			BP0(NLAT-k) = vlo_to_dbl(p);
+		  for (int j=0; j<NWAY; j++) {
+Q			r[j] = addi(r[j],r[j]);		// { re-ro , re+ro }
+S			t[j] = addi(t[j],t[j]);		// { te-to , te+to }
+T			p[j] = addi(p[j],p[j]);		// { pe-po , pe+po }
+		  }
+		  for (int j=0; j<NWAY; j++) {
+Q			BR0(k+j) = vhi_to_dbl(r[j]);
+S			BT0(k+j) = vhi_to_dbl(t[j]);	// Bt = dS/dt
+T			BP0(k+j) = vhi_to_dbl(p[j]);	// Bp = - dT/dt
+QB			BR0(NLAT-NWAY-k+j) = vlo_to_dbl(r[NWAY-1-j]);
+SB			BT0(NLAT-NWAY-k+j) = vlo_to_dbl(t[NWAY-1-j]);
+TB			BP0(NLAT-NWAY-k+j) = vlo_to_dbl(p[NWAY-1-j]);
+		  }
+			k+=NWAY;
 		#else
-Q			BR0(k) = vhi_to_dbl(r) + vlo_to_dbl(r);
-S			BT0(k) = vhi_to_dbl(t) + vlo_to_dbl(t);	// Bt = dS/dt
-T			BP0(k) = vhi_to_dbl(p) + vlo_to_dbl(p);	// Bp = - dT/dt
-			k++;
-QB			BR0(NLAT-k) = vlo_to_dbl(r) - vhi_to_dbl(r);
-SB			BT0(NLAT-k) = vlo_to_dbl(t) - vhi_to_dbl(t);
-TB			BP0(NLAT-k) = vlo_to_dbl(p) - vhi_to_dbl(p);
+		  for (int j=0; j<NWAY; j++) {
+Q			BR0(k+j) = vhi_to_dbl(r[j]) + vlo_to_dbl(r[j]);
+S			BT0(k+j) = vhi_to_dbl(t[j]) + vlo_to_dbl(t[j]);	// Bt = dS/dt
+T			BP0(k+j) = vhi_to_dbl(p[j]) + vlo_to_dbl(p[j]);	// Bp = - dT/dt
+QB			BR0(NLAT-NWAY-k+j) = vlo_to_dbl(r[j]) - vhi_to_dbl(r[j]);
+SB			BT0(NLAT-NWAY-k+j) = vlo_to_dbl(t[j]) - vhi_to_dbl(t[j]);
+TB			BP0(NLAT-NWAY-k+j) = vlo_to_dbl(p[j]) - vhi_to_dbl(p[j]);
+		  }
+		  k+=NWAY;
 		#endif
 	#endif
 		#ifdef SHT_VAR_LTR
@@ -407,13 +432,13 @@ QX				re  += vdup(yl[0]) * Ql[l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[
 QX				ro  += vdup(yl[1]) * Ql[l+1];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
 TB				dpo -= vdup(dyl[0].t) * Tl[l];
 S				dto += vdup(dyl[0].t) * Sl[l];
-T				dpe -= vdup(dyl[1].t) * Tl[l+1];
-SB				dte += vdup(dyl[1].t) * Sl[l+1];
 TB				te  += vdup(dyl[0].p) * Tl[l];
 S				pe  += vdup(dyl[0].p) * Sl[l];
+3				re  += vdup(dyl[0].p) * Ql[l];
+T				dpe -= vdup(dyl[1].t) * Tl[l+1];
+SB				dte += vdup(dyl[1].t) * Sl[l+1];
 T				to  += vdup(dyl[1].p) * Tl[l+1];
 SB				po  += vdup(dyl[1].p) * Sl[l+1];
-3				re  += vdup(dyl[0].p) * Ql[l];
 3				ro  += vdup(dyl[1].p) * Ql[l+1];
 				l+=2;
 Q				yl+=2;
@@ -430,9 +455,9 @@ Q				yl++;
 V				dyl++;
 			}
 3			s2d qv = vdup(st[k]*m_1);
-3			re *= qv;	ro *= qv;
 V			BtF[k] = addi(dte+dto, te+to);		// Bt = dS/dt       + I.m/sint *T
 VB			BtF[NLAT-1-k] = addi(dte-dto, te-to);
+3			re *= qv;	ro *= qv;
 V			BpF[k] = addi(dpe+dpo, pe+po);		// Bp = I.m/sint * S - dT/dt
 VB			BpF[NLAT-1-k] = addi(dpe-dpo, pe-po);
 Q			BrF[k] = re + ro;

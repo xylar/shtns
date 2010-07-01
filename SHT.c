@@ -45,14 +45,18 @@ double *wg;					// gauss weights (if current grid is a gauss grid).
 
 int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
-struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
 double** zlm;		// matrix for direct transform (analysis)
+#ifndef SHT_SCALAR_ONLY
+struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
 struct DtDp** dzlm;
+#endif
 
 double** ykm_dct;	// matrix for inverse transform (synthesis) using dct.
-struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix
 double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
+#ifndef SHT_SCALAR_ONLY
+struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix
 double* dzlm_dct0;
+#endif
 
 double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
 int *li = NULL;				// used as flag for shtns_set_size
@@ -325,22 +329,30 @@ void alloc_SHTarrays()
 	st = ct + l0;		st_1 = ct + 2*l0;
 	ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );
 	zlm = ylm + (MMAX+1);		ykm_dct = ylm + (MMAX+1)*2;
+  #ifndef SHT_SCALAR_ONLY
 	dylm = (struct DtDp **) fftw_malloc( sizeof(struct DtDp *) * (MMAX+1)*3);
 	dzlm = dylm + (MMAX+1);		dykm_dct = dylm + (MMAX+1)*2;
+  #endif
 
 // Allocate legendre functions lookup tables.
 	lstride = (LMAX+1);		lstride += (lstride&1);		// even stride.
 	ylm[0] = (double *) fftw_malloc(sizeof(double)* (NLM-(LMAX+1)+lstride)*NLAT_2);
+  #ifndef SHT_SCALAR_ONLY
 	dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
+  #endif
 	zlm[0] = (double *) fftw_malloc(sizeof(double)* (NLM*NLAT_2 + (NLAT_2 & 1)));
+  #ifndef SHT_SCALAR_ONLY
 	dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (NLM-1)*NLAT_2);		// remove l=0
+  #endif
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;	l0 = (m==0) ? 1 : m;
 		if (im>0) lstride = (LMAX+1 -m);
 		ylm[im+1] = ylm[im] + NLAT_2*lstride;
-		dylm[im+1] = dylm[im] + NLAT_2*(LMAX+1 -m);
 		zlm[im+1] = zlm[im] + NLAT_2*(LMAX+1 -m) + ((m==0)*(NLAT_2&1));
+  #ifndef SHT_SCALAR_ONLY
+		dylm[im+1] = dylm[im] + NLAT_2*(LMAX+1 -m);
 		dzlm[im+1] = dzlm[im] + NLAT_2*(LMAX+1 -l0);
+  #endif
 	}
 #if SHT_VERBOSE > 1
 	printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
@@ -349,8 +361,18 @@ void alloc_SHTarrays()
 
 void free_SHTarrays()
 {
-	fftw_free(dzlm[0]);		fftw_free(zlm[0]);		fftw_free(dylm[0]);		fftw_free(ylm[0]);
-	fftw_free(dylm);		fftw_free(ylm);		fftw_free(ct);
+#ifndef SHT_SCALAR_ONLY
+	fftw_free(dzlm[0]);		
+#endif	
+	fftw_free(zlm[0]);
+#ifndef SHT_SCALAR_ONLY
+	fftw_free(dylm[0]);
+#endif
+	fftw_free(ylm[0]);
+#ifndef SHT_SCALAR_ONLY
+	fftw_free(dylm);
+#endif
+	fftw_free(ylm);		fftw_free(ct);
 }
 
 /// \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
@@ -669,23 +691,29 @@ void OptimizeMatrices(double eps)
 		  if (tm[im] > 0) {		// we can remove the data corresponding to polar values.
 			m = im*MRES;
 			ylm[im]  += tm[im]*(LMAX-m+1);		// shift pointers (still one block for each m)
+#ifndef SHT_SCALAR_ONLY
 			dylm[im] += tm[im]*(LMAX-m+1);
+#endif
 			if (zlm[0] != NULL) {
 			  for (l=m; l<LMAX; l+=2) {
 				for (it=0; it<NLAT_2-tm[im]; it++) {	// copy data to avoid cache misses.
 					zlm[im][(l-m)*(NLAT_2-tm[im]) + it*2]   = zlm[im][(l-m)*NLAT_2 + (it+tm[im])*2];
 					zlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1] = zlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1];
+#ifndef SHT_SCALAR_ONLY
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2].t;
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2].p;
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1].t;
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1].p;
+#endif
 				}
 			  }
 			  if (l==LMAX) {
 				for (it=0; it<NLAT_2-tm[im]; it++) {
 					zlm[im][(l-m)*(NLAT_2-tm[im]) + it]   = zlm[im][(l-m)*NLAT_2 + (it+tm[im])];
+#ifndef SHT_SCALAR_ONLY
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])].t;
 					dzlm[im][(l-m)*(NLAT_2-tm[im]) + it].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])].p;
+#endif
 				}
 			  }
 			}
@@ -695,6 +723,7 @@ void OptimizeMatrices(double eps)
 		for (im=0;im<=MMAX;im++)	tm[im] = 0;
 	}
 
+#ifndef SHT_SCALAR_ONLY
 /// Compression of dylm and dzlm for m=0, as .p is 0
 	im=0;	m=0;
 	yg = (double *) dylm[im];
@@ -718,6 +747,7 @@ void OptimizeMatrices(double eps)
 			}
 		}
 	}
+#endif
 }
 
 
@@ -735,8 +765,10 @@ void init_SH_synth()
 		for (it=0; it<NLAT_2; it++) {
 			legendre_sphPlm_deriv_array(LMAX, im, ct[it], st[it], ylm[im] + it*lstride, dtylm);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
+  #ifndef SHT_SCALAR_ONLY
 				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
 				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*lstride + (l-m)] *m;	// 1/sint(t) dYlm/dphi
+  #endif
 				if (m>0) ylm[im][it*lstride + (l-m)] *= st[it];
 			}
 			if ((im==0) && ((LMAX&1) == 0)) ylm[im][it*lstride + LMAX+1] = 0.0;	// add one zero for padding.
@@ -823,17 +855,21 @@ void init_SH_gauss()
 				}
 				zlm[im][(l-m)*NLAT_2 + it*2 +talign]    =  ylm[im][it*lstride + (l-m)]   * nz0;
 				zlm[im][(l-m)*NLAT_2 + it*2 +1 +talign] =  ylm[im][it*lstride + (l+1-m)] * nz1;
+  #ifndef SHT_SCALAR_ONLY
 				dzlm[im][(l-l0)*NLAT_2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
 				dzlm[im][(l-l0)*NLAT_2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
 				dzlm[im][(l-l0)*NLAT_2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * nz1 /((l+1)*(l+2));
 				dzlm[im][(l-l0)*NLAT_2 + it*2+1].p = dylm[im][it*(LMAX-m+1) + (l+1-m)].p * nz1 /((l+1)*(l+2));
+  #endif
 			}
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
 				if (SHT_NORM == sht_schmidt)
 					nz0 = norm*(2*l+1);
 				zlm[im][(l-m)*NLAT_2 + it +talign]    =  ylm[im][it*lstride + (l-m)]   * nz0;
+  #ifndef SHT_SCALAR_ONLY
 				dzlm[im][(l-l0)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
 				dzlm[im][(l-l0)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
+  #endif
 			}
 		}
 	}
@@ -954,7 +990,14 @@ inline eval_dct_cplx(complex double *val, complex double *dct, long int n, doubl
 
 void free_SH_dct()
 {
-	fftw_free(dzlm_dct0);	fftw_free(zlm_dct0);	fftw_free(dykm_dct[0]);		fftw_free(ykm_dct[0]);
+#ifndef SHT_SCALAR_ONLY
+	fftw_free(dzlm_dct0);
+#endif
+	fftw_free(zlm_dct0);
+#ifndef SHT_SCALAR_ONLY
+	fftw_free(dykm_dct[0]);
+#endif
+	fftw_free(ykm_dct[0]);
 }
 
 #ifndef SHT_NO_DCT
@@ -1031,9 +1074,13 @@ void init_SH_dct(int analysis)
 	printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
 #endif
 	ykm_dct[0] = (double *) fftw_malloc(sizeof(double)* sk);
+#ifndef SHT_SCALAR_ONLY
 	dykm_dct[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* dsk);
+#endif
 	zlm_dct0 = (double *) fftw_malloc( sizeof(double)* it );
+#ifndef SHT_SCALAR_ONLY
 	dzlm_dct0 = (double *) fftw_malloc( sizeof(double)* im );
+#endif
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
 		for (it=0, sk=0; it<= KMAX; it+=2) {
@@ -1046,7 +1093,9 @@ void init_SH_dct(int analysis)
 			dsk += LMAX+1 - l;
 		}
 		ykm_dct[im+1] = ykm_dct[im] + sk;
+#ifndef SHT_SCALAR_ONLY
 		dykm_dct[im+1] = dykm_dct[im] + dsk;
+#endif
 	}
 
 	dct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT10, FFTW_ESTIMATE );	// quick and dirty dct.
@@ -1089,14 +1138,18 @@ void init_SH_dct(int analysis)
 			if (m & 1) {	// m odd
 				for (it=0; it<NLAT_2; it++) {
 					Z[it] = ylm[im][it*lstride + (l-m)] * st[it];	// P[l+1](x)	*st
+#ifndef SHT_SCALAR_ONLY
 					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t;	// P[l](x)	*1
 					dZp[it] = dylm[im][it*(LMAX-m+1) + (l-m)].p;		// P[l-1](x)	*1
+#endif
 				}
 			} else {	// m even
 				for (it=0; it<NLAT_2; it++) {
 					Z[it] = ylm[im][it*lstride + (l-m)];		// P[l](x)	*1
+#ifndef SHT_SCALAR_ONLY
 					dZt[it] = dylm[im][it*(LMAX-m+1) + (l-m)].t *st[it];	// P[l+1](x)	*st
 					dZp[it] = ylm[im][it*lstride + (l-m)] * m;	// P[l](x)	*st
+#endif
 				}
 			}
 			if ((l-m)&1) {	// odd
@@ -1227,14 +1280,18 @@ void init_SH_dct(int analysis)
 			} else if ((sk == 0)&&(l == LMAX)) {
 				for (it=0; it<NLAT_2; it++) {
 					zlm[im][(l-m)*NLAT_2 + it + talign] =  Z[it];
+	#ifndef SHT_SCALAR_ONLY
 					dzlm[im][(l-l0)*NLAT_2 + it].p = dZp[it];
 					dzlm[im][(l-l0)*NLAT_2 + it].t = dZt[it];
+	#endif
 				}
 			} else {
 				for (it=0; it<NLAT_2; it++) {
 					zlm[im][(l-m-sk)*NLAT_2 + it*2 +sk + talign] = Z[it];
+	#ifndef SHT_SCALAR_ONLY
 					dzlm[im][(l-l0-sk)*NLAT_2 + it*2 +sk].p = dZp[it];
 					dzlm[im][(l-l0-sk)*NLAT_2 + it*2 +sk].t = dZt[it];
+	#endif
 				}
 			}
 		}
@@ -1242,7 +1299,6 @@ void init_SH_dct(int analysis)
 
 		// Compact the coefficients for improved cache efficiency.
 		yg = ykm_dct[im];
-		dyg = dykm_dct[im];
 		for (it=0; it<= KMAX; it+=2) {
 			l = (it < m) ? m : it-(m&1);
 			while (l<=LMAX) {
@@ -1251,6 +1307,8 @@ void init_SH_dct(int analysis)
 			}
 			if ((m==0) && ((LMAX & 1) == 0)) {	yg[0] = 0;		yg++;	}		// SSE2 padding.
 		}
+#ifndef SHT_SCALAR_ONLY		
+		dyg = dykm_dct[im];
 		for (it=0; it<= KMAX; it+=2) {
 			l = (it-2 < m) ? m : it-2+(m&1);
 			while (l<=LMAX) {
@@ -1275,6 +1333,7 @@ void init_SH_dct(int analysis)
 				}
 			}
 		}
+#endif
 	}
 	
 	// compact yk to zlm_dct0
@@ -1291,6 +1350,7 @@ void init_SH_dct(int analysis)
 			}
 			yk0 += 2*NLAT_2;
 		}
+	#ifndef SHT_SCALAR_ONLY
 		yg = dzlm_dct0;
 		for (l=1; l<=LMAX; l+=2) {
 			for (it=l-1; it<klim; it++) {	// for m=0, dzl coeff with i<l-1 are zeros.
@@ -1299,6 +1359,7 @@ void init_SH_dct(int analysis)
 			}
 			dyk0 += 2*NLAT_2;
 		}
+	#endif
 		free(yk0 - (2*NLAT_2)*(LMAX/2+1));
 	}
 
@@ -1578,7 +1639,9 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 				for (im=1; im<=MMAX; im++) {	//	im >= 1
 					m = im*MRES;
 					ylm[im]  -= tm[im]*(LMAX-m+1);		// restore pointers altered by OptimizeMatrices().
+#ifndef SHT_SCALAR_ONLY
 					dylm[im] -= tm[im]*(LMAX-m+1);
+#endif
 				}
 				if (n_gauss > 0) {		// we should use the optimal size for gauss-legendre
 					if (NPHI>1) {
@@ -1606,8 +1669,10 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	if (flags == sht_reg_poles)
 	{
 		MTR_DCT = -1;		// we do not use DCT !!!
-		fftw_free(dzlm[0]);	fftw_free(zlm[0]);	// no inverse transform.
-		dzlm[0] = NULL;		zlm[0] = NULL;		// mark as unused.
+	  #ifndef SHT_SCALAR_ONLY
+		fftw_free(dzlm[0]);		dzlm[0] = NULL;
+	  #endif
+		fftw_free(zlm[0]);		zlm[0] = NULL;		// no inverse transform, mark as unused.
 		EqualPolarGrid();
 		init_SH_synth();
 		OptimizeMatrices(0.0);

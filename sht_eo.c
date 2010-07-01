@@ -42,12 +42,16 @@ void spat_to_SHeo(double *Vr, complex double *Qlm, int parity)
 
 void SHeo_sphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int parity)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "SHT/SHeost_to_spat.c"
+#endif
 }
 
 void spat_to_SHeo_sphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int parity)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "SHT/spat_to_SHeost.c"
+#endif
 }
 
 //@}

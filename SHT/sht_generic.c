@@ -44,15 +44,31 @@ void GEN(spat_to_SH,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
 	#include "spat_to_SH.c"
 }
 
-/// Backward \b Scalar Spherical Harmonic Transform (synthesis).
-void GEN(SH_to_spat,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
+void GEN(SH_to_spat_hyb,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 {
 	#include "SH_to_spat.c"
+}
+
+void GEN(SH_to_spat_gauss,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
+{
+	#define SHT_NO_DCT
+	#include "SH_to_spat.c"
+	#undef SHT_NO_DCT
 }
 
 void GEN(SH_to_spat_fly,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 {
 	#include "SH_to_spat_fly.c"
+}
+
+// function pointers.
+void (*GEN(SH_to_spat_ptr,SUFFIX))(complex double*, double* SUPARG) = &GEN(SH_to_spat_hyb, SUFFIX);
+
+/// Backward \b Scalar Spherical Harmonic Transform (synthesis).
+void GEN(SH_to_spat,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
+{
+	(*GEN(SH_to_spat_ptr,SUFFIX))(Qlm, Vr SUPARG2);
+	return;
 }
 
 //@}
@@ -71,37 +87,50 @@ void GEN(SH_to_spat_fly,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 /// Backward \b Vector Spherical Harmonic Transform (synthesis).
 void GEN(SHsphtor_to_spat,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "SHst_to_spat.c"
+#endif
 }
 
 void GEN(SHsphtor_to_spat_fly,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "SHst_to_spat_fly.c"
+#endif
 }
 
 #ifndef SHT_AXISYM
 /// Spheroidal only synthesis.
 void GEN(SHsph_to_spat,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "SHs_to_spat.c"
+#endif
+
 }
 
 /// Toroidal only synthesis.
 void GEN(SHtor_to_spat,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "SHt_to_spat.c"
+#endif
 }
 #else
 /// Spheroidal m=0 only synthesis (results in theta component only).
 void GEN(SHsph_to_spat,SUFFIX)(complex double *Slm, double *Vt SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "SHs_to_spat.c"
+#endif
 }
 
 /// Toroidal m=0 only synthesis (results in phi component only).
 void GEN(SHtor_to_spat,SUFFIX)(complex double *Tlm, double *Vp SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "SHt_to_spat.c"
+#endif
 }
 #endif
 
@@ -109,7 +138,9 @@ void GEN(SHtor_to_spat,SUFFIX)(complex double *Tlm, double *Vp SUPARG)
 /// \b Vector Spherical Harmonics Transform (analysis) : convert a spatial vector field (theta,phi components) to its spheroidal/toroidal spherical harmonic representation.
 void GEN(spat_to_SHsphtor,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#include "spat_to_SHst.c"
+#endif
 }
 
 //@}
@@ -128,15 +159,18 @@ void GEN(spat_to_SHsphtor,SUFFIX)(double *Vt, double *Vp, complex double *Slm, c
 /// This is basically a shortcut to call both spat_to_SH* and spat_to_SHsphtor* but may be significantly faster.
 void GEN(spat_to_SHqst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#define SHT_3COMP
 	#include "spat_to_SHqst.c"
 	#undef SHT_3COMP
+#endif
 }
 
 /// Backward \b 3D Vector Spherical Harmonic Transform (synthesis).
 /// This is basically a shortcut to call both SH_to_spat* and SHsphtor_to spat* but may be significantly faster.
 void GEN(SHqst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	if (MTR_DCT >= 0) {
 		GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARG2);
 		GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARG2);
@@ -145,13 +179,16 @@ void GEN(SHqst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex
 		#include "SHqst_to_spat.c"
 		#undef SHT_3COMP
 	}
+#endif
 }
 
 void GEN(SHqst_to_spat_fly,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
+#ifndef SHT_SCALAR_ONLY
 	#define SHT_3COMP
 	#include "SHqst_to_spat_fly.c"
 	#undef SHT_3COMP
+#endif
 }
 
 //@}
@@ -239,7 +276,6 @@ void GENF(spat_to_qst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double
 //@}
 
 #endif
-
 
 #undef GEN
 #undef _GEN

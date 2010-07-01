@@ -25,6 +25,9 @@
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
 #define SHT_VERBOSE 1
 
+// if SHT_SCALAR_ONLY is defined, it will disable the vector transform (which saves some memory)
+//#define SHT_SCALAR_ONLY
+
 // if SHT_AXISYM is defined, an axisymmetric-only transform will be compiled.
 //#define SHT_AXISYM
 
@@ -55,3 +58,4 @@
 /// I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 is supported) !
 /// (set to zero to disable, may be useful for calling from Fortran)
 #define _GCC_VEC_ 1
+
