@@ -67,7 +67,6 @@ extern struct sht_sze shtns;
  *///@{
 extern double *ct;	///< ct[i] = cos(theta)
 extern double *st;	///< st[i] = sin(theta)
-extern double *st_1;	///< st_1[i] = 1/sin(theta)
 //@}
 
 /*! \name spherical harmonic space arrays
@@ -106,6 +105,14 @@ extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 /// total number of 'doubles' required for a spatial field (includes FFTW reserved space).
 /// only the first shtns.nlat*shtns.nphi are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat
 #define NSPAT_ALLOC (shtns.nlat*(shtns.nphi/2+1)*2)
+
+// HELPER FUNCTIONS //
+
+/// phi angle value in degrees for given index ip.
+inline double phi_deg(int ip) {	return( (360./(shtns.nphi*shtns.mres))*ip ); }
+/// phi angle value in radians for given index ip.
+inline double phi_rad(int ip) {	return( (2.*M_PI/(shtns.nphi*shtns.mres))*ip ); }
+
 
 // FUNCTIONS //
 

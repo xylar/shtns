@@ -11,8 +11,6 @@
   => we should therefore use our own aligned memory allocation ... (or use autoconf ?)
 
 *** TODO ***
-Compare speed with spherepack.
-
 new functions :
   precompute_auto() will choose size (and maybe in-place/out-of-place) according to nl_order.
   precompute_advanced() allow to set a complex layout.

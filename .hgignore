@@ -6,9 +6,10 @@ syntax: glob
 o_*
 poltor*
 SHT/*spat.c
+SHT/*fly.c
 doc/*
 
 # switch to regexp syntax.
 syntax: regexp
-SHT/.*SH[eost]*.c
+SHT/.*SH[eoqst]*.c
 

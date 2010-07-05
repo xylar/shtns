@@ -85,7 +85,7 @@ for you, by using \ref shtns_precompute_auto with nphi and or nlat set to zero.
 
 Identifying a grid point with its indices \c it and \c ip in latitudinal and longitudinal direction respectively (indices start at 0), one has :
  - \f$ \theta \f$ = \c acos(ct[it]) where \ref ct is initialized by the call to \ref shtns_init
- - \f$ \phi \f$ = \c ip * 2\f$\pi\f$/(NPHI*MRES)
+ - \f$ \phi \f$ = \c ip * 2\f$\pi\f$/(NPHI*MRES)  and \ref phi_rad and \ref phi_deg can be used to get the phi angle corresponding to \c ip.
  - How to access \f$ A(\theta,\phi) \f$ depends on the data layout, but it is always <b>a contiguous array of double precision floating point values</b> (64 bit)
 
 Currently, three data layouts are supported. \ref phi_fast, \ref theta_fast, and \ref native.
@@ -146,6 +146,9 @@ The details of the storage may depend on the algorithm, and to access a particul
  - \ref LiM(l,im) gives the index in the array for coefficient of degree \e l and order \e im*MRES.
 
 Hence \c Alm[LM(l,m)] is the SH coefficient of degree \e l and order \e m.
+
+\note Since SHTns only deals with real spatial data, the Spherical Harmonic coefficients wiht negative \e m are the complex conjugate of the
+positive \e m coefficents : \f$ A_l^{-m} = (A_l^m)^*\f$. For efficiency purposes, only the coefficients with positive \e m are stored.
 
 \note There is no test on bounds, so that LM(l,m) with \e l or \e m that is not described, will give undefined result
 (in particular for an \e m that is not a multiple of \c MRES)
