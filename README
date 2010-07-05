@@ -10,19 +10,19 @@ Then browse the html documentation starting with doc/html/index.html
  * Send an email to nathanael.schaeffer@ujf-grenoble.fr to be informed on release or request a pre-version.
  *
  * Main features :
- * - both scalar and vector transforms
+ * - both <b>scalar and vector transforms</b>
  * - backward and forward (synthesis and analysis) functions
  * - flexible truncation
  * - spatial data can be stored in latitude-major or longitude-major order arrays.
  * - various conventions (normalization and Condon-Shortley phase)
- * - can be used from fortran or c/c++ programs
- * - a highly efficient Gauss algorithm working with gauss nodes (based on Gauss-Legendre quadrature)
- * - an even faster algorithm using DCT for regular nodes (based on a generalized Fejer quadrature)
+ * - can be used from <b>fortran or c/c++</b> programs
+ * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature)
+ * - an even faster algorithm using DCT for <b>regular nodes</b> (based on a generalized Fejer quadrature)
  * - support for SSE2 & SSE3 vectorization with gcc.
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
  * - ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
  *
- * Using DCT acceleration and other classical optimizations, it is intended to be <b>very fast</b>.
+ * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *
  * It uses the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms, and is distributed under the open source CeCILL License.
  *
@@ -281,20 +281,18 @@ almost half the grid points as usual.
 
 The theoretical result is that for a function band-limited by L, L+2 equispaced grid-points allow us
 to fully recover the spectral content.
-There is still a drawback for non-linear terms : for a non-linear product of two functions band-limited to L,
+There is, however, a drawback for non-linear terms : for a product of two functions band-limited to L,
 we would require L*2+2 grid points, whereas the Gauss-Legendre quadrature would only require (L+1)*3/2 grid-points if we
 are interested in only the first L modes of the product.
 
 There is a slight loss of accuracy due to round-off errors (as an example, relative errors
 with DCT are around \c 1.e-11 instead of \c 1.e-12 without for lmax around 500).
-If you can live with it, the DCT-based algorithm performs much faster on small m's :
-twice as fast for axisymmetric transforms, and between 1.5 and 1.2 times faster on non-axisymmetric ones.
-For large m's however the spatial-domain polar optimization takes the lead.
+If you can live with it (you really should), the DCT-based algorithm performs much faster on small m's :
+twice to four times faster for axisymmetric transforms, and between 1.5 and 1.2 times faster on non-axisymmetric ones.
+For large m's however, the spatial-domain polar optimization takes the lead.
 
 Note also that the DCT algorithm, while beeing usually faster, requires significantly larger init time. It
 is then suitable for performing many transforms (as in a direct numerical simulations).
-
-<b>Warning : this is still at the research stage (beta), you should use with caution and test before production use.</b>
 
 \section opt_runtime Runtime tuning of algorithm
 
@@ -306,6 +304,22 @@ can choose to do so using the adequate \ref shtns_type when calling \ref shtns_i
 */
 
 /** \page bench Speed and Accuracy
+
+\section Speed
+
+SHTns does not implement any "fast" algorithm. However, timings with other Spherical Harmonic Transform tools (including a fast algorithm)
+show that <b>SHTns performs much faster than any other</b>. Furthermore, even at large sizes, the fast algorithm we tested does not seem to be willing to take the lead.
+
+<div>
+<table><tr>
+<td>\f$\ell_{max}\f$</td> <td><a href="http://www.ipgp.fr/~wieczor/SHTOOLS/SHTOOLS.html">shtools</a> 2.5 (Gauss)</td>  <td><a href="http://www.cs.dartmouth.edu/~geelong/sphere/">SpharmonicKit2</a> 2.7 (fast)</td>  <td><b>SHTns</b> (Gauss)</td> <td>SHTns/SpharmonicKit2</td> </tr><tr>
+<td>127 </td> <td>8.9 ms</td>  <td>5.5 ms</td>  <td><b>0.69 ms</b></td>  <td>8.0</td> </tr><tr>
+<td>255 </td> <td>73 ms</td>  <td>27 ms</td>  <td><b>6.5 ms</b></td>  <td>4.2</td> </tr><tr>
+<td>511 </td> <td>757 ms</td>  <td>143 ms</td>  <td><b>49 ms</b></td>  <td>2.9</td> </tr><tr>
+<td>1023 </td> <td>10.3 s</td>  <td>860 ms</td>  <td><b>297 ms</b></td>  <td>2.9</td> </tr></table>
+
+<i>Average times for forward or backward scalar transform on an Intel Xeon E5520 (2.27GHz), with gcc 4.1.2 and "-O3 -march=core2" compilation options.</i>
+</div>
 
 \section Accuracy
 
