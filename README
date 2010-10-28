@@ -32,6 +32,9 @@ Then browse the html documentation starting with doc/html/index.html
  * \see The description of \ref opt.
  *
  * \author SHTns is written by Nathanael Schaeffer (LGIT, CNRS)
+ *
+ * \image html logo_cnrs_small.png
+ *
 */
 
 

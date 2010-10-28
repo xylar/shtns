@@ -96,8 +96,10 @@ S				to[j] = dy0[j];
 T				po[j] = dy0[j];
 			}
 			for (int j=0; j<NWAY; j++) {
-				y1[j] = vdup(al[1]) * cost[j] * y0[j];
-V				dy1[j] = -vdup(al[1]) * sint[j] * y0[j];
+				y1[j] = (vdup(al[1])*y0[j]) * cost[j];
+V				dy1[j] = -(vdup(al[1])*y0[j]) * sint[j];
+			}
+			for (int j=0; j<NWAY; j++) {
 Q				ro[j] = y1[j] * vdup(Ql0[1]);
 S				te[j] = dy1[j] * vdup(Sl0[0]);
 T				pe[j] = -dy1[j] * vdup(Tl0[0]);
@@ -107,6 +109,8 @@ T				pe[j] = -dy1[j] * vdup(Tl0[0]);
 				for (int j=0; j<NWAY; j++) {
 					y0[j]  = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
 V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] - y1[j]*sint[j]) + vdup(al[0])*dy0[j];
+				}
+				for (int j=0; j<NWAY; j++) {
 Q					re[j] += y0[j] * vdup(Ql0[l]);
 S					to[j] += dy0[j] * vdup(Sl0[l-1]);
 T					po[j] -= dy0[j] * vdup(Tl0[l-1]);
@@ -114,6 +118,8 @@ T					po[j] -= dy0[j] * vdup(Tl0[l-1]);
 				for (int j=0; j<NWAY; j++) {
 					y1[j]  = vdup(al[3])*cost[j]*y0[j] + vdup(al[2])*y1[j];
 V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] - y0[j]*sint[j]) + vdup(al[2])*dy1[j];
+				}
+				for (int j=0; j<NWAY; j++) {
 Q					ro[j] += y1[j] * vdup(Ql0[l+1]);
 S					te[j] += dy1[j] * vdup(Sl0[l]);
 T					pe[j] -= dy1[j] * vdup(Tl0[l]);
@@ -124,6 +130,8 @@ T					pe[j] -= dy1[j] * vdup(Tl0[l]);
 				for (int j=0; j<NWAY; j++) {
 					y0[j]  = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
 V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] - y1[j]*sint[j]) + vdup(al[0])*dy0[j];
+				}
+				for (int j=0; j<NWAY; j++) {
 Q					re[j] += y0[j] * vdup(Ql0[l]);
 S					to[j] += dy0[j] * vdup(Sl0[l-1]);
 T					po[j] -= dy0[j] * vdup(Tl0[l-1]);
@@ -210,13 +218,15 @@ V				y0[j] *= vdup(m);		// for the vector transform, compute ylm*m/sint
 			}
 Q			l=m;
 V			l=m-1;
-			do {
+			do {		// sin(theta)^m
 				if (l&1) for (int j=0; j<NWAY; j++) y0[j] *= cost[j];
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
 			} while(l >>= 1);
-			for (int j=0; j<NWAY; j++) cost[j] = ((s2d*)(ct+k))[j];
+			for (int j=0; j<NWAY; j++) {
+				cost[j] = ((s2d*)(ct+k))[j];
+V				dy0[j] = cost[j]*y0[j];
+			}
 			l=m;
-V			for (int j=0; j<NWAY; j++) dy0[j] = cost[j]*y0[j];
 Q			v2d q = ((v2d*)Ql)[l];
 S			v2d s = ((v2d*)Sl)[l];
 T			v2d t = ((v2d*)Tl)[l];
@@ -242,14 +252,11 @@ T				dte[j] = subadd(dte[j], y0[j] * vxchg(t));
 		#endif
 			l++;
 			for (int j=0; j<NWAY; j++) {
-				y1[j] = vdup(0.0);
-V				dy1[j] = vdup(0.0);
+				y1[j]  = (vdup(al[1])*y0[j]) *cost[j];		//	y1[j] = vdup(al[1])*cost[j]*y0[j];
+V				dy1[j] = (vdup(al[1])*y0[j]) *(cost[j]*cost[j] - st2[j]);		//	dy1[j] = vdup(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]);
 			}
+			al+=2;
 			while (l<llim) {	// compute even and odd parts
-				for (int j=0; j<NWAY; j++) {
-					y1[j] = vdup(al[1])*cost[j]*y0[j] + vdup(al[0])*y1[j];
-V					dy1[j] = vdup(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]) + vdup(al[0])*dy1[j];
-				}
 Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
@@ -261,7 +268,7 @@ T					dpe[j] -= dy1[j] * t;
 T					to[j]  -= y1[j] * t;
 				}
 		#if _GCC_VEC_
-				for (int j=0; j<NWAY; j++) {				
+				for (int j=0; j<NWAY; j++) {
 Q					rox[j] += y1[j] * vxchg(q);
 S					dpo[j] = subadd(dpo[j], y1[j] * vxchg(s));
 S					te[j]  = subadd(te[j], dy1[j] * vxchg(s));
@@ -269,15 +276,13 @@ T					pe[j]  = subadd(pe[j], dy1[j] * vxchg(t));
 T					dto[j] = subadd(dto[j], y1[j] * vxchg(t));
 				}
 		#endif
-				al+=2;
-				l++;
 				for (int j=0; j<NWAY; j++) {
 					y0[j] = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
 V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] - y1[j]*st2[j]) + vdup(al[0])*dy0[j];
 				}
-Q				q = ((v2d*)Ql)[l];
-S				s = ((v2d*)Sl)[l];
-T				t = ((v2d*)Tl)[l];
+Q				q = ((v2d*)Ql)[l+1];
+S				s = ((v2d*)Sl)[l+1];
+T				t = ((v2d*)Tl)[l+1];
 				for (int j=0; j<NWAY; j++) {
 Q					re[j]  += y0[j] * q;
 S					pe[j]  += y0[j] * s;
@@ -286,7 +291,7 @@ T					dpo[j] -= dy0[j] * t;
 T					te[j]  -= y0[j] * t;
 				}
 		#if _GCC_VEC_
-				for (int j=0; j<NWAY; j++) {				
+				for (int j=0; j<NWAY; j++) {
 Q					rex[j] += y0[j] * vxchg(q);
 S					dpe[j] = subadd(dpe[j], y0[j] * vxchg(s));
 S					to[j]  = subadd(to[j], dy0[j] * vxchg(s));
@@ -294,14 +299,14 @@ T					po[j]  = subadd(po[j], dy0[j] * vxchg(t));
 T					dte[j] = subadd(dte[j], y0[j] * vxchg(t));
 				}
 		#endif
-				al+=2;
-				l++;
+				l+=2;
+				for (int j=0; j<NWAY; j++) {
+					y1[j] = vdup(al[3])*cost[j]*y0[j] + vdup(al[2])*y1[j];
+V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] - y0[j]*st2[j]) + vdup(al[2])*dy1[j];
+				}
+				al+=4;
 			}
 			if (l==llim) {
-				for (int j=0; j<NWAY; j++) {
-					y1[j] = vdup(al[1])*cost[j]*y0[j] + vdup(al[0])*y1[j];
-V					dy1[j] = vdup(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]) + vdup(al[0])*dy1[j];
-				}
 Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
@@ -313,7 +318,7 @@ T					dpe[j] -= dy1[j] * t;
 T					to[j]  -= y1[j] * t;
 				}
 		#if _GCC_VEC_
-				for (int j=0; j<NWAY; j++) {				
+				for (int j=0; j<NWAY; j++) {
 Q					rox[j] += y1[j] * vxchg(q);
 S					dpo[j] = subadd(dpo[j], y1[j] * vxchg(s));
 S					te[j]  = subadd(te[j], dy1[j] * vxchg(s));
@@ -322,7 +327,7 @@ T					dto[j] = subadd(dto[j], y1[j] * vxchg(t));
 				}
 		#endif
 			}
-3			for (int j=0; j<NWAY; j++) {				
+3			for (int j=0; j<NWAY; j++) {
 3				cost[j]  = ((s2d*)(st+k))[j];
 3				cost[j] *= vdup(1.0/m);
 3			}

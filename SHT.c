@@ -785,7 +785,7 @@ void init_SH_gauss()
 	long double iylm_fft_norm;
 	long double xg[NLAT], wgl[NLAT];	// gauss points and weights.
 	
-	wg = malloc(NLAT_2 * sizeof(double));	// gauss weights, double precision.
+	wg = malloc((NLAT_2 +15) * sizeof(double));	// gauss weights, double precision.
 
  	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
  		iylm_fft_norm = 0.5/NPHI;		// FFT/SHT normalization for zlm (4pi normalized)
@@ -804,10 +804,10 @@ void init_SH_gauss()
 	}
 	for (it=0; it<NLAT_2; it++)
 		wg[it] = wgl[it]*iylm_fft_norm;		// faster double-precision computations.
-
 	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point.
 		wg[NLAT_2-1] *= 0.5;
 	}
+	for (it=NLAT_2; it < NLAT_2 +15; it++) wg[it] = 0.0;		// padding for multi-way algorithm.
 
 #if SHT_VERBOSE > 1
 	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
