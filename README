@@ -88,7 +88,7 @@ for you, by using \ref shtns_precompute_auto with nphi and or nlat set to zero.
 
 Identifying a grid point with its indices \c it and \c ip in latitudinal and longitudinal direction respectively (indices start at 0), one has :
  - \f$ \theta \f$ = \c acos(ct[it]) where \ref ct is initialized by the call to \ref shtns_init
- - \f$ \phi \f$ = \c ip * 2\f$\pi\f$/(NPHI*MRES)  and \ref phi_rad and \ref phi_deg can be used to get the phi angle corresponding to \c ip.
+ - \f$ \phi \f$ = \c ip * 2\f$\pi\f$/(NPHI*MRES)  and \ref PHI_RAD and \ref PHI_DEG can be used to get the phi angle corresponding to \c ip.
  - How to access \f$ A(\theta,\phi) \f$ depends on the data layout, but it is always <b>a contiguous array of double precision floating point values</b> (64 bit)
 
 Currently, three data layouts are supported. \ref phi_fast, \ref theta_fast, and \ref native.

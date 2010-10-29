@@ -1415,6 +1415,7 @@ double SHT_error()
 	printf("        scalar SH - poloidal   rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
 #endif
 
+#ifndef SHT_SCALAR_ONLY
 	Slm0[0] = 0.0; 	Tlm0[0] = 0.0;		// l=0, m=0 n'a pas de signification sph/tor
 	SHsphtor_to_spat(Slm0, Tlm0, Sh, Th);		// vector SHT
 	spat_to_SHsphtor(Sh, Th, Slm, Tlm);
@@ -1435,6 +1436,7 @@ double SHT_error()
 	if (tmax > err) err = tmax;
 #if SHT_VERBOSE > 1
 	printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%d,lm=%d\n",sqrt(n2/NLM),tmax,li[jj],jj);
+#endif
 #endif
 	return(err);		// return max error.
 }
@@ -1494,6 +1496,10 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	if (SHT_NORM == sht_fourpi) printf("4.pi normalized]\n");
 	else if (SHT_NORM == sht_schmidt) printf("Schmidt semi-normalized]\n");
 	else printf("orthonormalized]\n");
+  #ifdef SHT_SCALAR_ONLY
+	printf("  *** Compiled with SCALAR support only (no vector support) ***\n");
+	#warning "Compilation with SCALAR support only."
+  #endif
 #endif
 	if (MMAX*MRES > LMAX) shtns_runerr("MMAX*MRES should not exceed LMAX");
 	if (MRES <= 0) shtns_runerr("MRES must be > 0");

@@ -106,12 +106,12 @@ extern double *l_2;	///< l_2[lm] = 1/(l(l+1))
 /// only the first shtns.nlat*shtns.nphi are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat
 #define NSPAT_ALLOC (shtns.nlat*(shtns.nphi/2+1)*2)
 
-// HELPER FUNCTIONS //
+// HELPER MACROS //
 
 /// phi angle value in degrees for given index ip.
-inline double phi_deg(int ip) {	return( (360./(shtns.nphi*shtns.mres))*ip ); }
+#define PHI_DEG(ip) (360./(shtns.nphi*shtns.mres))*(ip)
 /// phi angle value in radians for given index ip.
-inline double phi_rad(int ip) {	return( (2.*M_PI/(shtns.nphi*shtns.mres))*ip ); }
+#define PHI_RAD(ip) (2.*M_PI/(shtns.nphi*shtns.mres))*(ip)
 
 
 // FUNCTIONS //
