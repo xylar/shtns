@@ -40,9 +40,9 @@ libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 	@cat COPYRIGHT
 
 install :
-	cp libshtns.a $(PREFIX)/lib
-	cp shtns.h $(PREFIX)/include
-	cp shtns.f $(PREFIX)/include
+	cp libshtns.a $(PREFIX)/lib/
+	cp shtns.h $(PREFIX)/include/
+	cp shtns.f $(PREFIX)/include/
 	@echo " "
 	@cat COPYRIGHT
 
