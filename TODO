@@ -1,4 +1,5 @@
 *** BUG ***
++ fixed critical bug in SHtor_to_spat or SHsph_to_spat that lead to wrong results  (31/1/2011)
 + NPHI>MMAX*2 is right condition for the sampling theorem to apply.	(16/10/2008)
 + Bug found in SHT.c : here are the correct versions of LiM() and LM marcros :	(16/10/2008)
 	#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
@@ -11,6 +12,12 @@
   => we should therefore use our own aligned memory allocation ... (or use autoconf ?)
 
 *** TODO ***
+- change architecture for more than one algo !
+- On-the-fly function for spat_to_SH.
+- Memory aware switching.
+- compare on-the-fly and memory algos and choose best (and free mem if unused) + in-place/out-of-place + more than 1 n-way !
+- split the fft and the legendre transform so that they can be done independantly ?
+
 new functions :
   precompute_auto() will choose size (and maybe in-place/out-of-place) according to nl_order.
   precompute_advanced() allow to set a complex layout.

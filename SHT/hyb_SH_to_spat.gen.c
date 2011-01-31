@@ -163,6 +163,10 @@ Q				yl+=2;
 V				dyl0+=2;
 			}
 Q			BR0(k) = re;	BR0(k+1) = ro;
+VX		#ifndef SHT_AXISYM
+VX			BT0(k) = 0.0;	BT0(k+1) = 0.0;			// required for tor or sph only transform
+VX			BP0(k) = 0.0;	BP0(k+1) = 0.0;
+VX		#endif
 S			BT0(k) = te;	BT0(k+1) = to;
 T			BP0(k) = pe;	BP0(k+1) = po;
 	#else
@@ -190,7 +194,9 @@ V			} while(2*l < llim);
 			for (int j=0; j<NWAY; j++) {
 		#ifndef SHT_AXISYM
 Q				BR0(k+2*j) = vlo_to_dbl(r[j]);		BR0(k+1+2*j) = vhi_to_dbl(r[j]);
+VX				BT0(k+2*j) = 0.0;					BT0(k+1+2*j) = 0.0;
 S				BT0(k+2*j) = vlo_to_dbl(t[j]);		BT0(k+1+2*j) = vhi_to_dbl(t[j]);
+VX				BP0(k+2*j) = 0.0;					BP0(k+1+2*j) = 0.0;
 T				BP0(k+2*j) = vlo_to_dbl(p[j]);		BP0(k+1+2*j) = vhi_to_dbl(p[j]);
 		#else
 Q				*((v2d*)(((double*)BrF)+k+2*j)) = r[j];
@@ -209,8 +215,13 @@ Q		} while (k<=llim);
 V		} while (k<=llim+1);
 		while (k<NLAT) {	// dct padding (NLAT is even)
 Q			BR0(k) = 0.0;	BR0(k+1) = 0.0;
+		#ifndef SHT_AXISYM
+V			BT0(k) = 0.0;	BT0(k+1) = 0.0;			// required for tor or sph only transform
+V			BP0(k) = 0.0;	BP0(k+1) = 0.0;
+		#else
 S			BT0(k) = 0.0;	BT0(k+1) = 0.0;
 T			BP0(k) = 0.0;	BP0(k+1) = 0.0;
+		#endif
 			k+=2;
 		}
     #ifdef SHT_AXISYM
@@ -267,10 +278,16 @@ V				dyl0+=2;
 			}
 Q			yl++;
 Q			BR0(k) = re + ro;
+V		#ifndef SHT_AXISYM
+V			BT0(k) = 0.0;		BP0(k) = 0.0;		// required for partial tor or sph transform
+V		#endif
 S			BT0(k) = te + to;			// Bt = dS/dt
 T			BP0(k) = pe + po;			// Bp = - dT/dt
 			k++;
 QB			BR0(NLAT-k) = re - ro;
+VB		#ifndef SHT_AXISYM
+VB			BT0(NLAT-k) = 0.0;		BP0(NLAT-k) = 0.0;		// required for partial tor or sph transform
+VB		#endif
 SB			BT0(NLAT-k) = te - to;
 TB			BP0(NLAT-k) = pe - po;
 	#else
@@ -309,9 +326,15 @@ T			p[j] = addi(p[j],p[j]);		// { pe-po , pe+po }
 		  }
 		  for (int j=0; j<NWAY; j++) {
 Q			BR0(k+j) = vhi_to_dbl(r[j]);
+V		#ifndef SHT_AXISYM
+V			BT0(k+j) = 0.0;		BP0(k+j) = 0.0;		// required for partial tor or sph transform
+V		#endif
 S			BT0(k+j) = vhi_to_dbl(t[j]);	// Bt = dS/dt
 T			BP0(k+j) = vhi_to_dbl(p[j]);	// Bp = - dT/dt
 QB			BR0(NLAT-NWAY-k+j) = vlo_to_dbl(r[NWAY-1-j]);
+VB		#ifndef SHT_AXISYM
+VB			BT0(NLAT-NWAY-k+j) = 0.0;		BP0(NLAT-NWAY-k+j) = 0.0;		// required for partial tor or sph transform
+VB		#endif
 SB			BT0(NLAT-NWAY-k+j) = vlo_to_dbl(t[NWAY-1-j]);
 TB			BP0(NLAT-NWAY-k+j) = vlo_to_dbl(p[NWAY-1-j]);
 		  }
@@ -319,9 +342,15 @@ TB			BP0(NLAT-NWAY-k+j) = vlo_to_dbl(p[NWAY-1-j]);
 		#else
 		  for (int j=0; j<NWAY; j++) {
 Q			BR0(k+j) = vhi_to_dbl(r[j]) + vlo_to_dbl(r[j]);
+V		#ifndef SHT_AXISYM
+V			BT0(k+j) = 0.0;		BP0(k+j) = 0.0;		// required for partial tor or sph transform
+V		#endif
 S			BT0(k+j) = vhi_to_dbl(t[j]) + vlo_to_dbl(t[j]);	// Bt = dS/dt
 T			BP0(k+j) = vhi_to_dbl(p[j]) + vlo_to_dbl(p[j]);	// Bp = - dT/dt
 QB			BR0(NLAT-NWAY-k+j) = vlo_to_dbl(r[j]) - vhi_to_dbl(r[j]);
+VB		#ifndef SHT_AXISYM
+VB			BT0(NLAT-NWAY-k+j) = 0.0;		BP0(NLAT-NWAY-k+j) = 0.0;		// required for partial tor or sph transform
+VB		#endif
 SB			BT0(NLAT-NWAY-k+j) = vlo_to_dbl(t[j]) - vhi_to_dbl(t[j]);
 TB			BP0(NLAT-NWAY-k+j) = vlo_to_dbl(p[j]) - vhi_to_dbl(p[j]);
 		  }
@@ -527,16 +556,17 @@ V			Vp[k] = ((double *)BpF)[2*k];
     #ifndef SHT_NO_DCT
 		if (MTR_DCT >= 0) {
 Q			fftw_execute_r2r(idct_r1,Vr, Vr);		// iDCT m=0
-V			fftw_execute_r2r(idct_r1,Vt, Vt);		// iDCT m=0
-V			fftw_execute_r2r(idct_r1,Vp, Vp);		// iDCT m=0
+S			fftw_execute_r2r(idct_r1,Vt, Vt);		// iDCT m=0
+T			fftw_execute_r2r(idct_r1,Vp, Vp);		// iDCT m=0
 V			k=0;	do {
 V		#ifdef _GCC_VEC_
 V				v2d sin_1 = ((v2d *)st_1)[k];
-V				((v2d *)Vt)[k] *= sin_1; 	((v2d *)Vp)[k] *= sin_1;
+S				((v2d *)Vt)[k] *= sin_1;
+T				((v2d *)Vp)[k] *= sin_1;
 V		#else
 V			double sin_1 = st_1[2*k]; 	double sin_2 = st_1[2*k+1];
-V			Vt[2*k] *= sin_1;		Vt[2*k+1] *= sin_2;
-V			Vp[2*k] *= sin_1;		Vp[2*k+1] *= sin_2;
+S			Vt[2*k] *= sin_1;		Vt[2*k+1] *= sin_2;
+T			Vp[2*k] *= sin_1;		Vp[2*k+1] *= sin_2;
 V		#endif
 V				k++;
 V			} while (k<NLAT_2);
