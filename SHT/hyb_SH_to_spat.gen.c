@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2010 Centre National de la Recherche Scientifique.
- * written by Nathanael Schaeffer (CNRS, LGIT, Grenoble, France).
+ * Copyright (c) 2010-2011 Centre National de la Recherche Scientifique.
+ * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@ujf-grenoble.fr
  * 
@@ -141,6 +141,7 @@ V		l = 1;
 		do {
 Q			l = k;
 	#ifndef _GCC_VEC_
+			#define NWAY 1
 Q			re = 0.0;	ro = 0.0;
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;

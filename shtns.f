@@ -1,6 +1,6 @@
 c
-c  Copyright (c) 2010 Centre National de la Recherche Scientifique.
-c  written by Nathanael Schaeffer (CNRS, LGIT, Grenoble, France).
+c  Copyright (c) 2010-2011 Centre National de la Recherche Scientifique.
+c  written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
 c  
 c  nathanael.schaeffer@ujf-grenoble.fr
 c  
@@ -13,6 +13,8 @@ c
 c  The fact that you are presently reading this means that you have had
 c  knowledge of the CeCILL license and that you accept its terms.
 c  
+
+
 
 
       INTEGER SHT_NATIVE_LAYOUT

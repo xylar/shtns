@@ -1,7 +1,6 @@
-## "version" identification string
-HGID=`hg id -ti`
 ## path prefix for make install (installs to $(PREFIX)/lib and $(PREFIX)/include)
 PREFIX=$(HOME)
+
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
@@ -10,23 +9,18 @@ go= -O3 -fomit-frame-pointer -std=gnu99 -ffast-math -D_GNU_SOURCE
 ## compiler :
 ## generic gcc
 cmd = gcc $(go)
-## profiling
-#cmd = gcc $(go) -p -fno-inline
-## recent gcc with native support
+## recent gcc with native support ( gcc >= 4.2 )
 cmd = gcc $(go) -march=native
-## gcc k8 (lgitl3)
-#cmd = gcc $(go) -march=k8
-## gcc core2 (calcul1&2)
-#cmd = gcc $(go) -march=core2 -I$(PREFIX)/include -L$(PREFIX)/lib
-## icare 64bits opteron
-#cmd = cc -fast -xarch=amd64 -I$(PREFIX)/include -L$(PREFIX)/lib
-## r2d2
-#cmd = gcc $(go) -march=core2 -m64 -I$(PREFIX)/include -L$(PREFIX)/lib
+## gcc for core2 
+#cmd = gcc $(go) -march=core2 
 
 # intel compiler may be used for codelets
-#shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range -D_HGID_="\"$(HGID)\""
+#shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
 # gcc + vector intrinsic leads to faster code (with _GCC_VEC_ set to 1 in sht_config.h)
 shtcc = $(cmd)
+
+## "version" identification string
+HGID=`hg id -ti`
 
 shtfiles = SHT/SH_to_spat_fly.c SHT/fly_SH_to_spat.gen.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
 
@@ -40,6 +34,8 @@ libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
 	@cat COPYRIGHT
 
 install :
+	@mkdir -p $(PREFIX)/lib/
+	@mkdir -p $(PREFIX)/include/
 	cp libshtns.a $(PREFIX)/lib/
 	cp shtns.h $(PREFIX)/include/
 	cp shtns.f $(PREFIX)/include/
@@ -75,7 +71,7 @@ sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile
-	$(cmd) time_SHT.c libshtns.a -lfftw3 -lm -o time_SHT
+	$(cmd) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib libshtns.a -lfftw3 -lm -o time_SHT
 
 SHT_example : SHT_example.c libshtns.a Makefile shtns.h
 	$(cmd) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c -lshtns -lfftw3 -lm -o SHT_example
@@ -100,7 +96,7 @@ python : shtns.h shtns.i
 	gcc -shared /usr/lib/libfftw3.so SHT.o sht_*.o shtns_wrap.o -o _shtns.so
 
 # update the copyright notice
-updatecpy : copyright
+updatecpy : COPYRIGHT
 	./update-copyright.sh shtns.h
 	./update-copyright.sh SHT.c
 	./update-copyright.sh sht_legendre.c

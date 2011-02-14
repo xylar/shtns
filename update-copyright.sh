@@ -25,7 +25,9 @@ if [ -f "$1" ]; then
   # display the copyright notice within a comment block
   echo "$cmtstart" > $tmp
   sed "s/^/$cmt/" COPYRIGHT >> $tmp
-  echo "$cmtend" >> $tmp
+  if [ "x$cmtend" != "x" ]; then
+	  echo "$cmtend" >> $tmp
+  fi
   # do not forget the blank line !
   echo "" >> $tmp
 
