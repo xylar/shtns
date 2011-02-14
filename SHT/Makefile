@@ -133,4 +133,6 @@ $(SCEO) : $(GSPEO) Makefile
 	@echo "sparse_spat_to_SH* code generated."
 
 clean:
-	rm -f $(ST) $(Q) $(S) $(T) $(STEO) $(QEO) $(SEO) $(TEO) $(SC) $(VE) $(SCEO) $(VEEO)
+	rm -f $(ST) $(Q) $(S) $(T) $(QST) $(V3)
+	rm -f $(STEO) $(QEO) $(SEO) $(TEO) $(SC) $(VE) $(SCEO) $(VEEO)
+	rm -f $(FST) $(FQ) $(FS) $(FT) $(FQST)

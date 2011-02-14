@@ -1581,7 +1581,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 		n_gauss = ((nl_order+1)*LMAX)/2 +1;		// required gauss nodes
 		n_gauss += (n_gauss&1);		// even is better.
 		if ((flags == sht_auto)||(flags == sht_reg_fast)) {
-			m = fft_int(nl_order*LMAX+1, 7);		// required dct nodes
+			m = fft_int(nl_order*LMAX+2, 7);		// required dct nodes
 			*nlat = m + (m&1);		// even is better.
 		} else *nlat = n_gauss;
 	}

@@ -110,6 +110,7 @@ updatecpy : COPYRIGHT
 	./update-copyright.sh SHT/sht_generic.c
 	./update-copyright.sh SHT/hyb_SH_to_spat.gen.c
 	./update-copyright.sh SHT/hyb_spat_to_SH.gen.c
+	./update-copyright.sh SHT/fly_SH_to_spat.gen.c
 	./update-copyright.sh SHT/sparse_SH_to_spat.gen.c
 	./update-copyright.sh SHT/sparse_spat_to_SH.gen.c
 	./update-copyright.sh time_SHT.c
