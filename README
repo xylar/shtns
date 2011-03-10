@@ -31,7 +31,7 @@ Then browse the html documentation starting with doc/html/index.html
  * \see The organisation of data used by SHTns is described in \ref spat.
  * \see The description of \ref opt.
  *
- * \author SHTns is written by Nathanael Schaeffer (LGIT, CNRS)
+ * \author SHTns is written by Nathanael Schaeffer (CNRS)
  *
  * \image html logo_cnrs_small.png
  *

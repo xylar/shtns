@@ -20,7 +20,7 @@
  
  - Normalization of the associated functions for various spherical harmonics conventions are possible, with or without Condon-Shortley phase.
  - When computing the derivatives (with respect to colatitude theta), there are no singularities.
- - written by Nathanael Schaeffer / LGIT,CNRS, with some ideas and code from the GSL 1.13 and Numerical Recipies.
+ - written by Nathanael Schaeffer / CNRS, with some ideas and code from the GSL 1.13 and Numerical Recipies.
 
  The associated legendre functions are computed using the following recurrence formula :
  \f[  Y_l^m(x) = a_l^m \, x \  Y_{l-1}^m(x) + b_l^m \ Y_{l-2}^m(x)  \f]

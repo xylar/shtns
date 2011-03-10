@@ -17,13 +17,16 @@
 
 /********************************************************************
  * SHTns : Spherical Harmonic Transform for numerical simulations.  *
- *    written by Nathanael Schaeffer / LGIT,CNRS                    *
+ *    written by Nathanael Schaeffer / CNRS                         *
  ********************************************************************/
 
 /// \file sht_config.h compile-time configuration.
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
 #define SHT_VERBOSE 1
+
+// defines the maximum amount of memory in megabytes that SHTns should use.
+#define SHTNS_MAX_MEMORY 1024
 
 // if SHT_SCALAR_ONLY is defined, it will disable the vector transform (which saves some memory)
 //#define SHT_SCALAR_ONLY
@@ -53,7 +56,7 @@
 /// The maximum order of non-linear terms to be resolved by SH transform by default.
 /// 1 : no non-linear terms. 2 : quadratic non-linear terms (default), 3 : triadic, ...
 /// must be larger or equal to 1.
-#define SHT_DEFAULT_NL_ORDER 2
+#define SHT_DEFAULT_NL_ORDER 1
 
 /// I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 is supported) !
 /// (set to zero to disable, may be useful for calling from Fortran)
