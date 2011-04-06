@@ -92,8 +92,26 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 	  }
 	}
 	printf("   => max error = %g (l=%.0f,lm=%d)   rms error = %g",tmax,el[jj],jj,sqrt(n2/NLM));
-	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
-		else printf("\n");
+	if (tmax > 1e-3) {
+		if (NLM < 15) {
+			printf("\n orig:");
+			for (i=0; i<NLM;i++)
+				if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
+					printf("  %g",creal(Slm0[i]));
+				} else {
+					printf("  %g,%g",creal(Slm0[i]),cimag(Slm0[i]));
+				}
+			printf("\n diff:");
+			for (i=0; i<NLM;i++)
+				if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
+					printf("  %g",creal(Slm[i]));
+				} else {
+					printf("  %g,%g",creal(Slm[i]),cimag(Slm[i]));
+				}
+		}
+		printf("    **** ERROR ****\n");
+	}
+	else printf("\n");
 	return(tmax);
 }
 
@@ -147,7 +165,7 @@ int test_SHT_fly()
 {
 	long int jj,i, nlm_cplx;
 	clock_t tcpu;
-	double ts;
+	double ts,ta;
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
@@ -157,9 +175,16 @@ int test_SHT_fly()
 	}
 	tcpu = clock() - tcpu;
 	ts = tcpu / (1000.*SHT_ITER);
-	printf("   SHT time on-the-fly : \t synthesis = %f ms\n", ts);
 
-	spat_to_SH(Sh,Slm);
+	tcpu = clock();
+	spat_to_SH_fly(Sh,Slm);
+	for (jj=1; jj< SHT_ITER; jj++) {
+		spat_to_SH_fly(Sh,Tlm);
+	}
+	tcpu = clock() - tcpu;
+	ta = tcpu / (1000.*SHT_ITER);
+	printf("   SHT time on-the-fly : \t synthesis = %f ms \t analysis = %f ms\n", ts, ta);
+
 	scal_error(Slm, Slm0, LMAX);
 	return (int) tcpu;
 }
@@ -621,7 +646,8 @@ int main(int argc, char *argv[])
 		}
 	}
 	Slm[LiM(1,0)] = sh10_ct();
-	Slm[LiM(1,1)] = sh11_st();
+	if ((MMAX > 0)&&(MRES==1))
+		Slm[LiM(1,1)] = sh11_st();
 //	write_vect("ylm0",Slm, NLM*2);
 	SH_to_spat(Slm,Sh);
 	write_mx("spat",Sh,NPHI,NLAT);

@@ -39,10 +39,23 @@
 //@{
 
 /// \b Scalar Spherical Harmonics Transform (analysis) : convert a spatial scalar field to its spherical harmonic representation.
-void GEN(spat_to_SH,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
+void GEN(spat_to_SH_hyb,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
 {
 	#include "spat_to_SH.c"
 }
+
+void GEN(spat_to_SH_gauss,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
+{
+	#define SHT_NO_DCT
+	#include "spat_to_SH.c"
+	#undef SHT_NO_DCT
+}
+
+void GEN(spat_to_SH_fly,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
+{
+	#include "spat_to_SH_fly.c"
+}
+
 
 void GEN(SH_to_spat_hyb,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 {
@@ -63,11 +76,18 @@ void GEN(SH_to_spat_fly,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 
 // function pointers.
 void (*GEN(SH_to_spat_ptr,SUFFIX))(complex double*, double* SUPARG) = &GEN(SH_to_spat_hyb, SUFFIX);
+void (*GEN(spat_to_SH_ptr,SUFFIX))(double*, complex double* SUPARG) = &GEN(spat_to_SH_hyb, SUFFIX);
 
 /// Backward \b Scalar Spherical Harmonic Transform (synthesis).
 void GEN(SH_to_spat,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 {
 	(*GEN(SH_to_spat_ptr,SUFFIX))(Qlm, Vr SUPARG2);
+	return;
+}
+
+void GEN(spat_to_SH,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
+{
+	(*GEN(spat_to_SH_ptr,SUFFIX))(Vr, Qlm SUPARG2);
 	return;
 }
 

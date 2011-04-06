@@ -146,6 +146,7 @@ double shlm_e1(int l, int m);		///< returns the l,m SH coefficient corresponding
 void spat_to_SH(double *Vr, complex double *Qlm);
 void SH_to_spat(complex double *Qlm, double *Vr);
 void SH_to_spat_fly(complex double *Qlm, double *Vr);
+void spat_to_SH_fly(double *Vr, complex double *Qlm);
 //@}
 
 /// \name Vector transforms
