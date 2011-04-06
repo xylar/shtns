@@ -595,7 +595,7 @@ int main(int argc, char *argv[])
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	NLM = shtns_set_size(LMAX, MMAX, MRES, shtnorm);
 	shtns_precompute_auto(shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
-	
+
 // now would be a good time to save fftw's wisdom.
 	fw = fopen("fftw_wisdom","w");
 	if (fw != NULL) {

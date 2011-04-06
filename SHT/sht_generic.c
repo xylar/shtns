@@ -53,6 +53,7 @@ void GEN(spat_to_SH_gauss,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
 
 void GEN(spat_to_SH_fly,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
 {
+	if (wg == NULL) return;			// no gauss weights defined.
 	#include "spat_to_SH_fly.c"
 }
 

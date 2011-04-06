@@ -96,8 +96,8 @@ S				to[j] = dy0[j];
 T				po[j] = dy0[j];
 			}
 			for (int j=0; j<NWAY; j++) {
-				y1[j] = (vdup(al[1])*y0[j]) * cost[j];
-V				dy1[j] = -(vdup(al[1])*y0[j]) * sint[j];
+				y1[j] = vdup(al[0]*al[1]) * cost[j];
+V				dy1[j] = -vdup(al[0]*al[1]) * sint[j];
 			}
 			for (int j=0; j<NWAY; j++) {
 Q				ro[j] = y1[j] * vdup(Ql0[1]);

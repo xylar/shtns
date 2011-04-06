@@ -41,7 +41,7 @@ double *al0;	double **alm;	// coefficient list for Legendre function recurrence 
 double **dlm;	// coefficient list for Legendre function and theta derivative recurrence (size 4*NLM)
 
 double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
-double *wg;					// gauss weights (if current grid is a gauss grid).
+double *wg = NULL;			// gauss weights (if current grid is a gauss grid).
 
 int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 double** ylm;		// matrix for inverse transform (synthesis)
