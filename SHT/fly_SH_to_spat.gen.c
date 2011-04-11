@@ -68,8 +68,6 @@ T	BpF = (v2d*) Vp;
 
 	llim = LTR;		// copy LTR to a local variable for faster access (inner loop limit)
 	im=0;	m=0;
-		#undef NWAY
-		#define NWAY 4
  		l=1;
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double
@@ -179,9 +177,9 @@ T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
 
   #ifndef SHT_AXISYM
 	im=1;
-	#undef NWAY
-V	#define NWAY 1
-QX	#define NWAY 2
+//	#undef NWAY
+//V	#define NWAY 1
+//QX	#define NWAY 2
 Q	BrF += NLAT;
 V	BtF += NLAT;	BpF += NLAT;
 	while(im<=MTR) {	// regular for MTR_DCT < im <= MTR

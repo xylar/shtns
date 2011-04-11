@@ -73,7 +73,7 @@ sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile
-	$(cmd) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib libshtns.a -lfftw3 -lm -o time_SHT
+	$(cmd) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -o time_SHT
 
 SHT_example : SHT_example.c libshtns.a Makefile shtns.h
 	$(cmd) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c -lshtns -lfftw3 -lm -o SHT_example

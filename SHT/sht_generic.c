@@ -54,7 +54,9 @@ void GEN(spat_to_SH_gauss,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
 void GEN(spat_to_SH_fly,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
 {
 	if (wg == NULL) return;			// no gauss weights defined.
+	#define NWAY 6
 	#include "spat_to_SH_fly.c"
+	#undef NWAY
 }
 
 
@@ -72,7 +74,9 @@ void GEN(SH_to_spat_gauss,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 
 void GEN(SH_to_spat_fly,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 {
+	#define NWAY 4
 	#include "SH_to_spat_fly.c"
+	#undef NWAY
 }
 
 // function pointers.
@@ -116,7 +120,9 @@ void GEN(SHsphtor_to_spat,SUFFIX)(complex double *Slm, complex double *Tlm, doub
 void GEN(SHsphtor_to_spat_fly,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
 #ifndef SHT_SCALAR_ONLY
+	#define NWAY 2
 	#include "SHst_to_spat_fly.c"
+	#undef NWAY
 #endif
 }
 
@@ -207,7 +213,9 @@ void GEN(SHqst_to_spat_fly,SUFFIX)(complex double *Qlm, complex double *Slm, com
 {
 #ifndef SHT_SCALAR_ONLY
 	#define SHT_3COMP
+	#define NWAY 1
 	#include "SHqst_to_spat_fly.c"
+	#undef NWAY
 	#undef SHT_3COMP
 #endif
 }

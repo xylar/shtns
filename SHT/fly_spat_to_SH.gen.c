@@ -52,9 +52,6 @@ V	complex double s0,t0,s1,t1;
   #if _GCC_VEC_
 	s2d qt[2*LMAX];
   #endif
-
-		#undef NWAY
-		#define NWAY 4
   
   #ifndef SHT_AXISYM
 Q	double rei[NLAT_2+2*NWAY] SSE;
