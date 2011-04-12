@@ -53,6 +53,7 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
   #ifdef SHT_3COMP
     #define SHT_NO_DCT
   #endif
+	#define NWAY 1
 
 // MTR_DCT : -1 => no dct
 //            0 => dct for m=0 only
@@ -141,7 +142,6 @@ V		l = 1;
 		do {
 Q			l = k;
 	#ifndef _GCC_VEC_
-			#define NWAY 1
 Q			re = 0.0;	ro = 0.0;
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
@@ -171,7 +171,6 @@ VX		#endif
 S			BT0(k) = te;	BT0(k+1) = to;
 T			BP0(k) = pe;	BP0(k+1) = po;
 	#else
-			#define NWAY 1
 Q			v2d r[NWAY];
 S			v2d t[NWAY];
 T			v2d p[NWAY];
@@ -576,6 +575,7 @@ V			} while (k<NLAT_2);
     }
   #endif
 
+	#undef NWAY
 Q	#undef BR0
 V	#undef BT0
 V	#undef BP0

@@ -120,7 +120,7 @@ void GEN(SHsphtor_to_spat,SUFFIX)(complex double *Slm, complex double *Tlm, doub
 void GEN(SHsphtor_to_spat_fly,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
 #ifndef SHT_SCALAR_ONLY
-	#define NWAY 2
+	#define NWAY 1
 	#include "SHst_to_spat_fly.c"
 	#undef NWAY
 #endif
@@ -170,6 +170,16 @@ void GEN(spat_to_SHsphtor,SUFFIX)(double *Vt, double *Vp, complex double *Slm, c
 #endif
 }
 
+void GEN(spat_to_SHsphtor_fly,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
+{
+#ifndef SHT_SCALAR_ONLY
+	#define NWAY 2
+	#include "spat_to_SHst_fly.c"
+	#undef NWAY
+#endif
+}
+
+
 //@}
 
 /** \name 3D vector transforms
@@ -189,6 +199,17 @@ void GEN(spat_to_SHqst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex doubl
 #ifndef SHT_SCALAR_ONLY
 	#define SHT_3COMP
 	#include "spat_to_SHqst.c"
+	#undef SHT_3COMP
+#endif
+}
+
+void GEN(spat_to_SHqst_fly,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
+{
+#ifndef SHT_SCALAR_ONLY
+	#define SHT_3COMP
+	#define NWAY 2
+	#include "spat_to_SHqst_fly.c"
+	#undef NWAY
 	#undef SHT_3COMP
 #endif
 }

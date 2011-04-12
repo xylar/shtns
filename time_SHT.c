@@ -333,7 +333,10 @@ int test_SHT_vect_fly()
 {
 	int jj,i;
 	clock_t tcpu;
-	double ts;
+	double ts, ta;
+
+	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
@@ -344,9 +347,16 @@ int test_SHT_vect_fly()
 	}
 	tcpu = clock() - tcpu;
 	ts = tcpu / (1000.*SHT_ITER);
-	printf("   vector SHT time on-the-fly : \t synthesis %f ms\n", ts);
+	tcpu = clock();
+		spat_to_SHsphtor_fly(Sh,Th,Slm,Tlm);
+	for (jj=1; jj< SHT_ITER; jj++) {
+		spat_to_SHsphtor_fly(Sh,Th,S2,T2);
+	}
+	tcpu = clock() - tcpu;
+	ta = tcpu / (1000.*SHT_ITER);
+	printf("   vector SHT time on-the-fly : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
 
-	spat_to_SHsphtor(Sh,Th,Slm,Tlm);
+	fftw_free(T2);	fftw_free(S2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
 	return (int) tcpu;
 }
@@ -389,7 +399,11 @@ int test_SHT_vect3d_fly()
 {
 	int jj,i;
 	clock_t tcpu;
-	double ts;
+	double ts, ta;
+	
+	complex double *Q2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
@@ -401,8 +415,14 @@ int test_SHT_vect3d_fly()
 	}
 	tcpu = clock() - tcpu;
 	ts = tcpu / (1000.*SHT_ITER);
-	printf("   3D vector SHT time on-the-fly : \t synthesis %f ms\n", ts);	
-	spat_to_SHqst(NL,Sh,Th,Qlm,Slm,Tlm);
+	tcpu = clock();
+		spat_to_SHqst_fly(NL,Sh,Th,Qlm,Slm,Tlm);
+	for (jj=1; jj< SHT_ITER; jj++) {
+		spat_to_SHqst_fly(NL,Sh,Th,Q2,S2,T2);
+	}
+	tcpu = clock() - tcpu;
+	ta = tcpu / (1000.*SHT_ITER);
+	printf("   3D vector SHT time on-the-fly: \t synthesis %f ms \t analysis %f ms\n", ts, ta);
 
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
 	scal_error(Qlm, Tlm0, LMAX);
