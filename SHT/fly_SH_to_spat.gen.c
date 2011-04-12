@@ -157,8 +157,8 @@ Q				((v2d*)(((double*)BrF)+k))[j] = re[j]+ro[j];
 Q				*((v2d*)(((double*)BrF)+NLAT-k-2-2*j)) = vxchg(re[j]-ro[j]);
 S				((v2d*)(((double*)BtF)+k))[j] = te[j]+to[j];
 S				*((v2d*)(((double*)BtF)+NLAT-k-2-2*j)) = vxchg(te[j]-to[j]);
-S				((v2d*)(((double*)BpF)+k))[j] = pe[j]+po[j];
-S				*((v2d*)(((double*)BpF)+NLAT-k-2-2*j)) = vxchg(pe[j]-po[j]);
+T				((v2d*)(((double*)BpF)+k))[j] = pe[j]+po[j];
+T				*((v2d*)(((double*)BpF)+NLAT-k-2-2*j)) = vxchg(pe[j]-po[j]);
 			}
 		  #endif
 			k+=2*NWAY;
@@ -206,8 +206,8 @@ Q			v2d re[NWAY], ro[NWAY];
 		#if _GCC_VEC_
 Q			v2d rex[NWAY], rox[NWAY];
 		#endif
-S			v2d te[NWAY], to[NWAY], dpe[NWAY], dpo[NWAY];
-T			v2d pe[NWAY], po[NWAY], dte[NWAY], dto[NWAY];
+V			v2d te[NWAY], to[NWAY], dpe[NWAY], dpo[NWAY];
+V			v2d pe[NWAY], po[NWAY], dte[NWAY], dto[NWAY];
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = ((s2d*)(st+k))[j];
 				y0[j] = vdup(al[0]);

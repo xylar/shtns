@@ -34,7 +34,8 @@ enum shtns_type {
 	sht_reg_fast,	///< use fastest algorithm, on a <b>regular grid</b>, mixing dct and regular quadrature.
 	sht_reg_dct,	///< use pure dct algorithm, on a <b>regular grid</b>.
 	sht_quick_init, ///< gauss grid, with minimum initialization time (useful for pre/post-processing)
-	sht_reg_poles	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. Useful for vizualisation.
+	sht_reg_poles,	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. Useful for vizualisation.
+	sht_gauss_fly	///< legendre polynomials are recomputed on-the-fly for each transform (may be faster on some machines, saves memory and bandwidth).
 };
 
 /// structure containing useful information about the SHT.

@@ -44,11 +44,11 @@ double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
 double *wg = NULL;			// gauss weights (if current grid is a gauss grid).
 
 int *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-double** ylm;		// matrix for inverse transform (synthesis)
-double** zlm;		// matrix for direct transform (analysis)
+double** ylm = NULL;		// matrix for inverse transform (synthesis)
+double** zlm = NULL;		// matrix for direct transform (analysis)
 #ifndef SHT_SCALAR_ONLY
-struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
-struct DtDp** dzlm;
+struct DtDp** dylm = NULL;	// theta and phi derivative of Ylm matrix
+struct DtDp** dzlm = NULL;
 #endif
 
 double** ykm_dct;	// matrix for inverse transform (synthesis) using dct.
@@ -137,6 +137,37 @@ int fft_int(int n, int fmax)
 	if ((k-n)*33 < n) return k;		// rather choose power of 2 if not too far (3%)
 
 	return n;
+}
+
+
+
+/// \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
+/// \ingroup init
+int nlm_calc(int lmax, int mmax, int mres)
+{
+	if (mmax*mres > lmax) mmax = lmax/mres;
+	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
+}
+
+/*
+long int nlm_calc_eo(long int lmax, long int mmax, long int mres) {
+	long int im,l,lm;
+	for (im=0, lm=0; im<=mmax; im++) {
+		if (im*mres <= lmax) lm += (lmax+2-im*mres)/2;
+	}
+	return lm;
+}
+*/
+/// returns an aproximation of the memory usage in mega bytes.
+/// \ingroup init
+double sht_mem_size(int lmax, int mmax, int mres, int nlat)
+{
+	double s = 1./(1024*1024);
+	s *= (nlat+1) * sizeof(double) * nlm_calc(lmax, mmax, mres);
+  #ifndef SHT_SCALAR_ONLY
+	s *= 3.0;		// scalar + vector arrays.
+  #endif
+	return s;
 }
 
 /*
@@ -319,7 +350,7 @@ void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm,
 	INITIALIZATION FUNCTIONS
 */
 
-void alloc_SHTarrays()
+void alloc_SHTarrays(int on_the_fly)
 {
 	long int im,m, l0;
 	long int lstride;
@@ -327,6 +358,8 @@ void alloc_SHTarrays()
 	l0 = ((NLAT+1)>>1)*2;		// round up to even
 	ct = (double *) fftw_malloc(sizeof(double) * l0*3);
 	st = ct + l0;		st_1 = ct + 2*l0;
+	
+  if (on_the_fly == 0) {
 	ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );
 	zlm = ylm + (MMAX+1);		ykm_dct = ylm + (MMAX+1)*2;
   #ifndef SHT_SCALAR_ONLY
@@ -357,42 +390,26 @@ void alloc_SHTarrays()
 #if SHT_VERBOSE > 1
 	printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
 #endif
+  }
 }
 
 void free_SHTarrays()
 {
 #ifndef SHT_SCALAR_ONLY
-	fftw_free(dzlm[0]);		
-#endif	
-	fftw_free(zlm[0]);
-#ifndef SHT_SCALAR_ONLY
-	fftw_free(dylm[0]);
+	if (dzlm != NULL) fftw_free(dzlm[0]);		
 #endif
-	fftw_free(ylm[0]);
+	if (zlm != NULL) fftw_free(zlm[0]);
 #ifndef SHT_SCALAR_ONLY
-	fftw_free(dylm);
+	if (dylm != NULL) fftw_free(dylm[0]);
 #endif
-	fftw_free(ylm);		fftw_free(ct);
-}
+	if (ylm != NULL) fftw_free(ylm[0]);
+#ifndef SHT_SCALAR_ONLY
+	if (dylm != NULL) fftw_free(dylm);
+#endif
+	if (ylm != NULL) fftw_free(ylm);
 
-/// \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
-/// \ingroup init
-int nlm_calc(int lmax, int mmax, int mres)
-{
-	if (mmax*mres > lmax) mmax = lmax/mres;
-	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
+	fftw_free(ct);
 }
-
-/*
-long int nlm_calc_eo(long int lmax, long int mmax, long int mres) {
-	long int im,l,lm;
-	for (im=0, lm=0; im<=mmax; im++) {
-		if (im*mres <= lmax) lm += (lmax+2-im*mres)/2;
-	}
-	return lm;
-}
-*/
-
 
 /// Generates an equi-spaced theta grid including the poles, for synthesis only.
 void EqualPolarGrid()
@@ -659,6 +676,41 @@ double Find_Optimal_SHT()
 	return(tsum/tsum0);	// returns ratio of "optimal" time over "no_dct" time
 }
 
+/// Sets the value tm[im] used for polar optimiation on-the-fly.
+void PolarOptimize(double eps)
+{
+	int im, m, l, it;
+	double v;
+	double y[LMAX+1];
+
+	for (im=0;im<=MMAX;im++)	tm[im] = 0;
+
+	if (eps > 0.0) {
+		for (im=1;im<=MMAX;im++) {
+			m = im*MRES;
+			it = -1;
+			do {
+				it++;
+				legendre_sphPlm_array(LMAX, im, ct[it], y+m);
+				v = 0.0;
+				for (l=m; l<=LMAX; l++) {
+					double ya = fabs(y[l]);
+					if ( v < ya )	v = ya;
+				}
+			} while (v < eps);
+			tm[im] = it;
+		}
+	#if SHT_VERBOSE > 0
+		printf("        + polar optimization threshold = %.1e\n",eps);
+	#endif
+	#if SHT_VERBOSE > 1
+		printf("          tm[im]=");
+		for (im=0;im<=MMAX;im++)
+			printf(" %d",tm[im]);
+		printf("\n");
+	#endif
+	}
+}
 
 /// Perform some optimization on the SHT matrices.
 void OptimizeMatrices(double eps)
@@ -687,6 +739,7 @@ void OptimizeMatrices(double eps)
 			printf(" %d",tm[im]);
 		printf("\n");
 #endif
+
 		for (im=1; im<=MMAX; im++) {	//	im >= 1
 		  if (tm[im] > 0) {		// we can remove the data corresponding to polar values.
 			m = im*MRES;
@@ -750,7 +803,6 @@ void OptimizeMatrices(double eps)
 #endif
 }
 
-
 /// Precompute the matrix for SH synthesis.
 void init_SH_synth()
 {
@@ -778,13 +830,13 @@ void init_SH_synth()
 
 
 /// Precompute matrices for SH synthesis and analysis, on a Gauss-Legendre grid.
-void init_SH_gauss()
+void init_SH_gauss(int on_the_fly)
 {
 	double t,tmax;
 	long int it,im,m,l;
 	long double iylm_fft_norm;
 	long double xg[NLAT], wgl[NLAT];	// gauss points and weights.
-	
+
 	wg = malloc((NLAT_2 +15) * sizeof(double));	// gauss weights, double precision.
 
  	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
@@ -826,6 +878,8 @@ void init_SH_gauss()
 		printf("\n");
 	}
 #endif
+
+	if (on_the_fly != 0) return;
 
 	init_SH_synth();
 
@@ -1560,6 +1614,8 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	int im,m,l,lm;
 	int layout, nspat;
 	int n_gauss = 0;
+	int on_the_fly = 0;
+	int quick_init = 0;
 
 	if (nl_order <= 0) nl_order = SHT_DEFAULT_NL_ORDER;
 /*	shtns.lshift = 0;
@@ -1571,8 +1627,14 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	layout = flags & 0xFFFF00;
 	flags = flags & 255;	// clear higher bits.
 
-	if ((flags == sht_reg_poles)||(flags == sht_quick_init))
-		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init
+	switch (flags) {
+		case sht_gauss_fly :		flags = sht_gauss;		on_the_fly = 1;
+			break;
+		case sht_quick_init : 	flags = sht_gauss;
+		case sht_reg_poles :		quick_init = 1;		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init.
+			break;
+		default : break;
+	}
 
 	if (*nphi == 0) {
 		*nphi = fft_int((nl_order+1)*MMAX+1, 7);		// required fft nodes
@@ -1586,6 +1648,16 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 		} else *nlat = n_gauss;
 	}
 
+	t = sht_mem_size(shtns.lmax, shtns.mmax, shtns.mres, *nlat);
+	if ( (t > SHTNS_MAX_MEMORY) && (on_the_fly == 0) ) {
+		on_the_fly = 1;
+		if ( (flags == sht_reg_dct) || (flags == sht_reg_fast) ) shtns_runerr("Memory limit exceeded, try using sht_gauss or increase SHTNS_MAX_MEMORY in sht_config.h");
+		if (flags != sht_reg_poles) {
+			flags = sht_gauss;
+			if (n_gauss > 0) *nlat = n_gauss;
+		}
+	}
+
 	// copy to global variables.
 #ifdef SHT_AXISYM
 	shtns.nphi = 1;
@@ -1596,7 +1668,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
 	if ((NLAT_2)*2 <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
 
-	alloc_SHTarrays();		// allocate dynamic arrays
+	alloc_SHTarrays(on_the_fly);		// allocate dynamic arrays
 	nspat = planFFT(layout);		// initialize fftw
 	zlm_dct0 = NULL;		// used as a flag.
 
@@ -1656,7 +1728,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 					free_SHTarrays();
 					*nlat = n_gauss;
 					NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
-					alloc_SHTarrays();
+					alloc_SHTarrays(on_the_fly);
 					nspat = planFFT(layout);		// fft must be replanned because NLAT has changed.
 				}
 			}
@@ -1669,8 +1741,8 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 #endif
 	{
 		MTR_DCT = -1;		// we do not use DCT !!!
-		init_SH_gauss();
-		OptimizeMatrices(eps);
+		init_SH_gauss(on_the_fly);
+		if (on_the_fly == 0) OptimizeMatrices(eps);
 	}
 	if (flags == sht_reg_poles)
 	{
@@ -1680,17 +1752,21 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	  #endif
 		fftw_free(zlm[0]);		zlm[0] = NULL;		// no inverse transform, mark as unused.
 		EqualPolarGrid();
-		init_SH_synth();
-		OptimizeMatrices(0.0);
-	}
-	if (flags == sht_quick_init)
-	{
-		MTR_DCT = -1;		// we do not use DCT !!!
-		init_SH_gauss();
-		OptimizeMatrices(eps);
+		if (on_the_fly == 0) {
+			init_SH_synth();
+			OptimizeMatrices(0.0);
+		}
 	}
 
-	if ((flags != sht_reg_poles)&&(flags != sht_quick_init)) {
+	if (on_the_fly == 1) {
+  #if SHT_VERBOSE > 0
+		printf("        + using on-the-fly transforms.\n");
+  #endif
+		PolarOptimize(eps);
+		set_fly();		set_fly_l();		set_fly_m0();		// switch function pointers to "on-the-fly" functions.
+	}
+
+	if (quick_init == 0) {
 		t = SHT_error();		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);

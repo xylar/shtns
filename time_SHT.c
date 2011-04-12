@@ -42,6 +42,8 @@ int NPHI = 0;
 // number of SH iterations
 long int SHT_ITER = 50;		// do 50 iterations by default
 
+// access to Gauss weights.
+extern double *wg;
 	
 void write_vect(char *fn, double *vec, int N)
 {
@@ -176,13 +178,18 @@ int test_SHT_fly()
 	tcpu = clock() - tcpu;
 	ts = tcpu / (1000.*SHT_ITER);
 
-	tcpu = clock();
-	spat_to_SH_fly(Sh,Slm);
-	for (jj=1; jj< SHT_ITER; jj++) {
-		spat_to_SH_fly(Sh,Tlm);
+	if (wg == NULL) {
+		spat_to_SH(Sh,Slm);
+		ta = 0.0;
+	} else {
+		tcpu = clock();
+		spat_to_SH_fly(Sh,Slm);
+		for (jj=1; jj< SHT_ITER; jj++) {
+			spat_to_SH_fly(Sh,Tlm);
+		}
+		tcpu = clock() - tcpu;
+		ta = tcpu / (1000.*SHT_ITER);
 	}
-	tcpu = clock() - tcpu;
-	ta = tcpu / (1000.*SHT_ITER);
 	printf("   SHT time on-the-fly : \t synthesis = %f ms \t analysis = %f ms\n", ts, ta);
 
 	scal_error(Slm, Slm0, LMAX);
@@ -347,13 +354,19 @@ int test_SHT_vect_fly()
 	}
 	tcpu = clock() - tcpu;
 	ts = tcpu / (1000.*SHT_ITER);
-	tcpu = clock();
-		spat_to_SHsphtor_fly(Sh,Th,Slm,Tlm);
-	for (jj=1; jj< SHT_ITER; jj++) {
-		spat_to_SHsphtor_fly(Sh,Th,S2,T2);
+	
+	if (wg == NULL) {
+		spat_to_SHsphtor(Sh,Th,Slm,Tlm);
+		ta = 0.0;
+	} else {
+		tcpu = clock();
+			spat_to_SHsphtor_fly(Sh,Th,Slm,Tlm);
+		for (jj=1; jj< SHT_ITER; jj++) {
+			spat_to_SHsphtor_fly(Sh,Th,S2,T2);
+		}
+		tcpu = clock() - tcpu;
+		ta = tcpu / (1000.*SHT_ITER);
 	}
-	tcpu = clock() - tcpu;
-	ta = tcpu / (1000.*SHT_ITER);
 	printf("   vector SHT time on-the-fly : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
 
 	fftw_free(T2);	fftw_free(S2);
@@ -415,13 +428,19 @@ int test_SHT_vect3d_fly()
 	}
 	tcpu = clock() - tcpu;
 	ts = tcpu / (1000.*SHT_ITER);
-	tcpu = clock();
-		spat_to_SHqst_fly(NL,Sh,Th,Qlm,Slm,Tlm);
-	for (jj=1; jj< SHT_ITER; jj++) {
-		spat_to_SHqst_fly(NL,Sh,Th,Q2,S2,T2);
+	
+	if (wg == NULL) {
+		spat_to_SHqst(NL,Sh,Th,Qlm,Slm,Tlm);
+		ta = 0.0;
+	} else {
+		tcpu = clock();
+			spat_to_SHqst_fly(NL,Sh,Th,Qlm,Slm,Tlm);
+		for (jj=1; jj< SHT_ITER; jj++) {
+			spat_to_SHqst_fly(NL,Sh,Th,Q2,S2,T2);
+		}
+		tcpu = clock() - tcpu;
+		ta = tcpu / (1000.*SHT_ITER);
 	}
-	tcpu = clock() - tcpu;
-	ta = tcpu / (1000.*SHT_ITER);
 	printf("   3D vector SHT time on-the-fly: \t synthesis %f ms \t analysis %f ms\n", ts, ta);
 
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
@@ -553,10 +572,14 @@ void usage()
 	printf(" -polaropt=<thr> : set the threshold for polar optimization. 0 for no polar optimization, 1.e-6 for agressive.\n");
 	printf(" -iter=<n> : set the number of back-and-forth transforms to compute timings and errors.\n");
 	printf(" -gauss : force gauss grid\n");
+	printf(" -fly : force gauss grid with on-the-fly computations only\n");
+	printf(" -quickinit : force gauss grid and fast initialiation time (but suboptimal fourier transforms)\n");
 	printf(" -reg : force regular grid\n");
 	printf(" -oop : force out-of-place transform\n");
 	printf(" -transpose : force transpose data (ie phi varies fastest)\n");
 	printf(" -nlorder : define non-linear order to be resolved.\n");
+	printf(" -schmidt : use schmidt semi-normalization.\n");
+	printf(" -4pi : use 4pi normalization.\n");
 }
 
 int main(int argc, char *argv[])
@@ -603,6 +626,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"polaropt") == 0) polaropt = t;
 		if (strcmp(name,"iter") == 0) SHT_ITER = t;
 		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
+		if (strcmp(name,"fly") == 0) shtmode = sht_gauss_fly;		// force gauss grid with on-the-fly computation.
 		if (strcmp(name,"reg") == 0) shtmode = sht_reg_fast;	// force regular grid.
 		if (strcmp(name,"quickinit") == 0) shtmode = sht_quick_init;	// Gauss grid and fast initialization time, but suboptimal fourier transforms.
 		if (strcmp(name,"schmidt") == 0) shtnorm = sht_schmidt | SHT_NO_CS_PHASE;

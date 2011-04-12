@@ -23,10 +23,10 @@
 /// \file sht_config.h compile-time configuration.
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
-#define SHT_VERBOSE 2
+#define SHT_VERBOSE 1
 
 // defines the maximum amount of memory in megabytes that SHTns should use.
-#define SHTNS_MAX_MEMORY 1024
+#define SHTNS_MAX_MEMORY 2048
 
 // if SHT_SCALAR_ONLY is defined, it will disable the vector transform (which saves some memory)
 //#define SHT_SCALAR_ONLY
