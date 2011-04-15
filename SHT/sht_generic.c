@@ -35,6 +35,15 @@
   #define SUPARG2
 #endif
 
+typedef void (*pf2)(void*, void* SUPARG);
+#ifndef SHT_AXISYM
+typedef void (*pfg)(void*, void*, void* SUPARG);
+#else
+typedef void (*pfg)(void*, void* SUPARG);
+#endif
+typedef void (*pf4)(void*, void*, void*, void* SUPARG);
+typedef void (*pf6)(void*, void*, void*, void*, void*, void* SUPARG);
+
 /// \name scalar transforms
 //@{
 
@@ -139,8 +148,8 @@ void GEN(SH_to_spat_fly8,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 }
 
 // function pointers.
-void (*GEN(SH_to_spat_ptr,SUFFIX))(complex double*, double* SUPARG) = &GEN(SH_to_spat_hyb, SUFFIX);
-void (*GEN(spat_to_SH_ptr,SUFFIX))(double*, complex double* SUPARG) = &GEN(spat_to_SH_hyb, SUFFIX);
+pf2 GEN(SH_to_spat_ptr, SUFFIX) = (pf2) &GEN(SH_to_spat_hyb, SUFFIX);
+pf2 GEN(spat_to_SH_ptr,SUFFIX) = (pf2) &GEN(spat_to_SH_hyb, SUFFIX);
 
 /// Backward \b Scalar Spherical Harmonic Transform (synthesis).
 void GEN(SH_to_spat,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
@@ -335,15 +344,10 @@ void GEN(spat_to_SHsphtor_fly3,SUFFIX)(double *Vt, double *Vp, complex double *S
 }
 
 // function pointers.
-void (*GEN(spat_to_SHsphtor_ptr,SUFFIX))(double*, double*, complex double*, complex double* SUPARG) = &GEN(spat_to_SHsphtor_hyb,SUFFIX);
-void (*GEN(SHsphtor_to_spat_ptr,SUFFIX))(complex double*, complex double*, double*, double* SUPARG) = &GEN(SHsphtor_to_spat_hyb,SUFFIX);
-#ifndef SHT_AXISYM
-void (*GEN(SHsph_to_spat_ptr,SUFFIX))(complex double*, double*, double* SUPARG) = &GEN(SHsph_to_spat_hyb,SUFFIX);
-void (*GEN(SHtor_to_spat_ptr,SUFFIX))(complex double*, double*, double* SUPARG) = &GEN(SHtor_to_spat_hyb,SUFFIX);
-#else
-void (*GEN(SHsph_to_spat_ptr,SUFFIX))(complex double*, double* SUPARG) = &GEN(SHsph_to_spat_hyb,SUFFIX);
-void (*GEN(SHtor_to_spat_ptr,SUFFIX))(complex double*, double* SUPARG) = &GEN(SHtor_to_spat_hyb,SUFFIX);
-#endif
+pf4 GEN(spat_to_SHsphtor_ptr,SUFFIX) = (pf4) &GEN(spat_to_SHsphtor_hyb,SUFFIX);
+pf4 GEN(SHsphtor_to_spat_ptr,SUFFIX) = (pf4) &GEN(SHsphtor_to_spat_hyb,SUFFIX);
+pfg GEN(SHsph_to_spat_ptr,SUFFIX) = (pfg) &GEN(SHsph_to_spat_hyb,SUFFIX);
+pfg GEN(SHtor_to_spat_ptr,SUFFIX) = (pfg) &GEN(SHtor_to_spat_hyb,SUFFIX);
 
 /// Backward \b Vector Spherical Harmonic Transform (synthesis).
 void GEN(SHsphtor_to_spat,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
@@ -478,11 +482,9 @@ void GEN(spat_to_SHqst_2,SUFFIX)(double *Vr, double *Vt, double *Vp, complex dou
 	GEN(spat_to_SHsphtor,SUFFIX)(Vt, Vp, Slm, Tlm SUPARG2);
 }
 
-
-
 // function pointers.
-void (*GEN(spat_to_SHqst_ptr,SUFFIX))(double*, double*, double*, complex double*, complex double*, complex double* SUPARG) = &GEN(spat_to_SHqst_hyb,SUFFIX);
-void (*GEN(SHqst_to_spat_ptr,SUFFIX))(complex double*, complex double*, complex double*, double*, double*, double* SUPARG) = &GEN(SHqst_to_spat_hyb,SUFFIX);
+pf6 GEN(spat_to_SHqst_ptr,SUFFIX) = (pf6) &GEN(spat_to_SHqst_hyb,SUFFIX);
+pf6 GEN(SHqst_to_spat_ptr,SUFFIX) = (pf6) &GEN(SHqst_to_spat_hyb,SUFFIX);
 
 void GEN(spat_to_SHqst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
 {
@@ -498,23 +500,103 @@ void GEN(SHqst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex
 
 //@}
 
+typedef struct {
+  pf2 fp;  char *name;	int flags;
+} frec2;
+typedef struct {
+  pfg fp1;	pfg fp2;	char *name;		int flags;
+} frecg;
+typedef struct {
+  pf4 fp;	char * name;	int flags;
+} frec4;
+typedef struct {
+  pf6 fp;	char * name;	int flags;
+} frec6;
+
+frec2 GEN(scal_synth, SUFFIX)[] = {
+	{ .fp = (pf2) GEN(SH_to_spat_hyb, SUFFIX),  .name = "hyb" },
+	{ .fp = (pf2) GEN(SH_to_spat_fly1, SUFFIX), .name = "fly1" },
+	{ .fp = (pf2) GEN(SH_to_spat_fly2, SUFFIX), .name = "fly2" },
+	{ .fp = (pf2) GEN(SH_to_spat_fly3, SUFFIX), .name = "fly3" },
+	{ .fp = (pf2) GEN(SH_to_spat_fly4, SUFFIX), .name = "fly4" },
+	{ .fp = (pf2) GEN(SH_to_spat_fly6, SUFFIX), .name = "fly6" },
+	{ .fp = (pf2) GEN(SH_to_spat_fly8, SUFFIX), .name = "fly8" },
+	{ .fp = NULL, .name = NULL }
+};
+frec2 GEN(scal_analys, SUFFIX)[] = {
+	{ .fp = (pf2) GEN(spat_to_SH_hyb, SUFFIX),  .name = "hyb" },
+	{ .fp = (pf2) GEN(spat_to_SH_fly1, SUFFIX), .name = "fly1" },
+	{ .fp = (pf2) GEN(spat_to_SH_fly2, SUFFIX), .name = "fly2" },
+	{ .fp = (pf2) GEN(spat_to_SH_fly3, SUFFIX), .name = "fly3" },
+	{ .fp = (pf2) GEN(spat_to_SH_fly4, SUFFIX), .name = "fly4" },
+	{ .fp = (pf2) GEN(spat_to_SH_fly6, SUFFIX), .name = "fly6" },
+	{ .fp = (pf2) GEN(spat_to_SH_fly8, SUFFIX), .name = "fly8" },
+	{ .fp = NULL, .name = NULL }
+};
+
+frecg GEN(grad_synth, SUFFIX)[] = {
+	{ .fp1 = (pfg) GEN(SHsph_to_spat_hyb, SUFFIX),  .fp2 = (pfg) GEN(SHtor_to_spat_hyb, SUFFIX),  .name = "hyb" },
+	{ .fp1 = (pfg) GEN(SHsph_to_spat_fly1, SUFFIX), .fp2 = (pfg) GEN(SHtor_to_spat_fly1, SUFFIX), .name = "fly1" },
+	{ .fp1 = (pfg) GEN(SHsph_to_spat_fly2, SUFFIX), .fp2 = (pfg) GEN(SHtor_to_spat_fly2, SUFFIX), .name = "fly2" },
+	{ .fp1 = (pfg) GEN(SHsph_to_spat_fly4, SUFFIX), .fp2 = (pfg) GEN(SHtor_to_spat_fly4, SUFFIX), .name = "fly4" },
+	{ .fp1 = NULL, .fp2 =NULL, .name = NULL }
+};
+frec4 GEN(vect_synth, SUFFIX)[] = {
+	{ .fp = (pf4) GEN(SHsphtor_to_spat_hyb, SUFFIX),   .name = "hyb" },
+	{ .fp = (pf4) GEN(SHsphtor_to_spat_fly1, SUFFIX),  .name = "fly1" },
+	{ .fp = (pf4) GEN(SHsphtor_to_spat_fly2, SUFFIX),  .name = "fly2" },
+	{ .fp = (pf4) GEN(SHsphtor_to_spat_fly3, SUFFIX),  .name = "fly3" },
+	{ .fp = NULL, .name = NULL }
+};
+frec4 GEN(vect_analys, SUFFIX)[] = {
+	{ .fp = (pf4) GEN(spat_to_SHsphtor_hyb, SUFFIX),   .name = "hyb" },
+	{ .fp = (pf4) GEN(spat_to_SHsphtor_fly1, SUFFIX),  .name = "fly1" },
+	{ .fp = (pf4) GEN(spat_to_SHsphtor_fly2, SUFFIX),  .name = "fly2" },
+	{ .fp = (pf4) GEN(spat_to_SHsphtor_fly3, SUFFIX),  .name = "fly3" },
+	{ .fp = NULL, .name = NULL }
+};
+
+frec6 GEN(v3d_synth, SUFFIX)[] = {
+	{ .fp = (pf6) GEN(SHqst_to_spat_hyb, SUFFIX),   .name = "hyb" },
+	{ .fp = (pf6) GEN(SHqst_to_spat_2, SUFFIX),     .name = "s+v" },
+	{ .fp = (pf6) GEN(SHqst_to_spat_fly1, SUFFIX),  .name = "fly1" },
+	{ .fp = (pf6) GEN(SHqst_to_spat_fly2, SUFFIX),  .name = "fly2" },
+	{ .fp = (pf6) GEN(SHqst_to_spat_fly3, SUFFIX),  .name = "fly3" },
+	{ .fp = NULL, .name = NULL }
+};
+frec6 GEN(v3d_analys, SUFFIX)[] = {
+	{ .fp = (pf6) GEN(spat_to_SHqst_hyb, SUFFIX),   .name = "hyb" },
+	{ .fp = (pf6) GEN(spat_to_SHqst_2, SUFFIX),     .name = "s+v" },
+	{ .fp = (pf6) GEN(spat_to_SHqst_fly1, SUFFIX),  .name = "fly1" },
+	{ .fp = (pf6) GEN(spat_to_SHqst_fly2, SUFFIX),  .name = "fly2" },
+	{ .fp = (pf6) GEN(spat_to_SHqst_fly3, SUFFIX),  .name = "fly3" },
+	{ .fp = NULL, .name = NULL }
+};
+
 /// use on-the-fly alogorithm (good guess without measuring)
 void GEN(set_fly,SUFFIX)()
 {
-	GEN(SH_to_spat_ptr,SUFFIX) = &GEN(SH_to_spat_fly2, SUFFIX);
-	GEN(SHsph_to_spat_ptr,SUFFIX) = &GEN(SHsph_to_spat_fly2,SUFFIX);
-	GEN(SHtor_to_spat_ptr,SUFFIX) = &GEN(SHtor_to_spat_fly2,SUFFIX);
-	GEN(SHsphtor_to_spat_ptr,SUFFIX) = &GEN(SHsphtor_to_spat_fly1,SUFFIX);
-	GEN(SHqst_to_spat_ptr,SUFFIX) = &GEN(SHqst_to_spat_fly1, SUFFIX);
+	GEN(SH_to_spat_ptr,SUFFIX) = (pf2) &GEN(SH_to_spat_fly2, SUFFIX);
+	GEN(SHsph_to_spat_ptr,SUFFIX) = (pfg) &GEN(SHsph_to_spat_fly2,SUFFIX);
+	GEN(SHtor_to_spat_ptr,SUFFIX) = (pfg) &GEN(SHtor_to_spat_fly2,SUFFIX);
+	GEN(SHsphtor_to_spat_ptr,SUFFIX) = (pf4) &GEN(SHsphtor_to_spat_fly1,SUFFIX);
+	GEN(SHqst_to_spat_ptr,SUFFIX) = (pf6) &GEN(SHqst_to_spat_fly1, SUFFIX);
 	if (wg != NULL) {
-		GEN(spat_to_SH_ptr,SUFFIX) = &GEN(spat_to_SH_fly4, SUFFIX);
-		GEN(spat_to_SHsphtor_ptr,SUFFIX) = &GEN(spat_to_SHsphtor_fly2,SUFFIX);
-		GEN(spat_to_SHqst_ptr,SUFFIX) = &GEN(spat_to_SHqst_fly2, SUFFIX);
+		GEN(spat_to_SH_ptr,SUFFIX) = (pf2) &GEN(spat_to_SH_fly4, SUFFIX);
+		GEN(spat_to_SHsphtor_ptr,SUFFIX) = (pf4) &GEN(spat_to_SHsphtor_fly2,SUFFIX);
+		GEN(spat_to_SHqst_ptr,SUFFIX) = (pf6) &GEN(spat_to_SHqst_fly2, SUFFIX);
 	}
 }
 
 #ifndef SUFFIX
 #include "../cycle.h"
+#include <time.h> 
+
+#if SHT_VERBOSE > 1
+  #define PRINT_VERB(msg) printf(msg)
+#else
+  #define PRINT_VERB(msg) (0)
+#endif
 
 double GEN(get_time_2,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void* SUPARG), void *a, void *b SUPARG)
 {
@@ -529,7 +611,7 @@ double GEN(get_time_2,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void* S
 	tik1 = getticks();
 	double t = elapsed(tik1,tik0)/nloop;
 	#if SHT_VERBOSE > 1
-		printf("t(%s) = %.3g  ",name,t);
+		printf("  t(%s) = %.3g",name,t);
 	#endif
 	return t;
 }
@@ -547,7 +629,7 @@ double GEN(get_time_3,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, 
 	tik1 = getticks();
 	double t = elapsed(tik1,tik0)/nloop;
 	#if SHT_VERBOSE > 1
-		printf("t(%s) = %.3g  ",name,t);
+		printf("  t(%s) = %.3g",name,t);
 	#endif
 	return t;
 }
@@ -565,7 +647,7 @@ double GEN(get_time_4,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, 
 	tik1 = getticks();
 	double t = elapsed(tik1,tik0)/nloop;
 	#if SHT_VERBOSE > 1
-		printf("t(%s) = %.3g  ",name,t);
+		printf("  t(%s) = %.3g",name,t);
 	#endif
 	return t;
 }
@@ -583,7 +665,7 @@ double GEN(get_time_6,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, 
 	tik1 = getticks();
 	double t = elapsed(tik1,tik0)/nloop;
 	#if SHT_VERBOSE > 1
-		printf("t(%s) = %.3g  ",name,t);
+		printf("  t(%s) = %.3g",name,t);
 	#endif
 	return t;
 }
@@ -594,8 +676,9 @@ void GEN(choose_best_sht,SUFFIX)(int on_the_fly)
 	complex double *Qlm, *Slm, *Tlm;
 	double *Qh, *Sh, *Th;
 	int m, i, minc, nloop;
-	double t0, t0c, t, tt;
+	double t0, t, tt;
 	ticks tik0, tik1;
+	clock_t tcpu;
 
 	Qh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Sh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
@@ -613,132 +696,122 @@ void GEN(choose_best_sht,SUFFIX)(int on_the_fly)
 	nloop = 10;                     // number of loops to get timings.
 	m=0;
 	do {
+		tcpu = clock();
 		t0 = get_time_2(nloop, "", SH_to_spat_ptr, Slm, Sh);
 		t = get_time_2(nloop, "", SH_to_spat_ptr, Slm, Sh);
+		tcpu = clock() - tcpu;
 		double r = fabs(2.0*(t-t0)/(t+t0));
-	#if SHT_VERBOSE > 1
-		printf("nloop=%d, t0=%g, t=%g, r=%g, m=%d\n",nloop,t0,t,r,m);
-	#endif
 		if (r < 0.03) {
 			m++;
 		} else {
 			nloop *= 3;
 			m = 0;
 		}
-	} while((nloop<1000)&&(m < 3));
+		tt = tcpu * 1e-6;		// real time should not exceed 1 sec.
+		#if SHT_VERBOSE > 1
+			printf("nloop=%d, t0=%g, t=%g, r=%g, m=%d (real time (s) = %g)\n",nloop,t0,t,r,m,tt);
+		#endif
+	} while((nloop<1000)&&(m < 3)&&(tt<1.0));
 	#if SHT_VERBOSE > 1
 		printf("nloop=%d\n",nloop);
 	#endif
 
 	// scalar
 	#if SHT_VERBOSE > 1
-		printf("finding best scalar synthesis ...\t");	fflush(stdout);
+		printf("finding best scalar synthesis ...");	fflush(stdout);
 	#endif
-	if (on_the_fly == 1) {
-		t0c = 1e100;	t=t0c;
-	} else {
-		t0 = get_time_2(nloop, "hyb", &SH_to_spat_hyb, Slm, Sh);	t0c = t0/MIN_PERF_IMPROVE_DCT;		t=t0c;	// ref time.
+	i = 0;	t0 = 1e100;
+	if (on_the_fly == 0) {
+		t0 = get_time_2(nloop, scal_synth[i].name, scal_synth[i].fp, Slm, Sh);		t0 *= 1.0/MIN_PERF_IMPROVE_DCT;		// ref time.
 	}
-	tt = get_time_2(nloop, "fly1", &SH_to_spat_fly1, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SH_to_spat_ptr = &SH_to_spat_fly1;	t = tt;	}
-	tt = get_time_2(nloop, "fly2", &SH_to_spat_fly2, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SH_to_spat_ptr = &SH_to_spat_fly2;	t = tt;	}
-	tt = get_time_2(nloop, "fly3", &SH_to_spat_fly3, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SH_to_spat_ptr = &SH_to_spat_fly3;	t = tt;	}
-	tt = get_time_2(nloop, "fly4", &SH_to_spat_fly4, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SH_to_spat_ptr = &SH_to_spat_fly4;	t = tt;	}
-	tt = get_time_2(nloop, "fly6", &SH_to_spat_fly6, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SH_to_spat_ptr = &SH_to_spat_fly6;	t = tt;	}
-	tt = get_time_2(nloop, "fly8", &SH_to_spat_fly8, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SH_to_spat_ptr = &SH_to_spat_fly8;	t = tt;	}
+	while ( scal_synth[++i].fp != NULL) {
+		t = get_time_2(nloop, scal_synth[i].name, scal_synth[i].fp, Slm, Sh);	if (t < t0) {	SH_to_spat_ptr = scal_synth[i].fp;	t0 = t;	PRINT_VERB("*"); }
+	}
 	if (wg != NULL) {
 		#if SHT_VERBOSE > 1
-			printf("\nfinding best scalar analysis ...\t");	fflush(stdout);
+			printf("\nfinding best scalar analysis ...");	fflush(stdout);
 		#endif
-		if (on_the_fly == 1) {
-			t0c = 1e100;	t=t0c;
-		} else {
-			t0 = get_time_2(nloop, "hyb", &spat_to_SH_hyb, Sh, Slm);	t0c = t0/MIN_PERF_IMPROVE_DCT;		t=t0c;	//ref time.
+		i = 0;	t0 = 1e100;
+		if (on_the_fly == 0) {
+			t0 = get_time_2(nloop, scal_analys[i].name, scal_analys[i].fp, Sh, Slm);		t0 *= 1.0/MIN_PERF_IMPROVE_DCT;		// ref time.
 		}
-		tt = get_time_2(nloop, "fly1", &spat_to_SH_fly1, Sh, Slm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SH_ptr = &spat_to_SH_fly1;	t = tt;	}
-		tt = get_time_2(nloop, "fly2", &spat_to_SH_fly2, Sh, Slm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SH_ptr = &spat_to_SH_fly2;	t = tt;	}
-		tt = get_time_2(nloop, "fly3", &spat_to_SH_fly3, Sh, Slm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SH_ptr = &spat_to_SH_fly3;	t = tt;	}
-		tt = get_time_2(nloop, "fly4", &spat_to_SH_fly4, Sh, Slm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SH_ptr = &spat_to_SH_fly4;	t = tt;	}
-		tt = get_time_2(nloop, "fly6", &spat_to_SH_fly6, Sh, Slm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SH_ptr = &spat_to_SH_fly6;	t = tt;	}
-		tt = get_time_2(nloop, "fly8", &spat_to_SH_fly8, Sh, Slm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SH_ptr = &spat_to_SH_fly8;	t = tt;	}
+		while ( scal_analys[++i].fp != NULL) {
+			t = get_time_2(nloop, scal_analys[i].name, scal_analys[i].fp, Sh, Slm);	if (t < t0) {	spat_to_SH_ptr = scal_analys[i].fp;	t0 = t;	PRINT_VERB("*"); }
+		}
 	}
 
 	nloop = nloop/2;
 	// gradients
 	#if SHT_VERBOSE > 1
-		printf("\nfinding best gradient synthesis ...\t");	fflush(stdout);
+		printf("\nfinding best gradient synthesis ...");	fflush(stdout);
 	#endif
-	if (on_the_fly == 1) {
-			t0c = 1e100;	t=t0c;
-	} else {
+	i = 0;	t0 = 1e100;
   #ifndef SHT_AXISYM
-		t0 = get_time_3(nloop, "hyb", &SHsph_to_spat_hyb, Slm, Sh, Th);	t0c = t0/MIN_PERF_IMPROVE_DCT;		t=t0c;	//ref time.
+	if (on_the_fly == 0) {
+		t0 = get_time_3(nloop, grad_synth[i].name, grad_synth[i].fp1, Slm, Sh, Th);		t0 *= 1.0/MIN_PERF_IMPROVE_DCT;		// ref time.
 	}
-	tt = get_time_3(nloop, "fly1", &SHsph_to_spat_fly1, Slm, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHsph_to_spat_ptr = &SHsph_to_spat_fly1;	SHtor_to_spat_ptr = &SHtor_to_spat_fly1;	t = tt;	}
-	tt = get_time_3(nloop, "fly2", &SHsph_to_spat_fly2, Slm, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHsph_to_spat_ptr = &SHsph_to_spat_fly2;	SHtor_to_spat_ptr = &SHtor_to_spat_fly2;	t = tt;	}
-	tt = get_time_3(nloop, "fly4", &SHsph_to_spat_fly4, Slm, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHsph_to_spat_ptr = &SHsph_to_spat_fly4;	SHtor_to_spat_ptr = &SHtor_to_spat_fly4;	t = tt;	}
+	while ( grad_synth[++i].fp1 != NULL) {
+		t = get_time_3(nloop, grad_synth[i].name, grad_synth[i].fp1, Slm, Sh, Th);	if (t < t0) {	SHsph_to_spat_ptr = grad_synth[i].fp1;	SHtor_to_spat_ptr = grad_synth[i].fp2;	t0 = t;	PRINT_VERB("*"); }
+	}
   #else
-		t0 = get_time_2(nloop, "hyb", &SHsph_to_spat_hyb, Slm, Sh);	t0c = t0/MIN_PERF_IMPROVE_DCT;		t=t0c;	//ref time.
+	if (on_the_fly == 0) {
+		t0 = get_time_2(nloop, grad_synth[i].name, grad_synth[i].fp1, Slm, Sh);		t0 *= 1.0/MIN_PERF_IMPROVE_DCT;		// ref time.
 	}
-	tt = get_time_2(nloop, "fly1", &SHsph_to_spat_fly1, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SHsph_to_spat_ptr = &SHsph_to_spat_fly1;	SHtor_to_spat_ptr = &SHtor_to_spat_fly1;	t = tt;	}
-	tt = get_time_2(nloop, "fly2", &SHsph_to_spat_fly2, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SHsph_to_spat_ptr = &SHsph_to_spat_fly2;	SHtor_to_spat_ptr = &SHtor_to_spat_fly2;	t = tt;	}
-	tt = get_time_2(nloop, "fly4", &SHsph_to_spat_fly4, Slm, Sh);	if ((tt < t0c)&&(tt<t))	{	SHsph_to_spat_ptr = &SHsph_to_spat_fly4;	SHtor_to_spat_ptr = &SHtor_to_spat_fly4;	t = tt;	}
+	while ( grad_synth[++i].fp1 != NULL) {
+		t = get_time_2(nloop, grad_synth[i].name, grad_synth[i].fp1, Slm, Sh);	if (t < t0) {	SHsph_to_spat_ptr = grad_synth[i].fp1;	SHtor_to_spat_ptr = grad_synth[i].fp2;	t0 = t;	PRINT_VERB("*"); }
+	}
   #endif
 
 	// vector
 	#if SHT_VERBOSE > 1
-		printf("\nfinding best vector synthesis ...\t");	fflush(stdout);
+		printf("\nfinding best vector synthesis ...");	fflush(stdout);
 	#endif
-	if (on_the_fly == 1) {
-			t0c = 1e100;	t=t0c;
-	} else {
-		t0 = get_time_4(nloop, "hyb", &SHsphtor_to_spat_hyb, Slm, Tlm, Sh, Th);	t0c = t0/MIN_PERF_IMPROVE_DCT;		t=t0c;	//ref time.
+	i = 0;	t0 = 1e100;
+	if (on_the_fly == 0) {
+		t0 = get_time_4(nloop, vect_synth[i].name, vect_synth[i].fp, Slm, Tlm, Sh, Th);		t0 *= 1.0/MIN_PERF_IMPROVE_DCT;		// ref time.
 	}
-	tt = get_time_4(nloop, "fly1", &SHsphtor_to_spat_fly1, Slm, Tlm, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHsphtor_to_spat_ptr = &SHsphtor_to_spat_fly1;	t = tt; }
-	tt = get_time_4(nloop, "fly2", &SHsphtor_to_spat_fly2, Slm, Tlm, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHsphtor_to_spat_ptr = &SHsphtor_to_spat_fly2;	t = tt; }
-	tt = get_time_4(nloop, "fly3", &SHsphtor_to_spat_fly3, Slm, Tlm, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHsphtor_to_spat_ptr = &SHsphtor_to_spat_fly3;	t = tt; }
+	while ( vect_synth[++i].fp != NULL) {
+		t = get_time_4(nloop, vect_synth[i].name, vect_synth[i].fp, Slm, Tlm, Sh, Th);	if (t < t0) {	SHsphtor_to_spat_ptr = vect_synth[i].fp;	t0 = t;	PRINT_VERB("*"); }
+	}
 	if (wg != NULL) {
 		#if SHT_VERBOSE > 1
-			printf("\nfinding best vector analysis ...\t");	fflush(stdout);
+			printf("\nfinding best vector analysis ...");	fflush(stdout);
 		#endif
-		if (on_the_fly == 1) {
-			t0c = 1e100;	t=t0c;
-		} else {
-			t0 = get_time_4(nloop, "hyb", &spat_to_SHsphtor_hyb, Sh, Th, Slm, Tlm);	t0c = t0/MIN_PERF_IMPROVE_DCT;		t=t0c;	//ref time.
+		i = 0;	t0 = 1e100;
+		if (on_the_fly == 0) {
+			t0 = get_time_4(nloop, vect_analys[i].name, vect_analys[i].fp, Sh, Th, Slm, Tlm);		t0 *= 1.0/MIN_PERF_IMPROVE_DCT;		// ref time.
 		}
-		tt = get_time_4(nloop, "fly1", &spat_to_SHsphtor_fly1, Sh, Th, Slm, Tlm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SHsphtor_ptr = &spat_to_SHsphtor_fly1;	t = tt; }
-		tt = get_time_4(nloop, "fly2", &spat_to_SHsphtor_fly2, Sh, Th, Slm, Tlm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SHsphtor_ptr = &spat_to_SHsphtor_fly2;	t = tt; }
-		tt = get_time_4(nloop, "fly3", &spat_to_SHsphtor_fly3, Sh, Th, Slm, Tlm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SHsphtor_ptr = &spat_to_SHsphtor_fly3;	t = tt; }
+		while ( vect_synth[++i].fp != NULL) {
+			t = get_time_4(nloop, vect_analys[i].name, vect_analys[i].fp, Sh, Th, Slm, Tlm);	if (t < t0) {	spat_to_SHsphtor_ptr = vect_analys[i].fp;	t0 = t;	PRINT_VERB("*"); }
+		}
 	}
 
 	// 3d
 	#if SHT_VERBOSE > 1
-		printf("\nfinding best 3d synthesis ...\t");	fflush(stdout);
+		printf("\nfinding best 3d synthesis ...");	fflush(stdout);
 	#endif
-	if (on_the_fly == 1) {
-		t0c = 1e100;	t=t0c;
-	} else {
-		t0 = get_time_6(nloop, "hyb", &SHqst_to_spat_hyb, Qlm, Slm, Tlm, Qh, Sh, Th);	t0c = t0/MIN_PERF_IMPROVE_DCT;		t=t0c;	//ref time.
+	i = 0;	t0 = 1e100;
+	if (on_the_fly == 0) {
+		t0 = get_time_6(nloop, v3d_synth[i].name, v3d_synth[i].fp, Qlm, Slm, Tlm, Qh, Sh, Th);		t0 *= 1.0/MIN_PERF_IMPROVE_DCT;		// ref time.
 	}
-	tt = get_time_6(nloop, "s+v", &SHqst_to_spat_2, Qlm, Slm, Tlm, Qh, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHqst_to_spat_ptr = &SHqst_to_spat_2;	t = tt; }
-	tt = get_time_6(nloop, "fly1", &SHqst_to_spat_fly1, Qlm, Slm, Tlm, Qh, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHqst_to_spat_ptr = &SHqst_to_spat_fly1;	t = tt; }
-	tt = get_time_6(nloop, "fly2", &SHqst_to_spat_fly2, Qlm, Slm, Tlm, Qh, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHqst_to_spat_ptr = &SHqst_to_spat_fly2;	t = tt; }
-	tt = get_time_6(nloop, "fly3", &SHqst_to_spat_fly3, Qlm, Slm, Tlm, Qh, Sh, Th);	if ((tt < t0c)&&(tt<t))	{	SHqst_to_spat_ptr = &SHqst_to_spat_fly3;	t = tt; }
-
+	while ( v3d_synth[++i].fp != NULL) {
+		t = get_time_6(nloop, v3d_synth[i].name, v3d_synth[i].fp, Qlm, Slm, Tlm, Qh, Sh, Th);	if (t < t0) {	SHqst_to_spat_ptr = v3d_synth[i].fp;	t0 = t;	PRINT_VERB("*"); }
+	}
 	if (wg != NULL) {
 		#if SHT_VERBOSE > 1
-			printf("\nfinding best 3d analysis ...\t");	fflush(stdout);
+			printf("\nfinding best 3d analysis ...");	fflush(stdout);
 		#endif
-		if (on_the_fly == 1) {
-			t0c = 1e100;	t=t0c;
-		} else {
-			t0 = get_time_6(nloop, "hyb", &spat_to_SHqst_hyb, Qh, Sh, Th, Qlm, Slm, Tlm);	t0c = t0/MIN_PERF_IMPROVE_DCT;		t=t0c;	//ref time.
+		i = 0;	t0 = 1e100;
+		if (on_the_fly == 0) {
+			t0 = get_time_6(nloop, v3d_analys[i].name, v3d_analys[i].fp, Qh, Sh, Th, Qlm, Slm, Tlm);		t0 *= 1.0/MIN_PERF_IMPROVE_DCT;		// ref time.
 		}
-		tt = get_time_6(nloop, "s+v", &spat_to_SHqst_2, Qh, Sh, Th, Qlm, Slm, Tlm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SHqst_ptr = &spat_to_SHqst_2;	t = tt; }
-		tt = get_time_6(nloop, "fly1", &spat_to_SHqst_fly1, Qh, Sh, Th, Qlm, Slm, Tlm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SHqst_ptr = &spat_to_SHqst_fly1;	t = tt; }
-		tt = get_time_6(nloop, "fly2", &spat_to_SHqst_fly2, Qh, Sh, Th, Qlm, Slm, Tlm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SHqst_ptr = &spat_to_SHqst_fly2;	t = tt; }
-		tt = get_time_6(nloop, "fly3", &spat_to_SHqst_fly3, Qh, Sh, Th, Qlm, Slm, Tlm);	if ((tt < t0c)&&(tt<t))	{	spat_to_SHqst_ptr = &spat_to_SHqst_fly3;	t = tt; }
+		while ( v3d_synth[++i].fp != NULL) {
+			t = get_time_6(nloop, v3d_analys[i].name, v3d_analys[i].fp, Qh, Sh, Th, Qlm, Slm, Tlm);	if (t < t0) {	spat_to_SHqst_ptr = v3d_analys[i].fp;	t0 = t; PRINT_VERB("*"); }
+		}
 	}
-
+	#if SHT_VERBOSE > 1
+		printf("\n");
+	#endif
 	fftw_free(Tlm);	fftw_free(Slm);	fftw_free(Qlm);	fftw_free(Th);	fftw_free(Sh);	fftw_free(Qh);
 }
 
