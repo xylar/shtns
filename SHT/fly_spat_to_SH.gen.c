@@ -131,7 +131,7 @@ V			ter[i] = 0.0;		tor[i] = 0.0;
 V			per[i] = 0.0;		por[i] = 0.0;
 			i++;
 	#if _GCC_VEC_
-		} while(i<ni+2*(NWAY-1));
+		} while(i<ni+2*NWAY-1);
 	#else
 		} while(i<ni+NWAY-1);
 	#endif
@@ -243,7 +243,7 @@ V			ter[i] = 0.0;		tei[i] = 0.0;		tor[i] = 0.0;		toi[i] = 0.0;
 V			per[i] = 0.0;		pei[i] = 0.0;		por[i] = 0.0;		poi[i] = 0.0;
 			i++;
 	#if _GCC_VEC_
-		} while (i < ni+2*(NWAY-1));
+		} while (i < ni+2*NWAY-1);
 	#else
 		} while (i < ni+NWAY-1);
 	#endif
