@@ -1665,6 +1665,10 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 		}
 	}
 
+	if (flags == sht_auto) {
+		if ((nl_order>=2)&&(MMAX*MRES > LMAX/2)) flags = sht_gauss;		// avoid computing DCT stuff when it is not expected to be faster.
+	}
+
 	// copy to global variables.
 #ifdef SHT_AXISYM
 	shtns.nphi = 1;
@@ -1710,13 +1714,10 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	#if SHT_VERBOSE > 0
 				printf("     !! Not enough accuracy (%.3g) => turning off DCT.\n",t);
 	#endif
-	#if SHT_VERBOSE < 2
 				Set_MTR_DCT(-1);		// turn off DCT.
-	#endif
 			}
 		}
   #endif
-  #if SHT_VERBOSE < 2
 		if (MTR_DCT == -1) {			// free memory used by DCT and disables DCT.
 			free_SH_dct();			// free now useless arrays.
 			zlm_dct0 = NULL;		// this disables DCT completely.
@@ -1724,15 +1725,15 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 			if (dct_m0 != NULL) fftw_destroy_plan(dct_m0);
 			if (flags == sht_auto) {
 				flags = sht_gauss;		// switch to gauss grid, even better accuracy.
-	#if SHT_VERBOSE > 0
+		#if SHT_VERBOSE > 0
 				printf("        => switching back to Gauss Grid\n");
-	#endif
+		#endif
 				for (im=1; im<=MMAX; im++) {	//	im >= 1
 					m = im*MRES;
 					ylm[im]  -= tm[im]*(LMAX-m+1);		// restore pointers altered by OptimizeMatrices().
-	#ifndef SHT_SCALAR_ONLY
+		#ifndef SHT_SCALAR_ONLY
 					dylm[im] -= tm[im]*(LMAX-m+1);
-	#endif
+		#endif
 				}
 				if (n_gauss > 0) {		// we should use the optimal size for gauss-legendre
 					if (NPHI>1) {
@@ -1746,7 +1747,6 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 				}
 			}
 		}
-  #endif
 	}
 	if (flags == sht_gauss)
 	{
@@ -1772,6 +1772,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
   #if SHT_VERBOSE > 0
 		printf("        + using on-the-fly transforms.\n");
   #endif
+		if (NLAT < 32) shtns_runerr("on-the-fly only available for nlat>=32");		// avoid overflow with NLAT_2 < 2*NWAY
 		PolarOptimize(eps);
 		set_fly();		set_fly_l();		set_fly_m0();		// switch function pointers to "on-the-fly" functions.
 	}
