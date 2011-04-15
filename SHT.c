@@ -638,10 +638,9 @@ double Find_Optimal_SHT()
 	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 
-	t = 1.0 / (RAND_MAX/2);		// some random data to play with.
 	for (i=0;i<NLM;i++) {
-		Slm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
-		Tlm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		Slm[i] = l_2[i] + 0.5*I*l_2[i];
+		Tlm[i] = 0.5*l_2[i] + I*l_2[i];
 	}
 
         minc = MMAX/20 + 1;             // don't test every single m.
@@ -1598,6 +1597,10 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	return(NLM);
 }
 
+void set_fly();
+void set_fly_l();
+void set_fly_m0();
+void choose_best_sht(int);
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables and internal data.
@@ -1628,9 +1631,13 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	flags = flags & 255;	// clear higher bits.
 
 	switch (flags) {
+	  #ifdef SHT_NO_DCT
+		case sht_auto :				flags = sht_gauss;		// auto means gauss if dct is disabled.
+			break;
+	  #endif
 		case sht_gauss_fly :		flags = sht_gauss;		on_the_fly = 1;
 			break;
-		case sht_quick_init : 	flags = sht_gauss;
+		case sht_quick_init :	 	flags = sht_gauss;
 		case sht_reg_poles :		quick_init = 1;		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init.
 			break;
 		default : break;
@@ -1672,8 +1679,10 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	nspat = planFFT(layout);		// initialize fftw
 	zlm_dct0 = NULL;		// used as a flag.
 
-#ifndef SHT_NO_DCT
 	if (flags == sht_reg_dct) {		// pure dct.
+		#ifdef SHT_NO_DCT
+			runerr("DCT not supported. recompile without setting SHT_NO_DCT in sht_config.h");
+		#endif
 		init_SH_dct(1);
 		OptimizeMatrices(0.0);
 		Set_MTR_DCT(MMAX);
@@ -1682,27 +1691,31 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	{
 		init_SH_dct(1);
 		OptimizeMatrices(eps);
-  #if SHT_VERBOSE > 0
+  #ifdef SHT_NO_DCT
+			Set_MTR_DCT(-1);		// turn off DCT.
+  #else
+	#if SHT_VERBOSE > 0
 		printf("finding optimal MTR_DCT ...\r");	fflush(stdout);
-  #endif
+	#endif
 		t = Find_Optimal_SHT();
-  #if SHT_VERBOSE > 0
+	#if SHT_VERBOSE > 0
 		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
-  #endif
+	#endif
   		if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) NLAT)/n_gauss;	// we can revert to gauss with a smaller nlat.
 		if (t > MIN_PERF_IMPROVE_DCT) {
 			Set_MTR_DCT(-1);		// turn off DCT.
 		} else {
 			t = SHT_error();
 			if (t > MIN_ACCURACY_DCT) {
-  #if SHT_VERBOSE > 0
+	#if SHT_VERBOSE > 0
 				printf("     !! Not enough accuracy (%.3g) => turning off DCT.\n",t);
-  #endif
-  #if SHT_VERBOSE < 2
+	#endif
+	#if SHT_VERBOSE < 2
 				Set_MTR_DCT(-1);		// turn off DCT.
-  #endif
+	#endif
 			}
 		}
+  #endif
   #if SHT_VERBOSE < 2
 		if (MTR_DCT == -1) {			// free memory used by DCT and disables DCT.
 			free_SH_dct();			// free now useless arrays.
@@ -1717,9 +1730,9 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 				for (im=1; im<=MMAX; im++) {	//	im >= 1
 					m = im*MRES;
 					ylm[im]  -= tm[im]*(LMAX-m+1);		// restore pointers altered by OptimizeMatrices().
-#ifndef SHT_SCALAR_ONLY
+	#ifndef SHT_SCALAR_ONLY
 					dylm[im] -= tm[im]*(LMAX-m+1);
-#endif
+	#endif
 				}
 				if (n_gauss > 0) {		// we should use the optimal size for gauss-legendre
 					if (NPHI>1) {
@@ -1736,9 +1749,6 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
   #endif
 	}
 	if (flags == sht_gauss)
-#else
-	if ((flags == sht_gauss)||(flags == sht_auto)||(flags == sht_reg_fast)||(flags == sht_reg_dct))
-#endif
 	{
 		MTR_DCT = -1;		// we do not use DCT !!!
 		init_SH_gauss(on_the_fly);
@@ -1757,7 +1767,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 			OptimizeMatrices(0.0);
 		}
 	}
-
+	
 	if (on_the_fly == 1) {
   #if SHT_VERBOSE > 0
 		printf("        + using on-the-fly transforms.\n");
@@ -1767,6 +1777,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	}
 
 	if (quick_init == 0) {
+		choose_best_sht(on_the_fly);
 		t = SHT_error();		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);

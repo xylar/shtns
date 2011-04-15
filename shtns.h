@@ -146,18 +146,14 @@ double shlm_e1(int l, int m);		///< returns the l,m SH coefficient corresponding
 //@{
 void spat_to_SH(double *Vr, complex double *Qlm);
 void SH_to_spat(complex double *Qlm, double *Vr);
-void SH_to_spat_fly(complex double *Qlm, double *Vr);
-void spat_to_SH_fly(double *Vr, complex double *Qlm);
 //@}
 
 /// \name Vector transforms
 //@{
 void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
-void spat_to_SHsphtor_fly(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
 void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
 void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp);
 void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp);
-void SHsphtor_to_spat_fly(complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat
 #define SH_to_grad_spat(S,Gt,Gp) SHsph_to_spat(S, Gt, Gp)
@@ -165,9 +161,7 @@ void SHsphtor_to_spat_fly(complex double *Slm, complex double *Tlm, double *Vt, 
 /// \name 3D transforms (combine Scalar and Vector)
 //@{
 void spat_to_SHqst(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm);
-void spat_to_SHqst_fly(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm);
 void SHqst_to_spat(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp);
-void SHqst_to_spat_fly(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp);
 //@}
 
 /// \name Local and partial evalutions of a SH representation :
