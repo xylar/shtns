@@ -51,6 +51,10 @@ V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	s2d qq[2*LMAX];
 V	s2d ss[2*LMAX];
 V	s2d tt[2*LMAX];
+  #else
+Q	double qq[LMAX+1];
+V	double ss[LMAX+1];
+V	double tt[LMAX+1];
   #endif
 
   #ifndef SHT_AXISYM

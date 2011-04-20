@@ -684,10 +684,10 @@ int main(int argc, char *argv[])
 	
 	printf("** performing %d 3D vector SHT (no DCT) \n", SHT_ITER);
   if (m_opt >= 0) {
-	printf(":: OPTIMAL with LTR\n");
+	printf(":: OPTIMAL\n");
 	Set_MTR_DCT(m_opt);
 	test_SHT_vect3d();
-	printf(":: FULL DCT with LTR\n");
+	printf(":: FULL DCT\n");
 	Set_MTR_DCT(MMAX);
 	test_SHT_vect3d();
   }

@@ -605,76 +605,6 @@ int Get_MTR_DCT() {
 	return MTR_DCT;
 }
 
-/// TIMINGS
-	double get_time(int m, int nloop, double *Sh, double *Th, complex double *Slm, complex double *Tlm)
-	{
-		int i;
-		ticks tik0, tik1;
-
-		Set_MTR_DCT(m);
-			SH_to_spat(Tlm,Sh);			// caching...
-			SHsphtor_to_spat(Slm,Tlm,Sh,Th);
-		tik0 = getticks();
-		for (i=0; i<nloop; i++) {
-			SH_to_spat(Tlm,Sh);
-			SHsphtor_to_spat(Slm,Tlm,Sh,Th);
-		}
-		tik1 = getticks();
-	#if SHT_VERBOSE > 1
-		printf("m=%d - ticks : %.3f\n", m*MRES, elapsed(tik1,tik0)/(nloop*NLM*NLAT));
-	#endif
-		return elapsed(tik1,tik0);
-	}
-
-double Find_Optimal_SHT()
-{
-	complex double *Slm, *Tlm;
-	double *Sh, *Th;
-	int m, i, minc, nloop;
-	double t, tsum, tsum0;
-
-	Sh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
-	Th = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
-	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-
-	for (i=0;i<NLM;i++) {
-		Slm[i] = l_2[i] + 0.5*I*l_2[i];
-		Tlm[i] = 0.5*l_2[i] + I*l_2[i];
-	}
-
-        minc = MMAX/20 + 1;             // don't test every single m.
-        nloop = 10;                     // number of loops to get time.
-        if (NLM*NLAT > 1024*1024)
-                nloop = 1 + (10*1024*1024)/(NLM*NLAT);          // don't use too many loops for large transforms.
-#if SHT_VERBOSE > 1
-	printf("\nminc = %d, nloop = %d\n",minc,nloop);
-#endif
-
-	m = -1;
-	tsum0 = get_time(m, nloop, Sh, Th, Slm, Tlm);
-	tsum=tsum0;	i = m;
-	t = get_time(m, nloop, Sh, Th, Slm, Tlm);
-	if (t<tsum0) tsum0 = t;		// recheck m=-1
-	for (m=0; m<=MMAX; m+=minc) {
-		t = get_time(m, nloop, Sh, Th, Slm, Tlm);
-		if ((m==-1)&&(t<tsum0)) tsum0 = t;
-		if (t < tsum) {	tsum = t;	i = m; }
-	}
-	m=-1;	// recheck m=-1;
-		t = get_time(m, nloop, Sh, Th, Slm, Tlm);
-		if (t<tsum0) tsum0 = t;
-		if (t < tsum) { tsum = t;	i = m; }
-		t = get_time(m, nloop, Sh, Th, Slm, Tlm);	// twice
-		if (t<tsum0) tsum0 = t;
-		if (t < tsum) { tsum = t;	i = m; }
-
-	free(Tlm);	free(Slm);	fftw_free(Th);		fftw_free(Sh);
-
-	Set_MTR_DCT(i);
-	return(tsum/tsum0);	// returns ratio of "optimal" time over "no_dct" time
-}
-
 /// Sets the value tm[im] used for polar optimiation on-the-fly.
 void PolarOptimize(double eps)
 {
@@ -1600,7 +1530,7 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 void set_fly();
 void set_fly_l();
 void set_fly_m0();
-void choose_best_sht(int);
+double choose_best_sht(int*, int);
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables and internal data.
@@ -1614,8 +1544,9 @@ void choose_best_sht(int);
 int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi)
 {
 	double t;
-	int im,m,l,lm;
+	int im,m;
 	int layout, nspat;
+	int nloop = 0;
 	int n_gauss = 0;
 	int on_the_fly = 0;
 	int quick_init = 0;
@@ -1666,7 +1597,10 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	}
 
 	if (flags == sht_auto) {
-		if ((nl_order>=2)&&(MMAX*MRES > LMAX/2)) flags = sht_gauss;		// avoid computing DCT stuff when it is not expected to be faster.
+		if ( ((nl_order>=2)&&(MMAX*MRES > LMAX/2)) || (n_gauss <= 32) ) {
+			flags = sht_gauss;		// avoid computing DCT stuff when it is not expected to be faster.
+			if (n_gauss > 0) *nlat = n_gauss;
+		}
 	}
 
 	// copy to global variables.
@@ -1701,7 +1635,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	#if SHT_VERBOSE > 0
 		printf("finding optimal MTR_DCT ...\r");	fflush(stdout);
 	#endif
-		t = Find_Optimal_SHT();
+		t = choose_best_sht(&nloop, -1);		// find optimal MTR_DCT.
 	#if SHT_VERBOSE > 0
 		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
 	#endif
@@ -1774,11 +1708,12 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
   #endif
 		if (NLAT < 32) shtns_runerr("on-the-fly only available for nlat>=32");		// avoid overflow with NLAT_2 < 2*NWAY
 		PolarOptimize(eps);
+		if ( (shtns.norm & SHT_REAL_NORM) || (SHT_NORM == sht_schmidt) ) shtns_runerr("on-the-fly does not support schmidt normalization or real normalization yet.");
 		set_fly();		set_fly_l();		set_fly_m0();		// switch function pointers to "on-the-fly" functions.
 	}
 
 	if (quick_init == 0) {
-		choose_best_sht(on_the_fly);
+		choose_best_sht(&nloop, on_the_fly);
 		t = SHT_error();		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);

@@ -581,7 +581,7 @@ void GEN(set_fly,SUFFIX)()
 	GEN(SHtor_to_spat_ptr,SUFFIX) = (pfg) &GEN(SHtor_to_spat_fly2,SUFFIX);
 	GEN(SHsphtor_to_spat_ptr,SUFFIX) = (pf4) &GEN(SHsphtor_to_spat_fly1,SUFFIX);
 	GEN(SHqst_to_spat_ptr,SUFFIX) = (pf6) &GEN(SHqst_to_spat_fly1, SUFFIX);
-	if (wg != NULL) {
+	if ( (wg != NULL) && ((shtns.norm & SHT_REAL_NORM) == 0) && (SHT_NORM != sht_schmidt) ) {
 		GEN(spat_to_SH_ptr,SUFFIX) = (pf2) &GEN(spat_to_SH_fly4, SUFFIX);
 		GEN(spat_to_SHsphtor_ptr,SUFFIX) = (pf4) &GEN(spat_to_SHsphtor_fly2,SUFFIX);
 		GEN(spat_to_SHqst_ptr,SUFFIX) = (pf6) &GEN(spat_to_SHqst_fly2, SUFFIX);
@@ -671,16 +671,27 @@ double GEN(get_time_6,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, 
 }
 
 /// choose fastest between on-the-fly and gauss algorithms.
-void GEN(choose_best_sht,SUFFIX)(int on_the_fly)
+/// *nlp is the number of loops. If zero, it is set to a good value.
+/// on_the_fly : 1 = skip all memory algorithm. 0 = include memory and on-the-fly. -1 = test only DCT.
+double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly)
 {
 	complex double *Qlm, *Slm, *Tlm;
 	double *Qh, *Sh, *Th;
+	char *nb;
 	int m, i, minc, nloop;
+	int dct = 0;
+	int analys = 1;		// check also analysis.
 	double t0, t, tt;
+	double tdct, tnodct;
 	ticks tik0, tik1;
 	clock_t tcpu;
+	char ndct[20];
 
-	if (NLAT < 32) return;		// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow)
+	if (NLAT < 32) return(0.0);		// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow) and DCT not efficient for low NLAT.
+	if (on_the_fly == -1) {
+		on_the_fly = 0;		dct = 1;		// choose mtr_dct.
+	}
+	if ( (wg == NULL) || (shtns.norm & SHT_REAL_NORM) || (SHT_NORM == sht_schmidt) )	analys = 0;		// on-the-fly analysis not supported.
 
 	Qh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Sh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
@@ -694,22 +705,27 @@ void GEN(choose_best_sht,SUFFIX)(int on_the_fly)
 		Tlm[i] = 0.5*l_2[i] + I*l_2[i];
 	}
 
-	// find good nloop by requiring less than 3% difference between 2 consecutive timings.
-	m=0;	nloop = 10;                     // number of loops to get timings.
-	do {
-		tcpu = clock();
-		t0 = get_time_2(nloop, "", SH_to_spat_ptr, Slm, Sh);
-		t = get_time_2(nloop, "", SH_to_spat_ptr, Slm, Sh);
-		tcpu = clock() - tcpu;
-		double r = fabs(2.0*(t-t0)/(t+t0));
-		if (r > 0.03) {
-			m = 0;		nloop *= 3;
-		} else 	m++;
-		tt = 1.e-6 * tcpu;		// real time should not exceed 1 sec.
-		#if SHT_VERBOSE > 1
-			printf("nloop=%d, t0=%g, t=%g, r=%g, m=%d (real time (s) = %g)\n",nloop,t0,t,r,m,tt);
-		#endif
-	} while((nloop<1000)&&(m < 3)&&(tt<1.0));
+	if (*nlp <= 0) {
+		// find good nloop by requiring less than 3% difference between 2 consecutive timings.
+		m=0;	nloop = 10;                     // number of loops to get timings.
+		do {
+			tcpu = clock();
+			t0 = get_time_2(nloop, "", SH_to_spat_ptr, Slm, Sh);
+			t = get_time_2(nloop, "", SH_to_spat_ptr, Slm, Sh);
+			tcpu = clock() - tcpu;
+			double r = fabs(2.0*(t-t0)/(t+t0));
+			if (r > 0.03) {
+				m = 0;		nloop *= 3;
+			} else 	m++;
+			tt = 1.e-6 * tcpu;		// real time should not exceed 1 sec.
+			#if SHT_VERBOSE > 1
+				printf(", nloop=%d, t0=%g, t=%g, r=%g, m=%d (real time = %g s)\n",nloop,t0,t,r,m,tt);
+			#endif
+		} while((nloop<1000)&&(m < 3)&&(tt<1.0));
+		*nlp = nloop;
+	} else {
+		nloop = *nlp;
+	}
 	#if SHT_VERBOSE > 1
 		printf("nloop=%d\n",nloop);
 	#endif
@@ -722,9 +738,12 @@ void GEN(choose_best_sht,SUFFIX)(int on_the_fly)
 	while ( scal_synth[++i].fp != NULL) {
 		t = get_time_2(nloop, scal_synth[i].name, scal_synth[i].fp, Slm, Sh);
 		if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
-		if (t < t0) {	SH_to_spat_ptr = scal_synth[i].fp;	t0 = t;	PRINT_VERB("*"); }
+		if (t < t0) {	SH_to_spat_ptr = scal_synth[i].fp;	t0 = t;	nb=scal_synth[i].name;	PRINT_VERB("*"); }
 	}
-	if (wg != NULL) {
+	#if SHT_VERBOSE > 1
+		printf(" => %s",nb);
+	#endif
+	if (analys) {
 		#if SHT_VERBOSE > 1
 			printf("\nfinding best scalar analysis ...");	fflush(stdout);
 		#endif
@@ -732,11 +751,71 @@ void GEN(choose_best_sht,SUFFIX)(int on_the_fly)
 		while ( scal_analys[++i].fp != NULL) {
 			t = get_time_2(nloop, scal_analys[i].name, scal_analys[i].fp, Sh, Slm);
 			if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
-			if (t < t0) {	spat_to_SH_ptr = scal_analys[i].fp;	t0 = t;	PRINT_VERB("*"); }
+			if (t < t0) {	spat_to_SH_ptr = scal_analys[i].fp;	t0 = t;	nb=scal_analys[i].name;	PRINT_VERB("*"); }
 		}
+		#if SHT_VERBOSE > 1
+			printf(" => %s",nb);
+		#endif
 	}
 
 	nloop = nloop/2;
+	// vector
+	#if SHT_VERBOSE > 1
+		printf("\nfinding best vector synthesis ...");	fflush(stdout);
+	#endif
+	t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
+	while ( vect_synth[++i].fp != NULL) {
+		t = get_time_4(nloop, vect_synth[i].name, vect_synth[i].fp, Slm, Tlm, Sh, Th);
+		if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
+		if (t < t0) {	SHsphtor_to_spat_ptr = vect_synth[i].fp;	t0 = t;	nb=vect_synth[i].name;	PRINT_VERB("*"); }
+	}
+	#if SHT_VERBOSE > 1
+		printf(" => %s",nb);
+	#endif
+	if (analys) {
+		#if SHT_VERBOSE > 1
+			printf("\nfinding best vector analysis ...");	fflush(stdout);
+		#endif
+		t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
+		while ( vect_analys[++i].fp != NULL) {
+			t = get_time_4(nloop, vect_analys[i].name, vect_analys[i].fp, Sh, Th, Slm, Tlm);
+			if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
+			if (t < t0) {	spat_to_SHsphtor_ptr = vect_analys[i].fp;	t0 = t;	nb=vect_analys[i].name;	PRINT_VERB("*"); }
+		}
+		#if SHT_VERBOSE > 1
+			printf(" => %s",nb);
+		#endif
+	}
+
+  if (dct == 0) {
+	// 3d
+	#if SHT_VERBOSE > 1
+		printf("\nfinding best 3d synthesis ...");	fflush(stdout);
+	#endif
+	t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
+	while ( v3d_synth[++i].fp != NULL) {
+		t = get_time_6(nloop, v3d_synth[i].name, v3d_synth[i].fp, Qlm, Slm, Tlm, Qh, Sh, Th);
+//		if (i<2) t *= 1.0/MIN_PERF_IMPROVE_DCT;
+		if (t < t0) {	SHqst_to_spat_ptr = v3d_synth[i].fp;	t0 = t;	nb=v3d_synth[i].name;	PRINT_VERB("*"); }
+	}
+	#if SHT_VERBOSE > 1
+		printf(" => %s",nb);
+	#endif
+	if (analys) {
+		#if SHT_VERBOSE > 1
+			printf("\nfinding best 3d analysis ...");	fflush(stdout);
+		#endif
+		t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
+		while ( v3d_analys[++i].fp != NULL) {
+			t = get_time_6(nloop, v3d_analys[i].name, v3d_analys[i].fp, Qh, Sh, Th, Qlm, Slm, Tlm);
+//			if (i<2) t *= 1.0/MIN_PERF_IMPROVE_DCT;
+			if (t < t0) {	spat_to_SHqst_ptr = v3d_analys[i].fp;	t0 = t; nb=v3d_analys[i].name;	PRINT_VERB("*"); }
+		}
+		#if SHT_VERBOSE > 1
+			printf(" => %s",nb);
+		#endif
+	}
+	
 	// gradients
 	#if SHT_VERBOSE > 1
 		printf("\nfinding best gradient synthesis ...");	fflush(stdout);
@@ -749,56 +828,46 @@ void GEN(choose_best_sht,SUFFIX)(int on_the_fly)
 		t = get_time_2(nloop, grad_synth[i].name, grad_synth[i].fp1, Slm, Sh);
 	  #endif
 		if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
-		if (t < t0) {	SHsph_to_spat_ptr = grad_synth[i].fp1;	SHtor_to_spat_ptr = grad_synth[i].fp2;	t0 = t;	PRINT_VERB("*"); }
+		if (t < t0) {	SHsph_to_spat_ptr = grad_synth[i].fp1;	SHtor_to_spat_ptr = grad_synth[i].fp2;	t0 = t;	nb=grad_synth[i].name;	PRINT_VERB("*"); }
 	}
-
-	// vector
 	#if SHT_VERBOSE > 1
-		printf("\nfinding best vector synthesis ...");	fflush(stdout);
+		printf("   %s",nb);
 	#endif
-	t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
-	while ( vect_synth[++i].fp != NULL) {
-		t = get_time_4(nloop, vect_synth[i].name, vect_synth[i].fp, Slm, Tlm, Sh, Th);
-		if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
-		if (t < t0) {	SHsphtor_to_spat_ptr = vect_synth[i].fp;	t0 = t;	PRINT_VERB("*"); }
-	}
-	if (wg != NULL) {
-		#if SHT_VERBOSE > 1
-			printf("\nfinding best vector analysis ...");	fflush(stdout);
-		#endif
-		t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
-		while ( vect_analys[++i].fp != NULL) {
-			t = get_time_4(nloop, vect_analys[i].name, vect_analys[i].fp, Sh, Th, Slm, Tlm);
-			if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
-			if (t < t0) {	spat_to_SHsphtor_ptr = vect_analys[i].fp;	t0 = t;	PRINT_VERB("*"); }
-		}
-	}
+  }
 
-	// 3d
+  #ifndef SUFFIX
+	// DCT
+	if (dct > 0) {		// find the best DCT timings...
+        minc = MMAX/20 + 1;             // don't test every single m.
 	#if SHT_VERBOSE > 1
-		printf("\nfinding best 3d synthesis ...");	fflush(stdout);
+		printf("\nfinding best dct synthesis ...");
 	#endif
-	t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
-	while ( v3d_synth[++i].fp != NULL) {
-		t = get_time_6(nloop, v3d_synth[i].name, v3d_synth[i].fp, Qlm, Slm, Tlm, Qh, Sh, Th);
-//		if (i<2) t *= 1.0/MIN_PERF_IMPROVE_DCT;
-		if (t < t0) {	SHqst_to_spat_ptr = v3d_synth[i].fp;	t0 = t;	PRINT_VERB("*"); }
-	}
-	if (wg != NULL) {
-		#if SHT_VERBOSE > 1
-			printf("\nfinding best 3d analysis ...");	fflush(stdout);
-		#endif
-		t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
-		while ( v3d_analys[++i].fp != NULL) {
-			t = get_time_6(nloop, v3d_analys[i].name, v3d_analys[i].fp, Qh, Sh, Th, Qlm, Slm, Tlm);
-//			if (i<2) t *= 1.0/MIN_PERF_IMPROVE_DCT;
-			if (t < t0) {	spat_to_SHqst_ptr = v3d_analys[i].fp;	t0 = t; PRINT_VERB("*"); }
+		m = -1;		i = -1;		// reference = no dct.
+			t0 = get_time_2(nloop*2, "s", SH_to_spat_ptr, Qlm, Qh);
+			t0 += get_time_4(nloop, "v", SHsphtor_to_spat_ptr, Slm, Tlm, Sh, Th);
+			tnodct = t0;
+		for (m=0; m<=MMAX; m+=minc) {
+			#if SHT_VERBOSE > 1
+				printf("\nm=%d  ",m);
+			#endif
+			Set_MTR_DCT(m);
+			t = get_time_2(nloop*2, "sdct", (pf2) &SH_to_spat_hyb, Qlm, Qh);
+			t += get_time_4(nloop, "vdct", (pf4) &SHsphtor_to_spat_hyb, Slm, Tlm, Sh, Th);
+			if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
 		}
+		tdct = t0;
+		Set_MTR_DCT(i);		// the best DCT is chosen.
 	}
+  #endif
+
 	#if SHT_VERBOSE > 1
 		printf("\n");
 	#endif
 	fftw_free(Tlm);	fftw_free(Slm);	fftw_free(Qlm);	fftw_free(Th);	fftw_free(Sh);	fftw_free(Qh);
+
+	if (dct > 0) {
+		return(tdct/tnodct);
+	} else	return(0.0);
 }
 
 #endif
