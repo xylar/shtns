@@ -1531,6 +1531,8 @@ void set_fly();
 void set_fly_l();
 void set_fly_m0();
 double choose_best_sht(int*, int);
+double choose_best_sht_l(int*, int, int);
+double choose_best_sht_m0(int*, int);
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables and internal data.
@@ -1713,7 +1715,12 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	}
 
 	if (quick_init == 0) {
+  #if SHT_VERBOSE > 0
+		printf("finding fastest algorithm...\r");	fflush(stdout);
+  #endif
 		choose_best_sht(&nloop, on_the_fly);
+		choose_best_sht_l(&nloop, on_the_fly, 2*LMAX/3);
+		choose_best_sht_m0(&nloop, on_the_fly);
 		t = SHT_error();		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);
