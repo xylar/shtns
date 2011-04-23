@@ -39,17 +39,21 @@
   #define LEG_RANGE_CHECK
 #endif
 
+#define SHT_LEG_SCALEF 1.10180321e-280
+
 /// computes sin(t)^n from cos(t). ie returns (1-x^2)^(n/2), with x = cos(t)
 inline double sint_pow_n(double cost, int n)
 {
-	double val = 1.0;
+	double val = 1.0/SHT_LEG_SCALEF;
 	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
-	if (n&1) val *= sqrt(s2);	// = sin(t)
-	n >>= 1;
+
+	if (n&1) {
+		val *= sqrt(s2);	// = sin(t)
+		n--;
+	}
 	while(n>0) {
-		if (n&1) val *= s2;
-		n >>= 1;
-		s2 *= s2;
+		val *= s2;
+		n-=2;
 	}
 	return val;		// = sint(t)^n
 }
@@ -69,12 +73,14 @@ double legendre_sphPlm(const int l, const int im, double x)
 #endif
 
 	al = alm[im];
-	ymm = al[0] * sint_pow_n(x, m);		// l=m
-	if (l==m) return ((double) ymm);
-
-	ymmp1 = ymm * al[1] * x;				// l=m+1
+	ymm = al[0];		// l=m
+	if (im>0) ymm *= SHT_LEG_SCALEF;
+	ymmp1 = ymm;
+	if (l==m) goto done;
+	
+	ymmp1 *= al[1] * x;				// l=m+1
 	al+=2;
-	if (l == m+1) return ((double) ymmp1);
+	if (l == m+1) goto done;
 	
 	for (i=m+2; i<l; i+=2) {
 		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
@@ -84,6 +90,8 @@ double legendre_sphPlm(const int l, const int im, double x)
 	if (i==l) {
 		ymmp1 = al[1]*x*ymmp1 + al[0]*ymm;
 	}
+done:
+	if (im>0) ymmp1 *= sint_pow_n(x, m);
 	return ((double) ymmp1);
 }
 
@@ -105,16 +113,17 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 #endif
 
 	al = alm[im];
-	ymm = al[0] * sint_pow_n(x, m);	// l=m
-	yl[0] = ymm;
-	if (lmax==m) return;		// done.
+	yl -= m;			// shift pointer
+	ymm = al[0];	// l=m
+	if (m>0) ymm *= SHT_LEG_SCALEF;
+	yl[m] = ymm;
+	if (lmax==m) goto done;		// done.
 
 	ymmp1 = ymm * al[1] * x;		// l=m+1
-	yl[1] = ymmp1;
+	yl[m+1] = ymmp1;
 	al+=2;
-	if (lmax==m+1) return;		// done.
+	if (lmax==m+1) goto done;		// done.
 
-	yl -= m;			// shift pointer
 	for (l=m+2; l<lmax; l+=2) {
 		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
 		ymmp1 = al[3]*x*ymm   + al[2]*ymmp1;
@@ -124,6 +133,13 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 	}
 	if (l==lmax) {
 		yl[l] = al[1]*x*ymmp1 + al[0]*ymm;
+	}
+done:
+	if (m>0) {
+		ymm = sint_pow_n(x, m);
+		for (l=m; l<=lmax; l++) {		// rescale.
+			yl[l] *= ymm;
+		}
 	}
 	return;
 }
@@ -149,32 +165,27 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
 	al = alm[im];
+	yl -= m;	dyl -= m;			// shift pointers
 
 	st = sint;
 	y0 = al[0];
 	dy0 = 0.0;
 	if (im>0) {		// m > 0
-		l = m-1;			// compute  sin(theta)^(m-1)
-		do {
-			if (l&1) y0 *= st;
-			st *= st;
-		} while(l >>= 1);
+		y0 *= SHT_LEG_SCALEF;
 		dy0 = x*m*y0;
-		st = sint*sint;		// st = sin(theta)^2 is used in the recurrence for m>0
+		st *= st;			// st = sin(theta)^2 is used in the recurrence for m>0
 	}
-	yl[0] = y0;		// l=m
-	dyl[0] = dy0;
-	if (lmax==m) return;		// done.
+	yl[m] = y0;		// l=m
+	dyl[m] = dy0;
+	if (lmax==m) goto done;		// done.
 
-  #ifndef _GCC_VEC_
 	y1 = al[1] * x * y0;
 	dy1 = al[1]*( x*dy0 - st*y0 );
-	yl[1] = y1;		// l=m+1
-	dyl[1] = dy1;
-	if (lmax==m+1) return;		// done.
+	yl[m+1] = y1;		// l=m+1
+	dyl[m+1] = dy1;
+	if (lmax==m+1) goto done;		// done.
 	al+=2;
 
-	yl -= m;	dyl -= m;			// shift pointers
 	for (l=m+2; l<lmax; l+=2) {
 		y0 = al[1]*x*y1 + al[0]*y0;
 		dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
@@ -188,28 +199,21 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 		yl[l] = al[1]*x*y1 + al[0]*y0;
 		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 	}
-  #else
-  	v2d vy1 = vset(dy0, y0);
-  	v2d vx = vdup(x);
-  	v2d vst = vset(st, 0.0);
-
-  	v2d vty = vxchg(vy1);		// swap
-  	vty = vdup(al[1]) * ( vx*vy1 - vst*vty );
-
-	yl[1] = vlo_to_dbl(vty);		// l=m+1
-	dyl[1] = vhi_to_dbl(vty);
-	al+=2;
-
-	yl -= m;	dyl -= m;			// shift pointers
-	for (l=m+2; l<=lmax; l++) {		// vectorized loop : 4* and 2+ (instead of 7* and 3+)
-		v2d vy0 = vy1;
-		vy1 = vty;
-		vty = vxchg(vty);		// swap
-		vty = vdup(al[0])*vy0  +  vdup(al[1]) * (vx*vy1 - vst*vty);
-		yl[l] = vlo_to_dbl(vty);		dyl[l] = vhi_to_dbl(vty);
-		al+=2;
+done:
+	if (im>0) {
+		y0 = 1.0/SHT_LEG_SCALEF;
+		l = m-1;			// compute  sin(theta)^(m-1)
+		if (l&1) {
+			y0 *= sint;		l--;
+		}
+		while(l>0) {
+			y0 *= st;		l-=2;
+		}
+		for (l=m; l<=lmax; l++) {
+			yl[l] *= y0;		dyl[l] *= y0;		// rescale
+		}
 	}
-  #endif
+	return;
 }
 
 /// Precompute constants for the recursive generation of Legendre associated functions, with given normalization.
