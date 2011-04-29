@@ -40,20 +40,25 @@
 #endif
 
 #define SHT_LEG_SCALEF 1.10180321e-280
+#define SHT_M_RESCALE 1536
 
-/// computes sin(t)^n from cos(t). ie returns (1-x^2)^(n/2), with x = cos(t)
-inline double sint_pow_n(double cost, int n)
+/// computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
+/// works with very large values of n (up to 2700).
+double a_sint_pow_n(double val, double cost, int n)
 {
-	double val = 1.0/SHT_LEG_SCALEF;
 	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
+	int k = n >> 7;
 
-	if (n&1) {
-		val *= sqrt(s2);	// = sin(t)
+	if (n&1) val *= sqrt(s2);	// = sin(t)
+	do {
+		if (n&2) val *= s2;
+		n >>= 1;
+		s2 *= s2;
+	} while(n > k);
+	n >>= 1;
+	while(n > 0) {		// take care of very large power n
 		n--;
-	}
-	while(n>0) {
-		val *= s2;
-		n-=2;
+		val *= s2;		
 	}
 	return val;		// = sint(t)^n
 }
@@ -74,14 +79,14 @@ double legendre_sphPlm(const int l, const int im, double x)
 
 	al = alm[im];
 	ymm = al[0];		// l=m
-	if (im>0) ymm *= SHT_LEG_SCALEF;
+	if (m>0) ymm *= SHT_LEG_SCALEF;
 	ymmp1 = ymm;
 	if (l==m) goto done;
-	
+
 	ymmp1 *= al[1] * x;				// l=m+1
 	al+=2;
 	if (l == m+1) goto done;
-	
+
 	for (i=m+2; i<l; i+=2) {
 		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
 		ymmp1 = al[3]*x*ymm + al[2]*ymmp1;
@@ -91,7 +96,7 @@ double legendre_sphPlm(const int l, const int im, double x)
 		ymmp1 = al[1]*x*ymmp1 + al[0]*ymm;
 	}
 done:
-	if (im>0) ymmp1 *= sint_pow_n(x, m);
+	if (m>0) ymmp1 *= a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, m);
 	return ((double) ymmp1);
 }
 
@@ -115,7 +120,11 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 	al = alm[im];
 	yl -= m;			// shift pointer
 	ymm = al[0];	// l=m
-	if (m>0) ymm *= SHT_LEG_SCALEF;
+	if (m>0) {
+		if (lmax <= SHT_M_RESCALE) {
+			ymm = a_sint_pow_n(ymm, x, m);
+		} else ymm *= SHT_LEG_SCALEF;
+	}
 	yl[m] = ymm;
 	if (lmax==m) goto done;		// done.
 
@@ -135,8 +144,8 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 		yl[l] = al[1]*x*ymmp1 + al[0]*ymm;
 	}
 done:
-	if (m>0) {
-		ymm = sint_pow_n(x, m);
+	if ((lmax > SHT_M_RESCALE) && (m>0)) {
+		ymm = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, m);
 		for (l=m; l<=lmax; l++) {		// rescale.
 			yl[l] *= ymm;
 		}
@@ -170,8 +179,13 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 	st = sint;
 	y0 = al[0];
 	dy0 = 0.0;
-	if (im>0) {		// m > 0
-		y0 *= SHT_LEG_SCALEF;
+	if (m>0) {		// m > 0
+		l = m-1;
+		if (lmax <= SHT_M_RESCALE) {
+			if (l&1) {
+				y0 = a_sint_pow_n(y0, x, l-1) * sint;		// avoid computation of sqrt
+			} else  y0 = a_sint_pow_n(y0, x, l);
+		} else 	y0 *= SHT_LEG_SCALEF;
 		dy0 = x*m*y0;
 		st *= st;			// st = sin(theta)^2 is used in the recurrence for m>0
 	}
@@ -200,15 +214,11 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 	}
 done:
-	if (im>0) {
-		y0 = 1.0/SHT_LEG_SCALEF;
+	if ((lmax > SHT_M_RESCALE) && (m>0)) {
 		l = m-1;			// compute  sin(theta)^(m-1)
 		if (l&1) {
-			y0 *= sint;		l--;
-		}
-		while(l>0) {
-			y0 *= st;		l-=2;
-		}
+			y0 = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, l-1) * sint;		// avoid computation of sqrt
+		} else  y0 = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, l);
 		for (l=m; l<=lmax; l++) {
 			yl[l] *= y0;		dyl[l] *= y0;		// rescale
 		}
