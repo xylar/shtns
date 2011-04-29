@@ -39,9 +39,6 @@
   #define LEG_RANGE_CHECK
 #endif
 
-#define SHT_LEG_SCALEF 1.10180321e-280
-#define SHT_M_RESCALE 1536
-
 /// computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
 /// works with very large values of n (up to 2700).
 double a_sint_pow_n(double val, double cost, int n)
@@ -121,7 +118,7 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 	yl -= m;			// shift pointer
 	ymm = al[0];	// l=m
 	if (m>0) {
-		if (lmax <= SHT_M_RESCALE) {
+		if (lmax <= SHT_L_RESCALE) {
 			ymm = a_sint_pow_n(ymm, x, m);
 		} else ymm *= SHT_LEG_SCALEF;
 	}
@@ -144,7 +141,7 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 		yl[l] = al[1]*x*ymmp1 + al[0]*ymm;
 	}
 done:
-	if ((lmax > SHT_M_RESCALE) && (m>0)) {
+	if ((lmax > SHT_L_RESCALE) && (m>0)) {
 		ymm = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, m);
 		for (l=m; l<=lmax; l++) {		// rescale.
 			yl[l] *= ymm;
@@ -181,7 +178,7 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 	dy0 = 0.0;
 	if (m>0) {		// m > 0
 		l = m-1;
-		if (lmax <= SHT_M_RESCALE) {
+		if (lmax <= SHT_L_RESCALE) {
 			if (l&1) {
 				y0 = a_sint_pow_n(y0, x, l-1) * sint;		// avoid computation of sqrt
 			} else  y0 = a_sint_pow_n(y0, x, l);
@@ -214,7 +211,7 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 	}
 done:
-	if ((lmax > SHT_M_RESCALE) && (m>0)) {
+	if ((lmax > SHT_L_RESCALE) && (m>0)) {
 		l = m-1;			// compute  sin(theta)^(m-1)
 		if (l&1) {
 			y0 = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, l-1) * sint;		// avoid computation of sqrt

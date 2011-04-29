@@ -22,7 +22,7 @@ Then browse the html documentation starting with doc/html/index.html
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
  * - ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
  * - <b>on-the-fly transforms</b> : saving memory and bandwidth, and can even be faster depending on architecture.
- * - accurate up to l=1800.
+ * - accurate up to spherical harmonic degree l=2700.
  *
  * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *

@@ -25,17 +25,8 @@
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
 #define SHT_VERBOSE 1
 
-// defines the maximum amount of memory in megabytes that SHTns should use.
+/// defines the maximum amount of memory in megabytes that SHTns should use.
 #define SHTNS_MAX_MEMORY 2048
-
-// if SHT_SCALAR_ONLY is defined, it will disable the vector transform (which saves some memory)
-//#define SHT_SCALAR_ONLY
-
-// if SHT_AXISYM is defined, an axisymmetric-only transform will be compiled.
-//#define SHT_AXISYM
-
-// if SHT_NO_DCT is defined, no DCT support will be compiled. (Gauss-legendre only).
-//#define SHT_NO_DCT
 
 /// Compile the \ref fortapi
 #define SHT_F77_API
@@ -62,3 +53,14 @@
 /// (set to zero to disable, may be useful for calling from Fortran)
 #define _GCC_VEC_ 1
 
+// for LMAX > 1800, SHT_LARGE_L should be defined for on-the-fly transforms to be accurate up to LMAX=2700, but with lower performance.
+//#define SHT_LARGE_L
+
+// if SHT_SCALAR_ONLY is defined, it will disable the vector transform (which saves some memory)
+//#define SHT_SCALAR_ONLY
+
+// if SHT_AXISYM is defined, an axisymmetric-only transform will be compiled.
+//#define SHT_AXISYM
+
+// if SHT_NO_DCT is defined, no DCT support will be compiled. (Gauss-legendre only).
+//#define SHT_NO_DCT

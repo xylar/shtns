@@ -60,6 +60,10 @@
 # define M_PIl 3.1415926535897932384626433832795L
 #endif
 
+// scale factor applied for LMAX larger than SHT_L_RESCALE. Allows accurate transforms up to l=2700.
+#define SHT_LEG_SCALEF 1.10180321e-280
+#define SHT_L_RESCALE 1536
+
 /*
 struct SHTdef {
 	long int nlm;

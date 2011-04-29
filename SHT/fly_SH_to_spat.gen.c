@@ -216,10 +216,37 @@ V				y0[j] *= vdup(m);		// for the vector transform, compute ylm*m/sint
 			}
 Q			l=m;
 V			l=m-1;
+		#ifndef SHT_LARGE_L
 			do {		// sin(theta)^m
 				if (l&1) for (int j=0; j<NWAY; j++) y0[j] *= cost[j];
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
 			} while(l >>= 1);
+			#define Y0 y0[j]
+			#define Y1 y1[j]
+V			#define DY0 dy0[j]
+V			#define DY1 dy1[j]
+		#else
+			s2d scale[NWAY];
+			for (int j=0; j<NWAY; j++) {
+				y0[j] *= vdup(SHT_LEG_SCALEF);
+				scale[j] = vdup(1.0/SHT_LEG_SCALEF);
+			}
+
+			int ll = l >> 8;
+			do {		// sin(theta)^m
+				if (l&1) for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
+				l >>= 1;
+				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
+			} while(l > ll);
+			while(l > 0) {
+				l--;
+				for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
+			}
+			#define Y0 (y0[j]*scale[j])
+			#define Y1 (y1[j]*scale[j])
+V			#define DY0 (dy0[j]*scale[j])
+V			#define DY1 (dy1[j]*scale[j])
+		#endif
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = ((s2d*)(ct+k))[j];
 V				dy0[j] = cost[j]*y0[j];
@@ -229,11 +256,11 @@ Q			v2d q = ((v2d*)Ql)[l];
 S			v2d s = ((v2d*)Sl)[l];
 T			v2d t = ((v2d*)Tl)[l];
 			for (int j=0; j<NWAY; j++) {
-Q				re[j]  = y0[j] * q;
-S				pe[j]  = y0[j] * s;
-S				dto[j] = dy0[j] * s;
-T				dpo[j] = -dy0[j] * t;
-T				te[j]  = -y0[j] * t;
+Q				re[j]  = Y0 * q;
+S				pe[j]  = Y0 * s;
+S				dto[j] = DY0 * s;
+T				dpo[j] = -DY0 * t;
+T				te[j]  = -Y0 * t;
 T				dpe[j] = vdup(0.0);		to[j] = vdup(0.0);
 S				po[j] = vdup(0.0);		dte[j] = vdup(0.0);
 Q				ro[j] = vdup(0.0);
@@ -241,11 +268,11 @@ Q				ro[j] = vdup(0.0);
 		#if _GCC_VEC_
 			for (int j=0; j<NWAY; j++) {
 Q				rox[j] = vdup(0.0);
-Q				rex[j] = y0[j] * vxchg(q);
-S				dpe[j] = subadd(dpe[j], y0[j] * vxchg(s));
-S				to[j]  = subadd(to[j], dy0[j] * vxchg(s));
-T				po[j]  = subadd(po[j], dy0[j] * vxchg(t));
-T				dte[j] = subadd(dte[j], y0[j] * vxchg(t));
+Q				rex[j] = Y0 * vxchg(q);
+S				dpe[j] = subadd(dpe[j], Y0 * vxchg(s));
+S				to[j]  = subadd(to[j], DY0 * vxchg(s));
+T				po[j]  = subadd(po[j], DY0 * vxchg(t));
+T				dte[j] = subadd(dte[j], Y0 * vxchg(t));
 			}
 		#endif
 			l++;
@@ -259,19 +286,19 @@ Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
 				for (int j=0; j<NWAY; j++) {
-Q					ro[j]  += y1[j] * q;
-S					po[j]  += y1[j] * s;
-S					dte[j] += dy1[j] * s;
-T					dpe[j] -= dy1[j] * t;
-T					to[j]  -= y1[j] * t;
+Q					ro[j]  += Y1 * q;
+S					po[j]  += Y1 * s;
+S					dte[j] += DY1 * s;
+T					dpe[j] -= DY1 * t;
+T					to[j]  -= Y1 * t;
 				}
 		#if _GCC_VEC_
 				for (int j=0; j<NWAY; j++) {
-Q					rox[j] += y1[j] * vxchg(q);
-S					dpo[j] = subadd(dpo[j], y1[j] * vxchg(s));
-S					te[j]  = subadd(te[j], dy1[j] * vxchg(s));
-T					pe[j]  = subadd(pe[j], dy1[j] * vxchg(t));
-T					dto[j] = subadd(dto[j], y1[j] * vxchg(t));
+Q					rox[j] += Y1 * vxchg(q);
+S					dpo[j] = subadd(dpo[j], Y1 * vxchg(s));
+S					te[j]  = subadd(te[j], DY1 * vxchg(s));
+T					pe[j]  = subadd(pe[j], DY1 * vxchg(t));
+T					dto[j] = subadd(dto[j], Y1 * vxchg(t));
 				}
 		#endif
 				for (int j=0; j<NWAY; j++) {
@@ -282,19 +309,19 @@ Q				q = ((v2d*)Ql)[l+1];
 S				s = ((v2d*)Sl)[l+1];
 T				t = ((v2d*)Tl)[l+1];
 				for (int j=0; j<NWAY; j++) {
-Q					re[j]  += y0[j] * q;
-S					pe[j]  += y0[j] * s;
-S					dto[j] += dy0[j] * s;
-T					dpo[j] -= dy0[j] * t;
-T					te[j]  -= y0[j] * t;
+Q					re[j]  += Y0 * q;
+S					pe[j]  += Y0 * s;
+S					dto[j] += DY0 * s;
+T					dpo[j] -= DY0 * t;
+T					te[j]  -= Y0 * t;
 				}
 		#if _GCC_VEC_
 				for (int j=0; j<NWAY; j++) {
-Q					rex[j] += y0[j] * vxchg(q);
-S					dpe[j] = subadd(dpe[j], y0[j] * vxchg(s));
-S					to[j]  = subadd(to[j], dy0[j] * vxchg(s));
-T					po[j]  = subadd(po[j], dy0[j] * vxchg(t));
-T					dte[j] = subadd(dte[j], y0[j] * vxchg(t));
+Q					rex[j] += Y0 * vxchg(q);
+S					dpe[j] = subadd(dpe[j], Y0 * vxchg(s));
+S					to[j]  = subadd(to[j], DY0 * vxchg(s));
+T					po[j]  = subadd(po[j], DY0 * vxchg(t));
+T					dte[j] = subadd(dte[j], Y0 * vxchg(t));
 				}
 		#endif
 				l+=2;
@@ -309,19 +336,19 @@ Q				q = ((v2d*)Ql)[l];
 S				s = ((v2d*)Sl)[l];
 T				t = ((v2d*)Tl)[l];
 				for (int j=0; j<NWAY; j++) {
-Q					ro[j]  += y1[j] * q;
-S					po[j]  += y1[j] * s;
-S					dte[j] += dy1[j] * s;
-T					dpe[j] -= dy1[j] * t;
-T					to[j]  -= y1[j] * t;
+Q					ro[j]  += Y1 * q;
+S					po[j]  += Y1 * s;
+S					dte[j] += DY1 * s;
+T					dpe[j] -= DY1 * t;
+T					to[j]  -= Y1 * t;
 				}
 		#if _GCC_VEC_
 				for (int j=0; j<NWAY; j++) {
-Q					rox[j] += y1[j] * vxchg(q);
-S					dpo[j] = subadd(dpo[j], y1[j] * vxchg(s));
-S					te[j]  = subadd(te[j], dy1[j] * vxchg(s));
-T					pe[j]  = subadd(pe[j], dy1[j] * vxchg(t));
-T					dto[j] = subadd(dto[j], y1[j] * vxchg(t));
+Q					rox[j] += Y1 * vxchg(q);
+S					dpo[j] = subadd(dpo[j], Y1 * vxchg(s));
+S					te[j]  = subadd(te[j], DY1 * vxchg(s));
+T					pe[j]  = subadd(pe[j], DY1 * vxchg(t));
+T					dto[j] = subadd(dto[j], Y1 * vxchg(t));
 				}
 		#endif
 			}
@@ -388,6 +415,10 @@ V			Vp[k] = ((double *)BpF)[2*k];
     }
   #endif
 
+	#undef Y0
+	#undef Y1
+V	#undef DY0
+V	#undef DY1
 Q	#undef BR0
 V	#undef BT0
 V	#undef BP0
