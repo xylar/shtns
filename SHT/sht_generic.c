@@ -22,11 +22,15 @@
 
 // build interfaces to spherical harmonic transforms
 
+#define GLUE2(a,b) a##b
+#define GLUE3(a,b,c) a##b##c
+
 #ifdef SUFFIX
-  #define GEN(name,sfx) _GEN(name,sfx)
-  #define _GEN(a,b) a##b
+  #define GEN(name,sfx) GLUE2(name,sfx)
+  #define GENFLY(name,nw,sfx) GLUE3(name,nw,sfx)
 #else
   #define GEN(name,sfx) name
+  #define GENFLY(name,nw,sfx) GLUE2(name,nw)
 #endif
 #ifndef SUPARG
   #define SUPARG
@@ -52,100 +56,46 @@ void GEN(spat_to_SH_hyb,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
 {
 	#include "spat_to_SH.c"
 }
-
-void GEN(spat_to_SH_nodct,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
-{
-	#define SHT_NO_DCT
-	#include "spat_to_SH.c"
-	#undef SHT_NO_DCT
-}
-
-void GEN(spat_to_SH_fly1,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
-{
-	#define NWAY 1
-	#include "spat_to_SH_fly.c"
-	#undef NWAY
-}
-void GEN(spat_to_SH_fly2,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
-{
-	#define NWAY 2
-	#include "spat_to_SH_fly.c"
-	#undef NWAY
-}
-void GEN(spat_to_SH_fly3,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
-{
-	#define NWAY 3
-	#include "spat_to_SH_fly.c"
-	#undef NWAY
-}
-void GEN(spat_to_SH_fly4,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
-{
-	#define NWAY 4
-	#include "spat_to_SH_fly.c"
-	#undef NWAY
-}
-void GEN(spat_to_SH_fly6,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
-{
-	#define NWAY 6
-	#include "spat_to_SH_fly.c"
-	#undef NWAY
-}
-void GEN(spat_to_SH_fly8,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
-{
-	#define NWAY 8
-	#include "spat_to_SH_fly.c"
-	#undef NWAY
-}
-
-
 void GEN(SH_to_spat_hyb,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 {
 	#include "SH_to_spat.c"
 }
 
+#define SHT_NO_DCT
+void GEN(spat_to_SH_nodct,SUFFIX)(double *Vr, complex double *Qlm SUPARG)
+{
+	#include "spat_to_SH.c"
+}
 void GEN(SH_to_spat_nodct,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
 {
-	#define SHT_NO_DCT
 	#include "SH_to_spat.c"
-	#undef SHT_NO_DCT
 }
+#undef SHT_NO_DCT
 
-void GEN(SH_to_spat_fly1,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
-{
-	#define NWAY 1
-	#include "SH_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SH_to_spat_fly2,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
-{
-	#define NWAY 2
-	#include "SH_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SH_to_spat_fly3,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
-{
-	#define NWAY 3
-	#include "SH_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SH_to_spat_fly4,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
-{
-	#define NWAY 4
-	#include "SH_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SH_to_spat_fly6,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
-{
-	#define NWAY 6
-	#include "SH_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SH_to_spat_fly8,SUFFIX)(complex double *Qlm, double *Vr SUPARG)
-{
-	#define NWAY 8
-	#include "SH_to_spat_fly.c"
-	#undef NWAY
-}
+#define NWAY 1
+#include "spat_to_SH_fly.c"
+#include "SH_to_spat_fly.c"
+#undef NWAY
+#define NWAY 2
+#include "spat_to_SH_fly.c"
+#include "SH_to_spat_fly.c"
+#undef NWAY
+#define NWAY 3
+#include "spat_to_SH_fly.c"
+#include "SH_to_spat_fly.c"
+#undef NWAY
+#define NWAY 4
+#include "spat_to_SH_fly.c"
+#include "SH_to_spat_fly.c"
+#undef NWAY
+#define NWAY 6
+#include "spat_to_SH_fly.c"
+#include "SH_to_spat_fly.c"
+#undef NWAY
+#define NWAY 8
+#include "spat_to_SH_fly.c"
+#include "SH_to_spat_fly.c"
+#undef NWAY
 
 // function pointers.
 pf2 GEN(SH_to_spat_ptr, SUFFIX) = (pf2) &GEN(SH_to_spat_hyb, SUFFIX);
@@ -185,137 +135,6 @@ void GEN(SHsphtor_to_spat_hyb,SUFFIX)(complex double *Slm, complex double *Tlm, 
 #endif
 }
 
-void GEN(SHsphtor_to_spat_fly1,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 1
-	#include "SHst_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHsphtor_to_spat_fly2,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 2
-	#include "SHst_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHsphtor_to_spat_fly3,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 3
-	#include "SHst_to_spat_fly.c"
-	#undef NWAY
-}
-
-#ifndef SHT_AXISYM
-/// Spheroidal only synthesis.
-void GEN(SHsph_to_spat_hyb,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARG)
-{
-#ifndef SHT_SCALAR_ONLY
-	#include "SHs_to_spat.c"
-#endif
-}
-
-void GEN(SHsph_to_spat_fly1,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 1
-	#include "SHs_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHsph_to_spat_fly2,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 2
-	#include "SHs_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHsph_to_spat_fly4,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 4
-	#include "SHs_to_spat_fly.c"
-	#undef NWAY
-}
-
-/// Toroidal only synthesis.
-void GEN(SHtor_to_spat_hyb,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARG)
-{
-#ifndef SHT_SCALAR_ONLY
-	#include "SHt_to_spat.c"
-#endif
-}
-
-void GEN(SHtor_to_spat_fly1,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 1
-	#include "SHt_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHtor_to_spat_fly2,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 2
-	#include "SHt_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHtor_to_spat_fly4,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 4
-	#include "SHt_to_spat_fly.c"
-	#undef NWAY
-}
-
-#else
-/// Spheroidal m=0 only synthesis (results in theta component only).
-void GEN(SHsph_to_spat_hyb,SUFFIX)(complex double *Slm, double *Vt SUPARG)
-{
-#ifndef SHT_SCALAR_ONLY
-	#include "SHs_to_spat.c"
-#endif
-}
-
-void GEN(SHsph_to_spat_fly1,SUFFIX)(complex double *Slm, double *Vt SUPARG)
-{
-	#define NWAY 1
-	#include "SHs_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHsph_to_spat_fly2,SUFFIX)(complex double *Slm, double *Vt SUPARG)
-{
-	#define NWAY 2
-	#include "SHs_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHsph_to_spat_fly4,SUFFIX)(complex double *Slm, double *Vt SUPARG)
-{
-	#define NWAY 4
-	#include "SHs_to_spat_fly.c"
-	#undef NWAY
-}
-
-/// Toroidal m=0 only synthesis (results in phi component only).
-void GEN(SHtor_to_spat_hyb,SUFFIX)(complex double *Tlm, double *Vp SUPARG)
-{
-#ifndef SHT_SCALAR_ONLY
-	#include "SHt_to_spat.c"
-#endif
-}
-
-void GEN(SHtor_to_spat_fly1,SUFFIX)(complex double *Tlm, double *Vp SUPARG)
-{
-	#define NWAY 1
-	#include "SHt_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHtor_to_spat_fly2,SUFFIX)(complex double *Tlm, double *Vp SUPARG)
-{
-	#define NWAY 2
-	#include "SHt_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHtor_to_spat_fly4,SUFFIX)(complex double *Tlm, double *Vp SUPARG)
-{
-	#define NWAY 4
-	#include "SHt_to_spat_fly.c"
-	#undef NWAY
-}
-#endif
-
-
 /// \b Vector Spherical Harmonics Transform (analysis) : convert a spatial vector field (theta,phi components) to its spheroidal/toroidal spherical harmonic representation.
 void GEN(spat_to_SHsphtor_hyb,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
 {
@@ -324,24 +143,67 @@ void GEN(spat_to_SHsphtor_hyb,SUFFIX)(double *Vt, double *Vp, complex double *Sl
 #endif
 }
 
-void GEN(spat_to_SHsphtor_fly1,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
+#define NWAY 1
+#include "spat_to_SHst_fly.c"
+#include "SHst_to_spat_fly.c"
+#undef NWAY
+#define NWAY 2
+#include "spat_to_SHst_fly.c"
+#include "SHst_to_spat_fly.c"
+#undef NWAY
+#define NWAY 3
+#include "spat_to_SHst_fly.c"
+#include "SHst_to_spat_fly.c"
+#undef NWAY
+
+
+/* GRADIENTS */
+#define SHT_GRAD
+
+#ifndef SHT_AXISYM
+/// Spheroidal only synthesis.
+void GEN(SHsph_to_spat_hyb,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARG)
+#else
+/// Spheroidal m=0 only synthesis (results in theta component only).
+void GEN(SHsph_to_spat_hyb,SUFFIX)(complex double *Slm, double *Vt SUPARG)
+#endif
 {
-	#define NWAY 1
-	#include "spat_to_SHst_fly.c"
-	#undef NWAY
+#ifndef SHT_SCALAR_ONLY
+	#include "SHs_to_spat.c"
+#endif
 }
-void GEN(spat_to_SHsphtor_fly2,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
+
+#ifndef SHT_AXISYM
+/// Toroidal only synthesis.
+void GEN(SHtor_to_spat_hyb,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARG)
+#else
+/// Toroidal m=0 only synthesis (results in phi component only).
+void GEN(SHtor_to_spat_hyb,SUFFIX)(complex double *Tlm, double *Vp SUPARG)
+#endif
 {
-	#define NWAY 2
-	#include "spat_to_SHst_fly.c"
-	#undef NWAY
+#ifndef SHT_SCALAR_ONLY
+	#include "SHt_to_spat.c"
+#endif
 }
-void GEN(spat_to_SHsphtor_fly3,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
-{
-	#define NWAY 3
-	#include "spat_to_SHst_fly.c"
-	#undef NWAY
-}
+
+#define NWAY 1
+#include "SHs_to_spat_fly.c"
+#include "SHt_to_spat_fly.c"
+#undef NWAY
+#define NWAY 2
+#include "SHs_to_spat_fly.c"
+#include "SHt_to_spat_fly.c"
+#undef NWAY
+#define NWAY 3
+#include "SHs_to_spat_fly.c"
+#include "SHt_to_spat_fly.c"
+#undef NWAY
+#define NWAY 4
+#include "SHs_to_spat_fly.c"
+#include "SHt_to_spat_fly.c"
+#undef NWAY
+#undef SHT_GRAD
+
 
 // function pointers.
 pf4 GEN(spat_to_SHsphtor_ptr,SUFFIX) = (pf4) &GEN(spat_to_SHsphtor_hyb,SUFFIX);
@@ -416,58 +278,29 @@ void GEN(spat_to_SHqst_hyb,SUFFIX)(double *Vr, double *Vt, double *Vp, complex d
 #endif
 }
 
-void GEN(spat_to_SHqst_fly1,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
-{
-	#define NWAY 1
-	#include "spat_to_SHqst_fly.c"
-	#undef NWAY
-}
-void GEN(spat_to_SHqst_fly2,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
-{
-	#define NWAY 2
-	#include "spat_to_SHqst_fly.c"
-	#undef NWAY
-}
-void GEN(spat_to_SHqst_fly3,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
-{
-	#define NWAY 3
-	#include "spat_to_SHqst_fly.c"
-	#undef NWAY
-}
+#define NWAY 1
+#include "spat_to_SHqst_fly.c"
+#include "SHqst_to_spat_fly.c"
+#undef NWAY
+#define NWAY 2
+#include "spat_to_SHqst_fly.c"
+#include "SHqst_to_spat_fly.c"
+#undef NWAY
+#define NWAY 3
+#include "spat_to_SHqst_fly.c"
+#include "SHqst_to_spat_fly.c"
+#undef NWAY
+#undef SHT_3COMP
 
 /// Backward \b 3D Vector Spherical Harmonic Transform (synthesis).
 /// This is basically a shortcut to call both SH_to_spat* and SHsphtor_to spat* but may be significantly faster.
-void GEN(SHqst_to_spat_fly1,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 1
-	#include "SHqst_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHqst_to_spat_fly2,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 2
-	#include "SHqst_to_spat_fly.c"
-	#undef NWAY
-}
-void GEN(SHqst_to_spat_fly3,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
-{
-	#define NWAY 3
-	#include "SHqst_to_spat_fly.c"
-	#undef NWAY
-}
-#undef SHT_3COMP
 
 void GEN(SHqst_to_spat_hyb,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
 #ifndef SHT_SCALAR_ONLY
-	if (MTR_DCT >= 0) {
-		GEN(SH_to_spat,SUFFIX)(Qlm, Vr SUPARG2);
-		GEN(SHsphtor_to_spat,SUFFIX)(Slm, Tlm, Vt, Vp SUPARG2);
-	} else {
-		#define SHT_3COMP
-		#include "SHqst_to_spat.c"
-		#undef SHT_3COMP
-	}
+	#define SHT_3COMP
+	#include "SHqst_to_spat.c"
+	#undef SHT_3COMP
 #endif
 }
 // combining vector and scalar.
@@ -651,6 +484,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 		{ .fp1 = (pfg) GEN(SHsph_to_spat_hyb, SUFFIX),  .fp2 = (pfg) GEN(SHtor_to_spat_hyb, SUFFIX),  .name = "hyb" },
 		{ .fp1 = (pfg) GEN(SHsph_to_spat_fly1, SUFFIX), .fp2 = (pfg) GEN(SHtor_to_spat_fly1, SUFFIX), .name = "fly1" },
 		{ .fp1 = (pfg) GEN(SHsph_to_spat_fly2, SUFFIX), .fp2 = (pfg) GEN(SHtor_to_spat_fly2, SUFFIX), .name = "fly2" },
+		{ .fp1 = (pfg) GEN(SHsph_to_spat_fly3, SUFFIX), .fp2 = (pfg) GEN(SHtor_to_spat_fly3, SUFFIX), .name = "fly3" },
 		{ .fp1 = (pfg) GEN(SHsph_to_spat_fly4, SUFFIX), .fp2 = (pfg) GEN(SHtor_to_spat_fly4, SUFFIX), .name = "fly4" },
 		{ .fp1 = NULL, .fp2 =NULL, .name = NULL }
 	};
@@ -952,7 +786,9 @@ void GENF(spat_to_qst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double
 #endif
 
 #undef GEN
-#undef _GEN
+#undef GENFLY
+#undef GLUE2
+#undef GLUE3
 #undef GENF
 #undef _GENF
 #undef SUFFIX

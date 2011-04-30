@@ -1527,6 +1527,13 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 	return(NLM);
 }
 
+
+#define SHT_STD_LIST(pre,sfx) pre SH_to_spat##sfx pre spat_to_SH##sfx pre SHsphtor_to_spat##sfx pre SHqst_to_spat##sfx pre spat_to_SHsphtor##sfx pre spat_to_SHqst##sfx
+SHT_STD_LIST(extern void*, _ptr;)
+SHT_STD_LIST(extern void*, _ptr_m0;)
+SHT_STD_LIST(extern void*, _ptr_l;)
+SHT_STD_LIST(extern void*, _ptr_m0l;)
+
 void set_fly();
 void set_fly_l();
 void set_fly_m0();
@@ -1720,10 +1727,18 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
   #if SHT_VERBOSE > 0
 		printf("finding fastest algorithm...\r");	fflush(stdout);
   #endif
-		choose_best_sht(&nloop, on_the_fly);
-		choose_best_sht_l(&nloop, on_the_fly, 2*LMAX/3);
+		if (MMAX > 0) {
+			choose_best_sht(&nloop, on_the_fly);
+			choose_best_sht_l(&nloop, on_the_fly, 2*LMAX/3);
+		}
 		choose_best_sht_m0(&nloop, on_the_fly);
 		choose_best_sht_m0l(&nloop, on_the_fly, 2*LMAX/3);
+		if (MMAX == 0) {		// use SHT_AXISYM version
+			SH_to_spat_ptr = SH_to_spat_ptr_m0;		SHsphtor_to_spat_ptr = SHsphtor_to_spat_ptr_m0;		SHqst_to_spat_ptr = SHqst_to_spat_ptr_m0;
+			spat_to_SH_ptr = spat_to_SH_ptr_m0;		spat_to_SHsphtor_ptr = spat_to_SHsphtor_ptr_m0;		spat_to_SHqst_ptr = spat_to_SHqst_ptr_m0;
+			SH_to_spat_ptr_l = SH_to_spat_ptr_m0l;		SHsphtor_to_spat_ptr_l = SHsphtor_to_spat_ptr_m0l;		SHqst_to_spat_ptr_l = SHqst_to_spat_ptr_m0l;
+			spat_to_SH_ptr_l = spat_to_SH_ptr_m0l;		spat_to_SHsphtor_ptr_l = spat_to_SHsphtor_ptr_m0l;		spat_to_SHqst_ptr_l = spat_to_SHqst_ptr_m0l;
+		}
 		t = SHT_error();		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);

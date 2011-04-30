@@ -38,9 +38,10 @@ V/// complex double arrays of size NLM.
 /// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
   #endif
 
-#Q void spat_to_SH(double *Vr, complex double *Qlm)
-#V void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm)
-# {
+QX	void GENFLY(spat_to_SH_fly,NWAY,SUFFIX)(double *Vr, complex double *Qlm SUPARG) {
+VX	void GENFLY(spat_to_SHsphtor_fly,NWAY,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG) {
+3	void GENFLY(spat_to_SHqst_fly,NWAY,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG) {
+
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 	double *al;
@@ -422,4 +423,4 @@ VX	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
 V	#undef DY0
 V	#undef DY1
 
-# }
+  }

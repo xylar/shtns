@@ -13,9 +13,7 @@
 
 *** TODO ***
 - change architecture for more than one algo !
-- On-the-fly function for spat_to_SH.
-- Memory aware switching.
-- compare on-the-fly and memory algos and choose best (and free mem if unused) + in-place/out-of-place + more than 1 n-way !
+- compare in-place/out-of-place ffts and choose best
 - split the fft and the legendre transform so that they can be done independantly ?
 
 new functions :
@@ -38,9 +36,6 @@ for m=3, z[k] is constant up to l-2
 
 *** On-the-fly ***
 + m=0 : compress complex to real beforehand.
-- m=0 : 2/4-way for scalar only ?
-- spat_to_SH* should be good !
-- rewrite calling for selection of algo at init-time ...
 - split m=0 and m>0 ??
 
 - Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
@@ -71,12 +66,12 @@ for SHsphtor_to_spat, maybe storing .t and .p together is not the best... => I t
 -!!!	grid.c should also treat even/odd sub-cases. !!!
 
 - FFTW : out-of-place is faster than in-place. switch ? http://www.fftw.org/speed/CoreDuo-3.0GHz-icc64/
-- try blas ?
 
 + NLAT odd is now allowed (but not for DCT)
 
 *** NOTES :
 DCT SHT is ok for LMAX=1300 and NLAT_2=1024. changeset 70:f901295a7862
+DCT tested up to LMAX=2045. changeset 218:d0d6a8e1e22b
 
 Run-time setup for everything.
 DCT is about 25% faster than GAUSS for xshells dj_ref case (axisym).

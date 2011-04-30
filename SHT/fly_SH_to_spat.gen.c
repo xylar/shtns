@@ -27,8 +27,20 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
-#void SH_to_spat_fly(complex double *Qlm, double *Vr)
-#{
+3	void GENFLY(SHqst_to_spat_fly,NWAY,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG) {
+QX	void GENFLY(SH_to_spat_fly,NWAY,SUFFIX)(complex double *Qlm, double *Vr SUPARG) {
+  #ifndef SHT_GRAD
+VX	void GENFLY(SHsphtor_to_spat_fly,NWAY,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG) {
+  #else
+	#ifndef SHT_AXISYM
+S	void GENFLY(SHsph_to_spat_fly,NWAY,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARG) {
+T	void GENFLY(SHtor_to_spat_fly,NWAY,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARG) {
+	#else
+S	void GENFLY(SHsph_to_spat_fly,NWAY,SUFFIX)(complex double *Slm, double *Vt SUPARG) {
+T	void GENFLY(SHtor_to_spat_fly,NWAY,SUFFIX)(complex double *Tlm, double *Vp SUPARG) {
+	#endif
+  #endif
+
 Q	v2d *BrF;
   #ifndef SHT_AXISYM
 V	v2d *BtF, *BpF;
@@ -422,4 +434,4 @@ V	#undef DY1
 Q	#undef BR0
 V	#undef BT0
 V	#undef BP0
-# }
+  }
