@@ -345,7 +345,7 @@ make time_SHT
 ./time_SHT 600 -iter=1 -nlorder=1 -polaropt=0 -quickinit
 \endcode
 
-SHTns has been tested on x86 architecture with SSE2 double precision floating point math (64 bit) to be <b>accurate up to l=1800</b>.
+SHTns has been tested on x86 architecture with SSE2 double precision floating point math (64 bit) to be <b>accurate up to l=2700</b>.
 
 */
 

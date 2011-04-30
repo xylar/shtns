@@ -269,6 +269,11 @@ Q			q[0] = vdup(0.0);		q[1] = vdup(0.0);		q+=2;
 V			s[0] = vdup(0.0);		s[1] = vdup(0.0);		s+=2;
 V			t[0] = vdup(0.0);		t[1] = vdup(0.0);		t+=2;
 		}
+	  if (llim <= SHT_L_RESCALE_FLY) {
+		#define Y0 y0[j]
+		#define Y1 y1[j]
+V		#define DY0 dy0[j]
+V		#define DY1 dy1[j]
 		do {
 		#if _GCC_VEC_
 Q			s2d* q = qq;
@@ -289,36 +294,10 @@ V				y0[j] *= vdup(m);		// for the vector transform, compute ylm*m/sint
 			}
 Q			l=m;
 V			l=m-1;
-		#ifndef SHT_LARGE_L
 			do {		// sin(theta)^m
 				if (l&1) for (int j=0; j<NWAY; j++) y0[j] *= cost[j];
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
 			} while(l >>= 1);
-			#define Y0 y0[j]
-			#define Y1 y1[j]
-V			#define DY0 dy0[j]
-V			#define DY1 dy1[j]
-		#else
-			s2d scale[NWAY];
-			for (int j=0; j<NWAY; j++) {
-				y0[j] *= vdup(SHT_LEG_SCALEF);
-				scale[j] = vdup(1.0/SHT_LEG_SCALEF);
-			}
-			int ll = l >> 8;
-			do {		// sin(theta)^m
-				if (l&1) for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
-				l >>= 1;
-				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
-			} while(l > ll);
-			while(l > 0) {
-				l--;
-				for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
-			}
-			#define Y0 (y0[j]*scale[j])
-			#define Y1 (y1[j]*scale[j])
-V			#define DY0 (dy0[j]*scale[j])
-V			#define DY1 (dy1[j]*scale[j])
-		#endif
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = ((s2d*)(ct+k))[j];
 V				dy0[j] = cost[j]*y0[j];
@@ -386,6 +365,121 @@ V					t[1] -= DY1 * ((s2d*)(pei+k))[j]  + Y1 * ((s2d*)(tor+k))[j];
 			k+=NWAY;
 		#endif
 		} while (k < NLAT_2);
+		#undef Y0
+		#undef Y1
+V		#undef DY0
+V		#undef DY1
+	  } else {		// llim > SHT_L_RESCALE_FLY
+		#define Y0 (y0[j]*scale[j])
+		#define Y1 (y1[j]*scale[j])
+V		#define DY0 (dy0[j]*scale[j])
+V		#define DY1 (dy1[j]*scale[j])
+		do {
+		#if _GCC_VEC_
+Q			s2d* q = qq;
+V			s2d* s = ss;		s2d* t = tt;
+		#else
+Q			double* q = (double *) &Qlm[LiM(m,im)];
+V			double* s = (double *) &Slm[LiM(m,im)];
+V			double* t = (double *) &Tlm[LiM(m,im)];
+		#endif
+			al = alm[im];
+			s2d cost[NWAY], y0[NWAY], y1[NWAY], scale[NWAY];
+V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
+			for (int j=0; j<NWAY; j++) {
+				cost[j] = ((s2d*)(st+k))[j];
+				y0[j] = vdup(al[0]) * ((s2d*)(wg+k))[j];		// weight appears here.
+V				st2[j] = cost[j]*cost[j]*vdup(1.0/m);
+V				y0[j] *= vdup(m);		// for the vector transform, compute ylm*m/sint
+			}
+Q			l=m;
+V			l=m-1;
+			for (int j=0; j<NWAY; j++) {
+				y0[j] *= vdup(SHT_LEG_SCALEF);
+				scale[j] = vdup(1.0/SHT_LEG_SCALEF);
+			}
+			int ll = l >> 8;
+			do {		// sin(theta)^m
+				if (l&1) for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
+				l >>= 1;
+				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
+			} while(l > ll);
+			while(l > 0) {
+				l--;
+				for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
+			}
+			for (int j=0; j<NWAY; j++) {
+				cost[j] = ((s2d*)(ct+k))[j];
+V				dy0[j] = cost[j]*y0[j];
+			}
+			l=m;
+			for (int j=0; j<NWAY; j++) {
+Q				q[0] += Y0 * ((s2d*)(rer+k))[j];		// real even
+Q				q[1] += Y0 * ((s2d*)(rei+k))[j];		// imag even
+V				s[0] += DY0 * ((s2d*)(tor+k))[j]  + Y0 * ((s2d*)(pei+k))[j];
+V				s[1] += DY0 * ((s2d*)(toi+k))[j]  - Y0 * ((s2d*)(per+k))[j];
+V				t[0] -= DY0 * ((s2d*)(por+k))[j]  - Y0 * ((s2d*)(tei+k))[j];
+V				t[1] -= DY0 * ((s2d*)(poi+k))[j]  + Y0 * ((s2d*)(ter+k))[j];
+			}
+Q			q+=2;
+V			s+=2;	t+=2;
+			l++;
+			for (int j=0; j<NWAY; j++) {
+				y1[j]  = (vdup(al[1])*y0[j]) *cost[j];		//	y1[j] = vdup(al[1])*cost[j]*y0[j];
+V				dy1[j] = (vdup(al[1])*y0[j]) *(cost[j]*cost[j] - st2[j]);		//	dy1[j] = vdup(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]);
+			}
+			al+=2;
+			while (l<llim) {	// compute even and odd parts
+				for (int j=0; j<NWAY; j++) {
+Q					q[0] += Y1 * ((s2d*)(ror+k))[j];		// real odd
+Q					q[1] += Y1 * ((s2d*)(roi+k))[j];		// imag odd
+V					s[0] += DY1 * ((s2d*)(ter+k))[j]  + Y1 * ((s2d*)(poi+k))[j];
+V					s[1] += DY1 * ((s2d*)(tei+k))[j]  - Y1 * ((s2d*)(por+k))[j];
+V					t[0] -= DY1 * ((s2d*)(per+k))[j]  - Y1 * ((s2d*)(toi+k))[j];
+V					t[1] -= DY1 * ((s2d*)(pei+k))[j]  + Y1 * ((s2d*)(tor+k))[j];
+				}
+				for (int j=0; j<NWAY; j++) {
+					y0[j] = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
+V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] - y1[j]*st2[j]) + vdup(al[0])*dy0[j];
+				}
+				for (int j=0; j<NWAY; j++) {
+Q					q[2] += Y0 * ((s2d*)(rer+k))[j];		// real even
+Q					q[3] += Y0 * ((s2d*)(rei+k))[j];		// imag even
+V					s[2] += DY0 * ((s2d*)(tor+k))[j]  + Y0 * ((s2d*)(pei+k))[j];
+V					s[3] += DY0 * ((s2d*)(toi+k))[j]  - Y0 * ((s2d*)(per+k))[j];
+V					t[2] -= DY0 * ((s2d*)(por+k))[j]  - Y0 * ((s2d*)(tei+k))[j];
+V					t[3] -= DY0 * ((s2d*)(poi+k))[j]  + Y0 * ((s2d*)(ter+k))[j];
+				}
+Q				q+=4;
+V				s+=4;	t+=4;
+				l+=2;
+				for (int j=0; j<NWAY; j++) {
+					y1[j] = vdup(al[3])*cost[j]*y0[j] + vdup(al[2])*y1[j];
+V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] - y0[j]*st2[j]) + vdup(al[2])*dy1[j];
+				}
+				al+=4;
+			}
+			if (l==llim) {
+				for (int j=0; j<NWAY; j++) {
+Q					q[0] += Y1 * ((s2d*)(ror+k))[j];		// real odd
+Q					q[1] += Y1 * ((s2d*)(roi+k))[j];		// imag odd
+V					s[0] += DY1 * ((s2d*)(ter+k))[j]  + Y1 * ((s2d*)(poi+k))[j];
+V					s[1] += DY1 * ((s2d*)(tei+k))[j]  - Y1 * ((s2d*)(por+k))[j];
+V					t[0] -= DY1 * ((s2d*)(per+k))[j]  - Y1 * ((s2d*)(toi+k))[j];
+V					t[1] -= DY1 * ((s2d*)(pei+k))[j]  + Y1 * ((s2d*)(tor+k))[j];
+				}
+			}
+		#if _GCC_VEC_
+			k += 2*NWAY;
+		#else
+			k+=NWAY;
+		#endif
+		} while (k < NLAT_2);
+		#undef Y0
+		#undef Y1
+V		#undef DY0
+V		#undef DY1
+	  }
 Q		complex double *Ql = &Qlm[LiM(m,im)];
 V		complex double *Sl = &Slm[LiM(m,im)];
 V		complex double *Tl = &Tlm[LiM(m,im)];
@@ -417,10 +511,5 @@ Q	    fftw_free(BrF - NLAT*(MTR+1));
 VX	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
 	}
   #endif
-
-	#undef Y0
-	#undef Y1
-V	#undef DY0
-V	#undef DY1
 
   }

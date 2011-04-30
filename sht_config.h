@@ -53,9 +53,6 @@
 /// (set to zero to disable, may be useful for calling from Fortran)
 #define _GCC_VEC_ 1
 
-// for LMAX > 1800, SHT_LARGE_L should be defined for on-the-fly transforms to be accurate up to LMAX=2700, but with lower performance.
-//#define SHT_LARGE_L
-
 // if SHT_SCALAR_ONLY is defined, it will disable the vector transform (which saves some memory)
 //#define SHT_SCALAR_ONLY
 

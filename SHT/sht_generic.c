@@ -362,12 +362,18 @@ void GEN(set_fly,SUFFIX)()
 }
 
 #include "../cycle.h"
-#include <time.h> 
+#include <time.h>
 
 #if SHT_VERBOSE > 1
   #define PRINT_VERB(msg) printf(msg)
 #else
   #define PRINT_VERB(msg) (0)
+#endif
+
+#if SHT_VERBOSE == 1
+  #define PRINT_DOT 	{	printf(".");	fflush(stdout);	}
+#else
+  #define PRINT_DOT (0);
 #endif
 
 double GEN(get_time_2,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void* SUPARG), void *a, void *b SUPARG)
@@ -555,6 +561,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 			#if SHT_VERBOSE > 1
 				printf(", nloop=%d, t0=%g, t=%g, r=%g, m=%d (real time = %g s)\n",nloop,t0,t,r,m,tt);
 			#endif
+			PRINT_DOT
 		} while((nloop<10000)&&(m < 3)&&(tt<0.35));
 		*nlp = nloop;
 	} else {
@@ -574,6 +581,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 		if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
 		if (t < t0) {	GEN(SH_to_spat_ptr,SUFFIX) = scal_synth[i].fp;	t0 = t;	nb=scal_synth[i].name;	PRINT_VERB("*"); }
 	}
+	PRINT_DOT
 	#if SHT_VERBOSE > 1
 		printf(" => %s",nb);
 	#endif
@@ -587,6 +595,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 			if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
 			if (t < t0) {	GEN(spat_to_SH_ptr,SUFFIX) = scal_analys[i].fp;	t0 = t;	nb=scal_analys[i].name;	PRINT_VERB("*"); }
 		}
+		PRINT_DOT
 		#if SHT_VERBOSE > 1
 			printf(" => %s",nb);
 		#endif
@@ -603,6 +612,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 		if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
 		if (t < t0) {	GEN(SHsphtor_to_spat_ptr,SUFFIX) = vect_synth[i].fp;	t0 = t;	nb=vect_synth[i].name;	PRINT_VERB("*"); }
 	}
+	PRINT_DOT
 	#if SHT_VERBOSE > 1
 		printf(" => %s",nb);
 	#endif
@@ -616,6 +626,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 			if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
 			if (t < t0) {	GEN(spat_to_SHsphtor_ptr,SUFFIX) = vect_analys[i].fp;	t0 = t;	nb=vect_analys[i].name;	PRINT_VERB("*"); }
 		}
+		PRINT_DOT
 		#if SHT_VERBOSE > 1
 			printf(" => %s",nb);
 		#endif
@@ -632,6 +643,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 //		if (i<2) t *= 1.0/MIN_PERF_IMPROVE_DCT;
 		if (t < t0) {	GEN(SHqst_to_spat_ptr,SUFFIX) = v3d_synth[i].fp;	t0 = t;	nb=v3d_synth[i].name;	PRINT_VERB("*"); }
 	}
+	PRINT_DOT
 	#if SHT_VERBOSE > 1
 		printf(" => %s",nb);
 	#endif
@@ -645,6 +657,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 //			if (i<2) t *= 1.0/MIN_PERF_IMPROVE_DCT;
 			if (t < t0) {	GEN(spat_to_SHqst_ptr,SUFFIX) = v3d_analys[i].fp;	t0 = t; nb=v3d_analys[i].name;	PRINT_VERB("*"); }
 		}
+		PRINT_DOT
 		#if SHT_VERBOSE > 1
 			printf(" => %s",nb);
 		#endif
@@ -664,6 +677,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 		if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
 		if (t < t0) {	GEN(SHsph_to_spat_ptr,SUFFIX) = grad_synth[i].fp1;	GEN(SHtor_to_spat_ptr,SUFFIX) = grad_synth[i].fp2;	t0 = t;	nb=grad_synth[i].name;	PRINT_VERB("*"); }
 	}
+	PRINT_DOT
 	#if SHT_VERBOSE > 1
 		printf(" => %s",nb);
 	#endif
@@ -688,6 +702,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 			t = GEN(get_time_2, SUFFIX)(nloop*2, "sdct", (pf2) &SH_to_spat_hyb, Qlm, Qh SUPARG2);
 			t += GEN(get_time_4, SUFFIX)(nloop, "vdct", (pf4) &SHsphtor_to_spat_hyb, Slm, Tlm, Sh, Th SUPARG2);
 			if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
+			PRINT_DOT
 		}
 		tdct = t0;
 		Set_MTR_DCT(i);		// the best DCT is chosen.

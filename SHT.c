@@ -1644,11 +1644,11 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 			Set_MTR_DCT(-1);		// turn off DCT.
   #else
 	#if SHT_VERBOSE > 0
-		printf("finding optimal MTR_DCT ...\r");	fflush(stdout);
+		printf("        => finding optimal MTR_DCT");	fflush(stdout);
 	#endif
 		t = choose_best_sht(&nloop, -1);		// find optimal MTR_DCT.
 	#if SHT_VERBOSE > 0
-		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
+		printf("\n        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
 	#endif
   		if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) NLAT)/n_gauss;	// we can revert to gauss with a smaller nlat.
 		if (t > MIN_PERF_IMPROVE_DCT) {
@@ -1725,7 +1725,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 
 	if (quick_init == 0) {
   #if SHT_VERBOSE > 0
-		printf("finding fastest algorithm...\r");	fflush(stdout);
+		printf("        => finding fastest algorithm");	fflush(stdout);
   #endif
 		if (MMAX > 0) {
 			choose_best_sht(&nloop, on_the_fly);
@@ -1739,6 +1739,9 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 			SH_to_spat_ptr_l = SH_to_spat_ptr_m0l;		SHsphtor_to_spat_ptr_l = SHsphtor_to_spat_ptr_m0l;		SHqst_to_spat_ptr_l = SHqst_to_spat_ptr_m0l;
 			spat_to_SH_ptr_l = spat_to_SH_ptr_m0l;		spat_to_SHsphtor_ptr_l = spat_to_SHsphtor_ptr_m0l;		spat_to_SHqst_ptr_l = spat_to_SHqst_ptr_m0l;
 		}
+  #if SHT_VERBOSE > 0
+		printf("\n");
+  #endif
 		t = SHT_error();		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);
