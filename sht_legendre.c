@@ -245,8 +245,9 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 	im = ((MMAX+2)>>1)*2;		// alloc memory for arrays.
 	alm = (double **) malloc( im * sizeof(double *) + (2*NLM)*sizeof(double) );
 	al0 = (double *) (alm + im);
-	dlm = (double **) malloc( im * sizeof(double *) + (4*NLM)*sizeof(double) );
-	dl0 = (double *) (dlm + im);
+	bl0 = al0;		blm = alm;		// by default analysis recurrence is the same
+//	dlm = (double **) malloc( im * sizeof(double *) + (4*NLM)*sizeof(double) );
+//	dl0 = (double *) (dlm + im);
 
 /// - Precompute the factors alm and blm of the recurrence relation :
   if (norm == sht_schmidt) {
@@ -301,6 +302,32 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 		alm[im][0] *= t2;
 	}
 
+/// - Compute analysis recurrence coefficients if necessary
+	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
+		blm = (double **) malloc( im * sizeof(double *) + (2*NLM)*sizeof(double) );
+		bl0 = (double *) (blm + im);
+		for (lm=0; lm<2*NLM; lm++) bl0[lm] = al0[lm];		// copy
+		for (im=0, lm=0; im<=MMAX; im++) {
+			m = im*MRES;
+			blm[im] = bl0 + lm;
+			double c0 = 1.0;
+			if (m>0) c0 = 1.0/mpos_renorm;
+			if (norm == sht_schmidt) {
+				bl0[lm+1] *= (2*m+3)/(2*m+1.);
+				c0 *= 2*m+1;
+			}
+			bl0[lm] *= c0;
+			lm+=2;
+			for (l=m+2; l<=LMAX; l++) {
+				if (norm == sht_schmidt) {
+					bl0[lm] *= (2*l+1)/(2*l-3.);
+					bl0[lm+1] *= (2*l+1)/(2*l-1.);
+				}
+				lm+=2;
+			}
+		}
+	}
+/*
 /// - Compute and store coefficients for computation of derivative also.
 	for (im=1, lm=0; im<=MMAX; im++) {
 		m = im*MRES;
@@ -317,6 +344,7 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 			lm+=4;	al+=2;
 		}
 	}
+*/
 }
 
 /// returns the value of the Legendre Polynomial of degree l.

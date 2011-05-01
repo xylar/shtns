@@ -346,7 +346,7 @@ typedef struct {
   pf6 fp;	char * name;	int flags;
 } frec6;
 
-/// use on-the-fly alogorithm (good guess without measuring)
+/// \internal use on-the-fly alogorithm (good guess without measuring)
 void GEN(set_fly,SUFFIX)()
 {
 	GEN(SH_to_spat_ptr,SUFFIX) = (pf2) &GEN(SH_to_spat_fly2, SUFFIX);
@@ -354,7 +354,7 @@ void GEN(set_fly,SUFFIX)()
 	GEN(SHtor_to_spat_ptr,SUFFIX) = (pfg) &GEN(SHtor_to_spat_fly2,SUFFIX);
 	GEN(SHsphtor_to_spat_ptr,SUFFIX) = (pf4) &GEN(SHsphtor_to_spat_fly1,SUFFIX);
 	GEN(SHqst_to_spat_ptr,SUFFIX) = (pf6) &GEN(SHqst_to_spat_fly1, SUFFIX);
-	if ( (wg != NULL) && ((shtns.norm & SHT_REAL_NORM) == 0) && (SHT_NORM != sht_schmidt) ) {
+	if (wg != NULL) {
 		GEN(spat_to_SH_ptr,SUFFIX) = (pf2) &GEN(spat_to_SH_fly4, SUFFIX);
 		GEN(spat_to_SHsphtor_ptr,SUFFIX) = (pf4) &GEN(spat_to_SHsphtor_fly2,SUFFIX);
 		GEN(spat_to_SHqst_ptr,SUFFIX) = (pf6) &GEN(spat_to_SHqst_fly2, SUFFIX);
@@ -448,7 +448,7 @@ double GEN(get_time_6,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, 
 	return t;
 }
 
-/// choose fastest between on-the-fly and gauss algorithms.
+/// \internal choose fastest between on-the-fly and gauss algorithms.
 /// *nlp is the number of loops. If zero, it is set to a good value.
 /// on_the_fly : 1 = skip all memory algorithm. 0 = include memory and on-the-fly. -1 = test only DCT.
 double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
@@ -531,7 +531,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 	if (on_the_fly == -1) {
 		on_the_fly = 0;		dct = 1;		// choose mtr_dct.
 	}
-	if ( (wg == NULL) || (shtns.norm & SHT_REAL_NORM) || (SHT_NORM == sht_schmidt) )	analys = 0;		// on-the-fly analysis not supported.
+	if (wg == NULL)	analys = 0;		// on-the-fly analysis not supported.
 
 	Qh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
 	Sh = (double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));

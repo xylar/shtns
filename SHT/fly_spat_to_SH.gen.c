@@ -142,7 +142,7 @@ V			per[i] = 0.0;		por[i] = 0.0;
 	#endif
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
-Q		Qlm[0] = r0 * al0[0];					// l=0 is done.
+Q		Qlm[0] = r0 * bl0[0];					// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
 		for (l=1;l<=llim;l++) {
@@ -150,7 +150,7 @@ Q			qq[l] = vdup(0.0);
 V			ss[l] = vdup(0.0);		tt[l] = vdup(0.0);
 		}
 		do {
-			al = al0;
+			al = bl0;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d sint[NWAY], dy0[NWAY], dy1[NWAY];
 			for (int j=0; j<NWAY; j++) {
@@ -283,7 +283,7 @@ Q			double* q = (double *) &Qlm[LiM(m,im)];
 V			double* s = (double *) &Slm[LiM(m,im)];
 V			double* t = (double *) &Tlm[LiM(m,im)];
 		#endif
-			al = alm[im];
+			al = blm[im];
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 			for (int j=0; j<NWAY; j++) {
@@ -383,7 +383,7 @@ Q			double* q = (double *) &Qlm[LiM(m,im)];
 V			double* s = (double *) &Slm[LiM(m,im)];
 V			double* t = (double *) &Tlm[LiM(m,im)];
 		#endif
-			al = alm[im];
+			al = blm[im];
 			s2d cost[NWAY], y0[NWAY], y1[NWAY], scale[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 			for (int j=0; j<NWAY; j++) {

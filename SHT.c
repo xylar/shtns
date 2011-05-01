@@ -38,7 +38,8 @@
 struct sht_sze shtns;
 
 double *al0;	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
-double **dlm;	// coefficient list for Legendre function and theta derivative recurrence (size 4*NLM)
+double *bl0;	double **blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
+//double **dlm;	// coefficient list for Legendre function and theta derivative recurrence (size 4*NLM)
 
 double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
 double *wg = NULL;			// gauss weights (if current grid is a gauss grid).
@@ -1428,6 +1429,22 @@ double SHT_error()
   #define _HGID_ "unknown"
 #endif
 
+
+#define SHT_STD_LIST(pre,sfx) pre SH_to_spat##sfx pre spat_to_SH##sfx pre SHsphtor_to_spat##sfx pre SHqst_to_spat##sfx pre spat_to_SHsphtor##sfx pre spat_to_SHqst##sfx
+SHT_STD_LIST(extern void*, _ptr;)
+SHT_STD_LIST(extern void*, _ptr_m0;)
+SHT_STD_LIST(extern void*, _ptr_l;)
+SHT_STD_LIST(extern void*, _ptr_m0l;)
+
+void set_fly();
+void set_fly_l();
+void set_fly_m0();
+void set_fly_m0l();
+double choose_best_sht(int*, int);
+double choose_best_sht_l(int*, int, int);
+double choose_best_sht_m0(int*, int);
+double choose_best_sht_m0l(int*, int, int);
+
 /** \addtogroup init Initialization functions.
 */
 //@{
@@ -1526,22 +1543,6 @@ int shtns_set_size(int lmax, int mmax, int mres, enum shtns_norm norm)
 
 	return(NLM);
 }
-
-
-#define SHT_STD_LIST(pre,sfx) pre SH_to_spat##sfx pre spat_to_SH##sfx pre SHsphtor_to_spat##sfx pre SHqst_to_spat##sfx pre spat_to_SHsphtor##sfx pre spat_to_SHqst##sfx
-SHT_STD_LIST(extern void*, _ptr;)
-SHT_STD_LIST(extern void*, _ptr_m0;)
-SHT_STD_LIST(extern void*, _ptr_l;)
-SHT_STD_LIST(extern void*, _ptr_m0l;)
-
-void set_fly();
-void set_fly_l();
-void set_fly_m0();
-void set_fly_m0l();
-double choose_best_sht(int*, int);
-double choose_best_sht_l(int*, int, int);
-double choose_best_sht_m0(int*, int);
-double choose_best_sht_m0l(int*, int, int);
 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_set_size and before any SH transform.</b> and sets all global variables and internal data.
@@ -1719,7 +1720,6 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
   #endif
 		if (NLAT < 32) shtns_runerr("on-the-fly only available for nlat>=32");		// avoid overflow with NLAT_2 < 2*NWAY
 		PolarOptimize(eps);
-		if ( (shtns.norm & SHT_REAL_NORM) || (SHT_NORM == sht_schmidt) ) shtns_runerr("on-the-fly does not support schmidt normalization or real normalization yet.");
 		set_fly();		set_fly_l();		set_fly_m0();		set_fly_m0l();		// switch function pointers to "on-the-fly" functions.
 	}
 

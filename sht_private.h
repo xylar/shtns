@@ -120,7 +120,8 @@ struct DtDp {		// theta and phi derivatives stored together.
 
 extern double *al0;
 extern double **alm;		// legendre recursion coefficients.
-extern double **dlm;		// legendre recursion coefficients (+ derivative).
+extern double *bl0;
+extern double **blm;		// legendre recursion coefficients for analysis.
 extern int *tm;				// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 extern double *wg;			// Gauss weights for Gauss-Legendre quadrature.
 extern double *st_1;		// st_1[i] = 1/sin(theta)
