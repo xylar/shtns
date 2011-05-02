@@ -316,15 +316,20 @@ can choose to do so using the adequate \ref shtns_type when calling \ref shtns_i
 \section Speed
 
 SHTns does not implement any "fast" algorithm. However, timings with other Spherical Harmonic Transform tools (including a fast algorithm)
-show that <b>SHTns performs much faster than any other</b>. Furthermore, even at large sizes, the fast algorithm we tested does not seem to be willing to take the lead.
+show that <b>SHTns performs much faster than any other</b> (non-parallel). Furthermore, even at large sizes, the fast algorithm we tested does not seem to be willing to take the lead.
 
 <div>
 <table><tr>
-<td>\f$\ell_{max}\f$</td> <td><a href="http://www.ipgp.fr/~wieczor/SHTOOLS/SHTOOLS.html">shtools</a> 2.5 (Gauss)</td>  <td><a href="http://www.cs.dartmouth.edu/~geelong/sphere/">SpharmonicKit2</a> 2.7 (fast)</td>  <td><b>SHTns</b> (Gauss)</td> <td>SHTns/SpharmonicKit2</td> </tr><tr>
-<td>127 </td> <td>8.9 ms</td>  <td>5.5 ms</td>  <td><b>0.69 ms</b></td>  <td>8.0</td> </tr><tr>
-<td>255 </td> <td>73 ms</td>  <td>27 ms</td>  <td><b>6.5 ms</b></td>  <td>4.2</td> </tr><tr>
-<td>511 </td> <td>757 ms</td>  <td>143 ms</td>  <td><b>49 ms</b></td>  <td>2.9</td> </tr><tr>
-<td>1023 </td> <td>10.3 s</td>  <td>860 ms</td>  <td><b>297 ms</b></td>  <td>2.9</td> </tr></table>
+<td>\f$\ell_{max}\f$</td> <td><a href="http://www.ipgp.fr/~wieczor/SHTOOLS/SHTOOLS.html">shtools</a> 2.5 (Gauss)</td>
+  <td><a href="http://sourceforge.net/projects/libpsht/">libpsht</a> (1 thread)</td>
+  <td><a href="http://sourceforge.net/projects/libpsht/">libpsht</a> (8 parallel threads)</td>
+  <td><a href="http://www.cs.dartmouth.edu/~geelong/sphere/">SpharmonicKit2</a> 2.7 (fast)</td>
+  <td><b>SHTns</b> (Gauss)</td> <td>SHTns/SpharmonicKit2</td> </tr><tr>
+<td>127 </td> <td>8.9 ms</td> <td> 5.3 ms</td> <td> 10-80 ms </td> <td>5.5 ms</td>  <td><b>0.69 ms</b></td>  <td>8.0</td> </tr><tr>
+<td>255 </td> <td>73 ms</td> <td> 29 ms</td> <td> 20-90ms </td> <td>27 ms</td>  <td><b>6.5 ms</b></td>  <td>4.2</td> </tr><tr>
+<td>511 </td> <td>757 ms</td> <td>170 ms </td> <td>40-116 ms</td> <td>143 ms</td>  <td><b>49 ms</b></td>  <td>2.9</td> </tr><tr>
+<td>1023 </td> <td>10.3 s</td> <td>1.1 s </td> <td> 130-300 ms</td> <td>860 ms</td>  <td><b>297 ms</b></td>  <td>2.9</td> </tr><tr>
+<td>2047 </td> <td>NA (too slow)</td> <td>5.9 s</td> <td>0.8-0.9 s</td> <td>NA (out of memory)</td>  <td><b>3.6 s</b></td>  <td>NA</td> </tr></table>
 
 <i>Average times for forward or backward scalar transform on an Intel Xeon E5520 (2.27GHz), with gcc 4.1.2 and "-O3 -march=core2" compilation options.</i>
 </div>
