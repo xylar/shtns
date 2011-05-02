@@ -60,10 +60,10 @@
 # define M_PIl 3.1415926535897932384626433832795L
 #endif
 
-// scale factor applied for LMAX larger than SHT_L_RESCALE. Allows accurate transforms up to l=2700.
+// scale factor applied for LMAX larger than SHT_L_RESCALE. Allows accurate transforms up to l=2700 with 64 bit double precision.
 #define SHT_LEG_SCALEF 1.10180321e-280
 #define SHT_L_RESCALE 1536
-// higher value for on-the-fly transforms as there is an associated performance drop.
+// value for on-the-fly transforms is near the limit of double precsision, as there is an associated performance drop.
 #define SHT_L_RESCALE_FLY 1792
 
 /*

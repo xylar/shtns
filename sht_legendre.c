@@ -41,10 +41,11 @@
 
 /// computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
 /// works with very large values of n (up to 2700).
-double a_sint_pow_n(double val, double cost, int n)
+long double a_sint_pow_n(long double val, long double cost, int n)
 {
-	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
+	long double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
 	int k = n >> 7;
+	if (sizeof(s2) > 8) k = 0;		// enough accuracy, we do not bother.
 
 	if (n&1) val *= sqrt(s2);	// = sin(t)
 	do {
@@ -66,8 +67,8 @@ double a_sint_pow_n(double val, double cost, int n)
 double legendre_sphPlm(const int l, const int im, double x)
 {
 	double *al;
-	long int i,m;
-	double ymm, ymmp1;
+	int i,m;
+	long double ymm, ymmp1;
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
@@ -103,24 +104,29 @@ done:
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
 /// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
-void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
+void legendre_sphPlm_array(const int lmax, const int im, const double cost, double *yl)
 {
 	double *al;
-	long int l,m;
-	double ymm, ymmp1;
+	int l,m;
+	int rescale = 0;		// flag for rescale.
+	long double ymm, ymmp1, x;
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_array");
 #endif
 
+	x = cost;
 	al = alm[im];
 	yl -= m;			// shift pointer
 	ymm = al[0];	// l=m
 	if (m>0) {
-		if (lmax <= SHT_L_RESCALE) {
+		if ((lmax <= SHT_L_RESCALE) || (sizeof(ymm) > 8)) {
 			ymm = a_sint_pow_n(ymm, x, m);
-		} else ymm *= SHT_LEG_SCALEF;
+		} else {
+			rescale = 1;
+			ymm *= SHT_LEG_SCALEF;
+		}
 	}
 	yl[m] = ymm;
 	if (lmax==m) goto done;		// done.
@@ -141,7 +147,7 @@ void legendre_sphPlm_array(const int lmax, const int im, double x, double *yl)
 		yl[l] = al[1]*x*ymmp1 + al[0]*ymm;
 	}
 done:
-	if ((lmax > SHT_L_RESCALE) && (m>0)) {
+	if (rescale != 0) {
 		ymm = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, m);
 		for (l=m; l<=lmax; l++) {		// rescale.
 			yl[l] *= ymm;
@@ -160,12 +166,14 @@ done:
 /// \param sint = sqrt(1-x^2) to avoid recomputation of sqrt.
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
 /// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
-void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
+void legendre_sphPlm_deriv_array(const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
 {
 	double *al;
 	long int l,m;
-	double st, y0, y1, dy0, dy1;
+	int rescale = 0;		// flag for rescale.
+	long double x, st, y0, y1, dy0, dy1;
 
+	x = cost;
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
@@ -178,11 +186,14 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 	dy0 = 0.0;
 	if (m>0) {		// m > 0
 		l = m-1;
-		if (lmax <= SHT_L_RESCALE) {
+		if ((lmax <= SHT_L_RESCALE) || (sizeof(y0) > 8)) {
 			if (l&1) {
 				y0 = a_sint_pow_n(y0, x, l-1) * sint;		// avoid computation of sqrt
 			} else  y0 = a_sint_pow_n(y0, x, l);
-		} else 	y0 *= SHT_LEG_SCALEF;
+		} else {
+			rescale = 1;
+			y0 *= SHT_LEG_SCALEF;
+		}
 		dy0 = x*m*y0;
 		st *= st;			// st = sin(theta)^2 is used in the recurrence for m>0
 	}
@@ -211,7 +222,7 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double x, c
 		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 	}
 done:
-	if ((lmax > SHT_L_RESCALE) && (m>0)) {
+	if (rescale != 0) {
 		l = m-1;			// compute  sin(theta)^(m-1)
 		if (l&1) {
 			y0 = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, l-1) * sint;		// avoid computation of sqrt
