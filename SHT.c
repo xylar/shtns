@@ -68,8 +68,6 @@ fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
 fftw_plan ifft_eo, fft_eo;		// for half the size (given parity)
 unsigned fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 
-
-
 /// Abort program with error message.
 void shtns_runerr(const char * error_text)
 {
@@ -1599,13 +1597,18 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 	}
 
 	t = sht_mem_size(shtns.lmax, shtns.mmax, shtns.mres, *nlat);
-	if ( (t > SHTNS_MAX_MEMORY) && (on_the_fly == 0) ) {
+	if ( (t > SHTNS_MAX_MEMORY) && (on_the_fly == 0) ) {		// huge transform has been requested
 		on_the_fly = 1;
 		if ( (flags == sht_reg_dct) || (flags == sht_reg_fast) ) shtns_runerr("Memory limit exceeded, try using sht_gauss or increase SHTNS_MAX_MEMORY in sht_config.h");
 		if (flags != sht_reg_poles) {
 			flags = sht_gauss;
 			if (n_gauss > 0) *nlat = n_gauss;
 		}
+		if (quick_init == 0) {
+			if (*nphi > 256) fftw_plan_mode = FFTW_PATIENT;		// do not waste too much time finding optimal fftw.
+			if (*nphi > 512) fftw_plan_mode = FFTW_MEASURE;
+		}
+		if (t > 10*SHTNS_MAX_MEMORY) quick_init =1;			// do not time such large transforms.
 	}
 
 	if (flags == sht_auto) {
@@ -1645,7 +1648,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 			Set_MTR_DCT(-1);		// turn off DCT.
   #else
 	#if SHT_VERBOSE > 0
-		printf("        => finding optimal MTR_DCT");	fflush(stdout);
+		printf("        finding optimal MTR_DCT");	fflush(stdout);
 	#endif
 		t = choose_best_sht(&nloop, -1);		// find optimal MTR_DCT.
 	#if SHT_VERBOSE > 0
@@ -1725,7 +1728,7 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 
 	if (quick_init == 0) {
   #if SHT_VERBOSE > 0
-		printf("        => finding fastest algorithm");	fflush(stdout);
+		printf("        finding fastest algorithm");	fflush(stdout);
   #endif
 		if (MMAX > 0) {
 			choose_best_sht(&nloop, on_the_fly);
@@ -1750,6 +1753,9 @@ int shtns_precompute_auto(enum shtns_type flags, double eps, int nl_order, int *
 		if (t > 1.e-3) shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
   #endif
 	}
+  #if SHT_VERBOSE > 0
+	printf("        => SHTns is ready.\n");
+  #endif
 	return(nspat);	// returns the number of doubles to be allocated for a spatial field.
 }
 

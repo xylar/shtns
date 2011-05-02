@@ -459,7 +459,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 	int m, i, minc, nloop;
 	int dct = 0;
 	int analys = 1;		// check also analysis.
-	double t0, t, tt;
+	double t0, t, tt, r;
 	double tdct, tnodct;
 	ticks tik0, tik1;
 	clock_t tcpu;
@@ -547,16 +547,17 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 
 	if (*nlp <= 0) {
 		// find good nloop by requiring less than 3% difference between 2 consecutive timings.
-		m=0;	nloop = 10;                     // number of loops to get timings.
+		m=0;	nloop = 1;                     // number of loops to get timings.
+		r = 0.0;	tt = 1.0;
 		do {
+			if ((r > 0.03)||(tt<0.02)) {
+				m = 0;		nloop *= 3;
+			} else 	m++;
 			tcpu = clock();
 			t0 = GEN(get_time_2, SUFFIX)(nloop, "", GEN(SH_to_spat_ptr,SUFFIX), Slm, Sh SUPARG2);
 			t = GEN(get_time_2, SUFFIX)(nloop, "", GEN(SH_to_spat_ptr,SUFFIX), Slm, Sh SUPARG2);
 			tcpu = clock() - tcpu;
-			double r = fabs(2.0*(t-t0)/(t+t0));
-			if (r > 0.03) {
-				m = 0;		nloop *= 3;
-			} else 	m++;
+			r = fabs(2.0*(t-t0)/(t+t0));
 			tt = 1.e-6 * tcpu;		// real time should not exceed 1 sec.
 			#if SHT_VERBOSE > 1
 				printf(", nloop=%d, t0=%g, t=%g, r=%g, m=%d (real time = %g s)\n",nloop,t0,t,r,m,tt);

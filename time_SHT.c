@@ -567,6 +567,7 @@ int main(int argc, char *argv[])
 
 	Set_MTR_DCT(MMAX);
 
+  if (NLM < 10000) {
 // SH_to_spat
 	for (i=0;i<NLM;i++) {
 		Slm[i] = 0.0;	Tlm[i] = 0.0;
@@ -617,8 +618,10 @@ int main(int argc, char *argv[])
 	}
 	spat_to_SH(Sh,Slm);
 	write_vect("ylm",(double *)Slm,NLM*2);
+  }
 
 // test case...
+	printf("generating random test case...\n");
 	t = 1.0 / (RAND_MAX/2);
 	for (i=0;i<NLM;i++) {
 		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
