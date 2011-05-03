@@ -303,14 +303,12 @@ V			l=m-1;
 V				dy0[j] = cost[j]*y0[j];
 			}
 			l=m;
-			for (int j=0; j<NWAY; j++) {
-Q				q[0] += Y0 * ((s2d*)(rer+k))[j];		// real even
-Q				q[1] += Y0 * ((s2d*)(rei+k))[j];		// imag even
-V				s[0] += DY0 * ((s2d*)(tor+k))[j]  + Y0 * ((s2d*)(pei+k))[j];
-V				s[1] += DY0 * ((s2d*)(toi+k))[j]  - Y0 * ((s2d*)(per+k))[j];
-V				t[0] -= DY0 * ((s2d*)(por+k))[j]  - Y0 * ((s2d*)(tei+k))[j];
-V				t[1] -= DY0 * ((s2d*)(poi+k))[j]  + Y0 * ((s2d*)(ter+k))[j];
-			}
+Q			for (int j=0; j<NWAY; j++)	q[0] += Y0 * ((s2d*)(rer+k))[j];		// real even
+Q			for (int j=0; j<NWAY; j++)	q[1] += Y0 * ((s2d*)(rei+k))[j];		// imag even
+V			for (int j=0; j<NWAY; j++)	s[0] += DY0 * ((s2d*)(tor+k))[j]  + Y0 * ((s2d*)(pei+k))[j];
+V			for (int j=0; j<NWAY; j++)	s[1] += DY0 * ((s2d*)(toi+k))[j]  - Y0 * ((s2d*)(per+k))[j];
+V			for (int j=0; j<NWAY; j++)	t[0] -= DY0 * ((s2d*)(por+k))[j]  - Y0 * ((s2d*)(tei+k))[j];
+V			for (int j=0; j<NWAY; j++)	t[1] -= DY0 * ((s2d*)(poi+k))[j]  + Y0 * ((s2d*)(ter+k))[j];
 Q			q+=2;
 V			s+=2;	t+=2;
 			l++;
@@ -320,26 +318,22 @@ V				dy1[j] = (vdup(al[1])*y0[j]) *(cost[j]*cost[j] - st2[j]);		//	dy1[j] = vdup
 			}
 			al+=2;
 			while (l<llim) {	// compute even and odd parts
-				for (int j=0; j<NWAY; j++) {
-Q					q[0] += Y1 * ((s2d*)(ror+k))[j];		// real odd
-Q					q[1] += Y1 * ((s2d*)(roi+k))[j];		// imag odd
-V					s[0] += DY1 * ((s2d*)(ter+k))[j]  + Y1 * ((s2d*)(poi+k))[j];
-V					s[1] += DY1 * ((s2d*)(tei+k))[j]  - Y1 * ((s2d*)(por+k))[j];
-V					t[0] -= DY1 * ((s2d*)(per+k))[j]  - Y1 * ((s2d*)(toi+k))[j];
-V					t[1] -= DY1 * ((s2d*)(pei+k))[j]  + Y1 * ((s2d*)(tor+k))[j];
-				}
+Q				for (int j=0; j<NWAY; j++)	q[0] += Y1 * ((s2d*)(ror+k))[j];		// real odd
+Q				for (int j=0; j<NWAY; j++)	q[1] += Y1 * ((s2d*)(roi+k))[j];		// imag odd
+V				for (int j=0; j<NWAY; j++)	s[0] += DY1 * ((s2d*)(ter+k))[j]  + Y1 * ((s2d*)(poi+k))[j];
+V				for (int j=0; j<NWAY; j++)	s[1] += DY1 * ((s2d*)(tei+k))[j]  - Y1 * ((s2d*)(por+k))[j];
+V				for (int j=0; j<NWAY; j++)	t[0] -= DY1 * ((s2d*)(per+k))[j]  - Y1 * ((s2d*)(toi+k))[j];
+V				for (int j=0; j<NWAY; j++)	t[1] -= DY1 * ((s2d*)(pei+k))[j]  + Y1 * ((s2d*)(tor+k))[j];
 				for (int j=0; j<NWAY; j++) {
 					y0[j] = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
 V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] - y1[j]*st2[j]) + vdup(al[0])*dy0[j];
 				}
-				for (int j=0; j<NWAY; j++) {
-Q					q[2] += Y0 * ((s2d*)(rer+k))[j];		// real even
-Q					q[3] += Y0 * ((s2d*)(rei+k))[j];		// imag even
-V					s[2] += DY0 * ((s2d*)(tor+k))[j]  + Y0 * ((s2d*)(pei+k))[j];
-V					s[3] += DY0 * ((s2d*)(toi+k))[j]  - Y0 * ((s2d*)(per+k))[j];
-V					t[2] -= DY0 * ((s2d*)(por+k))[j]  - Y0 * ((s2d*)(tei+k))[j];
-V					t[3] -= DY0 * ((s2d*)(poi+k))[j]  + Y0 * ((s2d*)(ter+k))[j];
-				}
+Q				for (int j=0; j<NWAY; j++)	q[2] += Y0 * ((s2d*)(rer+k))[j];		// real even
+Q				for (int j=0; j<NWAY; j++)	q[3] += Y0 * ((s2d*)(rei+k))[j];		// imag even
+V				for (int j=0; j<NWAY; j++)	s[2] += DY0 * ((s2d*)(tor+k))[j]  + Y0 * ((s2d*)(pei+k))[j];
+V				for (int j=0; j<NWAY; j++)	s[3] += DY0 * ((s2d*)(toi+k))[j]  - Y0 * ((s2d*)(per+k))[j];
+V				for (int j=0; j<NWAY; j++)	t[2] -= DY0 * ((s2d*)(por+k))[j]  - Y0 * ((s2d*)(tei+k))[j];
+V				for (int j=0; j<NWAY; j++)	t[3] -= DY0 * ((s2d*)(poi+k))[j]  + Y0 * ((s2d*)(ter+k))[j];
 Q				q+=4;
 V				s+=4;	t+=4;
 				l+=2;
@@ -350,14 +344,12 @@ V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] - y0[j]*st2[j]) + vdup(al[2])*dy1[j];
 				al+=4;
 			}
 			if (l==llim) {
-				for (int j=0; j<NWAY; j++) {
-Q					q[0] += Y1 * ((s2d*)(ror+k))[j];		// real odd
-Q					q[1] += Y1 * ((s2d*)(roi+k))[j];		// imag odd
-V					s[0] += DY1 * ((s2d*)(ter+k))[j]  + Y1 * ((s2d*)(poi+k))[j];
-V					s[1] += DY1 * ((s2d*)(tei+k))[j]  - Y1 * ((s2d*)(por+k))[j];
-V					t[0] -= DY1 * ((s2d*)(per+k))[j]  - Y1 * ((s2d*)(toi+k))[j];
-V					t[1] -= DY1 * ((s2d*)(pei+k))[j]  + Y1 * ((s2d*)(tor+k))[j];
-				}
+Q				for (int j=0; j<NWAY; j++)	q[0] += Y1 * ((s2d*)(ror+k))[j];		// real odd
+Q				for (int j=0; j<NWAY; j++)	q[1] += Y1 * ((s2d*)(roi+k))[j];		// imag odd
+V				for (int j=0; j<NWAY; j++)	s[0] += DY1 * ((s2d*)(ter+k))[j]  + Y1 * ((s2d*)(poi+k))[j];
+V				for (int j=0; j<NWAY; j++)	s[1] += DY1 * ((s2d*)(tei+k))[j]  - Y1 * ((s2d*)(por+k))[j];
+V				for (int j=0; j<NWAY; j++)	t[0] -= DY1 * ((s2d*)(per+k))[j]  - Y1 * ((s2d*)(toi+k))[j];
+V				for (int j=0; j<NWAY; j++)	t[1] -= DY1 * ((s2d*)(pei+k))[j]  + Y1 * ((s2d*)(tor+k))[j];
 			}
 		#if _GCC_VEC_
 			k += 2*NWAY;
