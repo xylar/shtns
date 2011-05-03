@@ -45,7 +45,7 @@ VX	void GENFLY(spat_to_SHsphtor_fly,NWAY,SUFFIX)(double *Vt, double *Vp, complex
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 	double *al;
-	long int llim, m;
+	long int llim, imlim, m;
 	long int ni, k;
 	long int i,i0, im,l;
   #if _GCC_VEC_
@@ -80,24 +80,27 @@ V	double per[NLAT_2+2*NWAY] SSE;
 V	double por[NLAT_2+2*NWAY] SSE;
   #endif
 
-	llim = LTR;
+	llim = LTR;		imlim = MTR;
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
-Q    	BrF = (complex double *) Vr;
-V    	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > llim) imlim = llim/MRES;
+	#endif
+Q	BrF = (complex double *) Vr;
+V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 0) {
 	    if (SHT_FFT > 1) {		// alloc memory for the FFT
 	    	long int nspat = ((NPHI>>1) +1)*NLAT;
-QX	    	BrF = fftw_malloc( nspat * sizeof(complex double) );
-VX	    	BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
-VX	    	BpF = BtF + nspat;
-3	    	BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
-3	    	BtF = BrF + nspat;		BpF = BtF + nspat;
+QX			BrF = fftw_malloc( nspat * sizeof(complex double) );
+VX			BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+VX			BpF = BtF + nspat;
+3			BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
+3			BtF = BrF + nspat;		BpF = BtF + nspat;
 	    }
-Q	    fftw_execute_dft_r2c(fft,Vr, BrF);
-V	    fftw_execute_dft_r2c(fft,Vt, BtF);
-V	    fftw_execute_dft_r2c(fft,Vp, BpF);
+Q		fftw_execute_dft_r2c(fft,Vr, BrF);
+V		fftw_execute_dft_r2c(fft,Vt, BtF);
+V		fftw_execute_dft_r2c(fft,Vp, BpF);
 	}
   #endif
 
@@ -212,7 +215,7 @@ V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 		#endif
 
   #ifndef SHT_AXISYM
-	for (im=1;im<=MTR;im++) {
+	for (im=1;im<=imlim;im++) {
 		i0 = tm[im];
 		m = im*MRES;
 	#if _GCC_VEC_
@@ -497,10 +500,20 @@ V				Sl[l] = 0.0;		Tl[l] = 0.0;
 			}
 		#endif
 	}
+	#ifdef SHT_VAR_LTR
+	if (imlim < MMAX) {
+		im = imlim+1;
+		l = LiM(im*MRES, im);
+		do {
+Q			((v2d*)Qlm)[l] = vdup(0.0);
+V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
+		} while(++l < NLM);
+	}
+	#endif
 
   	if (SHT_FFT > 1) {		// free memory
-Q	    fftw_free(BrF - NLAT*(MTR+1));
-VX	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
+Q	    fftw_free(BrF - NLAT*(imlim+1));
+VX	    fftw_free(BtF - NLAT*(imlim+1));	// this frees also BpF.
 	}
   #endif
 

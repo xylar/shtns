@@ -83,7 +83,7 @@ T	#define BP0(i) ((double *)BpF)[i]
   #endif
 Q	double *yl;
 V	double *dyl0;
-	long int llim;
+	long int llim, imlim, imlim_dct;
 	long int k,im,m,l;
   #ifdef _GCC_VEC_
 Q	v2d Ql0[(LTR+3)>>1];		// we need some zero-padding.
@@ -109,6 +109,16 @@ T	BpF = (v2d*) Vp;
   #endif
 
 	llim = LTR;		// copy LTR to a local variable for faster access (inner loop limit)
+	imlim = MTR;
+	#ifndef SHT_NO_DCT
+		imlim_dct = MTR_DCT;
+		#ifdef SHT_VAR_LTR
+			if (imlim_dct*MRES > llim) imlim_dct = llim/MRES;
+		#endif
+	#endif
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > llim) imlim = llim/MRES;
+	#endif
 	im=0;	m=0;
   #ifdef _GCC_VEC_
   	{	// store the m=0 coefficients in an efficient & vectorizable way.
@@ -371,7 +381,7 @@ V			dyl0 += (((LMAX+1)>>1) - ((LTR+1)>>1))*2;
 Q	BrF += NLAT;
 V	BtF += NLAT;	BpF += NLAT;
     #ifndef SHT_NO_DCT
-	while(im<=MTR_DCT) {		// dct for im <= MTR_DCT
+	while(im<=imlim_dct) {		// dct for im <= MTR_DCT
 		m=im*MRES;
 Q		v2d* Ql = (v2d*) &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
 S		v2d* Sl = (v2d*) &Slm[LiM(0,im)];
@@ -435,7 +445,8 @@ Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
     #endif
-	while(im<=MTR) {	// regular for MTR_DCT < im <= MTR
+
+	while(im<=imlim) {	// regular for MTR_DCT < im <= MTR
 		m = im*MRES;
 3		double m_1 = 1.0/m;
 Q		v2d* Ql = (v2d*) &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
@@ -501,12 +512,12 @@ V			dyl += (LMAX-LTR);
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
-	for (k=0; k < NLAT*((NPHI>>1) -MTR); k++) {	// padding for high m's
+	for (k=0; k < NLAT*((NPHI>>1) -imlim); k++) {	// padding for high m's
 Q			BrF[k] = vdup(0.0);
 V			BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
 	}
-Q	BrF -= NLAT*(MTR+1);		// restore original pointer
-V	BtF -= NLAT*(MTR+1);	BpF -= NLAT*(MTR+1);	// restore original pointer
+Q	BrF -= NLAT*(imlim+1);		// restore original pointer
+V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
 
     if (NPHI>1) {
     #ifndef SHT_NO_DCT

@@ -46,7 +46,7 @@ V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	double *zl;
 V	double *dzl0;
 V	struct DtDp *dzl;
-	long int ni;
+	long int ni, llim, imlim;
 	long int i,i0, im,l;
 Q	complex double q0,q1;
 V	complex double s0,t0,s1,t1;
@@ -75,8 +75,12 @@ VB	#define pe0(i)	tpeo0[4*(i)+2]
 VB	#define po0(i)	tpeo0[4*(i)+3]
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
-Q    	BrF = (complex double *) Vr;
-V    	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
+	llim = LTR;		imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > llim) imlim = llim/MRES;
+	#endif
+Q		BrF = (complex double *) Vr;
+V		BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 0) {
@@ -149,9 +153,9 @@ V	#else
 V		v2d s = vdup(0.0);		v2d t = vdup(0.0);		// l=0 : Sl = Tl = 0
 V	#endif
 	#ifdef SHT_VAR_LTR
-		i = (LTR * SHT_NL_ORDER) + 2;		// sum truncation
+		i = (llim * SHT_NL_ORDER) + 2;		// sum truncation
 		if (i < klim) klim = i;
-		while(l < LTR) {
+		while(l < llim) {
 	#else
 		do {		// l < LMAX
 	#endif
@@ -199,11 +203,11 @@ V			Sl[l+1] = vlo_to_cplx(s);		Tl[l+1] = vlo_to_cplx(t);
 	  #endif
 			l+=2;
 	#ifndef SHT_VAR_LTR
-		} while(l<LTR);
+		} while(l<llim);
 	#else
 		}
 	#endif
-		if (l == LTR) {
+		if (l == llim) {
 V	#ifndef _GCC_VEC_
 V			Sl[l] = s1;		Tl[l] = t1;
 V	#else
@@ -271,7 +275,7 @@ VB		BtF += NLAT;	BpF += NLAT;
 Q		((complex double *)Ql)[0] = r0;
 V		Sl[0] = vdup(0.0);	Tl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
 	#ifdef SHT_VAR_LTR
-		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+		while (l<llim) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 	#else
 		do {
 	#endif
@@ -313,11 +317,11 @@ V			Tl[l] = vlo_to_cplx(t);		Tl[l+1] = vhi_to_cplx(t);
   #endif
 			l+=2;
 	#ifndef SHT_VAR_LTR
-		} while (l<LTR);
+		} while (l<llim);
 	#else
 		}
 	#endif
-		if (l==LTR) {
+		if (l==llim) {
 			long int lstride=1;
 	  #ifdef SHT_VAR_LTR
 			if (l != LMAX) lstride=2;
@@ -349,7 +353,7 @@ V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
 	}
   #endif
   #ifndef SHT_AXISYM
-	for (im=1;im<=MTR;im++) {
+	for (im=1;im<=imlim;im++) {
 		i0 = tm[im];
  B		i=i0;
  B		do {	// compute symmetric and antisymmetric parts.
@@ -371,7 +375,7 @@ Q		zl = zlm[im];
 V		dzl = dzlm[im];
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
-		while (l<LTR) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
+		while (l<llim) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 QE			v2d q0 = vdup(0.0);
 QO			v2d q1 = vdup(0.0);
 VE			v2d s0 = vdup(0.0);	v2d t1 = vdup(0.0);		v2d s0i = vdup(0.0);	v2d t1i = vdup(0.0);
@@ -404,7 +408,7 @@ QE			Ql[l] = q0;
 QO			Ql[l+1] = q1;
 			l+=2;
 		}
-		if (l==LTR) {
+		if (l==llim) {
 			long int lstride=1;
 	  #ifdef SHT_VAR_LTR
 			if (l != LMAX) lstride=2;
@@ -440,10 +444,20 @@ V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
       #endif
 		}
 	}
+	#ifdef SHT_VAR_LTR
+	if (imlim < MMAX) {
+		im = imlim+1;
+		l = LiM(im*MRES, im);
+		do {
+Q			((v2d*)Qlm)[l] = vdup(0.0);
+V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
+		} while(++l < NLM);
+	}
+	#endif
 
   	if (SHT_FFT > 1) {		// free memory
-Q	    fftw_free(BrF - NLAT*(MTR+1));
-VX	    fftw_free(BtF - NLAT*(MTR+1));	// this frees also BpF.
+Q	    fftw_free(BrF - NLAT*(imlim+1));
+VX	    fftw_free(BtF - NLAT*(imlim+1));	// this frees also BpF.
 	}
   #endif
 

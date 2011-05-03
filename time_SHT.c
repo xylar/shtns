@@ -81,17 +81,15 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
-	  if (li[i] <= ltr) {
 		if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
-			Slm[i] = creal(Slm[i]-Slm0[i]);
+			if (li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
 		} else {
-			Slm[i] -= Slm0[i];
+			if (li[i] <= ltr)	Slm[i] -= Slm0[i];
 			t = cabs(Slm[i]);
 		}
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
-	  }
 	}
 	printf("   => max error = %g (l=%.0f,lm=%d)   rms error = %g",tmax,el[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) {
@@ -125,17 +123,15 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
-	  if (li[i] <= ltr) {
 		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
-			Slm[i] = creal(Slm[i]-Slm0[i]);
+			if (li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
 		} else {
-			Slm[i] -= Slm0[i];
+			if (li[i] <= ltr)	Slm[i] -= Slm0[i];
 			t = cabs(Slm[i]);
 		}
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
-	  }
 	}
 	printf("   Spheroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g",tmax,el[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
@@ -145,17 +141,15 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
-	  if (li[i] <= ltr) {
 		if ((i <= LMAX)||(i >= LiM(MRES*(NPHI+1)/2,(NPHI+1)/2))) {
-			Tlm[i] = creal(Tlm[i]- Tlm0[i]);
+			if (li[i] <= ltr)	Tlm[i] = creal(Tlm[i]- Tlm0[i]);
 			t = fabs(creal(Tlm[i]));
 		} else {
-			Tlm[i] -= Tlm0[i];
+			if (li[i] <= ltr)	Tlm[i] -= Tlm0[i];
 			t = cabs(Tlm[i]);
 		}
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
-	  }
 	}
 	printf("   Toroidal => max error = %g (l=%.0f,lm=%d)    rms error = %g",tmax,el[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
