@@ -396,12 +396,11 @@ double GEN(get_time_2,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void* S
 
 double GEN(get_time_3,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, void* SUPARG), void *a, void *b, void *c SUPARG)
 {
-	int i;
 	ticks tik0, tik1;
 	
 		(*fptr)(a,b,c SUPARG2);		// caching...
 	tik0 = getticks();
-	for (i=0; i<nloop; i++) {
+	for (int i=0; i<nloop; i++) {
 		(*fptr)(a,b,c SUPARG2);
 	}
 	tik1 = getticks();
@@ -414,12 +413,11 @@ double GEN(get_time_3,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, 
 
 double GEN(get_time_4,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, void*, void* SUPARG), void *a, void *b, void *c, void *d SUPARG)
 {
-	int i;
 	ticks tik0, tik1;
 	
 		(*fptr)(a,b,c,d SUPARG2);		// caching...
 	tik0 = getticks();
-	for (i=0; i<nloop; i++) {
+	for (int i=0; i<nloop; i++) {
 		(*fptr)(a,b,c,d SUPARG2);
 	}
 	tik1 = getticks();
@@ -432,12 +430,11 @@ double GEN(get_time_4,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, 
 
 double GEN(get_time_6,SUFFIX)(int nloop, char* name, void (*fptr)(void*, void*, void*, void*, void*, void* SUPARG), void *a, void *b, void *c, void *d, void *e, void *f SUPARG)
 {
-	int i;
 	ticks tik0, tik1;
 	
 		(*fptr)(a,b,c,d,e,f SUPARG2);		// caching...
 	tik0 = getticks();
-	for (i=0; i<nloop; i++) {
+	for (int i=0; i<nloop; i++) {
 		(*fptr)(a,b,c,d,e,f SUPARG2);
 	}
 	tik1 = getticks();
@@ -550,7 +547,7 @@ double GEN(choose_best_sht,SUFFIX)(int* nlp, int on_the_fly SUPARG)
 		m=0;	nloop = 1;                     // number of loops to get timings.
 		r = 0.0;	tt = 1.0;
 		do {
-			if ((r > 0.03)||(tt<0.02)) {
+			if ((r > 0.03)||(tt<0.1)) {
 				m = 0;		nloop *= 3;
 			} else 	m++;
 			tcpu = clock();
