@@ -315,6 +315,7 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 
 /// - Compute analysis recurrence coefficients if necessary
 	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
+		im = ((MMAX+2)>>1)*2;
 		blm = (double **) malloc( im * sizeof(double *) + (2*NLM)*sizeof(double) );
 		bl0 = (double *) (blm + im);
 		for (lm=0; lm<2*NLM; lm++) bl0[lm] = al0[lm];		// copy
