@@ -439,8 +439,10 @@ void EqualPolarGrid()
 /// \todo even/odd transform do not work with out-of-place FFT (segfault).
 int planFFT(int layout)
 {
+	double cost_ip, cost_oop;
 	complex double *ShF;
 	double *Sh;
+	fftw_plan fft2, ifft2;
 	int nfft, ncplx, nreal;
 	int theta_inc, phi_inc, phi_embed;
 
@@ -466,29 +468,42 @@ int planFFT(int layout)
 	printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc,phi_embed);
 	if (NPHI <= (SHT_NL_ORDER+1)*MMAX)	printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
 	if (NPHI != fft_int(NPHI,7))		printf("     !! Warning : Nphi is not optimal for FFTW !\n");
-	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
 #endif
 
 // Allocate dummy Spatial Fields.
-	if (SHT_FFT > 1) {
-		ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
-		Sh = (double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
-	} else {
-		ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
-		Sh = (double *) ShF;
-	}
+	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	Sh = (double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
 
 // IFFT : unnormalized.  FFT : must be normalized.
+	cost_ip = 0.0;		cost_oop = 0.0;
+	if (SHT_FFT == 1) {		// in-place FFT allowed
+		ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, fftw_plan_mode);
+		if (ifft2 == NULL) shtns_runerr("[FFTW] ifft planning failed !");
+		fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
+		if (fft2 == NULL) shtns_runerr("[FFTW] fft planning failed !");
+		cost_ip = fftw_cost(ifft2) + fftw_cost(fft2);
+	}
+	if ((SHT_FFT > 1) || (cost_ip > 0.0)) {		// out-of-place FFT
 		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, fftw_plan_mode);
 		if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
 		if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
+		cost_oop = fftw_cost(ifft) + fftw_cost(fft);
+	}
+	if (SHT_FFT == 1) {
+		if ((cost_oop >= cost_ip) || (cost_oop == 0.0)) {		// switch to in-place transforms.
+			fftw_destroy_plan(fft);		fftw_destroy_plan(ifft);
+			fft = fft2;		ifft = ifft2;
+		} else {		// out-of-place is faster
+			fftw_destroy_plan(fft2);		fftw_destroy_plan(ifft2);
+			SHT_FFT = 2;		// switch to out-of-place.
+		}
+	}
 
-		ifft_eo = fftw_plan_many_dft_c2r(1, &nfft, NLAT_2, ShF, &ncplx, NLAT_2, 1, Sh, &nreal, (phi_inc+1)/2, theta_inc, fftw_plan_mode);
-		if (ifft_eo == NULL) shtns_runerr("[FFTW] ifft planning failed !");
-		fft_eo = fftw_plan_many_dft_r2c(1, &nfft, NLAT_2, Sh, &nreal, (phi_inc+1)/2, theta_inc, ShF, &ncplx, NLAT_2, 1, fftw_plan_mode);
-		if (fft_eo == NULL) shtns_runerr("[FFTW] fft planning failed !");
-
+#if SHT_VERBOSE > 0
+	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
+	printf("out-of-place cost = %g    in-place cost = %g\n",cost_oop, cost_ip);
+#endif
 #if SHT_VERBOSE > 2
 	printf(" *** fft plan :\n");
 	fftw_print_plan(fft);
@@ -497,9 +512,7 @@ int planFFT(int layout)
 	printf("\n");
 #endif
 
-//	fft_norm = 1.0/nfft;
-	if (SHT_FFT > 1) fftw_free(Sh);
-	fftw_free(ShF);
+	fftw_free(Sh);		fftw_free(ShF);
   } else {
 	if (theta_inc != 1) shtns_runerr("only contiguous spatial data is supported for Nphi=1");
 #if SHT_VERBOSE > 0

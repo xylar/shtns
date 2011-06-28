@@ -42,7 +42,7 @@ Then browse the html documentation starting with doc/html/index.html
 
 /** \page compil Compiling and installing SHTns
 
-To compile SHTns, you need a C compiler and the FFTW library version 3.0 or later carefully installed.
+To compile SHTns, you need a C compiler and the FFTW library version 3.3 or later carefully installed.
 We recommend using GCC 4.0 or later as it will produce the fastest vectorized code on x86_64 architecture.
 
 You should edit the Makefile to adapt it to your architecture and compiler. In particular, using gcc or icc will not lead to the same performance, and you
