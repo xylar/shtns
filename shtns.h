@@ -203,12 +203,3 @@ void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex do
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_m0
 #define SH_to_grad_spat_m0(S,Gt) SHsph_to_spat_m0(S, Gt)
-
-/*! \name SHT transforms with assumed equatorial symmetry (parity = 0 or 1)
- * these work with (NLAT+1)/2 latitudinal points, and do not overwrite SH coefficients of other parity
- *///@{
-void SHeo_to_spat(complex double *Qlm, double *Vr, int parity);
-void spat_to_SHeo(double *Vr, complex double *Qlm, int parity);
-void SHeo_sphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int parity);
-void spat_to_SHeo_sphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int parity);
-//@}

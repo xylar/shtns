@@ -22,14 +22,15 @@ shtcc = $(cmd)
 ## "version" identification string
 HGID=`hg id -ti`
 
-shtfiles = SHT/SH_to_spat_fly.c SHT/fly_spat_to_SH.gen.c SHT/spat_to_SH_fly.c SHT/fly_SH_to_spat.gen.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c SHT/Makefile sht_legendre.c
+shtfiles = SHT/SH_to_spat_fly.c SHT/fly_spat_to_SH.gen.c SHT/spat_to_SH_fly.c SHT/fly_SH_to_spat.gen.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/Makefile sht_legendre.c
+#SHT/sparse_spat_to_SH.gen.c SHT/sparse_SH_to_spat.gen.c  SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c 
 
 hfiles = sht_private.h sht_config.h shtns.h
 
 default : libshtns.a
 
-libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
-	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_eo.o sht_m0ltr.o
+libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	@echo " "
 	@cat COPYRIGHT
 
@@ -51,10 +52,10 @@ SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
 	$(MAKE) SH_to_spat.c -C SHT
 SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 	$(MAKE) spat_to_SH.c -C SHT
-SHT/SHeo_to_spat.c : SHT/sparse_SH_to_spat.gen.c SHT/Makefile
-	$(MAKE) SHeo_to_spat.c -C SHT
-SHT/spat_to_SHeo.c : SHT/sparse_spat_to_SH.gen.c SHT/Makefile
-	$(MAKE) spat_to_SHeo.c -C SHT
+#SHT/SHeo_to_spat.c : SHT/sparse_SH_to_spat.gen.c SHT/Makefile
+#	$(MAKE) SHeo_to_spat.c -C SHT
+#SHT/spat_to_SHeo.c : SHT/sparse_spat_to_SH.gen.c SHT/Makefile
+#	$(MAKE) spat_to_SHeo.c -C SHT
 
 # objects :
 SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
@@ -68,8 +69,8 @@ sht_m0.o : sht_m0.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/sp
 	$(shtcc) -c sht_m0.c -o sht_m0.o
 sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
 	$(shtcc) -c sht_m0ltr.c -o sht_m0ltr.o
-sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
-	$(shtcc) -c sht_eo.c -o sht_eo.o
+#sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
+#	$(shtcc) -c sht_eo.c -o sht_eo.o
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile

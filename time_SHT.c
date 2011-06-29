@@ -185,6 +185,7 @@ int test_SHT()
 	return (int) tcpu;
 }
 
+/*
 int test_SHT_parity(int eo)
 {
 	long int jj,i, nlm_cplx;
@@ -203,6 +204,7 @@ int test_SHT_parity(int eo)
 	scal_error(Slm, Slm0, LMAX);
 	return (int) tcpu;
 }
+*/
 
 int test_SHT_l(int ltr)
 {

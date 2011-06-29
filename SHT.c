@@ -478,10 +478,14 @@ int planFFT(int layout)
 	cost_ip = 0.0;		cost_oop = 0.0;
 	if (SHT_FFT == 1) {		// in-place FFT allowed
 		ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, fftw_plan_mode);
-		if (ifft2 == NULL) shtns_runerr("[FFTW] ifft planning failed !");
-		fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
-		if (fft2 == NULL) shtns_runerr("[FFTW] fft planning failed !");
-		cost_ip = fftw_cost(ifft2) + fftw_cost(fft2);
+		if (ifft2 != NULL) {
+			fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
+			if (fft2 != NULL) {
+				cost_ip = fftw_cost(ifft2) + fftw_cost(fft2);
+			} else {
+				fftw_destroy_plan(ifft2);	ifft2 = NULL;	SHT_FFT = 2;
+			}
+		} else SHT_FFT = 2;
 	}
 	if ((SHT_FFT > 1) || (cost_ip > 0.0)) {		// out-of-place FFT
 		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, fftw_plan_mode);
@@ -502,9 +506,9 @@ int planFFT(int layout)
 
 #if SHT_VERBOSE > 0
 	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
-	printf("out-of-place cost = %g    in-place cost = %g\n",cost_oop, cost_ip);
 #endif
 #if SHT_VERBOSE > 2
+	printf("out-of-place cost = %g    in-place cost = %g\n",cost_oop, cost_ip);
 	printf(" *** fft plan :\n");
 	fftw_print_plan(fft);
 	printf("\n *** ifft plan :\n");
