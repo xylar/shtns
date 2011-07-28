@@ -40,5 +40,6 @@
  * For synthesis, coefficients wiht l>ltr are ignored, but for analysis coefficient with l>ltr are set to zero.
 */
 //@{
+#define IVAR SHT_LTR
 #include "SHT/sht_generic.c"
 

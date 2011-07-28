@@ -27,17 +27,17 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
-3	void GENFLY(SHqst_to_spat_fly,NWAY,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG) {
-QX	void GENFLY(SH_to_spat_fly,NWAY,SUFFIX)(complex double *Qlm, double *Vr SUPARG) {
+3	void GEN3(SHqst_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG) {
+QX	void GEN3(SH_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr SUPARG) {
   #ifndef SHT_GRAD
-VX	void GENFLY(SHsphtor_to_spat_fly,NWAY,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG) {
+VX	void GEN3(SHsphtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG) {
   #else
 	#ifndef SHT_AXISYM
-S	void GENFLY(SHsph_to_spat_fly,NWAY,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARG) {
-T	void GENFLY(SHtor_to_spat_fly,NWAY,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARG) {
+S	void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp SUPARG) {
+T	void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp SUPARG) {
 	#else
-S	void GENFLY(SHsph_to_spat_fly,NWAY,SUFFIX)(complex double *Slm, double *Vt SUPARG) {
-T	void GENFLY(SHtor_to_spat_fly,NWAY,SUFFIX)(complex double *Tlm, double *Vp SUPARG) {
+S	void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt SUPARG) {
+T	void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp SUPARG) {
 	#endif
   #endif
 
@@ -62,7 +62,7 @@ T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	long int llim,imlim;
 	long int k,im,m,l;
-	double *al;
+	double *al, *ct, *st;
 Q	double Ql0[LTR+1];
 S	double Sl0[LTR+1];
 T	double Tl0[LTR];
@@ -85,6 +85,7 @@ T	BpF = (v2d*) Vp;
   #endif
 
 	llim = LTR;		// copy LTR to a local variable for faster access (inner loop limit)
+	ct = shtns->ct;		st = shtns->st;
 	im=0;	m=0;
  		l=1;
 Q		Ql0[0] = (double) Qlm[0];		// l=0
@@ -96,7 +97,7 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 		} while(l<=llim);
 		k=0;
 		do {
-			l=0;	al = al0;
+			l=0;	al = shtns->al0;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d sint[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d re[NWAY], ro[NWAY];
@@ -206,10 +207,11 @@ V	BtF += NLAT;	BpF += NLAT;
   if (llim <= SHT_L_RESCALE_FLY) {
 	for(im=1; im<=imlim; im++) {
 		m = im*MRES;
-Q		complex double* Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
-S		complex double* Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
-T		complex double* Tl = &Tlm[LiM(0,im)];
-		k=0;	l=tm[im];
+		l = LiM(shtns, 0,im);
+Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
+S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
+T		complex double* Tl = &Tlm[l];
+		k=0;	l=shtns->tm[im];
 	#if _GCC_VEC_
 		l=(l>>1)*2;		// stay on a 16 byte boundary
 	#endif
@@ -221,7 +223,7 @@ V			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zer
 			k++;
 		}
 		do {
-			al = alm[im];
+			al = shtns->alm[im];
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];
@@ -345,10 +347,11 @@ V		BtF += NLAT;	BpF += NLAT;
   } else {		// llim > SHT_L_RESCALE_FLY
 	for(im=1; im<=imlim; im++) {
 		m = im*MRES;
-Q		complex double* Ql = &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
-S		complex double* Sl = &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
-T		complex double* Tl = &Tlm[LiM(0,im)];
-		k=0;	l=tm[im];
+		l = LiM(shtns, 0,im);
+Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
+S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
+T		complex double* Tl = &Tlm[l];
+		k=0;	l=shtns->tm[im];
 	#if _GCC_VEC_
 		l=(l>>1)*2;		// stay on a 16 byte boundary
 	#endif
@@ -360,7 +363,7 @@ V			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zer
 			k++;
 		}
 		do {
-			al = alm[im];
+			al = shtns->alm[im];
 			s2d cost[NWAY], y0[NWAY], y1[NWAY], scale[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];
@@ -508,9 +511,9 @@ Q	BrF -= NLAT*(imlim+1);		// restore original pointer
 V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
 
     if (NPHI>1) {
-Q		fftw_execute_dft_c2r(ifft, (complex double *) BrF, Vr);
-V		fftw_execute_dft_c2r(ifft, (complex double *) BtF, Vt);
-V		fftw_execute_dft_c2r(ifft, (complex double *) BpF, Vp);
+Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
+V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
+V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
 		if (SHT_FFT > 1) {		// free memory
 Q			fftw_free(BrF);
 VX			fftw_free(BtF);		// this frees also BpF.

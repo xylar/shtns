@@ -38,13 +38,14 @@ V/// complex double arrays of size NLM.
 /// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
   #endif
 
-QX	void GENFLY(spat_to_SH_fly,NWAY,SUFFIX)(double *Vr, complex double *Qlm SUPARG) {
-VX	void GENFLY(spat_to_SHsphtor_fly,NWAY,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG) {
-3	void GENFLY(spat_to_SHqst_fly,NWAY,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG) {
+QX	void GEN3(spat_to_SH_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm SUPARG) {
+VX	void GEN3(spat_to_SHsphtor_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG) {
+3	void GEN3(spat_to_SHqst_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG) {
 
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
-	double *al;
+	double *al, *wg, *ct, *st;
+V	double *l_2;
 	long int llim, imlim, m;
 	long int ni, k;
 	long int i,i0, im,l;
@@ -98,12 +99,14 @@ VX			BpF = BtF + nspat;
 3			BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
 3			BtF = BrF + nspat;		BpF = BtF + nspat;
 	    }
-Q		fftw_execute_dft_r2c(fft,Vr, BrF);
-V		fftw_execute_dft_r2c(fft,Vt, BtF);
-V		fftw_execute_dft_r2c(fft,Vp, BpF);
+Q		fftw_execute_dft_r2c(shtns->fft,Vr, BrF);
+V		fftw_execute_dft_r2c(shtns->fft,Vt, BtF);
+V		fftw_execute_dft_r2c(shtns->fft,Vp, BpF);
 	}
   #endif
 
+	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
+V	l_2 = shtns->l_2;
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
 		i=0;
 Q		double r0 = 0.0;
@@ -145,7 +148,7 @@ V			per[i] = 0.0;		por[i] = 0.0;
 	#endif
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
-Q		Qlm[0] = r0 * bl0[0];					// l=0 is done.
+Q		Qlm[0] = r0 * shtns->bl0[0];					// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
 		for (l=1;l<=llim;l++) {
@@ -153,7 +156,7 @@ Q			qq[l] = vdup(0.0);
 V			ss[l] = vdup(0.0);		tt[l] = vdup(0.0);
 		}
 		do {
-			al = bl0;
+			al = shtns->bl0;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d sint[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rerk[NWAY], rork[NWAY];		// help the compiler to cache into registers.
@@ -221,7 +224,7 @@ V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 
   #ifndef SHT_AXISYM
 	for (im=1;im<=imlim;im++) {
-		i0 = tm[im];
+		i0 = shtns->tm[im];
 		m = im*MRES;
 	#if _GCC_VEC_
 		i0=(i0>>1)*2;		// stay on a 16 byte boundary
@@ -268,9 +271,10 @@ V		BtF += NLAT;	BpF += NLAT;
 Q			s2d* q = qq;
 V			s2d* s = ss;		s2d* t = tt;
 		#else
-Q			double* q = (double *) &Qlm[LiM(m,im)];
-V			double* s = (double *) &Slm[LiM(m,im)];
-V			double* t = (double *) &Tlm[LiM(m,im)];
+			l = LiM(shtns, m, im);
+Q			double* q = (double *) &Qlm[l];
+V			double* s = (double *) &Slm[l];
+V			double* t = (double *) &Tlm[l];
 		#endif
 		for (l=llim-m; l>=0; l--) {
 Q			q[0] = vdup(0.0);		q[1] = vdup(0.0);		q+=2;
@@ -287,11 +291,12 @@ V		#define DY1 dy1[j]
 Q			s2d* q = qq;
 V			s2d* s = ss;		s2d* t = tt;
 		#else
-Q			double* q = (double *) &Qlm[LiM(m,im)];
-V			double* s = (double *) &Slm[LiM(m,im)];
-V			double* t = (double *) &Tlm[LiM(m,im)];
+			l = LiM(shtns, m, im);
+Q			double* q = (double *) &Qlm[l];
+V			double* s = (double *) &Slm[l];
+V			double* t = (double *) &Tlm[l];
 		#endif
-			al = blm[im];
+			al = shtns->blm[im];
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rerk[NWAY], reik[NWAY], rork[NWAY], roik[NWAY];		// help the compiler to cache into registers.
@@ -387,11 +392,12 @@ V		#define DY1 (dy1[j]*scale[j])
 Q			s2d* q = qq;
 V			s2d* s = ss;		s2d* t = tt;
 		#else
-Q			double* q = (double *) &Qlm[LiM(m,im)];
-V			double* s = (double *) &Slm[LiM(m,im)];
-V			double* t = (double *) &Tlm[LiM(m,im)];
+			l = LiM(shtns, m, im);
+Q			double* q = (double *) &Qlm[l];
+V			double* s = (double *) &Slm[l];
+V			double* t = (double *) &Tlm[l];
 		#endif
-			al = blm[im];
+			al = shtns->blm[im];
 			s2d cost[NWAY], y0[NWAY], y1[NWAY], scale[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rerk[NWAY], reik[NWAY], rork[NWAY], roik[NWAY];		// help the compiler to cache into registers.
@@ -494,9 +500,10 @@ V					t[1] -= DY1 * peik[j]  + Y1 * tork[j];
 V		#undef DY0
 V		#undef DY1
 	  }
-Q		complex double *Ql = &Qlm[LiM(m,im)];
-V		complex double *Sl = &Slm[LiM(m,im)];
-V		complex double *Tl = &Tlm[LiM(m,im)];
+		l = LiM(shtns, m, im);
+Q		complex double *Ql = &Qlm[l];
+V		complex double *Sl = &Slm[l];
+V		complex double *Tl = &Tlm[l];
 3		double m_1 = 1.0/m;
 		#if _GCC_VEC_
 			for (l=0; l<=llim-m; l++) {
@@ -522,7 +529,7 @@ V				Sl[l] = 0.0;		Tl[l] = 0.0;
 	#ifdef SHT_VAR_LTR
 	if (imlim < MMAX) {
 		im = imlim+1;
-		l = LiM(im*MRES, im);
+		l = LiM(shtns, im*MRES, im);
 		do {
 Q			((v2d*)Qlm)[l] = vdup(0.0);
 V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);

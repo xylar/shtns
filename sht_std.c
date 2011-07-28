@@ -32,4 +32,5 @@
  * Spherical Harmonic transforms for sizes set by \ref shtns_init, \ref shtns_set_size and \ref shtns_precompute
 */
 //@{
+#define IVAR SHT_STD
 #include "SHT/sht_generic.c"

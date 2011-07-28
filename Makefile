@@ -4,7 +4,7 @@ PREFIX=$(HOME)
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= -O3 -fomit-frame-pointer -std=gnu99 -ffast-math -D_GNU_SOURCE
+go= -O3 -fomit-frame-pointer -std=gnu99 -ffast-math -D_GNU_SOURCE -funsafe-math-optimizations
 
 ## compiler :
 ## generic gcc
@@ -29,8 +29,8 @@ hfiles = sht_private.h sht_config.h shtns.h
 
 default : libshtns.a
 
-libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
-	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o #sht_m0.o sht_m0ltr.o
+	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o #sht_m0.o sht_m0ltr.o
 	@echo " "
 	@cat COPYRIGHT
 

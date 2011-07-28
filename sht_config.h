@@ -23,13 +23,13 @@
 /// \file sht_config.h compile-time configuration.
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
-#define SHT_VERBOSE 1
+#define SHT_VERBOSE 2
 
 /// defines the maximum amount of memory in megabytes that SHTns should use.
 #define SHTNS_MAX_MEMORY 2048
 
 /// Compile the \ref fortapi
-#define SHT_F77_API
+//#define SHT_F77_API
 
 
 /// Minimum performance improve for DCT in \ref sht_auto mode. If not atained, we switch back to gauss.

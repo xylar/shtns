@@ -58,9 +58,21 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
 // MTR_DCT : -1 => no dct
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
-#Q void SH_to_spat(complex double *Qlm, double *Vr)
-#V void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp)
-# {
+
+3	void GEN3(SHqst_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG) {
+QX	void GEN3(SH_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr SUPARG) {
+  #ifndef SHT_GRAD
+VX	void GEN3(SHsphtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG) {
+  #else
+	#ifndef SHT_AXISYM
+S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp SUPARG) {
+T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp SUPARG) {
+	#else
+S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt SUPARG) {
+T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp SUPARG) {
+	#endif
+  #endif
+	
 Q	v2d *BrF;
   #ifndef SHT_AXISYM
 V	v2d *BtF, *BpF;
@@ -145,8 +157,8 @@ Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
 	#endif
-Q		yl = ykm_dct[im];
-V		dyl0 = (double *) dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
+Q		yl = shtns->ykm_dct[im];
+V		dyl0 = (double *) shtns->dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
 V		l = 1;
 		do {
@@ -235,9 +247,10 @@ T			BP0(k) = 0.0;	BP0(k+1) = 0.0;
 			k+=2;
 		}
     #ifdef SHT_AXISYM
-Q		fftw_execute_r2r(idct_r1,Vr, Vr);		// iDCT m=0
-S		fftw_execute_r2r(idct_r1,Vt, Vt);		// iDCT m=0
-T		fftw_execute_r2r(idct_r1,Vp, Vp);		// iDCT m=0
+Q		fftw_execute_r2r(shtns->idct_r1,Vr, Vr);		// iDCT m=0
+S		fftw_execute_r2r(shtns->idct_r1,Vt, Vt);		// iDCT m=0
+T		fftw_execute_r2r(shtns->idct_r1,Vp, Vp);		// iDCT m=0
+V		double* st_1 = shtns->st_1;
 V		k=0;	do {
 V		#ifdef _GCC_VEC_
 V			v2d sin_1 = ((v2d *)st_1)[k];
@@ -259,8 +272,8 @@ S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
 	#endif
 		k=0;
-Q		yl  = ylm[im];
-V		dyl0 = (double *) dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
+Q		yl  = shtns->ylm[im];
+V		dyl0 = (double *) shtns->dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
 		do {	// ops : NLAT_2 * [ (lmax-m+1) + 4]	: almost twice as fast.
 	#ifndef _GCC_VEC_
 			l=1;
@@ -383,11 +396,12 @@ V	BtF += NLAT;	BpF += NLAT;
     #ifndef SHT_NO_DCT
 	while(im<=imlim_dct) {		// dct for im <= MTR_DCT
 		m=im*MRES;
-Q		v2d* Ql = (v2d*) &Qlm[LiM(0,im)];		// virtual pointer for l=0 and im
-S		v2d* Sl = (v2d*) &Slm[LiM(0,im)];
-T		v2d* Tl = (v2d*) &Tlm[LiM(0,im)];
-Q		yl = ykm_dct[im];
-V		dyl = dykm_dct[im];
+		l = LiM(shtns, 0,im);
+Q		v2d* Ql = (v2d*) &Qlm[l];		// virtual pointer for l=0 and im
+S		v2d* Sl = (v2d*) &Slm[l];
+T		v2d* Tl = (v2d*) &Tlm[l];
+Q		yl = shtns->ykm_dct[im];
+V		dyl = shtns->dykm_dct[im];
 		k=0;	l=m;
 		do {
 Q			v2d re = vdup(0.0);		v2d ro = vdup(0.0);
@@ -449,19 +463,20 @@ V		BtF += NLAT;	BpF += NLAT;
 	while(im<=imlim) {	// regular for MTR_DCT < im <= MTR
 		m = im*MRES;
 3		double m_1 = 1.0/m;
-Q		v2d* Ql = (v2d*) &Qlm[LiM(0,im)];	// virtual pointer for l=0 and im
-S		v2d* Sl = (v2d*) &Slm[LiM(0,im)];	// virtual pointer for l=0 and im
-T		v2d* Tl = (v2d*) &Tlm[LiM(0,im)];
-		k=0;
-		while (k<tm[im]) {	// polar optimization
+		l = LiM(shtns, 0,im);
+Q		v2d* Ql = (v2d*) &Qlm[l];	// virtual pointer for l=0 and im
+S		v2d* Sl = (v2d*) &Slm[l];	// virtual pointer for l=0 and im
+T		v2d* Tl = (v2d*) &Tlm[l];
+		k=0;	l=shtns->tm[im];
+		while (k<l) {	// polar optimization
 Q			BrF[k] = vdup(0.0);
-QB			BrF[NLAT-tm[im] + k] = vdup(0.0);	// south pole zeroes <=> BrF[im*NLAT + NLAT-(k+1)] = 0.0;
+QB			BrF[NLAT-l + k] = vdup(0.0);	// south pole zeroes <=> BrF[im*NLAT + NLAT-(k+1)] = 0.0;
 V			BtF[k] = vdup(0.0);		BpF[k] = vdup(0.0);
-VB			BtF[NLAT-tm[im] + k] = vdup(0.0);		BpF[NLAT-tm[im] + k] = vdup(0.0);	// south pole zeroes
+VB			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zeroes
 			k++;
 		}
-Q		yl  = ylm[im];
-V		dyl = dylm[im];
+Q		yl  = shtns->ylm[im];
+V		dyl = shtns->dylm[im];
 		do {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 Q			v2d re = vdup(0.0); 	v2d ro = vdup(0.0);
@@ -494,7 +509,7 @@ SE				pe  += vdup(dyl[0].p) * Sl[l];
 Q				yl++;
 V				dyl++;
 			}
-3			s2d qv = vdup(st[k]*m_1);
+3			s2d qv = vdup(shtns->st[k]*m_1);
 V			BtF[k] = addi(dte+dto, te+to);		// Bt = dS/dt       + I.m/sint *T
 VB			BtF[NLAT-1-k] = addi(dte-dto, te-to);
 3			re *= qv;	ro *= qv;
@@ -522,9 +537,10 @@ V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
     if (NPHI>1) {
     #ifndef SHT_NO_DCT
 		if (MTR_DCT >= 0) {
-Q			fftw_execute_r2r(idct,(double *) BrF, (double *) BrF);		// iDCT
-V			fftw_execute_r2r(idct,(double *) BtF, (double *) BtF);		// iDCT
-V			fftw_execute_r2r(idct,(double *) BpF, (double *) BpF);		// iDCT
+Q			fftw_execute_r2r(shtns->idct,(double *) BrF, (double *) BrF);		// iDCT
+V			fftw_execute_r2r(shtns->idct,(double *) BtF, (double *) BtF);		// iDCT
+V			fftw_execute_r2r(shtns->idct,(double *) BpF, (double *) BpF);		// iDCT
+V			double* st_1 = shtns->st_1;
 V			k=0;	do {		// m=0
 V				double sin_1 = st_1[k];		double sin_2 = st_1[k+1];
 V				((double *)BtF)[2*k] *= sin_1;   	((double *)BpF)[2*k] *= sin_1;
@@ -532,6 +548,7 @@ V				((double *)BtF)[2*k+2] *= sin_2; 	((double *)BpF)[2*k+2] *= sin_2;
 V				k+=2;
 V			} while(k<NLAT);
 Q			if (MRES & 1) {		// odd m's must be divided by sin(theta)
+Q				double* st_1 = shtns->st_1;
 Q				for (im=1; im<=MTR_DCT; im+=2) {	// odd m's
 Q					k=0;	do {
 Q						((v2d *)BrF)[im*NLAT + k] *= vdup(st_1[k]);		((v2d *)BrF)[im*NLAT + k+1] *= vdup(st_1[k+1]);
@@ -550,9 +567,9 @@ V				} while(k<NLAT);
 V			}
 		}
     #endif
-Q		fftw_execute_dft_c2r(ifft, (complex double *) BrF, Vr);
-V		fftw_execute_dft_c2r(ifft, (complex double *) BtF, Vt);
-V		fftw_execute_dft_c2r(ifft, (complex double *) BpF, Vp);
+Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
+V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
+V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
 		if (SHT_FFT > 1) {		// free memory
 Q			fftw_free(BrF);
 VX			fftw_free(BtF);	// this frees also BpF.
@@ -566,9 +583,10 @@ V			Vp[k] = ((double *)BpF)[2*k];
 		} while(k<NLAT);
     #ifndef SHT_NO_DCT
 		if (MTR_DCT >= 0) {
-Q			fftw_execute_r2r(idct_r1,Vr, Vr);		// iDCT m=0
-S			fftw_execute_r2r(idct_r1,Vt, Vt);		// iDCT m=0
-T			fftw_execute_r2r(idct_r1,Vp, Vp);		// iDCT m=0
+Q			fftw_execute_r2r(shtns->idct_r1,Vr, Vr);		// iDCT m=0
+S			fftw_execute_r2r(shtns->idct_r1,Vt, Vt);		// iDCT m=0
+T			fftw_execute_r2r(shtns->idct_r1,Vp, Vp);		// iDCT m=0
+V			double* st_1 = shtns->st_1;
 V			k=0;	do {
 V		#ifdef _GCC_VEC_
 V				v2d sin_1 = ((v2d *)st_1)[k];
@@ -590,4 +608,4 @@ V			} while (k<NLAT_2);
 Q	#undef BR0
 V	#undef BT0
 V	#undef BP0
-# }
+  }

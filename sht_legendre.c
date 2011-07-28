@@ -64,7 +64,7 @@ long double a_sint_pow_n(long double val, long double cost, int n)
 /// Returns the value of a legendre polynomial of degree l and order im*MRES, noramalized for spherical harmonics, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
-double legendre_sphPlm(const int l, const int im, double x)
+double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, double x)
 {
 	double *al;
 	int i,m;
@@ -75,7 +75,7 @@ double legendre_sphPlm(const int l, const int im, double x)
 	if ( (l>LMAX) || (l<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
 #endif
 
-	al = alm[im];
+	al = shtns->alm[im];
 	ymm = al[0];		// l=m
 	if (m>0) ymm *= SHT_LEG_SCALEF;
 	ymmp1 = ymm;
@@ -104,7 +104,7 @@ done:
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
 /// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
-void legendre_sphPlm_array(const int lmax, const int im, const double cost, double *yl)
+void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double cost, double *yl)
 {
 	double *al;
 	int l,m;
@@ -117,7 +117,7 @@ void legendre_sphPlm_array(const int lmax, const int im, const double cost, doub
 #endif
 
 	x = cost;
-	al = alm[im];
+	al = shtns->alm[im];
 	yl -= m;			// shift pointer
 	ymm = al[0];	// l=m
 	if (m>0) {
@@ -166,7 +166,7 @@ done:
 /// \param sint = sqrt(1-x^2) to avoid recomputation of sqrt.
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
 /// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
-void legendre_sphPlm_deriv_array(const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
+void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
 {
 	double *al;
 	long int l,m;
@@ -178,7 +178,7 @@ void legendre_sphPlm_deriv_array(const int lmax, const int im, const double cost
 #ifdef LEG_RANGE_CHECK
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
-	al = alm[im];
+	al = shtns->alm[im];
 	yl -= m;	dyl -= m;			// shift pointers
 
 	st = sint;
@@ -241,9 +241,10 @@ done:
 /// \param[in] with_cs_phase : Condon-Shortley phase (-1)^m is included (1) or not (0)
 /// \param[in] mpos_renorm : Optional renormalization for m>0.
 ///  1.0 (no renormalization) is the "complex" convention, while 0.5 leads to the "real" convention (with FFTW).
-void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
+void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
 {
-	double *dl0;
+	double *al0, *bl0;
+	double **alm, **blm;
 	long int im, m, l, lm;
 	double t1, t2;
 
@@ -257,8 +258,6 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 	alm = (double **) malloc( im * sizeof(double *) + (2*NLM)*sizeof(double) );
 	al0 = (double *) (alm + im);
 	bl0 = al0;		blm = alm;		// by default analysis recurrence is the same
-//	dlm = (double **) malloc( im * sizeof(double *) + (4*NLM)*sizeof(double) );
-//	dl0 = (double *) (dlm + im);
 
 /// - Precompute the factors alm and blm of the recurrence relation :
   if (norm == sht_schmidt) {
@@ -339,24 +338,9 @@ void legendre_precomp(enum shtns_norm norm, int with_cs_phase, double mpos_renor
 			}
 		}
 	}
-/*
-/// - Compute and store coefficients for computation of derivative also.
-	for (im=1, lm=0; im<=MMAX; im++) {
-		m = im*MRES;
-		t2 = 1.0/m;
-		dlm[im] = dl0 + lm;
-		double *al = alm[im];
-			dl0[lm] = al[0];	// ymm initial value.
-		for (l=m+1; l<=LMAX; l++) {
-			t1 = (l+m)*(l-m);
-			if (norm != sht_schmidt) t1 *= (2*l+1.)/(2*l-1.);
-			dl0[lm] = al[0];	dl0[lm+1] = al[1];		// ylm recursion coeffs
-			dl0[lm+2] = -t2*sqrt(t1);
-			dl0[lm+3] = t2*l;
-			lm+=4;	al+=2;
-		}
-	}
-*/
+
+	shtns->al0 = al0;		shtns->alm = alm;
+	shtns->bl0 = bl0;		shtns->blm = blm;
 }
 
 /// returns the value of the Legendre Polynomial of degree l.
