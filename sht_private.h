@@ -81,10 +81,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 	unsigned short nphi;		///< number of spatial points in Phi direction (longitude)
 	unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
 	unsigned short nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
-	int *lmidx;					///< (virtual) index in SH array of given im : LiM(l,im) = lmidx[im] + l
-	unsigned short *li;			///< degree l for given mode number : li[lm]
-	double *el, *l2, *l_2;		///< l, l(l+1) and 1/(l(l+1)) arrays.
-	double *ct, *st;			///< cos(theta) and sin(theta) arrays.
+	int *lmidx;					///< (virtual) index in SH array of given im (size mmax+1) : LiM(l,im) = lmidx[im] + l
+	unsigned short *li;			///< degree l for given mode number (size nlm) : li[lm] 
+	double *ct, *st;			///< cos(theta) and sin(theta) arrays (size nlat)
 /* END OF PUBLIC PART */
 
 	short sht_fft;				///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
@@ -100,6 +99,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	double *al0;	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
 	double *bl0;	double **blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
+	double *l_2;	// array of size (LMAX+1) containing 1./l(l+1) for increasing integer l.
 
 	void* fptr[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 
@@ -156,54 +156,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 #define SHT_L_RESCALE 1536
 // value for on-the-fly transforms is near the limit of double precsision, as there is an associated performance drop.
 #define SHT_L_RESCALE_FLY 1792
-
-/*
-struct SHTdef {
-	long int nlm;
-	long int lmax,nlat,nlat_2;
-	long int mmax,mres,nphi;
-	long int mtr_dct;
-
-	double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
-	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
-	int *li;
-
-	int *lmidx;		// (virtual) index in SH array of given im.
-	int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-
-	double** ylm;		// matrix for inverse transform (synthesis)
-	double** zlm;		// matrix for direct transform (analysis)
-	double** ykm_dct;	// matrix for inverse transform (synthesis) using dct.
-	double* zlm_dct0;	// matrix for direct transform (analysis), only m=0
-
-	fftw_plan ifft, fft;	// plans for FFTW.
-	fftw_plan idct, dctm0;
-}
-
-struct VSHTdef {
-	long int nlm;
-	long int lmax,nlat,nlat_2;
-	long int mmax,mres,nphi;
-	long int mtr_dct;
-
-	double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
-	double *el, *l2, *l_2;		// l, l(l+1) and 1/(l(l+1))
-	int *li;
-
-	int *lmidx;		// (virtual) index in SH array of given im.
-	int *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-
-	struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
-	struct DtDp** dzlm;
-	struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix
-
-	fftw_plan ifft, fft;	// plans for FFTW.
-	fftw_plan idct;
-
-	spat_to_SH
-	SH_to_spat
-}
-*/
 
 /* for vectorization (SSE2) */
 

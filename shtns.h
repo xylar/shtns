@@ -48,14 +48,11 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 	const unsigned short mres;		///< the periodicity along the phi axis.
 	const unsigned short nphi;		///< number of spatial points in Phi direction (longitude)
 	const unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
-	const unsigned short nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
-	const int *const lmidx;					///< (virtual) index in SH array of given im : LiM(l,im) = lmidx[im] + l
-	const unsigned short *const li;			///< degree l for given mode number : li[lm]
-	const double *const el;			///< l, l(l+1) and 1/(l(l+1)) arrays.
-	const double *const l2;			
-	const double *const l_2;		
-	const double *const ct;			///< cos(theta) and sin(theta) arrays.
-	const double *const st;			
+	const unsigned short nlat_2;	///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	const int *const lmidx;			///< (virtual) index in SH array of given im (size mmax+1) : LiM(l,im) = lmidx[im] + l
+	const unsigned short *const li;	///< degree l for given mode number (size nlm) : li[lm] 
+	const double *const ct;			///< cos(theta) array (size nlat)
+	const double *const st;			///< sin(theta) array (size nlat)
 };
 #endif
 
@@ -112,6 +109,13 @@ int shtns_set_grid_auto(shtns_cfg, enum shtns_type flags, double eps, int nl_ord
 int nlm_calc(int lmax, int mmax, int mres);
 void Set_MTR_DCT(shtns_cfg, int m);
 int Get_MTR_DCT(shtns_cfg);
+
+void shtns_reset();				///< free memory and go back to initial state.
+void shtns_destroy(shtns_cfg);	///< free memory of given config, which cannot be used afterwards.
+
+void print_shtns_version();		///< print version information to stdout.
+void print_shtns_cfg(shtns_cfg, int opt);		///< print information about given config to stdout.
+
 //@}
 
 /// \name special values

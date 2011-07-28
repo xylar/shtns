@@ -526,6 +526,8 @@ int main(int argc, char *argv[])
 	NLM = nlm_calc(LMAX, MMAX, MRES);
 	shtns_set_grid_auto(shtns, shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
 
+	print_shtns_cfg(shtns, 1);
+
 // now would be a good time to save fftw's wisdom.
 	fw = fopen("fftw_wisdom","w");
 	if (fw != NULL) {
@@ -699,5 +701,6 @@ int main(int argc, char *argv[])
 
 #endif
 
+	shtns_reset();
 }
 

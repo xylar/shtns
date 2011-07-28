@@ -1319,7 +1319,7 @@ double SHT_error(shtns_cfg shtns)
 
 char* sht_name[SHT_NALG] = {"hyb", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
 char* sht_var[SHT_NVAR] = {"std", "ltr"};
-char *sht_type[SHT_NTYP] = {"scal_synth", "scal_analys", "vect_synth", "vect_analys", "grad_synth", "grad_synth2", "v3d_synth", "v3d_analys" };
+char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsy", "gs2", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
 extern void* sht_array[SHT_NTYP][SHT_NALG];
@@ -1434,8 +1434,9 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 	Qlm = (complex double *) fftw_malloc(m);	Slm = (complex double *) fftw_malloc(m);	Tlm = (complex double *) fftw_malloc(m);
 
 	for (i=0;i<NLM;i++) {
-		Slm[i] = shtns->l_2[i] + 0.5*I*shtns->l_2[i];
-		Tlm[i] = 0.5*shtns->l_2[i] + I*shtns->l_2[i];
+		int l = shtns->li[i];
+		Slm[i] = shtns->l_2[l] + 0.5*I*shtns->l_2[l];
+		Tlm[i] = 0.5*shtns->l_2[l] + I*shtns->l_2[l];
 	}
 
 	if (*nlp <= 0) {
@@ -1499,6 +1500,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 		if ( ((ityp&1) == 0) && (analys == 0) ) ityp++;		// skip analysis
 	} while(++ityp < SHT_NTYP);
 
+#ifndef SHT_NO_DCT
 	if (dct > 0) {		// find the best DCT timings...
         minc = MMAX/20 + 1;             // don't test every single m.
 	#if SHT_VERBOSE > 1
@@ -1521,6 +1523,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 		tdct = t0;
 		Set_MTR_DCT(shtns, i);		// the best DCT is chosen.
 	}
+#endif
 
 	#if SHT_VERBOSE > 1
 		printf("\n");
@@ -1537,6 +1540,38 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 #ifndef _HGID_
   #define _HGID_ "unknown"
 #endif
+
+void print_shtns_version() {
+	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
+}
+
+void print_shtns_cfg(shtns_cfg shtns, int opt)
+{
+	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d,  Nphi=%d, Nlat=%d  [",LMAX, MMAX*MRES, MRES, NLM, NPHI, NLAT);
+	if (shtns->norm & SHT_REAL_NORM) printf("'real' norm, ");
+	if (shtns->norm & SHT_NO_CS_PHASE) printf("no Condon-Shortley phase, ");
+	if (SHT_NORM == sht_fourpi) printf("4.pi normalized]\n");
+	else if (SHT_NORM == sht_schmidt) printf("Schmidt semi-normalized]\n");
+	else printf("orthonormalized]\n");
+
+	if (opt == 0) return;
+
+	printf("            ");
+	for (int it=0; it<SHT_NTYP; it++)
+		printf("%5s ",sht_type[it]);
+	for (int iv=0; iv<SHT_NVAR; iv++) {
+		printf("\n        %4s:",sht_var[iv]);
+		for (int it=0; it<SHT_NTYP; it++) {
+			for (int ia=0; ia<SHT_NALG; ia++) {
+				if (sht_func[iv][it][ia] == shtns->fptr[iv][it]) {
+					printf("%5s ",sht_name[ia]);
+					break;
+				}
+			}
+		}
+	}
+	printf("\n");
+}
 
 /** \addtogroup init Initialization functions.
 */
@@ -1558,6 +1593,9 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	int im, m, l, lm;
 	int with_cs_phase = 1;		/// Condon-Shortley phase (-1)^m is used by default.
 	double mpos_renorm = 1.0;	/// renormalization of m>0.
+	int larrays_ok = 0;
+	int legendre_ok = 0;
+	int l_2_ok = 0;
 
 //	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
 	if (lmax < 2) shtns_runerr("lmax must be at least 2");
@@ -1573,9 +1611,8 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 
 	// allocate new setup and initialize some variables (used as flags) :
 	shtns = malloc( sizeof(struct shtns_info) + (mmax+1)*( sizeof(int)+sizeof(unsigned short) ) );
-	if (shtns == NULL) return shtns;
+	if (shtns == NULL) return shtns;	// FAIL
 	{
-		//memset(shtns, 0, sizeof(struct shtns_info) );
 		void **p0 = (void**) &shtns->tm;	// first pointer in struct.
 		void **p1 = (void**) &shtns->Y00_1;	// first non-pointer.
 		while(p0 < p1)	 *p0++ = NULL;		// write NULL to every pointer.
@@ -1612,48 +1649,45 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
   #endif
 #endif
 
-	s2 = sht_data;		// check if this setup already exists.
+	s2 = sht_data;		// check if some data can be shared ...
 	while(s2 != NULL) {
 		if ( (s2->lmax == lmax) && (s2->mmax == mmax) && (s2->mres == mres) )
-		{	// we can reuse the l-related arrays
-			shtns->li = s2->li;		shtns->el = s2->el;			shtns->l2 = s2->l2;		shtns->l_2 = s2->l_2;
+		{	// we can reuse the l-related arrays (li + copy lmidx)
+			shtns->li = s2->li;
 			for (im=0; im<=mmax; im++)	shtns->lmidx[im] = s2->lmidx[im];
-			break;
+			larrays_ok = 1;
 		}
-		s2 = s2->next;
-	}
-	if (s2 == NULL) {
-		// alloc spectral arrays
-		shtns->el = (double *) malloc( 3*NLM*sizeof(double) + NLM*sizeof(unsigned short) );	// NLM defined at runtime.
-		shtns->l2 = shtns->el + NLM;	shtns->l_2 = shtns->el + 2*NLM;
-		shtns->li = (unsigned short *) (shtns->el + 3*NLM);
-
-		for (im=0, lm=0; im<=MMAX; im++) {		// init l-related arrays.
-			m = im*MRES;
-			shtns->lmidx[im] = lm -m;		// virtual pointer for l=0
-			for (l=im*MRES;l<=LMAX;l++) {
-				shtns->el[lm] = l;	shtns->l2[lm] = l*(l+1.0);	shtns->l_2[lm] = 1.0/(l*(l+1.0));
-				shtns->li[lm] = l;
-				lm++;
-			}
-		}
-		shtns->l_2[0] = 0.0;	// undefined for l=0 => replace with 0.	
-		if (lm != NLM) shtns_runerr("unexpected error");
-	}
-
-	s2 = sht_data;
-	while(s2 != NULL) {
 		if ( (s2->lmax >= lmax) && (s2->mmax >= mmax) && (s2->mres == mres) && (s2->norm == norm) )
 		{	// we can reuse the legendre tables.
 			shtns->al0 = s2->al0;		shtns->alm = s2->alm;
 			shtns->bl0 = s2->bl0;		shtns->blm = s2->blm;
-			break;
+			legendre_ok = 1;
+		}
+		if (s2->lmax >= lmax) {		// we can reuse l_2
+			shtns->l_2 = s2->l_2;
+			l_2_ok = 1;
 		}
 		s2 = s2->next;
 	}
-	if (s2 == NULL) {
-		// this quickly precomputes some values for the legendre recursion.
+	if (larrays_ok == 0) {
+		// alloc spectral arrays
+		shtns->li = (unsigned short *) malloc( NLM*sizeof(unsigned short) );	// NLM defined at runtime.
+		for (im=0, lm=0; im<=MMAX; im++) {		// init l-related arrays.
+			m = im*MRES;
+			shtns->lmidx[im] = lm -m;		// virtual pointer for l=0
+			for (l=im*MRES;l<=LMAX;l++) {
+				shtns->li[lm] = l;		lm++;
+			}
+		}
+		if (lm != NLM) shtns_runerr("unexpected error");
+	}
+	if (legendre_ok == 0) {	// this quickly precomputes some values for the legendre recursion.
 		legendre_precomp(shtns, SHT_NORM, with_cs_phase, mpos_renorm);
+	}
+	if (l_2_ok == 0) {
+		shtns->l_2 = (double *) malloc( (LMAX+1)*sizeof(double) );
+		shtns->l_2[0] = 0.0;	// undefined for l=0 => replace with 0.	
+		for (l=1; l<=LMAX; l++)		shtns->l_2[l] = 1.0/(l*(l+1.0));
 	}
 
 	switch(SHT_NORM) {
@@ -1677,31 +1711,58 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	return(shtns);
 }
 
-void free_array(shtns_cfg shtns, void *p)
+
+int free_unused_array(shtns_cfg shtns, void* p)
 {
-	if (p == NULL) return;
-	while(shtns != NULL) {
-		if (shtns->el == p) shtns->el = NULL;
-		if (shtns->alm == p) shtns->alm = NULL;
-		if (shtns->blm == p) shtns->blm = NULL;
-		if (shtns->wg == p) shtns->wg = NULL;
-		shtns = shtns->next;
+	int i = 0;		// reference count.
+	shtns_cfg s2 = sht_data;
+	if (p==NULL) return i;
+
+	while (s2 != NULL) {		// we must not free shared resources.
+		if (s2 != shtns) {		// don't count the one we want to free.
+			if (s2->alm == p) i++;
+			if (s2->blm == p) i++;
+			if (s2->l_2 == p) i++;
+			if (s2->li == p) i++;
+		}
+		s2 = s2->next;
 	}
-	free(p);
+	if (i == 0)  free(p);
+	return i;
 }
 
-// clear all allocated memory and go back to 0 state.
+/// release all resources allocated by a given shtns_cfg
+void shtns_destroy(shtns_cfg shtns)
+{
+	free_unused_array(shtns, shtns->l_2);
+	if (shtns->blm != shtns->alm)
+		free_unused_array(shtns, shtns->blm);
+	free_unused_array(shtns, shtns->alm);
+	free_unused_array(shtns, shtns->li);
+
+	free_SHTarrays(shtns);
+
+	if (sht_data == shtns) {
+		sht_data = shtns->next;		// forget shtns
+	} else {
+		shtns_cfg s2 = sht_data;
+		while (s2 != NULL) {
+			if (s2->next == shtns) {
+				s2->next = shtns->next;		// forget shtns
+				break;
+			}
+			s2 = s2->next;
+		}
+	}
+	shtns->nlm = 0;		shtns->lmax = 0;	shtns->mmax = 0;		// security : mark as 0.
+	free(shtns);
+}
+
+// clear all allocated memory (hopefully) and go back to 0 state.
 void shtns_reset()
 {
 	while (sht_data != NULL) {
-		free_array(sht_data, sht_data->el);
-		free_array(sht_data, sht_data->alm);
-		free_array(sht_data, sht_data->blm);
-		free_array(sht_data, sht_data->wg);
-		free_SHTarrays(sht_data);
-		void *p = sht_data;
-		sht_data = sht_data->next;
-		free(p);
+		shtns_destroy(sht_data);
 	}
 }
 
