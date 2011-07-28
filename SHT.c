@@ -37,9 +37,6 @@
 // chained list of sht_setup : start with NULL
 shtns_cfg sht_data = NULL;
 
-// fftw plan mode.
-unsigned fftw_plan_mode;
-
 /// Abort program with error message.
 void shtns_runerr(const char * error_text)
 {
@@ -441,9 +438,9 @@ int planFFT(shtns_cfg shtns, int layout)
 // IFFT : unnormalized.  FFT : must be normalized.
 	cost_ip = 0.0;		cost_oop = 0.0;
 	if (SHT_FFT == 1) {		// in-place FFT allowed
-		ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, fftw_plan_mode);
+		ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 		if (ifft2 != NULL) {
-			fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
+			fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 			if (fft2 != NULL) {
 //				cost_ip = fftw_cost(ifft2) + fftw_cost(fft2);
 			} else {
@@ -452,9 +449,9 @@ int planFFT(shtns_cfg shtns, int layout)
 		} else SHT_FFT = 2;
 	}
 	if ((SHT_FFT > 1) || (cost_ip > 0.0)) {		// out-of-place FFT
-		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, fftw_plan_mode);
+		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 		if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
-		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, fftw_plan_mode);
+		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 		if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
 //		cost_oop = fftw_cost(ifft) + fftw_cost(fft);
 	}
@@ -510,11 +507,11 @@ void planDCT(shtns_cfg shtns)
 		Sh = (double *) fftw_malloc( NLAT * sizeof(double) );
 		if (shtns->dct_r1 == NULL) {
 			r2r_kind = FFTW_REDFT10;
-			shtns->dct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);
+			shtns->dct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
 		}
 		if (shtns->idct_r1 == NULL) {
 			r2r_kind = FFTW_REDFT01;
-			shtns->idct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);
+			shtns->idct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
 		}
 		fftw_free(Sh);
 		if ((shtns->dct_r1 == NULL)||(shtns->idct_r1 == NULL))
@@ -536,7 +533,7 @@ void planDCT(shtns_cfg shtns)
 
 	if (NPHI>1) {		// complex data for NPHI>1, recompute as it does depend on MTR_DCT
 		r2r_kind = FFTW_REDFT01;
-		shtns->idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, fftw_plan_mode);
+		shtns->idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, shtns->fftw_plan_mode);
 		if (shtns->idct == NULL)
 			shtns_runerr("[FFTW] idct planning failed !");
 #if SHT_VERBOSE > 2
@@ -544,8 +541,8 @@ void planDCT(shtns_cfg shtns)
 #endif
 		if (shtns->dct_m0 == NULL) {
 			r2r_kind = FFTW_REDFT10;
-//			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, fftw_plan_mode);
-			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);	// out-of-place.
+//			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, shtns->fftw_plan_mode);
+			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
 			if (shtns->dct_m0 == NULL)
 				shtns_runerr("[FFTW] dct_m0 planning failed !");
 #if SHT_VERBOSE > 2
@@ -555,7 +552,7 @@ void planDCT(shtns_cfg shtns)
 	} else {	// NPHI==1
 		if (shtns->dct_m0 == NULL) {
 			r2r_kind = FFTW_REDFT10;
-			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, fftw_plan_mode);	// out-of-place.
+			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
 			if (shtns->dct_m0 == NULL)
 				shtns_runerr("[FFTW] dct_m0 planning failed !");
 #if SHT_VERBOSE > 2
@@ -1795,7 +1792,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	layout = flags & 0xFFFF00;
 	flags = flags & 255;	// clear higher bits.
 
-	fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
+	shtns->fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 	switch (flags) {
 	  #ifdef SHT_NO_DCT
 		case sht_auto :				flags = sht_gauss;		// auto means gauss if dct is disabled.
@@ -1804,7 +1801,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		case sht_gauss_fly :		flags = sht_gauss;		on_the_fly = 1;
 			break;
 		case sht_quick_init :	 	flags = sht_gauss;
-		case sht_reg_poles :		quick_init = 1;		fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init.
+		case sht_reg_poles :		quick_init = 1;		shtns->fftw_plan_mode = FFTW_ESTIMATE;		// quick fftw init.
 			break;
 		default : break;
 	}
@@ -1830,8 +1827,8 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			if (n_gauss > 0) *nlat = n_gauss;
 		}
 		if (quick_init == 0) {
-			if (*nphi > 256) fftw_plan_mode = FFTW_PATIENT;		// do not waste too much time finding optimal fftw.
-			if (*nphi > 512) fftw_plan_mode = FFTW_MEASURE;
+			if (*nphi > 256) shtns->fftw_plan_mode = FFTW_PATIENT;		// do not waste too much time finding optimal fftw.
+			if (*nphi > 512) shtns->fftw_plan_mode = FFTW_MEASURE;
 		}
 		if (t > 10*SHTNS_MAX_MEMORY) quick_init =1;			// do not time such large transforms.
 	}
