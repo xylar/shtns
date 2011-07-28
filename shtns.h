@@ -40,6 +40,24 @@ enum shtns_type {
 	sht_gauss_fly	///< legendre polynomials are recomputed on-the-fly for each transform (may be faster on some machines, saves memory and bandwidth).
 };
 
+#ifndef SHTNS_PRIVATE
+struct shtns_info {		// allow read-only access to some data (useful for optimization and helper macros)
+	const int nlm;					///< total number of (l,m) spherical harmonics components.
+	const unsigned short lmax;		///< maximum degree (lmax) of spherical harmonics.
+	const unsigned short mmax;		///< maximum order (mmax*mres) of spherical harmonics.
+	const unsigned short mres;		///< the periodicity along the phi axis.
+	const unsigned short nphi;		///< number of spatial points in Phi direction (longitude)
+	const unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
+	const unsigned short nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	const int *const lmidx;					///< (virtual) index in SH array of given im : LiM(l,im) = lmidx[im] + l
+	const unsigned short *const li;			///< degree l for given mode number : li[lm]
+	const double *const el;			///< l, l(l+1) and 1/(l(l+1)) arrays.
+	const double *const l2;			
+	const double *const l_2;		
+	const double *const ct;			///< cos(theta) and sin(theta) arrays.
+	const double *const st;			
+};
+#endif
 
 // MACROS //
 
@@ -102,12 +120,6 @@ double sh00_1(shtns_cfg);	///< returns the spherical harmonic representation of 
 double sh10_ct(shtns_cfg);	///< returns the spherical harmonic representation of cos(theta) (l=1,m=0)
 double sh11_st(shtns_cfg);	///< returns the spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
 double shlm_e1(shtns_cfg, int l, int m);		///< returns the l,m SH coefficient corresponding to unit energy.
-
-unsigned short* sht_li(shtns_cfg shtns);
-double* sht_el(shtns_cfg shtns);
-double* sht_ct(shtns_cfg shtns);
-int sht_lim(shtns_cfg shtns, int l, int im);
-int sht_lm(shtns_cfg shtns, int l, int m);
 //@}
 
 /// \name Scalar transforms

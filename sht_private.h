@@ -27,6 +27,8 @@
 // FFTW la derivee d/dx = ik	(pas de moins !)
 #include <fftw3.h>
 
+#define SHTNS_PRIVATE
+
 #include "sht_config.h"
 #include "shtns.h"
 
@@ -70,7 +72,8 @@ typedef void (*pf4l)(shtns_cfg, void*, void*, void*, void*, int);
 typedef void (*pf6l)(shtns_cfg, void*, void*, void*, void*, void*, void*, int);
 
 /// structure containing useful information about the SHT.
-struct shtns_info {
+struct shtns_info {		// MUST start with "int nlm;"
+/* PUBLIC PART (if modified, shtns.h should be modified acordingly) */
 	int nlm;					///< total number of (l,m) spherical harmonics components.
 	unsigned short lmax;		///< maximum degree (lmax) of spherical harmonics.
 	unsigned short mmax;		///< maximum order (mmax*mres) of spherical harmonics.
@@ -78,18 +81,22 @@ struct shtns_info {
 	unsigned short nphi;		///< number of spatial points in Phi direction (longitude)
 	unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
 	unsigned short nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	int *lmidx;					///< (virtual) index in SH array of given im : LiM(l,im) = lmidx[im] + l
+	unsigned short *li;			///< degree l for given mode number : li[lm]
+	double *el, *l2, *l_2;		///< l, l(l+1) and 1/(l(l+1)) arrays.
+	double *ct, *st;			///< cos(theta) and sin(theta) arrays.
+/* END OF PUBLIC PART */
 
 	short sht_fft;				///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
 	short mtr_dct;				///< m truncation for dct. -1 means no dct at all.
 	unsigned short klim;		///< Limit to k for non-linear terms.
 	unsigned short nlorder;		///< order of non-linear terms to be resolved by SH transform.
 
-	fftw_plan ifft, fft;			// plans for FFTW.
-
-	int *lmidx;				//< (virtual) index in SH array of given im.
-	unsigned short *tm;		// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-	double *ct, *st, *st_1;		// cos(theta), sin(theta), 1/sin(theta);
+	unsigned short *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 	double *wg;					// Gauss weights for Gauss-Legendre quadrature.
+	double *st_1;				// 1/sin(theta);
+
+	fftw_plan ifft, fft;			// plans for FFTW.
 
 	double *al0;	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
 	double *bl0;	double **blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
@@ -97,24 +104,22 @@ struct shtns_info {
 	void* fptr[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 
 	double **ylm;		// matrix for inverse transform (synthesis)
-	double **zlm;		// matrix for direct transform (analysis)
 	struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
+	double **zlm;		// matrix for direct transform (analysis)
 	struct DtDp** dzlm;
 
 	fftw_plan idct, dct_m0;			// (I)DCT for NPHI>1
 	fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
 
 	double **ykm_dct;	// matrix for inverse transform (synthesis) using dct.
+	struct DtDp** dykm_dct;	// theta and phi derivative of Ykm matrix.
 	double *zlm_dct0;	// matrix for direct transform (analysis), only m=0
-	struct DtDp** dykm_dct;	// theta and phi derivative of Ylm matrix.
 	double *dzlm_dct0;
-
-	unsigned short *li;
-	double *el, *l2, *l_2;
 
 	double Y00_1, Y10_ct, Y11_st;
 	void *next;		// pointer to next sht_setup or NULL (records a chained list of SHT setup).
-	unsigned short norm;		///< store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
+	int norm;		///< store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
+	// the end should be aligned on the size of int, to allow the storage of small arrays.
 };
 
 // define shortcuts to sizes + allow compile-time optimizations when SHT_AXISYM is defined.

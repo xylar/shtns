@@ -70,7 +70,7 @@ Look at the FFTW manual for compilation advice.</b>
 
 The angular coordinates on a spherical shell are the co-latitude \f$ \theta \f$ and the longitude \f$ \phi \f$.
 
-The spatial discretization is defined by a call to \ref shtns_init; or to \ref shtns_precompute or \ref shtns_precompute_auto after \ref shtns_set_size.
+The spatial discretization is defined by a call to \ref shtns_init; or to \ref shtns_set_grid or \ref shtns_set_grid_auto after \ref shtns_create.
 
 A field \e A (or one of its component in case of a vector field) is discretized on an ordered grid, which consists of
  - NPHI equally spaced nodes in longitude, spanning the range of angle between 0 and \f$2\pi\f$/MRES,
@@ -86,7 +86,7 @@ exist. For a given non-linear order of the equation N (typically 2), the anti-al
  - NLAT > N*LMAX for our DCT quadrature
 
 Furthermore, FFT is more efficient for certain values of NPHI and/or NLAT. If you do not require specific NLAT or NPHI, you can let SHTns choose them
-for you, by using \ref shtns_precompute_auto with nphi and or nlat set to zero.
+for you, by using \ref shtns_set_grid_auto with nphi and or nlat set to zero.
 
 Identifying a grid point with its indices \c it and \c ip in latitudinal and longitudinal direction respectively (indices start at 0), one has :
  - \f$ \theta \f$ = \c acos(ct[it]) where \ref ct is initialized by the call to \ref shtns_init
@@ -138,7 +138,7 @@ In addition, spatial data must be allocated using the \c fftw_malloc function, f
 \section spec_data Spherical Harmonic coefficients layout
 
 <b>The collection of Alm (spherical harmonics coefficient of degree \e l and order \e m) is stored in an array of \c complex \c double floating point values.</b>
-The spherical harmonic truncation is defined by a call to \ref shtns_init or to \ref shtns_set_size which returns the size NLM of the array.
+The spherical harmonic truncation is defined by a call to \ref shtns_init or to \ref shtns_create which returns the size NLM of the array.
 
 The field \em A is decomposed on the basis of spherical harmonics Ylm (degree \e l, order \e m) :
 \f[ A(\theta,\phi) = \sum_{l,m} A_l^m Y_l^m(\theta,\phi)\f]
@@ -186,7 +186,7 @@ SHTns lets you choose one of the following :
 </li></ul>
 
 \ref shtns_init uses the default (defined by \ref SHT_DEFAULT_NORM) but you can choose another normalization
-by calling \ref shtns_set_size instead.
+by calling \ref shtns_create instead.
 
 The legendre associated functions are defined by :
 
@@ -198,16 +198,16 @@ For reference, function \ref SH_to_point gives a simple explicit implementation 
 
 \subsection norm_opt Normalization variations
 
-Use \ref shtns_set_size with \ref SHT_NO_CS_PHASE to disable the <b>Condon-Shortley phase</b>.
+Use \ref shtns_create with \ref SHT_NO_CS_PHASE to disable the <b>Condon-Shortley phase</b>.
 For example, to initialize a Schmidt semi-normalized transform of maximum degree 16 without Condon-Shortrley phase, use
-\code shtns_set_size(16, 16, 1, sht_schmidt | SHT_NO_CS_PHASE); \endcode
+\code shtns_create(16, 16, 1, sht_schmidt | SHT_NO_CS_PHASE); \endcode
 
 By default, SHTns uses "complex" spherical harmonic normalization. However, as it deals only with real functions,
 the m<0 coefficients are not stored, since they are complex conjugate of the m>0 ones.
 Thus, one must pay attention, that the m>0 coefficient have to be counted twice in a total energy calculation.
 
 An alternative to this "complex" normalization is the "real" normalization, for which the energy is simply
-the sum of the coefficients (m>=0) squared. Use \ref shtns_set_size with \ref SHT_REAL_NORM to use a "real" spherical harmonic normalization.
+the sum of the coefficients (m>=0) squared. Use \ref shtns_create with \ref SHT_REAL_NORM to use a "real" spherical harmonic normalization.
 This is the usual "real" spherical harmonics, if one takes the complex conjugate of the coefficients.
 
 A few useful examples, for orthonormal spherical harmonics :
@@ -253,7 +253,7 @@ transforms.
 A less common, but still classic optimization : high m's spherical harmonics have their magnitude descrease exponentially
 when aproaching the poles. SHTns use a threshold below which the SH is taken to be zero.
 The default value for this threshold is defined by \ref SHT_DEFAULT_POLAR_OPT,
-but you can also choose it with the \c eps parameter of the \ref shtns_precompute function,
+but you can also choose it with the \c eps parameter of the \ref shtns_set_grid function,
 trading some accuracy for more speed.
 Around 5% to 15% speed increase are typical values for a SHT with a large MMAX.
 
@@ -264,8 +264,8 @@ This means ordering coefficients and stripping out systematic zeros.
 
 \section opt_size Spatial Size optimization
 
-When using \ref shtns_precompute_auto, you can let SHTns choose the optimal spatial sizes for
-the spherical harmonic truncation you specified with \ref shtns_set_size.
+When using \ref shtns_set_grid_auto, you can let SHTns choose the optimal spatial sizes for
+the spherical harmonic truncation you specified with \ref shtns_create.
 The spatial sizes are chosen so that no aliasing occurs, and ensuring FFTW will perform as fast
 as possible.
 
@@ -307,7 +307,7 @@ is then suitable for performing many transforms (as in a direct numerical simula
 The default mode used by SHTns is to measure performance of the different algorithms, and choose
 the one that performs best (it will also check that the accuracy is good enough).
 However, there are situation where either the Gauss-Legendre algorithm or a regular grid is required, and you
-can choose to do so using the adequate \ref shtns_type when calling \ref shtns_init or \ref shtns_precompute.
+can choose to do so using the adequate \ref shtns_type when calling \ref shtns_init or \ref shtns_set_grid.
 
 */
 
@@ -365,7 +365,7 @@ in the preamble of your source file.
 
 First of all you need to initialize SHTns. There are two ways to do this :
 \li calling \ref shtns_init function,
-\li or calling \ref shtns_set_size followed by \ref shtns_precompute. This way lets you choose normalization and optimization.
+\li or calling \ref shtns_create followed by \ref shtns_set_grid. This way lets you choose normalization and optimization.
 
 Note that you can call initialization function(s) only once.
 Then you must allocate some memory (with fftw_malloc so that the memory is properly aligned for vectorized code),
@@ -388,7 +388,7 @@ SHTns provides an interface to Fortran language (compatible with gfortran).
 
 First of all you need to initialize SHTns. There are two ways to do this :
 \li calling one of the shtns_init_* subroutines,
-\li or calling shtns_set_size followed by shtns_precompute. This way lets you choose normalization and optimization.
+\li or calling shtns_create followed by shtns_set_grid. This way lets you choose normalization and optimization.
 
 Note that you can call initialization function(s) only once.
 Then you must allocate some memory, and finaly you can perform some spherical harmonic transforms.

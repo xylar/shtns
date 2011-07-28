@@ -78,23 +78,22 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 {
 	long int jj,i, nlm_cplx;
 	double tmax,t,n2;
-	unsigned short *li = sht_li(shtns);
 
-	nlm_cplx = (MMAX*2 == NPHI) ? sht_lim(shtns, MRES*MMAX,MMAX) : NLM;
+	nlm_cplx = (MMAX*2 == NPHI) ? LiM(shtns, MRES*MMAX,MMAX) : NLM;
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
 		if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
-			if (li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
+			if (shtns->li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
 		} else {
-			if (li[i] <= ltr)	Slm[i] -= Slm0[i];
+			if (shtns->li[i] <= ltr)	Slm[i] -= Slm0[i];
 			t = cabs(Slm[i]);
 		}
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("   => max error = %g (l=%d,lm=%d)   rms error = %g",tmax,li[jj],jj,sqrt(n2/NLM));
+	printf("   => max error = %g (l=%d,lm=%d)   rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) {
 		if (NLM < 15) {
 			printf("\n orig:");
@@ -122,22 +121,21 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 {
 	long int jj,i, nlm_cplx;
 	double tmax,t,n2;
-	unsigned short *li = sht_li(shtns);
 
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
-		if ((i <= LMAX)||(i >= sht_lim(shtns, MRES*(NPHI+1)/2,(NPHI+1)/2))) {
-			if (li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
+		if ((i <= LMAX)||(i >= LiM(shtns, MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			if (shtns->li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
 		} else {
-			if (li[i] <= ltr)	Slm[i] -= Slm0[i];
+			if (shtns->li[i] <= ltr)	Slm[i] -= Slm0[i];
 			t = cabs(Slm[i]);
 		}
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("   Spheroidal => max error = %g (l=%d,lm=%d)    rms error = %g",tmax,li[jj],jj,sqrt(n2/NLM));
+	printf("   Spheroidal => max error = %g (l=%d,lm=%d)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
 		else printf("\n");
 //	write_vect("Slm",Slm,NLM*2);
@@ -145,17 +143,17 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
-		if ((i <= LMAX)||(i >= sht_lim(shtns, MRES*(NPHI+1)/2,(NPHI+1)/2))) {
-			if (li[i] <= ltr)	Tlm[i] = creal(Tlm[i]- Tlm0[i]);
+		if ((i <= LMAX)||(i >= LiM(shtns, MRES*(NPHI+1)/2,(NPHI+1)/2))) {
+			if (shtns->li[i] <= ltr)	Tlm[i] = creal(Tlm[i]- Tlm0[i]);
 			t = fabs(creal(Tlm[i]));
 		} else {
-			if (li[i] <= ltr)	Tlm[i] -= Tlm0[i];
+			if (shtns->li[i] <= ltr)	Tlm[i] -= Tlm0[i];
 			t = cabs(Tlm[i]);
 		}
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("   Toroidal => max error = %g (l=%d,lm=%d)    rms error = %g",tmax,li[jj],jj,sqrt(n2/NLM));
+	printf("   Toroidal => max error = %g (l=%d,lm=%d)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
 		else printf("\n");
 //	write_vect("Tlm",Tlm,NLM*2);
@@ -471,7 +469,6 @@ void usage()
 
 int main(int argc, char *argv[])
 {
-	double *ct;
 	complex double t1, t2;
 	double t,tmax,n2;
 	int i,im,m,l,jj, m_opt;
@@ -528,7 +525,6 @@ int main(int argc, char *argv[])
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
 	NLM = nlm_calc(LMAX, MMAX, MRES);
 	shtns_set_grid_auto(shtns, shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
-	ct = sht_ct(shtns);
 
 // now would be a good time to save fftw's wisdom.
 	fw = fopen("fftw_wisdom","w");
@@ -580,9 +576,9 @@ int main(int argc, char *argv[])
 			Sh[im*NLAT+i] = 0.0;
 		}
 	}
-	Slm[sht_lim(shtns, 1,0)] = sh10_ct(shtns);
+	Slm[LiM(shtns, 1,0)] = sh10_ct(shtns);
 	if ((MMAX > 0)&&(MRES==1))
-		Slm[sht_lim(shtns, 1,1)] = sh11_st(shtns);
+		Slm[LiM(shtns, 1,1)] = sh11_st(shtns);
 //	write_vect("ylm0",Slm, NLM*2);
 	SH_to_spat(shtns, Slm,Sh);
 	write_mx("spat",Sh,NPHI,NLAT);
@@ -616,7 +612,7 @@ int main(int argc, char *argv[])
 // spat_to_SH
 	for (im=0;im<NPHI;im++) {
 		for (i=0;i<NLAT;i++) {
-			Sh[im*NLAT+i] = ct[i];
+			Sh[im*NLAT+i] = shtns->ct[i];
 		}
 	}
 	spat_to_SH(shtns, Sh,Slm);
@@ -659,8 +655,8 @@ int main(int argc, char *argv[])
 
 #define TEST_VECT_SHT
 #ifdef TEST_VECT_SHT
-	Slm0[sht_lm(shtns, 0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
-	Tlm0[sht_lm(shtns, 0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	Slm0[LM(shtns, 0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	Tlm0[LM(shtns, 0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
 //	for (i=0;i<NLM;i++) Slm0[i] = 0.0;	// zero out Slm.
 
 	printf("** performing %d vector SHT\n", SHT_ITER);

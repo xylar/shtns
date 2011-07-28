@@ -318,9 +318,8 @@ void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
 	long int lstride;
 
 	l0 = ((NLAT+1)>>1)*2;		// round up to even
-	shtns->ct = (double *) fftw_malloc( sizeof(double) * l0*3 + sizeof(unsigned short)*(MMAX+1) );
+	shtns->ct = (double *) fftw_malloc( sizeof(double) * l0*3 );
 	shtns->st = shtns->ct + l0;		shtns->st_1 = shtns->ct + 2*l0;
-	shtns->tm = (unsigned short *) (shtns->ct + 3*l0);
 
   if (on_the_fly == 0) {
 	shtns->ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );
@@ -1573,13 +1572,16 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	if (mres <= 0) shtns_runerr("MRES must be > 0");
 
 	// allocate new setup and initialize some variables (used as flags) :
-	shtns = malloc( sizeof(struct shtns_info) );
+	shtns = malloc( sizeof(struct shtns_info) + (mmax+1)*( sizeof(int)+sizeof(unsigned short) ) );
+	if (shtns == NULL) return shtns;
 	{
 		//memset(shtns, 0, sizeof(struct shtns_info) );
-		void **p0 = (void**) &shtns->ifft;	// first pointer in struct.
+		void **p0 = (void**) &shtns->tm;	// first pointer in struct.
 		void **p1 = (void**) &shtns->Y00_1;	// first non-pointer.
 		while(p0 < p1)	 *p0++ = NULL;		// write NULL to every pointer.
 		set_sht_default(shtns);		// default SHT is hyb.
+		shtns->lmidx = (int*) (shtns + 1);		// lmidx is stored at the end of the struct...
+		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
 	}
 
 	// copy sizes.
@@ -1614,18 +1616,17 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	while(s2 != NULL) {
 		if ( (s2->lmax == lmax) && (s2->mmax == mmax) && (s2->mres == mres) )
 		{	// we can reuse the l-related arrays
-			shtns->el = s2->el;			shtns->l2 = s2->l2;		shtns->l_2 = s2->l_2;
-			shtns->lmidx = s2->lmidx;		shtns->li = s2->li;
+			shtns->li = s2->li;		shtns->el = s2->el;			shtns->l2 = s2->l2;		shtns->l_2 = s2->l_2;
+			for (im=0; im<=mmax; im++)	shtns->lmidx[im] = s2->lmidx[im];
 			break;
 		}
 		s2 = s2->next;
 	}
 	if (s2 == NULL) {
 		// alloc spectral arrays
-		shtns->el = (double *) malloc( 3*NLM*sizeof(double) + (MMAX+1)*sizeof(int) + NLM*sizeof(unsigned short) );	// NLM defined at runtime.
+		shtns->el = (double *) malloc( 3*NLM*sizeof(double) + NLM*sizeof(unsigned short) );	// NLM defined at runtime.
 		shtns->l2 = shtns->el + NLM;	shtns->l_2 = shtns->el + 2*NLM;
-		shtns->lmidx = (int *) (shtns->el + 3*NLM);
-		shtns->li = (unsigned short *) (shtns->lmidx + (MMAX+1));
+		shtns->li = (unsigned short *) (shtns->el + 3*NLM);
 
 		for (im=0, lm=0; im<=MMAX; im++) {		// init l-related arrays.
 			m = im*MRES;
@@ -1949,27 +1950,6 @@ shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nl
 	if (shtns != NULL)
 		shtns_set_grid(shtns, flags, SHT_DEFAULT_POLAR_OPT, nlat, nphi);
 	return shtns;
-}
-
-
-unsigned short* sht_li(shtns_cfg shtns) {
-	return shtns->li;
-}
-
-double* sht_el(shtns_cfg shtns) {
-	return shtns->el;
-}
-
-double* sht_ct(shtns_cfg shtns) {
-	return shtns->ct;
-}
-
-int sht_lim(shtns_cfg shtns, int l, int im) {
-	return shtns->lmidx[im] + l;
-}
-
-int sht_lm(shtns_cfg shtns, int l, int m) {
-	return shtns->lmidx[m/shtns->mres] + l;
 }
 
 //@}
