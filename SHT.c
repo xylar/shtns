@@ -1317,7 +1317,7 @@ double SHT_error(shtns_cfg shtns)
 }
 
 
-char* sht_name[SHT_NALG] = {"hyb", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
+char* sht_name[SHT_NALG] = {"hyb", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
 char* sht_var[SHT_NVAR] = {"std", "ltr"};
 char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsy", "gs2", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
@@ -1651,17 +1651,17 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 
 	s2 = sht_data;		// check if some data can be shared ...
 	while(s2 != NULL) {
-		if ( (s2->lmax == lmax) && (s2->mmax == mmax) && (s2->mres == mres) )
-		{	// we can reuse the l-related arrays (li + copy lmidx)
-			shtns->li = s2->li;
-			for (im=0; im<=mmax; im++)	shtns->lmidx[im] = s2->lmidx[im];
-			larrays_ok = 1;
-		}
-		if ( (s2->lmax >= lmax) && (s2->mmax >= mmax) && (s2->mres == mres) && (s2->norm == norm) )
-		{	// we can reuse the legendre tables.
-			shtns->al0 = s2->al0;		shtns->alm = s2->alm;
-			shtns->bl0 = s2->bl0;		shtns->blm = s2->blm;
-			legendre_ok = 1;
+		if ((s2->mmax >= mmax) && (s2->mres == mres)) {
+			if (s2->lmax == lmax) {		// we can reuse the l-related arrays (li + copy lmidx)
+				shtns->li = s2->li;
+				for (im=0; im<=mmax; im++)	shtns->lmidx[im] = s2->lmidx[im];
+				larrays_ok = 1;
+			}
+			if ( (s2->lmax >= lmax) && (s2->norm == norm) ) {		// we can reuse the legendre tables.
+				shtns->al0 = s2->al0;		shtns->alm = s2->alm;
+				shtns->bl0 = s2->bl0;		shtns->blm = s2->blm;
+				legendre_ok = 1;
+			}
 		}
 		if (s2->lmax >= lmax) {		// we can reuse l_2
 			shtns->l_2 = s2->l_2;

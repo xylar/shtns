@@ -243,22 +243,22 @@ void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex dou
 
 /* FUNCTION POINTER ARRAY */
 void* GEN(sht_array, SUFFIX)[SHT_NTYP][SHT_NALG] = {
-		{ GEN(SH_to_spat_hyb, SUFFIX), GEN(SH_to_spat_fly1, SUFFIX), GEN(SH_to_spat_fly2, SUFFIX),
+		{ GEN(SH_to_spat_hyb, SUFFIX), NULL, GEN(SH_to_spat_fly1, SUFFIX), GEN(SH_to_spat_fly2, SUFFIX),
 		  GEN(SH_to_spat_fly3, SUFFIX), GEN(SH_to_spat_fly4, SUFFIX), GEN(SH_to_spat_fly6, SUFFIX), GEN(SH_to_spat_fly8, SUFFIX) },
-		{ GEN(spat_to_SH_hyb, SUFFIX), GEN(spat_to_SH_fly1, SUFFIX), GEN(spat_to_SH_fly2, SUFFIX),
+		{ GEN(spat_to_SH_hyb, SUFFIX), NULL, GEN(spat_to_SH_fly1, SUFFIX), GEN(spat_to_SH_fly2, SUFFIX),
 		  GEN(spat_to_SH_fly3, SUFFIX), GEN(spat_to_SH_fly4, SUFFIX), GEN(spat_to_SH_fly6, SUFFIX), GEN(spat_to_SH_fly8, SUFFIX) },
-		{ GEN(SHsphtor_to_spat_hyb, SUFFIX), GEN(SHsphtor_to_spat_fly1, SUFFIX), GEN(SHsphtor_to_spat_fly2, SUFFIX),
+		{ GEN(SHsphtor_to_spat_hyb, SUFFIX), NULL, GEN(SHsphtor_to_spat_fly1, SUFFIX), GEN(SHsphtor_to_spat_fly2, SUFFIX),
 		  GEN(SHsphtor_to_spat_fly3, SUFFIX), NULL, NULL, NULL },
-		{ GEN(spat_to_SHsphtor_hyb, SUFFIX), GEN(spat_to_SHsphtor_fly1, SUFFIX), GEN(spat_to_SHsphtor_fly2, SUFFIX),
+		{ GEN(spat_to_SHsphtor_hyb, SUFFIX), NULL, GEN(spat_to_SHsphtor_fly1, SUFFIX), GEN(spat_to_SHsphtor_fly2, SUFFIX),
 		  GEN(spat_to_SHsphtor_fly3, SUFFIX), NULL, NULL, NULL },
-		{ GEN(SHtor_to_spat_hyb, SUFFIX), GEN(SHtor_to_spat_fly1, SUFFIX), GEN(SHtor_to_spat_fly2, SUFFIX),
+		{ GEN(SHtor_to_spat_hyb, SUFFIX), NULL, GEN(SHtor_to_spat_fly1, SUFFIX), GEN(SHtor_to_spat_fly2, SUFFIX),
 		  GEN(SHtor_to_spat_fly3, SUFFIX), GEN(SHtor_to_spat_fly4, SUFFIX), NULL, NULL },
-		{ GEN(SHsph_to_spat_hyb, SUFFIX), GEN(SHsph_to_spat_fly1, SUFFIX), GEN(SHsph_to_spat_fly2, SUFFIX),
+		{ GEN(SHsph_to_spat_hyb, SUFFIX), NULL, GEN(SHsph_to_spat_fly1, SUFFIX), GEN(SHsph_to_spat_fly2, SUFFIX),
 		  GEN(SHsph_to_spat_fly3, SUFFIX), GEN(SHsph_to_spat_fly4, SUFFIX), NULL, NULL },
-		{ GEN(SHqst_to_spat_hyb, SUFFIX), GEN(SHqst_to_spat_fly1, SUFFIX), GEN(SHqst_to_spat_fly2, SUFFIX),
-		  GEN(SHqst_to_spat_fly3, SUFFIX), NULL, NULL, NULL },
-		{ GEN(spat_to_SHqst_hyb, SUFFIX), GEN(spat_to_SHqst_fly1, SUFFIX), GEN(spat_to_SHqst_fly2, SUFFIX),
-		  GEN(spat_to_SHqst_fly3, SUFFIX), NULL, NULL, NULL }
+		{ GEN(SHqst_to_spat_hyb, SUFFIX), GEN(SHqst_to_spat_2, SUFFIX), GEN(SHqst_to_spat_fly1, SUFFIX),
+		  GEN(SHqst_to_spat_fly2, SUFFIX), GEN(SHqst_to_spat_fly3, SUFFIX), NULL, NULL, NULL },
+		{ GEN(spat_to_SHqst_hyb, SUFFIX), GEN(spat_to_SHqst_2, SUFFIX), GEN(spat_to_SHqst_fly1, SUFFIX),
+		  GEN(spat_to_SHqst_fly2, SUFFIX), GEN(spat_to_SHqst_fly3, SUFFIX), NULL, NULL, NULL }
 };
 
 //@}
