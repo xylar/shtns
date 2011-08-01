@@ -64,8 +64,6 @@
 #undef SHT_NO_DCT
 
 #define NWAY 1
-#include "spat_to_SH_fly.c"
-#include "SH_to_spat_fly.c"
 #include "spat_to_SHst_fly.c"
 #include "SHst_to_spat_fly.c"
 #undef NWAY
@@ -243,9 +241,9 @@ void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex dou
 
 /* FUNCTION POINTER ARRAY */
 void* GEN(sht_array, SUFFIX)[SHT_NTYP][SHT_NALG] = {
-		{ GEN(SH_to_spat_hyb, SUFFIX), NULL, GEN(SH_to_spat_fly1, SUFFIX), GEN(SH_to_spat_fly2, SUFFIX),
+		{ GEN(SH_to_spat_hyb, SUFFIX), NULL, NULL, GEN(SH_to_spat_fly2, SUFFIX),
 		  GEN(SH_to_spat_fly3, SUFFIX), GEN(SH_to_spat_fly4, SUFFIX), GEN(SH_to_spat_fly6, SUFFIX), GEN(SH_to_spat_fly8, SUFFIX) },
-		{ GEN(spat_to_SH_hyb, SUFFIX), NULL, GEN(spat_to_SH_fly1, SUFFIX), GEN(spat_to_SH_fly2, SUFFIX),
+		{ GEN(spat_to_SH_hyb, SUFFIX), NULL, NULL, GEN(spat_to_SH_fly2, SUFFIX),
 		  GEN(spat_to_SH_fly3, SUFFIX), GEN(spat_to_SH_fly4, SUFFIX), GEN(spat_to_SH_fly6, SUFFIX), GEN(spat_to_SH_fly8, SUFFIX) },
 		{ GEN(SHsphtor_to_spat_hyb, SUFFIX), NULL, GEN(SHsphtor_to_spat_fly1, SUFFIX), GEN(SHsphtor_to_spat_fly2, SUFFIX),
 		  GEN(SHsphtor_to_spat_fly3, SUFFIX), NULL, NULL, NULL },

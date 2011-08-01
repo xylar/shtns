@@ -450,18 +450,24 @@ int planFFT(shtns_cfg shtns, int layout)
 		if (ifft2 != NULL) {
 			fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 			if (fft2 != NULL) {
-//				cost_ip = fftw_cost(ifft2) + fftw_cost(fft2);
+				cost_ip = SHT_NL_ORDER * fftw_cost(ifft2) + fftw_cost(fft2);
 			} else {
 				fftw_destroy_plan(ifft2);	ifft2 = NULL;	SHT_FFT = 2;
 			}
 		} else SHT_FFT = 2;
 	}
 	if ((SHT_FFT > 1) || (cost_ip > 0.0)) {		// out-of-place FFT
+#if SHT_VERBOSE > 1
+		if (cost_ip > 0.0) {	printf("          in-place cost : ifft=%g, fft=%g", fftw_cost(ifft2), fftw_cost(fft2));	fflush(stdout);	}
+#endif
 		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 		if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 		if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
-//		cost_oop = fftw_cost(ifft) + fftw_cost(fft);
+		cost_oop = SHT_NL_ORDER * fftw_cost(ifft) + fftw_cost(fft);
+#if SHT_VERBOSE > 1
+		if (cost_ip > 0.0)	printf("    out-of-place cost : ifft=%g, fft=%g\n", fftw_cost(ifft), fftw_cost(fft));
+#endif
 	}
 	if (SHT_FFT == 1) {
 		if ((cost_oop >= cost_ip) || (cost_oop == 0.0)) {		// switch to in-place transforms.
@@ -479,7 +485,6 @@ int planFFT(shtns_cfg shtns, int layout)
 	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
 #endif
 #if SHT_VERBOSE > 2
-	printf("out-of-place cost = %g    in-place cost = %g\n",cost_oop, cost_ip);
 	printf(" *** fft plan :\n");
 	fftw_print_plan(fft);
 	printf("\n *** ifft plan :\n");
@@ -1351,8 +1356,8 @@ void set_sht_fly(shtns_cfg shtns)
 	shtns->fptr[ivar][SHT_TYP_SSY] = sht_func[ivar][SHT_TYP_SSY][SHT_FLY2]; \
 	shtns->fptr[ivar][SHT_TYP_GS1] = sht_func[ivar][SHT_TYP_GS1][SHT_FLY2]; \
 	shtns->fptr[ivar][SHT_TYP_GS2] = sht_func[ivar][SHT_TYP_GS2][SHT_FLY2]; \
-	shtns->fptr[ivar][SHT_TYP_VSY] = sht_func[ivar][SHT_TYP_VSY][SHT_FLY1];	\
-	shtns->fptr[ivar][SHT_TYP_3SY] = sht_func[ivar][SHT_TYP_3SY][SHT_FLY1]; \
+	shtns->fptr[ivar][SHT_TYP_VSY] = sht_func[ivar][SHT_TYP_VSY][SHT_FLY2];	\
+	shtns->fptr[ivar][SHT_TYP_3SY] = sht_func[ivar][SHT_TYP_3SY][SHT_FLY2]; \
 	if (shtns->wg != NULL) { \
 		shtns->fptr[ivar][SHT_TYP_SAN] = sht_func[ivar][SHT_TYP_SAN][SHT_FLY4]; \
 		shtns->fptr[ivar][SHT_TYP_VAN] = sht_func[ivar][SHT_TYP_VAN][SHT_FLY2]; \
@@ -1542,11 +1547,10 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 	}
 #endif
 
-	#if SHT_VERBOSE > 1
+	#if SHT_VERBOSE > 0
 		printf("\n");
 	#endif
 	fftw_free(Tlm);	fftw_free(Slm);	fftw_free(Qlm);	fftw_free(Th);	fftw_free(Sh);	fftw_free(Qh);
-
 	if (dct > 0) {
 		return(tdct/tnodct);
 	} else	return(0.0);
@@ -1564,7 +1568,7 @@ void print_shtns_version() {
 
 void print_shtns_cfg(shtns_cfg shtns, int opt)
 {
-	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d,  Nphi=%d, Nlat=%d  [",LMAX, MMAX*MRES, MRES, NLM, NPHI, NLAT);
+	printf("Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d,  Nphi=%d, Nlat=%d  [",LMAX, MMAX*MRES, MRES, NLM, NPHI, NLAT);
 	if (shtns->norm & SHT_REAL_NORM) printf("'real' norm, ");
 	if (shtns->norm & SHT_NO_CS_PHASE) printf("no Condon-Shortley phase, ");
 	if (SHT_NORM == sht_fourpi) printf("4.pi normalized]\n");
@@ -1573,11 +1577,11 @@ void print_shtns_cfg(shtns_cfg shtns, int opt)
 
 	if (opt == 0) return;
 
-	printf("            ");
+	printf("      ");
 	for (int it=0; it<SHT_NTYP; it++)
 		printf("%5s ",sht_type[it]);
 	for (int iv=0; iv<SHT_NVAR; iv++) {
-		printf("\n        %4s:",sht_var[iv]);
+		printf("\n  %4s:",sht_var[iv]);
 		for (int it=0; it<SHT_NTYP; it++) {
 			for (int ia=0; ia<SHT_NALG; ia++) {
 				if (sht_func[iv][it][ia] == shtns->fptr[iv][it]) {
@@ -1654,7 +1658,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	LMAX = lmax;
 	NLM = nlm_calc(LMAX, MMAX, MRES);
 #if SHT_VERBOSE > 0
-	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
+	print_shtns_version();
 	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d  [",LMAX, MMAX*MRES, MRES, NLM);
 	if (norm & SHT_REAL_NORM) printf("'real' norm, ");
 	if (!with_cs_phase) printf("no Condon-Shortley phase, ");
@@ -1898,7 +1902,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#endif
 		t = choose_best_sht(shtns, &nloop, -1, 0);		// find optimal MTR_DCT.
 	#if SHT_VERBOSE > 0
-		printf("\n        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
+		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
 	#endif
   		if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) NLAT)/n_gauss;	// we can revert to gauss with a smaller nlat.
 		if (t > MIN_PERF_IMPROVE_DCT) {
@@ -1967,6 +1971,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
 	if (quick_init == 0) {
+		#if SHT_VERBOSE > 0
+			printf("        finding optimal algorithm");	fflush(stdout);
+		#endif
 		choose_best_sht(shtns, &nloop, on_the_fly, 2*LMAX/3);
 		if (MMAX == 0) {		// use SHT_AXISYM version
 /*			SH_to_spat_ptr = SH_to_spat_ptr_m0;		SHsphtor_to_spat_ptr = SHsphtor_to_spat_ptr_m0;		SHqst_to_spat_ptr = SHqst_to_spat_ptr_m0;
@@ -1974,9 +1981,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			SH_to_spat_ptr_l = SH_to_spat_ptr_m0l;		SHsphtor_to_spat_ptr_l = SHsphtor_to_spat_ptr_m0l;		SHqst_to_spat_ptr_l = SHqst_to_spat_ptr_m0l;
 			spat_to_SH_ptr_l = spat_to_SH_ptr_m0l;		spat_to_SHsphtor_ptr_l = spat_to_SHsphtor_ptr_m0l;		spat_to_SHqst_ptr_l = spat_to_SHqst_ptr_m0l;
 */		}
-  #if SHT_VERBOSE > 0
-		printf("\n");
-  #endif
 		t = SHT_error(shtns);		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);
