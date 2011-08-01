@@ -374,6 +374,9 @@ void gauss_nodes(long double *x, long double *w, int n)
 	long double z, z1, p1, p2, p3, pp;
 	long double eps;
 
+	long double l_1[n-1];		// cache for 1/l on stack.
+	for (l=2; l<=n; l++) l_1[l-2] = 1.0L/l;		// precompute 1/l
+
 	if (sizeof(eps) > 8) {
 		eps = 1.1e-19;		// desired precision, minimum = 1.0842e-19 (long double i387)
 	} else {
@@ -382,21 +385,21 @@ void gauss_nodes(long double *x, long double *w, int n)
 
 	m = (n+1)/2;
 	for (i=1;i<=m;i++) {
-		z = cos(M_PI*(i-0.25)/(n+0.5));	// initial guess
+		z = (1.0 - (n-1.)/(8.*n*n*n)) * cos(M_PI*(i-0.25)/(n+0.5));	// initial guess
 		do {
 			p1 = z;		// P_1
 			p2 = 1.0;	// P_0
 			for(l=2;l<=n;l++) {		 // recurrence : l P_l = (2l-1) z P_{l-1} - (l-1) P_{l-2}	(works ok up to l=100000)
 				p3 = p2;
 				p2 = p1;
-				p1 = ((2*l-1)*z*p2 - (l-1)*p3)/l;		// The Legendre polynomial...
+				p1 = ((2*l-1)*z*p2 - (l-1)*p3)*l_1[l-2];		// The Legendre polynomial...
 			}
-			pp = - n*(z*p1-p2)/((1.-z)*(1.+z));	// ... and its derivative.
+			pp = ((1.-z)*(1.+z))/(n*(p2-z*p1));			// ... and its inverse derivative.
 			z1 = z;
-			z = z-p1/pp;
+			z -= p1*pp;		// Newton's method
 		} while ( fabsl(z-z1) > eps );
 		x[i-1] = z;		// Build up the abscissas.
-		w[i-1] = 2.0/(((1.-z)*(1.+z))*(pp*pp));		// Build up the weights.
+		w[i-1] = 2.0*pp*pp/((1.-z)*(1.+z));		// Build up the weights.
 		x[n-i] = -z;
 		w[n-i] = w[i-1];
 	}

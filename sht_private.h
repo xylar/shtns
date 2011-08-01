@@ -47,15 +47,15 @@
 #define SHT_TYP_3SY 6
 #define SHT_TYP_3AN 7
 // number of sht algorithms (hyb, fly1, ...)
-#define SHT_NALG 7
+#define SHT_NALG 8
 #define SHT_HYB 0
-#define SHT_FLY1 1
-#define SHT_FLY2 2
-#define SHT_FLY3 3
-#define SHT_FLY4 4
-#define SHT_FLY6 5
-#define SHT_FLY8 6
-
+#define SHT_SV 1
+#define SHT_FLY1 2
+#define SHT_FLY2 3
+#define SHT_FLY3 4
+#define SHT_FLY4 5
+#define SHT_FLY6 6
+#define SHT_FLY8 7
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
@@ -110,15 +110,15 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	fftw_plan idct, dct_m0;			// (I)DCT for NPHI>1
 	fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
-
 	double **ykm_dct;	// matrix for inverse transform (synthesis) using dct.
 	struct DtDp** dykm_dct;	// theta and phi derivative of Ykm matrix.
 	double *zlm_dct0;	// matrix for direct transform (analysis), only m=0
 	double *dzlm_dct0;
 
 	double Y00_1, Y10_ct, Y11_st;
-	void *next;		// pointer to next sht_setup or NULL (records a chained list of SHT setup).
-	int norm;		///< store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
+	shtns_cfg next;		// pointer to next sht_setup or NULL (records a chained list of SHT setup).
+	short norm;			// store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
+	short grid;			// store grid type.
 	unsigned fftw_plan_mode;
 	// the end should be aligned on the size of int, to allow the storage of small arrays.
 };
