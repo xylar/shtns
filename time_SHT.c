@@ -329,6 +329,7 @@ int test_SHT_vect3d()
 	ta = tcpu / (1000.*SHT_ITER);
 	printf("   3D vector SHT time : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
 
+	fftw_free(T2);	fftw_free(S2);	fftw_free(Q2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
 	scal_error(Qlm, Tlm0, LMAX);
 	return (int) tcpu;
@@ -523,7 +524,7 @@ int main(int argc, char *argv[])
 
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
-	NLM = nlm_calc(LMAX, MMAX, MRES);
+	NLM = shtns->nlm;
 	shtns_set_grid_auto(shtns, shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
 
 	print_shtns_cfg(shtns, 1);
@@ -701,6 +702,12 @@ int main(int argc, char *argv[])
 
 #endif
 
+// free memory and resources (to track memory leaks)
+	fftw_free(Qlm);		fftw_free(Tlm);		fftw_free(Slm);
+	fftw_free(Slm0);	fftw_free(Tlm0);
+	fftw_free(NLF);		fftw_free(ThF);		fftw_free(ShF);
+
 	shtns_reset();
+	fftw_cleanup();
 }
 

@@ -1327,6 +1327,8 @@ double SHT_error(shtns_cfg shtns)
 	printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%d\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
 #endif
 #endif
+
+	fftw_free(Th);  fftw_free(Sh);  fftw_free(Tlm);  fftw_free(Slm);  fftw_free(Slm0);  fftw_free(Tlm0);
 	return(err);		// return max error.
 }
 
@@ -1488,7 +1490,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 		if (ityp == 2) nloop = (nloop+1)/2;		// scalar ar done.
 		t0 = 1e100;
 		i0 = -1;		i = -1;
-		if (on_the_fly == 1) i = SHT_FLY1 -1;		// only on-the-fly
+		if (on_the_fly == 1) i = SHT_SV -1;		// only on-the-fly (SV is then also on-the-fly)
 		while (++i < SHT_NALG) {
 			void *pf = sht_func[0][ityp][i];
 			if (pf != NULL) {
@@ -1497,7 +1499,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 				} else {
 					t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Slm, Tlm, Qlm, Sh, Th, Qh, l);
 				}
-				if (i==0) t *= 1.0/MIN_PERF_IMPROVE_DCT;
+			//	if (i < SHT_FLY1) t *= 1.0/MIN_PERF_IMPROVE_DCT;
 				if (t < t0) {	i0 = i;		t0 = t;		PRINT_VERB("*");	}
 			}
 		}

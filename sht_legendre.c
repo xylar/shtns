@@ -377,14 +377,12 @@ void gauss_nodes(long double *x, long double *w, int n)
 	long double l_1[n-1];		// cache for 1/l on stack.
 	for (l=2; l<=n; l++) l_1[l-2] = 1.0L/l;		// precompute 1/l
 
-	if (sizeof(eps) > 8) {
-		eps = 1.1e-19;		// desired precision, minimum = 1.0842e-19 (long double i387)
-	} else {
-		eps = 2.3e-16;		// desired precision, minimum = 2.2204e-16 (double)
-	}
+	eps = 2.3e-16;		// desired precision, minimum = 2.2204e-16 (double)
+	if (sizeof(eps) > 8)	eps = 1.1e-19;		// desired precision, minimum = 1.0842e-19 (long double i387)
 
 	m = (n+1)/2;
 	for (i=1;i<=m;i++) {
+		int k=10;		// maximum Newton iteration count to prevent infinite loop.
 		z = (1.0 - (n-1.)/(8.*n*n*n)) * cos(M_PI*(i-0.25)/(n+0.5));	// initial guess
 		do {
 			p1 = z;		// P_1
@@ -397,7 +395,7 @@ void gauss_nodes(long double *x, long double *w, int n)
 			pp = ((1.-z)*(1.+z))/(n*(p2-z*p1));			// ... and its inverse derivative.
 			z1 = z;
 			z -= p1*pp;		// Newton's method
-		} while ( fabsl(z-z1) > eps );
+		} while (( fabsl(z-z1) > (z1+z)*0.5*eps ) && (--k > 0));
 		x[i-1] = z;		// Build up the abscissas.
 		w[i-1] = 2.0*pp*pp/((1.-z)*(1.+z));		// Build up the weights.
 		x[n-i] = -z;
