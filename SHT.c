@@ -309,30 +309,31 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 	INITIALIZATION FUNCTIONS
 */
 
+/// allocate arrays for SHT related to a given grid.
 void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
 {
 	long int im,m, l0;
 	long int lstride;
 
 	l0 = ((NLAT+1)>>1)*2;		// round up to even
-	shtns->ct = (double *) fftw_malloc( sizeof(double) * l0*3 );
+	shtns->ct = (double *) fftw_malloc( sizeof(double) * l0*3 );			/// ct[] (including st and st_1)
 	shtns->st = shtns->ct + l0;		shtns->st_1 = shtns->ct + 2*l0;
 
   if (on_the_fly == 0) {
-	shtns->ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );
+	shtns->ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );		/// ylm[] (including zlm and ykm_dct)
 	shtns->zlm = shtns->ylm + (MMAX+1);		shtns->ykm_dct = shtns->ylm + (MMAX+1)*2;
   #ifndef SHT_SCALAR_ONLY
-	shtns->dylm = (struct DtDp **) fftw_malloc( sizeof(struct DtDp *) * (MMAX+1)*3);
+	shtns->dylm = (struct DtDp **) fftw_malloc( sizeof(struct DtDp *) * (MMAX+1)*3);		/// dylm[] (including dzlm and dykm_dct)
 	shtns->dzlm = shtns->dylm + (MMAX+1);		shtns->dykm_dct = shtns->dylm + (MMAX+1)*2;
   #endif
 
 // Allocate legendre functions lookup tables.
 	lstride = (LMAX+1);		lstride += (lstride&1);		// even stride.
-	shtns->ylm[0] = (double *) fftw_malloc(sizeof(double)* (NLM-(LMAX+1)+lstride)*NLAT_2);
+	shtns->ylm[0] = (double *) fftw_malloc(sizeof(double)* (NLM-(LMAX+1)+lstride)*NLAT_2);		/// ylm[][]
   #ifndef SHT_SCALAR_ONLY
-	shtns->dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);
+	shtns->dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);				/// dylm[][]
   #endif
-	shtns->zlm[0] = (double *) fftw_malloc(sizeof(double)* (NLM*NLAT_2 + (NLAT_2 & 1)));
+	shtns->zlm[0] = (double *) fftw_malloc(sizeof(double)* (NLM*NLAT_2 + (NLAT_2 & 1)));		/// zlm[][]
   #ifndef SHT_SCALAR_ONLY
 	shtns->dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (NLM-1)*NLAT_2);		// remove l=0
   #endif
@@ -354,20 +355,27 @@ void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
 
 void free_SHTarrays(shtns_cfg shtns)
 {
-#ifndef SHT_SCALAR_ONLY
-	if (shtns->dzlm != NULL) fftw_free(shtns->dzlm[0]);		
-#endif
-	if (shtns->zlm != NULL) fftw_free(shtns->zlm[0]);
-#ifndef SHT_SCALAR_ONLY
-	if (shtns->dylm != NULL) fftw_free(shtns->dylm[0]);
-#endif
-	if (shtns->ylm != NULL) fftw_free(shtns->ylm[0]);
-#ifndef SHT_SCALAR_ONLY
-	if (shtns->dylm != NULL) fftw_free(shtns->dylm);
-#endif
-	if (shtns->ylm != NULL) fftw_free(shtns->ylm);
+	if (shtns->fft != NULL)		fftw_destroy_plan(shtns->fft);
+	if (shtns->ifft != NULL)	fftw_destroy_plan(shtns->ifft);
+	shtns->fft = NULL;		shtns->ifft = NULL;		shtns->sht_fft = 0;
 
-	fftw_free(shtns->ct);
+	if (shtns->dylm != NULL) {
+		if (shtns->dzlm[0] != NULL) fftw_free(shtns->dzlm[0]);
+		shtns->dzlm[0] = NULL;
+		if (shtns->dylm != NULL) fftw_free(shtns->dylm[0]);
+		shtns->dylm[0] = NULL;
+		fftw_free(shtns->dylm);		shtns->dylm = NULL;
+	}
+	if (shtns->ylm != NULL) {
+		if (shtns->zlm[0] != NULL) fftw_free(shtns->zlm[0]);
+		shtns->zlm[0] = NULL;
+		if (shtns->ylm[0] != NULL) fftw_free(shtns->ylm[0]);
+		shtns->ylm[0] = NULL;
+		fftw_free(shtns->ylm);		shtns->ylm = NULL;
+	}
+	if (shtns->ct != NULL) {
+		fftw_free(shtns->ct);		shtns->ct = NULL;
+	}
 }
 
 /// Generates an equi-spaced theta grid including the poles, for synthesis only.
@@ -856,14 +864,23 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 
 void free_SH_dct(shtns_cfg shtns)
 {
-#ifndef SHT_SCALAR_ONLY
-	fftw_free(shtns->dzlm_dct0);
-#endif
-	fftw_free(shtns->zlm_dct0);
-#ifndef SHT_SCALAR_ONLY
-	fftw_free(shtns->dykm_dct[0]);
-#endif
-	fftw_free(shtns->ykm_dct[0]);
+	if (shtns->zlm_dct0 == NULL) return;
+
+	if (shtns->dzlm_dct0 != NULL)	fftw_free(shtns->dzlm_dct0);
+	shtns->dzlm_dct0 = NULL;
+	if (shtns->zlm_dct0 != NULL)	fftw_free(shtns->zlm_dct0);
+	shtns->zlm_dct0 = NULL;
+
+	if ((shtns->dykm_dct != NULL)&&(shtns->dykm_dct[0] != NULL))	fftw_free(shtns->dykm_dct[0]);
+	shtns->dykm_dct[0] = NULL;
+	if ((shtns->ykm_dct != NULL)&&(shtns->ykm_dct[0] != NULL))	fftw_free(shtns->ykm_dct[0]);
+	shtns->ykm_dct[0] = NULL;
+
+	if (shtns->idct != NULL)	fftw_destroy_plan(shtns->idct);	// free unused dct plans
+	if (shtns->dct_m0 != NULL)	fftw_destroy_plan(shtns->dct_m0);
+	if (shtns->dct_r1 != NULL)	fftw_destroy_plan(shtns->dct_r1);
+	if (shtns->idct_r1 != NULL)	fftw_destroy_plan(shtns->idct_r1);
+	shtns->idct = NULL;		shtns->dct_m0 = NULL;		shtns->idct_r1 = NULL;		shtns->dct_r1 = NULL;
 }
 
 #ifndef SHT_NO_DCT
@@ -1469,8 +1486,9 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 			printf("finding best %s ...",sht_type[ityp]);	fflush(stdout);
 		#endif
 		if (ityp == 2) nloop = (nloop+1)/2;		// scalar ar done.
-		i0 = -1;
-		t0 = 1e100;		i = on_the_fly - 1;		// skip hybrid if on_the_fly == 1
+		t0 = 1e100;
+		i0 = -1;		i = -1;
+		if (on_the_fly == 1) i = SHT_FLY1 -1;		// only on-the-fly
 		while (++i < SHT_NALG) {
 			void *pf = sht_func[0][ityp][i];
 			if (pf != NULL) {
@@ -1616,6 +1634,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		set_sht_default(shtns);		// default SHT is hyb.
 		shtns->lmidx = (int*) (shtns + 1);		// lmidx is stored at the end of the struct...
 		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
+		shtns->ct = NULL;	shtns->st = NULL;
 	}
 
 	// copy sizes.
@@ -1737,6 +1756,9 @@ void shtns_destroy(shtns_cfg shtns)
 	free_unused_array(shtns, shtns->alm);
 	free_unused_array(shtns, shtns->li);
 
+	if (shtns->wg != NULL) free(shtns->wg);
+	shtns->wg = NULL;
+	free_SH_dct(shtns);
 	free_SHTarrays(shtns);
 
 	if (sht_data == shtns) {
@@ -1891,9 +1913,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
   #endif
 		if (MTR_DCT == -1) {			// free memory used by DCT and disables DCT.
 			free_SH_dct(shtns);			// free now useless arrays.
-			shtns->zlm_dct0 = NULL;		// this disables DCT completely.
-			if (shtns->idct != NULL) fftw_destroy_plan(shtns->idct);	// free unused dct plans
-			if (shtns->dct_m0 != NULL) fftw_destroy_plan(shtns->dct_m0);
 			if (flags == sht_auto) {
 				flags = sht_gauss;		// switch to gauss grid, even better accuracy.
 		#if SHT_VERBOSE > 0
@@ -1907,9 +1926,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		#endif
 				}
 				if (n_gauss > 0) {		// we should use the optimal size for gauss-legendre
-					if (NPHI>1) {
-						fftw_destroy_plan(shtns->fft);  fftw_destroy_plan(shtns->ifft);
-					}
 					free_SHTarrays(shtns);
 					*nlat = n_gauss;
 					NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
@@ -1949,9 +1965,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
 	if (quick_init == 0) {
-  #if SHT_VERBOSE > 0
-		printf("        finding fastest algorithm");	fflush(stdout);
-  #endif
 		choose_best_sht(shtns, &nloop, on_the_fly, 2*LMAX/3);
 		if (MMAX == 0) {		// use SHT_AXISYM version
 /*			SH_to_spat_ptr = SH_to_spat_ptr_m0;		SHsphtor_to_spat_ptr = SHsphtor_to_spat_ptr_m0;		SHqst_to_spat_ptr = SHqst_to_spat_ptr_m0;

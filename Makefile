@@ -60,15 +60,20 @@ SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 # objects :
 SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
 	$(cmd) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
+	@echo "DONE SHT.o"
 
 sht_std.o : sht_std.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
 	$(shtcc) -c sht_std.c -o sht_std.o
+	@echo "DONE sht_std"
 sht_ltr.o : sht_ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
 	$(shtcc) -c sht_ltr.c -o sht_ltr.o
+	@echo "DONE sht_ltr"
 sht_m0.o : sht_m0.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
 	$(shtcc) -c sht_m0.c -o sht_m0.o
+	@echo "DONE sht_m0"
 sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
 	$(shtcc) -c sht_m0ltr.c -o sht_m0ltr.o
+	@echo "DONE sht_m0ltr"
 #sht_eo.o : sht_eo.c Makefile $(hfiles) SHT/SHeo_to_spat.c SHT/spat_to_SHeo.c
 #	$(shtcc) -c sht_eo.c -o sht_eo.o
 
