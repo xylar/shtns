@@ -31,6 +31,9 @@
 
 #include "shtns.h"
 
+void Set_MTR_DCT(shtns_cfg, int m);		// these functions are not meant to be public but are useful here.
+int Get_MTR_DCT(shtns_cfg);				//
+
 shtns_cfg shtns;
 
 complex double *Slm, *Slm0, *Tlm, *Tlm0, *Qlm;	// spherical harmonics l,m space
@@ -527,7 +530,7 @@ int main(int argc, char *argv[])
 	NLM = shtns->nlm;
 	shtns_set_grid_auto(shtns, shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
 
-	print_shtns_cfg(shtns, 1);
+	shtns_print_cfg(shtns);
 
 // now would be a good time to save fftw's wisdom.
 	fw = fopen("fftw_wisdom","w");

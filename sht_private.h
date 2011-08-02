@@ -40,6 +40,9 @@ enum sht_types { SHT_TYP_SSY, SHT_TYP_SAN, SHT_TYP_VSY, SHT_TYP_VAN,
 // sht algorithms (hyb, fly1, ...)
 enum sht_algos { SHT_HYB, SHT_SV, SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8, SHT_NALG };
 
+// sht grids
+enum sht_grids { SHT_GRID_NONE, SHT_GRID_GAUSS, SHT_GRID_REG, SHT_GRID_POLES };
+
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;

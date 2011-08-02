@@ -37,7 +37,7 @@
 // chained list of sht_setup : start with NULL
 shtns_cfg sht_data = NULL;
 
-/// Abort program with error message.
+/// \internal Abort program with error message.
 void shtns_runerr(const char * error_text)
 {
 	printf("*** [SHTns] Run-time error : %s\n",error_text);
@@ -69,7 +69,7 @@ double shlm_e1(shtns_cfg shtns, int l, int m) {
 #include "sht_legendre.c"
 
 
-/// return the smallest power of 2 larger than n.
+/// \internal return the smallest power of 2 larger than n.
 int next_power_of_2(int n)
 {
 	int f = 1;
@@ -78,7 +78,7 @@ int next_power_of_2(int n)
 	return f;
 }
 
-/// find the closest integer that is larger than n and that contains only factors up to fmax.
+/// \internal find the closest integer that is larger than n and that contains only factors up to fmax.
 /// fmax is 7 for optimal FFTW fourier transforms.
 /// return only even integers for n>fmax.
 int fft_int(int n, int fmax)
@@ -116,7 +116,7 @@ int nlm_calc(int lmax, int mmax, int mres)
 	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
 }
 
-/// returns an aproximation of the memory usage in mega bytes.
+/// \internal returns an aproximation of the memory usage in mega bytes.
 /// \ingroup init
 double sht_mem_size(int lmax, int mmax, int mres, int nlat)
 {
@@ -234,7 +234,7 @@ double st_lat;
 
 /// synthesis at a given latitude, on nphi equispaced longitude points.
 /// vr, vt, and vp arrays must have nphi+2 doubles allocated (fftw requirement).
-/// It does not require a previous call to shtns_set_grid
+/// It does not require a previous call to shtns_set_grid, but it is NOT thread-safe.
 /// \ingroup local
 void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr)
@@ -309,7 +309,7 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 	INITIALIZATION FUNCTIONS
 */
 
-/// allocate arrays for SHT related to a given grid.
+/// \internal allocate arrays for SHT related to a given grid.
 void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
 {
 	long int im,m, l0;
@@ -353,6 +353,7 @@ void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
   }
 }
 
+/// \internal free arrays allocated by alloc_SHTarrays.
 void free_SHTarrays(shtns_cfg shtns)
 {
 	if (shtns->fft != NULL)		fftw_destroy_plan(shtns->fft);
@@ -378,12 +379,33 @@ void free_SHTarrays(shtns_cfg shtns)
 	}
 }
 
-/// Generates an equi-spaced theta grid including the poles, for synthesis only.
+/// \internal check if an array defined by shtns_create has been shared before freeing it.
+int free_unused_array(shtns_cfg shtns, void* p)
+{
+	int i = 0;		// reference count.
+	shtns_cfg s2 = sht_data;
+	if (p==NULL) return i;
+
+	while (s2 != NULL) {		// we must not free shared resources.
+		if (s2 != shtns) {		// don't count the one we want to free.
+			if (s2->alm == p) i++;
+			if (s2->blm == p) i++;
+			if (s2->l_2 == p) i++;
+			if (s2->li == p) i++;
+		}
+		s2 = s2->next;
+	}
+	if (i == 0)  free(p);
+	return i;
+}
+
+/// \internal Generates an equi-spaced theta grid including the poles, for synthesis only.
 void EqualPolarGrid(shtns_cfg shtns)
 {
 	int j;
 	double f;
-	
+
+	shtns->grid = SHT_GRID_POLES;
 #if SHT_VERBOSE > 0
 	printf("        => using Equaly Spaced Nodes including poles\n");
 #endif
@@ -400,11 +422,9 @@ void EqualPolarGrid(shtns_cfg shtns)
 }
 
 
-/// initialize FFTs using FFTW.
+/// \internal initialize FFTs using FFTW.
 /// \param[in] layout defines the spatial layout (see \ref spat).
 /// returns the number of double to be allocated for a spatial field.
-/// \todo we should time out-of-place and in-place, and chose the fastest.
-/// \todo even/odd transform do not work with out-of-place FFT (segfault).
 int planFFT(shtns_cfg shtns, int layout)
 {
 	double cost_ip, cost_oop;
@@ -506,7 +526,7 @@ int planFFT(shtns_cfg shtns, int layout)
 }
 
 #ifndef SHT_NO_DCT
-/// initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
+/// \internal initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
 void planDCT(shtns_cfg shtns)
 {
 	double *Sh;
@@ -578,7 +598,7 @@ void planDCT(shtns_cfg shtns)
 }
 #endif
 
-/// SET MTR_DCT and updates fftw_plan for DCT's
+/// \internal SET MTR_DCT and updates fftw_plan for DCT's
 void Set_MTR_DCT(shtns_cfg shtns, int m)
 {
 #ifndef SHT_NO_DCT
@@ -593,11 +613,12 @@ void Set_MTR_DCT(shtns_cfg shtns, int m)
 #endif
 }
 
+/// \internal returns the m-truncation of DCT part of synthesis
 int Get_MTR_DCT(shtns_cfg shtns) {
 	return MTR_DCT;
 }
 
-/// Sets the value tm[im] used for polar optimiation on-the-fly.
+/// \internal Sets the value tm[im] used for polar optimiation on-the-fly.
 void PolarOptimize(shtns_cfg shtns, double eps)
 {
 	int im, m, l, it;
@@ -609,7 +630,7 @@ void PolarOptimize(shtns_cfg shtns, double eps)
 	if (eps > 0.0) {
 		for (im=1;im<=MMAX;im++) {
 			m = im*MRES;
-			it = -1;
+			it = shtns->tm[im-1] -1;	// tm[im] is monotonic.
 			do {
 				it++;
 				legendre_sphPlm_array(shtns, LMAX, im, shtns->ct[it], y+m);
@@ -633,7 +654,7 @@ void PolarOptimize(shtns_cfg shtns, double eps)
 	}
 }
 
-/// Perform some optimization on the SHT matrices.
+/// \internal Perform some optimization on the SHT matrices.
 void OptimizeMatrices(shtns_cfg shtns, double eps)
 {
 	unsigned short *tm;
@@ -654,7 +675,7 @@ void OptimizeMatrices(shtns_cfg shtns, double eps)
 			m = im*MRES;
 			tm[im] = NLAT_2;
 			for (l=m;l<=LMAX;l++) {
-				it=0;
+				it = tm[im-1];		// tm[im] is monotonic.
 				while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }
 				if (tm[im] > it) tm[im] = it;
 			}
@@ -732,7 +753,7 @@ void OptimizeMatrices(shtns_cfg shtns, double eps)
 #endif
 }
 
-/// Precompute the matrix for SH synthesis.
+/// \internal Precompute the matrix for SH synthesis.
 void init_SH_synth(shtns_cfg shtns)
 {
 	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
@@ -762,7 +783,7 @@ void init_SH_synth(shtns_cfg shtns)
 }
 
 
-/// Precompute matrices for SH synthesis and analysis, on a Gauss-Legendre grid.
+/// \internal Precompute matrices for SH synthesis and analysis, on a Gauss-Legendre grid.
 void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 {
 	double t,tmax;
@@ -770,6 +791,7 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 	long double iylm_fft_norm;
 	long double xg[NLAT], wgl[NLAT];	// gauss points and weights.
 
+	shtns->grid = SHT_GRID_GAUSS;
 	shtns->wg = malloc((NLAT_2 +15) * sizeof(double));	// gauss weights, double precision.
 
  	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
@@ -866,7 +888,7 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 	}
 }
 
-
+/// \internal free arrays allocated by init_SH_dct
 void free_SH_dct(shtns_cfg shtns)
 {
 	if (shtns->zlm_dct0 == NULL) return;
@@ -889,7 +911,7 @@ void free_SH_dct(shtns_cfg shtns)
 }
 
 #ifndef SHT_NO_DCT
-/// Computes the matrices required for SH transform on a regular grid (with or without DCT).
+/// \internal Computes the matrices required for SH transform on a regular grid (with or without DCT).
 /// \param analysis : 0 => synthesis only.
 void init_SH_dct(shtns_cfg shtns, int analysis)
 {
@@ -907,6 +929,7 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	double *st = shtns->st;
 	double *st_1 = shtns->st_1;
 
+	shtns->grid = SHT_GRID_REG;
 	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
  		iylm_fft_norm = 0.5/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm (4pi)
 	} else {
@@ -1266,7 +1289,7 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 }
 #endif
 
-/// return the max error for a back-and-forth SHT transform.
+/// \internal return the max error for a back-and-forth SHT transform.
 /// this function is used to internally measure the accuracy.
 double SHT_error(shtns_cfg shtns)
 {
@@ -1349,7 +1372,7 @@ extern void* sht_array_l[SHT_NTYP][SHT_NALG];
 // big array holding all sht functions, variants and algorithms
 void* sht_func[SHT_NVAR][SHT_NTYP][SHT_NALG];
 
-/// \internal use on-the-fly alogorithm (good guess without measuring)
+/// \internal use on-the-fly alogorithm (guess without measuring)
 void set_sht_fly(shtns_cfg shtns)
 {
   #define SET_SHT_FUNC(ivar) \
@@ -1369,7 +1392,7 @@ void set_sht_fly(shtns_cfg shtns)
   #undef SET_SHT_FUNC
 }
 
-/// \internal set hyb alogorithm and copy all algos to sht_func array.
+/// \internal set hyb alogorithm and copy all algos to sht_func array (should be called by shtns_create).
 void set_sht_default(shtns_cfg shtns)
 {
 	for (int it=0; it<SHT_NTYP; it++) {
@@ -1398,6 +1421,7 @@ void set_sht_default(shtns_cfg shtns)
   #define PRINT_DOT (0);
 #endif
 
+/// \internal measure time used for a transform function
 double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, void *i1, void *i2, void *i3, void *o1, void *o2, void *o3, int l)
 {
 	double t;
@@ -1572,21 +1596,27 @@ done:
   #define _HGID_ "unknown"
 #endif
 
-void print_shtns_version() {
+void shtns_print_version() {
 	printf("[SHTns] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
 }
 
-void print_shtns_cfg(shtns_cfg shtns, int opt)
+void shtns_print_cfg(shtns_cfg shtns)
 {
-	printf("Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d,  Nphi=%d, Nlat=%d  [",LMAX, MMAX*MRES, MRES, NLM, NPHI, NLAT);
+	printf("Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d  [",LMAX, MMAX*MRES, MRES, NLM);
 	if (shtns->norm & SHT_REAL_NORM) printf("'real' norm, ");
 	if (shtns->norm & SHT_NO_CS_PHASE) printf("no Condon-Shortley phase, ");
 	if (SHT_NORM == sht_fourpi) printf("4.pi normalized]\n");
 	else if (SHT_NORM == sht_schmidt) printf("Schmidt semi-normalized]\n");
 	else printf("orthonormalized]\n");
+	if (shtns->ct == NULL)	return;		// no grid is set
 
-	if (opt == 0) return;
-
+	switch(shtns->grid) {
+		case SHT_GRID_GAUSS : printf("Gauss grid");	 break;
+		case SHT_GRID_REG : printf("Regular grid");	 break;
+		case SHT_GRID_POLES : printf("Regular grid including poles");  break;
+		default : printf("Unknown grid");
+	}
+	printf(" : Nlat=%d, Nphi=%d\n", NLAT, NPHI);
 	printf("      ");
 	for (int it=0; it<SHT_NTYP; it++)
 		printf("%5s ",sht_type[it]);
@@ -1610,7 +1640,7 @@ void print_shtns_cfg(shtns_cfg shtns, int opt)
 
 /*! This sets the description of spherical harmonic coefficients.
  * It tells SHTns how to interpret spherical harmonic coefficient arrays, and it sets usefull arrays.
- * returns the number of modes (complex double) to describe a scalar field.
+ * Returns the configuration to be passed to subsequent transform functions.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
@@ -1651,6 +1681,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->lmidx = (int*) (shtns + 1);		// lmidx is stored at the end of the struct...
 		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
 		shtns->ct = NULL;	shtns->st = NULL;
+		shtns->nphi = 0;	shtns->nlat = 0;	shtns->nlat_2 = 0;		// public data
 	}
 
 	// copy sizes.
@@ -1668,13 +1699,8 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	LMAX = lmax;
 	NLM = nlm_calc(LMAX, MMAX, MRES);
 #if SHT_VERBOSE > 0
-	print_shtns_version();
-	printf("        Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d  [",LMAX, MMAX*MRES, MRES, NLM);
-	if (norm & SHT_REAL_NORM) printf("'real' norm, ");
-	if (!with_cs_phase) printf("no Condon-Shortley phase, ");
-	if (SHT_NORM == sht_fourpi) printf("4.pi normalized]\n");
-	else if (SHT_NORM == sht_schmidt) printf("Schmidt semi-normalized]\n");
-	else printf("orthonormalized]\n");
+	shtns_print_version();
+	printf("        ");		shtns_print_cfg(shtns);
   #ifdef SHT_SCALAR_ONLY
 	printf("  *** Compiled with SCALAR support only (no vector support) ***\n");
 	#warning "Compilation with SCALAR support only."
@@ -1744,25 +1770,6 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 }
 
 
-int free_unused_array(shtns_cfg shtns, void* p)
-{
-	int i = 0;		// reference count.
-	shtns_cfg s2 = sht_data;
-	if (p==NULL) return i;
-
-	while (s2 != NULL) {		// we must not free shared resources.
-		if (s2 != shtns) {		// don't count the one we want to free.
-			if (s2->alm == p) i++;
-			if (s2->blm == p) i++;
-			if (s2->l_2 == p) i++;
-			if (s2->li == p) i++;
-		}
-		s2 = s2->next;
-	}
-	if (i == 0)  free(p);
-	return i;
-}
-
 /// release all resources allocated by a given shtns_cfg
 void shtns_destroy(shtns_cfg shtns)
 {
@@ -1804,6 +1811,7 @@ void shtns_reset()
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_create and before any SH transform.</b> and sets all global variables and internal data.
  * returns the required number of doubles to be allocated for a spatial field.
+ * \param shtns is the config created by shtns_create for which the grid will be set.
  * \param nlat,nphi pointers to the number of latitudinal and longitudinal grid points respectively. If 0, they are set to optimal values.
  * \param nl_order defines the maximum SH degree to be resolved by analysis : lmax_analysis = lmax*nl_order. It is used to set an optimal and anti-aliasing nlat. If 0, the default SHT_DEFAULT_NL_ORDER is used.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
@@ -2009,9 +2017,10 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_create and before any SH transform.</b> and sets all global variables.
  * returns the required number of doubles to be allocated for a spatial field.
- * \param nlat,nphi respectively the number of latitudinal and longitudinal grid points.
+ * \param shtns is the config created by shtns_create for which the grid will be set.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
  * \param eps polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
+ * \param nlat,nphi respectively the number of latitudinal and longitudinal grid points.
  *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
 */
 int shtns_set_grid(shtns_cfg shtns, enum shtns_type flags, double eps, int nlat, int nphi)
@@ -2024,7 +2033,7 @@ int shtns_set_grid(shtns_cfg shtns, enum shtns_type flags, double eps, int nlat,
 /*! Simple initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * This function sets all global variables by calling \ref shtns_create followed by \ref shtns_set_grid, with the
  * default normalization and the default polar optimization (see \ref sht_config.h).
- * returns the number of modes to describe a scalar field.
+ * returns the configuration to be passed to subsequent transform functions.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.

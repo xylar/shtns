@@ -105,16 +105,14 @@ int shtns_set_grid(shtns_cfg, enum shtns_type flags, double eps, int nlat, int n
 /// precompute everything and choose the optimal nlat and nphi for a given non-linear order.
 int shtns_set_grid_auto(shtns_cfg, enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi);
 
-/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require a previous call to init_SH
+/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require any previous setup.
 int nlm_calc(int lmax, int mmax, int mres);
-void Set_MTR_DCT(shtns_cfg, int m);
-int Get_MTR_DCT(shtns_cfg);
 
-void shtns_reset();				///< free memory and go back to initial state.
+void shtns_reset();				///< destroy all configs, free memory, and go back to initial state.
 void shtns_destroy(shtns_cfg);	///< free memory of given config, which cannot be used afterwards.
 
-void print_shtns_version();		///< print version information to stdout.
-void print_shtns_cfg(shtns_cfg, int opt);		///< print information about given config to stdout.
+void shtns_print_version();			///< print version information to stdout.
+void shtns_print_cfg(shtns_cfg);	///< print information about given config to stdout.
 
 //@}
 

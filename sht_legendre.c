@@ -39,7 +39,7 @@
   #define LEG_RANGE_CHECK
 #endif
 
-/// computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
+/// \internal computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
 /// works with very large values of n (up to 2700).
 long double a_sint_pow_n(long double val, long double cost, int n)
 {
@@ -61,7 +61,7 @@ long double a_sint_pow_n(long double val, long double cost, int n)
 	return val;		// = sint(t)^n
 }
 
-/// Returns the value of a legendre polynomial of degree l and order im*MRES, noramalized for spherical harmonics, using recurrence.
+/// \internal Returns the value of a legendre polynomial of degree l and order im*MRES, noramalized for spherical harmonics, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
 double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, double x)
@@ -98,7 +98,7 @@ done:
 	return ((double) ymmp1);
 }
 
-/// Compute values of legendre polynomials noramalized for spherical harmonics,
+/// \internal Compute values of legendre polynomials noramalized for spherical harmonics,
 /// for a range of l=m..lmax, at given m and x, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
@@ -157,7 +157,7 @@ done:
 }
 
 
-/// Compute values of a legendre polynomial normalized for spherical harmonics derivatives, for a range of l=m..lmax, using recurrence.
+/// \internal Compute values of a legendre polynomial normalized for spherical harmonics derivatives, for a range of l=m..lmax, using recurrence.
 /// Requires a previous call to \ref legendre_precomp(). Output is not directly compatible with GSL :
 /// - if m=0 : returns ylm(x)  and  d(ylm)/d(theta) = -sin(theta)*d(ylm)/dx
 /// - if m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta).
@@ -234,7 +234,7 @@ done:
 	return;
 }
 
-/// Precompute constants for the recursive generation of Legendre associated functions, with given normalization.
+/// \internal Precompute constants for the recursive generation of Legendre associated functions, with given normalization.
 /// this function is called by \ref shtns_set_size, and assumes up-to-date values in \ref shtns.
 /// For the same conventions as GSL, use \c legendre_precomp(sht_orthonormal,1);
 /// \param[in] norm : normalization of the associated legendre functions (\ref shtns_norm).
@@ -343,7 +343,7 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 	shtns->bl0 = bl0;		shtns->blm = blm;
 }
 
-/// returns the value of the Legendre Polynomial of degree l.
+/// \internal returns the value of the Legendre Polynomial of degree l.
 /// l is arbitrary, a direct recurrence relation is used, and a previous call to legendre_precomp() is not required.
 double legendre_Pl(const int l, double x)
 {
@@ -364,7 +364,7 @@ double legendre_Pl(const int l, double x)
 }
 
 
-/// Generates the abscissa and weights for a Gauss-Legendre quadrature.
+/// \internal Generates the abscissa and weights for a Gauss-Legendre quadrature.
 /// Newton method from initial Guess to find the zeros of the Legendre Polynome
 /// \param x = abscissa, \param w = weights, \param n points.
 /// \note Reference:  Numerical Recipes, Cornell press.
