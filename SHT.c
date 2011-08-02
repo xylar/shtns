@@ -1340,7 +1340,7 @@ double SHT_error(shtns_cfg shtns)
 
 char* sht_name[SHT_NALG] = {"hyb", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
 char* sht_var[SHT_NVAR] = {"std", "ltr"};
-char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsy", "gs2", "v3s", "v3a" };
+char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
 extern void* sht_array[SHT_NTYP][SHT_NALG];
@@ -1354,8 +1354,8 @@ void set_sht_fly(shtns_cfg shtns)
 {
   #define SET_SHT_FUNC(ivar) \
 	shtns->fptr[ivar][SHT_TYP_SSY] = sht_func[ivar][SHT_TYP_SSY][SHT_FLY2]; \
-	shtns->fptr[ivar][SHT_TYP_GS1] = sht_func[ivar][SHT_TYP_GS1][SHT_FLY2]; \
-	shtns->fptr[ivar][SHT_TYP_GS2] = sht_func[ivar][SHT_TYP_GS2][SHT_FLY2]; \
+	shtns->fptr[ivar][SHT_TYP_GSP] = sht_func[ivar][SHT_TYP_GSP][SHT_FLY2]; \
+	shtns->fptr[ivar][SHT_TYP_GTO] = sht_func[ivar][SHT_TYP_GTO][SHT_FLY2]; \
 	shtns->fptr[ivar][SHT_TYP_VSY] = sht_func[ivar][SHT_TYP_VSY][SHT_FLY2];	\
 	shtns->fptr[ivar][SHT_TYP_3SY] = sht_func[ivar][SHT_TYP_3SY][SHT_FLY2]; \
 	if (shtns->wg != NULL) { \
@@ -1377,8 +1377,8 @@ void set_sht_default(shtns_cfg shtns)
 			sht_func[SHT_STD][it][j] = sht_array[it][j];
 			sht_func[SHT_LTR][it][j] = sht_array_l[it][j];
 		}
-		shtns->fptr[SHT_STD][it] = sht_func[SHT_STD][it][SHT_HYB];
-		shtns->fptr[SHT_LTR][it] = sht_func[SHT_LTR][it][SHT_HYB];
+		for (int v=0; v<SHT_NVAR; v++)
+			shtns->fptr[v][it] = sht_func[v][it][SHT_HYB];
 	}
 }
 

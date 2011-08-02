@@ -153,28 +153,28 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 /// Spheroidal only synthesis.
 void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp SUPARG)
 {
-	((PF3) shtns->fptr[IVAR][SHT_TYP_GS1])(shtns, Slm, Vt, Vp SUPARG2);
+	((PF3) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt, Vp SUPARG2);
 	return;
 }
 
 /// Toroidal only synthesis.
 void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
-	((PF3) shtns->fptr[IVAR][SHT_TYP_GS2])(shtns, Tlm, Vt, Vp SUPARG2);
+	((PF3) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, Vt, Vp SUPARG2);
 	return;
 }
 #else
 /// Spheroidal m=0 only synthesis (results in theta component only).
 void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt SUPARG)
 {
-	((PF2) shtns->fptr[IVAR][SHT_TYP_GS1])(shtns, Slm, Vt SUPARG2);
+	((PF2) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt SUPARG2);
 	return;
 }
 
 /// Toroidal m=0 only synthesis (results in phi component only).
 void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp SUPARG)
 {
-	((PF2) shtns->fptr[IVAR][SHT_TYP_GS2])(shtns, Tlm, Vp SUPARG2);
+	((PF2) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, Vp SUPARG2);
 	return;
 }
 #endif
@@ -249,10 +249,10 @@ void* GEN(sht_array, SUFFIX)[SHT_NTYP][SHT_NALG] = {
 		  GEN(SHsphtor_to_spat_fly3, SUFFIX), NULL, NULL, NULL },
 		{ GEN(spat_to_SHsphtor_hyb, SUFFIX), NULL, GEN(spat_to_SHsphtor_fly1, SUFFIX), GEN(spat_to_SHsphtor_fly2, SUFFIX),
 		  GEN(spat_to_SHsphtor_fly3, SUFFIX), NULL, NULL, NULL },
-		{ GEN(SHtor_to_spat_hyb, SUFFIX), NULL, GEN(SHtor_to_spat_fly1, SUFFIX), GEN(SHtor_to_spat_fly2, SUFFIX),
-		  GEN(SHtor_to_spat_fly3, SUFFIX), GEN(SHtor_to_spat_fly4, SUFFIX), NULL, NULL },
 		{ GEN(SHsph_to_spat_hyb, SUFFIX), NULL, GEN(SHsph_to_spat_fly1, SUFFIX), GEN(SHsph_to_spat_fly2, SUFFIX),
 		  GEN(SHsph_to_spat_fly3, SUFFIX), GEN(SHsph_to_spat_fly4, SUFFIX), NULL, NULL },
+		{ GEN(SHtor_to_spat_hyb, SUFFIX), NULL, GEN(SHtor_to_spat_fly1, SUFFIX), GEN(SHtor_to_spat_fly2, SUFFIX),
+		  GEN(SHtor_to_spat_fly3, SUFFIX), GEN(SHtor_to_spat_fly4, SUFFIX), NULL, NULL },
 		{ GEN(SHqst_to_spat_hyb, SUFFIX), GEN(SHqst_to_spat_2, SUFFIX), GEN(SHqst_to_spat_fly1, SUFFIX),
 		  GEN(SHqst_to_spat_fly2, SUFFIX), GEN(SHqst_to_spat_fly3, SUFFIX), NULL, NULL, NULL },
 		{ GEN(spat_to_SHqst_hyb, SUFFIX), GEN(spat_to_SHqst_2, SUFFIX), GEN(spat_to_SHqst_fly1, SUFFIX),

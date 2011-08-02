@@ -12,8 +12,8 @@
   => we should therefore use our own aligned memory allocation ... (or use autoconf ?)
 
 *** TODO ***
-- change architecture for more than one algo !
-- compare in-place/out-of-place ffts and choose best
++ change architecture for more than one algo !
++ compare in-place/out-of-place ffts and choose best
 - split the fft and the legendre transform so that they can be done independantly ?
 
 new functions :
@@ -65,13 +65,12 @@ for SHsphtor_to_spat, maybe storing .t and .p together is not the best... => I t
 	should not change array sizes. only SHT function calls may (must) be different.
 -!!!	grid.c should also treat even/odd sub-cases. !!!
 
-- FFTW : out-of-place is faster than in-place. switch ? http://www.fftw.org/speed/CoreDuo-3.0GHz-icc64/
-
 + NLAT odd is now allowed (but not for DCT)
 
 *** NOTES :
 DCT SHT is ok for LMAX=1300 and NLAT_2=1024. changeset 70:f901295a7862
 DCT tested up to LMAX=2045. changeset 218:d0d6a8e1e22b
+DCT tested up to LMAX=2700. changeset 244:76e0128a9ef7 (with mres=135)
 
 Run-time setup for everything.
 DCT is about 25% faster than GAUSS for xshells dj_ref case (axisym).

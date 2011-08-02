@@ -32,30 +32,14 @@
 #include "sht_config.h"
 #include "shtns.h"
 
-// number of sht variants (std, ltr)
-#define SHT_NVAR 2
-#define SHT_STD 0
-#define SHT_LTR 1
-// number of sht types (scal synth, scal analys, vect synth, ...)
-#define SHT_NTYP 8
-#define SHT_TYP_SSY 0
-#define SHT_TYP_SAN 1
-#define SHT_TYP_VSY 2
-#define SHT_TYP_VAN 3
-#define SHT_TYP_GS1 4
-#define SHT_TYP_GS2 5
-#define SHT_TYP_3SY 6
-#define SHT_TYP_3AN 7
-// number of sht algorithms (hyb, fly1, ...)
-#define SHT_NALG 8
-#define SHT_HYB 0
-#define SHT_SV 1
-#define SHT_FLY1 2
-#define SHT_FLY2 3
-#define SHT_FLY3 4
-#define SHT_FLY4 5
-#define SHT_FLY6 6
-#define SHT_FLY8 7
+// sht variants (std, ltr)
+enum sht_variants { SHT_STD, SHT_LTR, SHT_NVAR };
+// sht types (scal synth, scal analys, vect synth, ...)
+enum sht_types { SHT_TYP_SSY, SHT_TYP_SAN, SHT_TYP_VSY, SHT_TYP_VAN,
+				SHT_TYP_GSP, SHT_TYP_GTO, SHT_TYP_3SY, SHT_TYP_3AN, SHT_NTYP };
+// sht algorithms (hyb, fly1, ...)
+enum sht_algos { SHT_HYB, SHT_SV, SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8, SHT_NALG };
+
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
