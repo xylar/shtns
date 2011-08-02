@@ -1400,10 +1400,12 @@ void set_sht_default(shtns_cfg shtns)
 
 double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, void *i1, void *i2, void *i3, void *o1, void *o2, void *o3, int l)
 {
+	double t;
 	int i;
 	ticks tik0, tik1;
 
-	for (i=0; i<=nloop; i++) {
+	tik1 = getticks();
+	for (i=0; i<nloop; i++) {
 		switch(npar) {
 /*			case 2: (*(pf2l)fptr)(shtns, i1,o1, l); break;			// l may be discarded.
 			case 3: (*(pf3l)fptr)(shtns, i1,o1,o2, l); break;
@@ -1416,10 +1418,14 @@ double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, vo
 		}
 		if (i==0) tik0 = getticks();
 	}
-	tik1 = getticks();
-	double t = elapsed(tik1,tik0)/nloop;
+	if (nloop == 1) {
+		t = elapsed(tik0, tik1);
+	} else {
+		tik1 = getticks();
+		t = elapsed(tik1, tik0)/(nloop-1);		// discard first iteration.
+	}
 	#if SHT_VERBOSE > 1
-		printf("  t(%s) = %.3g",name,t);
+		printf("  t(%s) = %.3g",name,t);	fflush(stdout);
 	#endif
 	return t;
 }
@@ -1436,6 +1442,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 	int m, i, i0, minc, nloop;
 	int dct = 0;
 	int analys = 1;		// check also analysis.
+	int typ_lim = SHT_NTYP;		// time every type.
 	double t0, t, tt, r;
 	double tdct, tnodct;
 	ticks tik0, tik1;
@@ -1470,23 +1477,25 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 			} else 	m++;
 			tcpu = clock();
 			t0 = get_time(shtns, nloop, 2, "", shtns->fptr[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, l);
+			tcpu = clock() - tcpu;		tt = 1.e-6 * tcpu;
+			if (tt >= 0.2) break;			// we should not exceed 1 second
 			t = get_time(shtns, nloop, 2, "", shtns->fptr[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, l);
-			tcpu = clock() - tcpu;
 			r = fabs(2.0*(t-t0)/(t+t0));
-			tt = 1.e-6 * tcpu;		// real time should not exceed 1 sec.
 			#if SHT_VERBOSE > 1
-				printf(", nloop=%d, t0=%g, t=%g, r=%g, m=%d (real time = %g s)\n",nloop,t0,t,r,m,tt);
+				printf(", nloop=%d, r=%g, m=%d (real time = %g s)\n",nloop,r,m,tt);
 			#endif
 			PRINT_DOT
-		} while((nloop<10000)&&(m < 3)&&(tt<0.35));
+		} while((nloop<10000)&&(m < 3));
 		*nlp = nloop;
 	} else {
 		nloop = *nlp;
 	}
 	#if SHT_VERBOSE > 1
-		printf("nloop=%d\n",nloop);
+		printf(" => nloop=%d (takes %g s)\n",nloop, tt);
 	#endif
-	
+	if (tt > 3.0)	typ_lim = SHT_TYP_VSY;		// time only scalar transforms.
+	if (tt > 10.0)	goto done;		// timing this will be too slow...
+
 	int ityp = 0;	do {
 		if ((dct != 0) && (ityp >= 4)) break;		// dct !=0 : only scalar and vector.
 		#if SHT_VERBOSE > 1
@@ -1504,7 +1513,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 				} else {
 					t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Slm, Tlm, Qlm, Sh, Th, Qh, l);
 				}
-			//	if (i < SHT_FLY1) t *= 1.0/MIN_PERF_IMPROVE_DCT;
+				if (i < SHT_FLY1) t *= 1.03;	// 3% penality for memory based transforms.
 				if (t < t0) {	i0 = i;		t0 = t;		PRINT_VERB("*");	}
 			}
 		}
@@ -1520,7 +1529,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 		}
 		if (ityp == 4) ityp++;		// skip second gradient
 		if ( ((ityp&1) == 0) && (analys == 0) ) ityp++;		// skip analysis
-	} while(++ityp < SHT_NTYP);
+	} while(++ityp < typ_lim);
 
 #ifndef SHT_NO_DCT
 	if (dct > 0) {		// find the best DCT timings...
@@ -1529,7 +1538,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 		printf("\nfinding best dct synthesis ...");
 	#endif
 		m = -1;		i = -1;		// reference = no dct.
-			t0 = get_time(shtns, nloop*2, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, l);
+			t0 = get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, l);
 			t0 += get_time(shtns, nloop, 4, "v", shtns->fptr[SHT_STD][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, l);
 			tnodct = t0;
 		for (m=0; m<=MMAX; m+=minc) {
@@ -1537,7 +1546,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 				printf("\nm=%d  ",m);
 			#endif
 			Set_MTR_DCT(shtns, m);
-			t = get_time(shtns, nloop*2, 2, "sdct", sht_array[SHT_TYP_SSY][SHT_HYB], Qlm, Slm, Tlm, Qh, Sh, Th, l);
+			t = get_time(shtns, *nlp, 2, "sdct", sht_array[SHT_TYP_SSY][SHT_HYB], Qlm, Slm, Tlm, Qh, Sh, Th, l);
 			t += get_time(shtns, nloop, 4, "vdct", sht_array[SHT_TYP_VSY][SHT_HYB], Slm, Tlm, Qlm, Sh, Th, Qh, l);
 			if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
 			PRINT_DOT
@@ -1550,6 +1559,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 	#if SHT_VERBOSE > 0
 		printf("\n");
 	#endif
+done:
 	fftw_free(Tlm);	fftw_free(Slm);	fftw_free(Qlm);	fftw_free(Th);	fftw_free(Sh);	fftw_free(Qh);
 	if (dct > 0) {
 		return(tdct/tnodct);
@@ -1858,7 +1868,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			if (*nphi > 256) shtns->fftw_plan_mode = FFTW_PATIENT;		// do not waste too much time finding optimal fftw.
 			if (*nphi > 512) shtns->fftw_plan_mode = FFTW_MEASURE;
 		}
-		if (t > 10*SHTNS_MAX_MEMORY) quick_init =1;			// do not time such large transforms.
+//		if (t > 10*SHTNS_MAX_MEMORY) quick_init =1;			// do not time such large transforms.
 	}
 
 	if (flags == sht_auto) {
