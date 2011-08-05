@@ -23,8 +23,7 @@
 // global variables definitions
 #include "sht_private.h"
 
-// truncation at LMAX and MMAX
-#define LTR ltr
+// truncation at MMAX
 #define MTR MMAX
 #define SHT_VAR_LTR
 

@@ -62,6 +62,9 @@ QB	double reo0[2*NLAT_2] SSE;	// symmetric (even) and anti-symmetric (odd) parts
 VB	double tpeo0[4*NLAT_2] SSE;	// theta and phi even and odd parts
   #endif
 
+QX	#define ZL(i) vdup(zl[i])
+3	#define ZL(i) vdup(dzl[i].p)
+
 // defines how to access even and odd parts of data
 QB	#define re(i)	reo[2*(i)]
 QB	#define ro(i)	reo[2*(i)+1]
@@ -393,13 +396,8 @@ VE				s0i -= vdup(dzl[0].p) *pe(i);
 VO				t0i -= vdup(dzl[0].p) *te(i);
 VO				s1i -= vdup(dzl[1].p) *po(i);
 VE				t1i -= vdup(dzl[1].p) *to(i);
-			  #ifndef SHT_3COMP
-QE				q0  += re(i) * vdup(zl[0]);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				q1  += ro(i) * vdup(zl[1]);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-			  #else
-QE				q0  += re(i) * vdup(dzl[0].p);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				q1  += ro(i) * vdup(dzl[1].p);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-			  #endif
+QE				q0  += re(i) * ZL(0);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+QO				q1  += ro(i) * ZL(1);		// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
 Q				zl +=2;
 V				dzl +=2;
 				i++;
@@ -425,11 +423,7 @@ VE				s0  += vdup(dzl[0].t) *to(i);
 VO				t0  -= vdup(dzl[0].t) *po(i);
 VE				s0i -= vdup(dzl[0].p) *pe(i);
 VO				t0i -= vdup(dzl[0].p) *te(i);
-			  #ifndef SHT_3COMP
-QE				q0  += re(i) * vdup(zl[0]);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-			  #else
-QE				q0  += vdup(dzl[0].p) * re(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-			  #endif
+QE				q0  += re(i) * ZL(0);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 Q				zl  += lstride;
 V				dzl += lstride;
 				i++;
@@ -465,6 +459,7 @@ VX	    fftw_free(BtF - NLAT*(imlim+1));	// this frees also BpF.
 	}
   #endif
 
+Q	#undef ZL
 Q	#undef re
 Q	#undef ro
 V	#undef te

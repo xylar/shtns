@@ -1361,7 +1361,7 @@ double SHT_error(shtns_cfg shtns)
 }
 
 
-char* sht_name[SHT_NALG] = {"hyb", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
+char* sht_name[SHT_NALG] = {"hyb", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
 char* sht_var[SHT_NVAR] = {"std", "ltr"};
 char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
@@ -1405,7 +1405,7 @@ void set_sht_default(shtns_cfg shtns)
 			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
 		}
 		for (int v=0; v<SHT_NVAR; v++)
-			shtns->fptr[v][it] = sht_func[v][it][SHT_HYB];
+			shtns->fptr[v][it] = sht_func[v][it][SHT_MEM];
 	}
 }
 
@@ -1467,7 +1467,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 	complex double *Qlm, *Slm, *Tlm;
 	double *Qh, *Sh, *Th;
 	char *nb;
-	int m, i, i0, minc, nloop;
+	int m, i, i0, minc, nloop, alg_end;
 	int dct = 0;
 	int analys = 1;		// check also analysis.
 	int typ_lim = SHT_NTYP;		// time every type.
@@ -1526,37 +1526,45 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 
 	int ityp = 0;	do {
 		if ((dct != 0) && (ityp >= 4)) break;		// dct !=0 : only scalar and vector.
-		#if SHT_VERBOSE > 1
-			printf("finding best %s ...",sht_type[ityp]);	fflush(stdout);
-		#endif
 		if (ityp == 2) nloop = (nloop+1)/2;		// scalar ar done.
 		t0 = 1e100;
-		i0 = -1;		i = -1;
-		if (on_the_fly == 1) i = SHT_SV -1;		// only on-the-fly (SV is then also on-the-fly)
-		while (++i < SHT_NALG) {
-			void *pf = sht_func[0][ityp][i];
-			if (pf != NULL) {
-				if (ityp&1) {	// analysis
-					t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Sh, Th, Qh, Slm, Tlm, Qlm, LMAX);
-				} else {
-					t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-				}
-				if (i < SHT_FLY1) t *= 1.03;	// 3% penality for memory based transforms.
-				if (t < t0) {	i0 = i;		t0 = t;		PRINT_VERB("*");	}
-			}
+		i0 = 0;
+		if (MTR_DCT < 0)	i0 = SHT_MEM;		// skip hybrid.
+		if (on_the_fly == 1) i0 = SHT_SV;		// only on-the-fly (SV is then also on-the-fly)
+		alg_end = SHT_NALG;
+		if ((ityp&1) && (analys == 0)) alg_end = SHT_FLY1;		// no on-the-fly analysis for regular grid.
+		for (i=i0, m=0;	i<alg_end; i++) {
+			if (sht_func[0][ityp][i] != NULL) m++;		// count number of algos
 		}
-		if (i0 >= 0) {
-			for (int j=0; j<SHT_NVAR; j++) {
-				shtns->fptr[j][ityp] = sht_func[j][ityp][i0];
-				if (ityp == 4) shtns->fptr[j][ityp+1] = sht_func[j][ityp+1][i0];		// only one timing for both gradients variants.
-			}
-			PRINT_DOT
+		if (m >= 2) {		// don't time if there is only 1 algo !
 			#if SHT_VERBOSE > 1
-				printf(" => %s\n",sht_name[i0]);
+				printf("finding best %s ...",sht_type[ityp]);	fflush(stdout);
 			#endif
+			i = i0-1;		i0 = -1;
+			while (++i < alg_end) {
+				void *pf = sht_func[0][ityp][i];
+				if (pf != NULL) {
+					if (ityp&1) {	// analysis
+						t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Sh, Th, Qh, Slm, Tlm, Qlm, LMAX);
+					} else {
+						t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+					}
+					if (i < SHT_FLY1) t *= 1.03;	// 3% penality for memory based transforms.
+					if (t < t0) {	i0 = i;		t0 = t;		PRINT_VERB("*");	}
+				}
+			}
+			if (i0 >= 0) {
+				for (int j=0; j<SHT_NVAR; j++) {
+					shtns->fptr[j][ityp] = sht_func[j][ityp][i0];
+					if (ityp == 4) shtns->fptr[j][ityp+1] = sht_func[j][ityp+1][i0];		// only one timing for both gradients variants.
+				}
+				PRINT_DOT
+				#if SHT_VERBOSE > 1
+					printf(" => %s\n",sht_name[i0]);
+				#endif
+			}
 		}
 		if (ityp == 4) ityp++;		// skip second gradient
-		if ( ((ityp&1) == 0) && (analys == 0) ) ityp++;		// skip analysis
 	} while(++ityp < typ_lim);
 
 #ifndef SHT_NO_DCT
@@ -1686,6 +1694,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
 		shtns->ct = NULL;	shtns->st = NULL;
 		shtns->nphi = 0;	shtns->nlat = 0;	shtns->nlat_2 = 0;		// public data
+		shtns->mtr_dct = -1;		// dct is switched off
 	}
 
 	// copy sizes.

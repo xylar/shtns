@@ -47,13 +47,6 @@
 #include "spat_to_SHst.c"
 #undef ID_NME
 
-#define SHT_NO_DCT
-#define ID_NME nodct
-#include "spat_to_SH.c"
-#include "SH_to_spat.c"
-#undef ID_NME
-#undef SHT_NO_DCT
-
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
 #define NWAY 1
@@ -195,7 +188,7 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 
 #define ID_NME hyb
 #include "spat_to_SHqst.c"
-#include "SHqst_to_spat.c"
+// no hybrid SHqst_to_spat possible.
 #undef ID_NME
 
 // fly are compiled only once, with SHT_VAR_LTR
@@ -239,10 +232,32 @@ void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex dou
 	return;
 }
 
+
+/* functions without dct, at the end for SHT_NO_DCT must no interfere with others */
+#define SHT_NO_DCT
+#define ID_NME mem
+#include "spat_to_SH.c"
+#include "SH_to_spat.c"
+#include "SHst_to_spat.c"
+#include "spat_to_SHst.c"
+/* nodct and gradients */
+#define SHT_GRAD
+#include "SHs_to_spat.c"
+#include "SHt_to_spat.c"
+#undef SHT_GRAD
+/* nodct 3 components */
+#define SHT_3COMP
+#include "spat_to_SHqst.c"
+#include "SHqst_to_spat.c"
+#undef SHT_3COMP
+#undef ID_NME
+
 /* FUNCTION POINTER ARRAY */
 void* GEN(sht_array, SUFFIX)[SHT_NALG][SHT_NTYP] = {
 /* hyb */	{ GEN(SH_to_spat_hyb, SUFFIX), GEN(spat_to_SH_hyb, SUFFIX), GEN(SHsphtor_to_spat_hyb, SUFFIX), GEN(spat_to_SHsphtor_hyb, SUFFIX), 
-				GEN(SHsph_to_spat_hyb, SUFFIX), GEN(SHtor_to_spat_hyb, SUFFIX), GEN(SHqst_to_spat_hyb, SUFFIX), GEN(spat_to_SHqst_hyb, SUFFIX) },
+				GEN(SHsph_to_spat_hyb, SUFFIX), GEN(SHtor_to_spat_hyb, SUFFIX), NULL, GEN(spat_to_SHqst_hyb, SUFFIX) },
+/* mem */	{ GEN(SH_to_spat_mem, SUFFIX), GEN(spat_to_SH_mem, SUFFIX), GEN(SHsphtor_to_spat_mem, SUFFIX), GEN(spat_to_SHsphtor_mem, SUFFIX), 
+				GEN(SHsph_to_spat_mem, SUFFIX), GEN(SHtor_to_spat_mem, SUFFIX), GEN(SHqst_to_spat_mem, SUFFIX), GEN(spat_to_SHqst_mem, SUFFIX) },
 /* s+v */	{ NULL, NULL, NULL, NULL, NULL, NULL, GEN(SHqst_to_spat_2, SUFFIX), GEN(spat_to_SHqst_2, SUFFIX) },
 #ifdef SHT_VAR_LTR
 /* fly1 */	{ NULL, NULL, GEN(SHsphtor_to_spat_fly1, SUFFIX), GEN(spat_to_SHsphtor_fly1, SUFFIX), 

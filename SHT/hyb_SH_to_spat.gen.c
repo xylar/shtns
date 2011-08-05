@@ -53,9 +53,8 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
 /// \param[in] llim MUST be shtns->lmax.
   #endif
 
-  #ifdef SHT_3COMP
-    #define SHT_NO_DCT
-  #endif
+// 3 components not possible with DCT acceleration.
+3	#define SHT_NO_DCT
 	#define NWAY 1
 
 // MTR_DCT : -1 => no dct
