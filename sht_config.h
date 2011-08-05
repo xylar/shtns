@@ -61,3 +61,6 @@
 
 // if SHT_NO_DCT is defined, no DCT support will be compiled. (Gauss-legendre only).
 //#define SHT_NO_DCT
+
+/// minimum NLAT to consider the use of DCT acceleration.
+#define SHT_MIN_NLAT_DCT 64

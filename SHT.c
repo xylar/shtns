@@ -941,8 +941,8 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	if (NLAT <= SHT_NL_ORDER *LMAX)	printf("     !! Warning : DCT anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER);
 	if (NLAT != fft_int(NLAT,7))	printf("     !! Warning : Nlat is not optimal for FFTW !\n");
 #endif
-	if ((NLAT_2)*2 <= LMAX+1) shtns_runerr("NLAT_2*2 should be at least LMAX+2 (DCT)");
 	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
+	if (NLAT <= LMAX+1) shtns_runerr("NLAT should be at least LMAX+2 (DCT)");
 	for (it=0; it<NLAT; it++) {	// Chebychev points : equaly spaced but skipping poles.
 		long double th = M_PIl*(it+0.5)/NLAT;
 		ct[it] = cosl(th);
@@ -1893,12 +1893,14 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
 	if (flags == sht_auto) {
-		if ( ((nl_order>=2)&&(MMAX*MRES > LMAX/2)) || (n_gauss <= 32) ) {
+		if ( ((nl_order>=2)&&(MMAX*MRES > LMAX/2)) || (*nlat < SHT_MIN_NLAT_DCT) || (*nlat & 1) || (*nlat <= LMAX+1) ) {
 			flags = sht_gauss;		// avoid computing DCT stuff when it is not expected to be faster.
 			if (n_gauss > 0) *nlat = n_gauss;
 		}
 	}
 
+	if (*nlat <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
+	
 	// copy to global variables.
 #ifdef SHT_AXISYM
 	shtns->nphi = 1;
@@ -1907,7 +1909,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	NPHI = *nphi;
 #endif
 	NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
-	if ((NLAT_2)*2 <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
 
 	alloc_SHTarrays(shtns, on_the_fly);		// allocate dynamic arrays
 	nspat = planFFT(shtns, layout);		// initialize fftw
@@ -1925,29 +1926,30 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	{
 		init_SH_dct(shtns, 1);
 		OptimizeMatrices(shtns, eps);
-  #ifdef SHT_NO_DCT
-			Set_MTR_DCT(shtns, -1);		// turn off DCT.
-  #else
-	#if SHT_VERBOSE > 0
-		printf("        finding optimal MTR_DCT");	fflush(stdout);
-	#endif
-		t = choose_best_sht(shtns, &nloop, -1);		// find optimal MTR_DCT.
-	#if SHT_VERBOSE > 0
-		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
-	#endif
-  		if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) NLAT)/n_gauss;	// we can revert to gauss with a smaller nlat.
-		if (t > MIN_PERF_IMPROVE_DCT) {
-			Set_MTR_DCT(shtns, -1);		// turn off DCT.
-		} else {
-			t = SHT_error(shtns);
-			if (t > MIN_ACCURACY_DCT) {
-	#if SHT_VERBOSE > 0
-				printf("     !! Not enough accuracy (%.3g) => turning off DCT.\n",t);
-	#endif
+		Set_MTR_DCT(shtns, -1);		// turn off DCT.
+	#ifndef SHT_NO_DCT
+		if (NLAT >= SHT_MIN_NLAT_DCT) {			// dct requires large NLAT to perform well.
+		#if SHT_VERBOSE > 0
+			printf("        finding optimal MTR_DCT");	fflush(stdout);
+		#endif
+			t = choose_best_sht(shtns, &nloop, -1);		// find optimal MTR_DCT.
+		#if SHT_VERBOSE > 0
+			printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
+		#endif
+			if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) NLAT)/n_gauss;	// we can revert to gauss with a smaller nlat.
+			if (t > MIN_PERF_IMPROVE_DCT) {
 				Set_MTR_DCT(shtns, -1);		// turn off DCT.
+			} else {
+				t = SHT_error(shtns);
+				if (t > MIN_ACCURACY_DCT) {
+		#if SHT_VERBOSE > 0
+					printf("     !! Not enough accuracy (%.3g) => turning off DCT.\n",t);
+		#endif
+					Set_MTR_DCT(shtns, -1);		// turn off DCT.
+				}
 			}
 		}
-  #endif
+	#endif
 		if (MTR_DCT == -1) {			// free memory used by DCT and disables DCT.
 			free_SH_dct(shtns);			// free now useless arrays.
 			if (flags == sht_auto) {
