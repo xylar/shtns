@@ -49,14 +49,10 @@ struct DtDp {		// theta and phi derivatives stored together.
 };
 
 // pointer to various function types
-typedef void (*pf2)(shtns_cfg, void*, void*);
-typedef void (*pf3)(shtns_cfg, void*, void*, void*);
-typedef void (*pf4)(shtns_cfg, void*, void*, void*, void*);
-typedef void (*pf6)(shtns_cfg, void*, void*, void*, void*, void*, void*);
-typedef void (*pf2l)(shtns_cfg, void*, void*, int);
-typedef void (*pf3l)(shtns_cfg, void*, void*, void*, int);
-typedef void (*pf4l)(shtns_cfg, void*, void*, void*, void*, int);
-typedef void (*pf6l)(shtns_cfg, void*, void*, void*, void*, void*, void*, int);
+typedef void (*pf2l)(shtns_cfg, void*, void*, long int);
+typedef void (*pf3l)(shtns_cfg, void*, void*, void*, long int);
+typedef void (*pf4l)(shtns_cfg, void*, void*, void*, void*, long int);
+typedef void (*pf6l)(shtns_cfg, void*, void*, void*, void*, void*, void*, long int);
 
 /// structure containing useful information about the SHT.
 struct shtns_info {		// MUST start with "int nlm;"

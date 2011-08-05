@@ -1366,8 +1366,8 @@ char* sht_var[SHT_NVAR] = {"std", "ltr"};
 char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
-extern void* sht_array[SHT_NTYP][SHT_NALG];
-extern void* sht_array_l[SHT_NTYP][SHT_NALG];
+extern void* sht_array[SHT_NALG][SHT_NTYP];
+extern void* sht_array_l[SHT_NALG][SHT_NTYP];
 
 // big array holding all sht functions, variants and algorithms
 void* sht_func[SHT_NVAR][SHT_NTYP][SHT_NALG];
@@ -1396,9 +1396,13 @@ void set_sht_fly(shtns_cfg shtns)
 void set_sht_default(shtns_cfg shtns)
 {
 	for (int it=0; it<SHT_NTYP; it++) {
-		for (int j=0; j<SHT_NALG; j++) {	// copy variants to global array.
-			sht_func[SHT_STD][it][j] = sht_array[it][j];
-			sht_func[SHT_LTR][it][j] = sht_array_l[it][j];
+		for (int j=0; j<SHT_FLY1; j++) {	// copy variants to global array.
+			sht_func[SHT_STD][it][j] = sht_array[j][it];
+			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
+		}
+		for (int j=SHT_FLY1; j<SHT_NALG; j++) {	// on-the-fly only exist in LTR version
+			sht_func[SHT_STD][it][j] = sht_array_l[j][it];
+			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
 		}
 		for (int v=0; v<SHT_NVAR; v++)
 			shtns->fptr[v][it] = sht_func[v][it][SHT_HYB];
@@ -1428,17 +1432,17 @@ double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, vo
 	int i;
 	ticks tik0, tik1;
 
+#if SHT_VERBOSE > 1
+	if (fptr == NULL) shtns_runerr("[get_time] attempt to call NULL function");
+#endif
+
 	tik1 = getticks();
 	for (i=0; i<nloop; i++) {
 		switch(npar) {
-/*			case 2: (*(pf2l)fptr)(shtns, i1,o1, l); break;			// l may be discarded.
+			case 2: (*(pf2l)fptr)(shtns, i1,o1, l); break;			// l may be discarded.
 			case 3: (*(pf3l)fptr)(shtns, i1,o1,o2, l); break;
 			case 4: (*(pf4l)fptr)(shtns, i1,i2,o1,o2, l); break;
 			default: (*(pf6l)fptr)(shtns, i1,i2,i3, o1,o2,o3, l); break;
-*/			case 2: (*(pf2)fptr)(shtns, i1,o1); break;			// l may be discarded.
-			case 3: (*(pf3)fptr)(shtns, i1,o1,o2); break;
-			case 4: (*(pf4)fptr)(shtns, i1,i2,o1,o2); break;
-			default: (*(pf6)fptr)(shtns, i1,i2,i3, o1,o2,o3); break;
 		}
 		if (i==0) tik0 = getticks();
 	}
@@ -1458,7 +1462,7 @@ double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, vo
 /// \internal choose fastest between on-the-fly and gauss algorithms.
 /// *nlp is the number of loops. If zero, it is set to a good value.
 /// on_the_fly : 1 = skip all memory algorithm. 0 = include memory and on-the-fly. -1 = test only DCT.
-double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
+double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 {
 	complex double *Qlm, *Slm, *Tlm;
 	double *Qh, *Sh, *Th;
@@ -1500,10 +1504,10 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 				m = 0;		nloop *= 3;
 			} else 	m++;
 			tcpu = clock();
-			t0 = get_time(shtns, nloop, 2, "", shtns->fptr[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, l);
+			t0 = get_time(shtns, nloop, 2, "", shtns->fptr[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			tcpu = clock() - tcpu;		tt = 1.e-6 * tcpu;
 			if (tt >= 0.2) break;			// we should not exceed 1 second
-			t = get_time(shtns, nloop, 2, "", shtns->fptr[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, l);
+			t = get_time(shtns, nloop, 2, "", shtns->fptr[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			r = fabs(2.0*(t-t0)/(t+t0));
 			#if SHT_VERBOSE > 1
 				printf(", nloop=%d, r=%g, m=%d (real time = %g s)\n",nloop,r,m,tt);
@@ -1533,9 +1537,9 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 			void *pf = sht_func[0][ityp][i];
 			if (pf != NULL) {
 				if (ityp&1) {	// analysis
-					t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Sh, Th, Qh, Slm, Tlm, Qlm, l);
+					t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Sh, Th, Qh, Slm, Tlm, Qlm, LMAX);
 				} else {
-					t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Slm, Tlm, Qlm, Sh, Th, Qh, l);
+					t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 				}
 				if (i < SHT_FLY1) t *= 1.03;	// 3% penality for memory based transforms.
 				if (t < t0) {	i0 = i;		t0 = t;		PRINT_VERB("*");	}
@@ -1562,16 +1566,16 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly, int l)
 		printf("\nfinding best dct synthesis ...");
 	#endif
 		m = -1;		i = -1;		// reference = no dct.
-			t0 = get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, l);
-			t0 += get_time(shtns, nloop, 4, "v", shtns->fptr[SHT_STD][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, l);
+			t0 = get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
+			t0 += get_time(shtns, nloop, 4, "v", shtns->fptr[SHT_STD][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			tnodct = t0;
 		for (m=0; m<=MMAX; m+=minc) {
 			#if SHT_VERBOSE > 1
 				printf("\nm=%d  ",m);
 			#endif
 			Set_MTR_DCT(shtns, m);
-			t = get_time(shtns, *nlp, 2, "sdct", sht_array[SHT_TYP_SSY][SHT_HYB], Qlm, Slm, Tlm, Qh, Sh, Th, l);
-			t += get_time(shtns, nloop, 4, "vdct", sht_array[SHT_TYP_VSY][SHT_HYB], Slm, Tlm, Qlm, Sh, Th, Qh, l);
+			t = get_time(shtns, *nlp, 2, "sdct", sht_array[SHT_HYB][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
+			t += get_time(shtns, nloop, 4, "vdct", sht_array[SHT_HYB][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
 			PRINT_DOT
 		}
@@ -1800,7 +1804,7 @@ void shtns_destroy(shtns_cfg shtns)
 	free(shtns);
 }
 
-// clear all allocated memory (hopefully) and go back to 0 state.
+/// clear all allocated memory (hopefully) and go back to 0 state.
 void shtns_reset()
 {
 	while (sht_data != NULL) {
@@ -1918,7 +1922,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#if SHT_VERBOSE > 0
 		printf("        finding optimal MTR_DCT");	fflush(stdout);
 	#endif
-		t = choose_best_sht(shtns, &nloop, -1, 0);		// find optimal MTR_DCT.
+		t = choose_best_sht(shtns, &nloop, -1);		// find optimal MTR_DCT.
 	#if SHT_VERBOSE > 0
 		printf("        + optimal MTR_DCT = %d  (%.1f%% performance gain)\n", MTR_DCT*MRES, 100.*(1/t-1));
 	#endif
@@ -1992,7 +1996,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		#if SHT_VERBOSE > 0
 			printf("        finding optimal algorithm");	fflush(stdout);
 		#endif
-		choose_best_sht(shtns, &nloop, on_the_fly, 2*LMAX/3);
+		choose_best_sht(shtns, &nloop, on_the_fly);
 		if (MMAX == 0) {		// use SHT_AXISYM version
 /*			SH_to_spat_ptr = SH_to_spat_ptr_m0;		SHsphtor_to_spat_ptr = SHsphtor_to_spat_ptr_m0;		SHqst_to_spat_ptr = SHqst_to_spat_ptr_m0;
 			spat_to_SH_ptr = spat_to_SH_ptr_m0;		spat_to_SHsphtor_ptr = spat_to_SHsphtor_ptr_m0;		spat_to_SHqst_ptr = spat_to_SHqst_ptr_m0;

@@ -27,27 +27,28 @@
 /// The spatial field is assumed to be \b axisymmetric (spatial size NLAT), and only the m=0 harmonics are written to output.
   #endif
 
-/// Truncation and spatial discretization are defined by \ref shtns_set_size and \ref shtns_precompute.
+/// Truncation and spatial discretization are defined by \ref shtns_create and \ref shtns_set_grid_*
+/// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by shtns_set_grid_*
 Q/// \param[in] Vr = spatial scalar field : double array.
 V/// \param[in] Vt, Vp = spatial (theta, phi) vector components : double arrays.
 Q/// \param[out] Qlm = spherical harmonics coefficients :
-Q/// complex double arrays of size NLM.
+Q/// complex double arrays of size shtns->nlm.
 V/// \param[out] Slm,Tlm = spherical harmonics coefficients of \b Spheroidal and \b Toroidal scalars :
-V/// complex double arrays of size NLM.
+V/// complex double arrays of size shtns->nlm.
   #ifdef SHT_VAR_LTR
-/// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
+/// \param[in] llim = specify maximum degree of spherical harmonic. llim must be at most shtns->lmax, and all spherical harmonic degree higher than llim are set to zero. 
   #endif
 
-QX	void GEN3(spat_to_SH_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm SUPARG) {
-VX	void GEN3(spat_to_SHsphtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG) {
-3	void GEN3(spat_to_SHqst_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG) {
+QX	void GEN3(spat_to_SH_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
+VX	void GEN3(spat_to_SHsphtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
+3	void GEN3(spat_to_SHqst_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
 
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	double *zl;
 V	double *dzl0;
 V	struct DtDp *dzl;
-	long int ni, llim, imlim;
+	long int ni, imlim;
 	long int i,i0, im,l;
 Q	complex double q0,q1;
 V	complex double s0,t0,s1,t1;
@@ -76,7 +77,7 @@ VB	#define pe0(i)	tpeo0[4*(i)+2]
 VB	#define po0(i)	tpeo0[4*(i)+3]
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
-	llim = LTR;		imlim = MTR;
+	imlim = MTR;
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > llim) imlim = llim/MRES;
 	#endif
@@ -454,7 +455,7 @@ V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
 		do {
 Q			((v2d*)Qlm)[l] = vdup(0.0);
 V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
-		} while(++l < NLM);
+		} while(++l < shtns->nlm);
 	}
 	#endif
 

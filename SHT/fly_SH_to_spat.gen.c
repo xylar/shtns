@@ -27,17 +27,17 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
-3	void GEN3(SHqst_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG) {
-QX	void GEN3(SH_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr SUPARG) {
+3	void GEN3(SHqst_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	void GEN3(SH_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	void GEN3(SHsphtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG) {
+VX	void GEN3(SHsphtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #else
 	#ifndef SHT_AXISYM
-S	void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp SUPARG) {
-T	void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp SUPARG) {
+S	void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
+T	void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
 	#else
-S	void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt SUPARG) {
-T	void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp SUPARG) {
+S	void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, long int llim) {
+T	void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp, long int llim) {
 	#endif
   #endif
 
@@ -60,12 +60,12 @@ Q	#define BR0(i) ((double *)BrF)[i]
 S	#define BT0(i) ((double *)BtF)[i]
 T	#define BP0(i) ((double *)BpF)[i]
   #endif
-	long int llim,imlim;
+	long int imlim;
 	long int k,im,m,l;
 	double *al, *ct, *st;
-Q	double Ql0[LTR+1];
-S	double Sl0[LTR+1];
-T	double Tl0[LTR];
+Q	double Ql0[llim+1];
+S	double Sl0[llim+1];
+T	double Tl0[llim];
 
   #ifndef SHT_AXISYM
 Q	BrF = (v2d *) Vr;
@@ -84,7 +84,6 @@ S	BtF = (v2d*) Vt;
 T	BpF = (v2d*) Vp;
   #endif
 
-	llim = LTR;		// copy LTR to a local variable for faster access (inner loop limit)
 	ct = shtns->ct;		st = shtns->st;
 	im=0;	m=0;
  		l=1;
@@ -381,7 +380,7 @@ V			l=m-1;
 				y0[j] *= vdup(SHT_LEG_SCALEF);
 				scale[j] = vdup(1.0/SHT_LEG_SCALEF);
 			}
-			int ll = l >> 8;
+			long int ll = l >> 8;
 			do {		// sin(theta)^m
 				if (l&1) for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
 				l >>= 1;

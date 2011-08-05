@@ -27,36 +27,37 @@
 /// The spatial field is assumed to be \b axisymmetric (spatial size NLAT), and only the m=0 harmonics are written to output.
   #endif
 
-/// Truncation and spatial discretization are defined by \ref shtns_set_size and \ref shtns_precompute.
+/// Truncation and spatial discretization are defined by \ref shtns_create and \ref shtns_set_grid_*
+/// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by shtns_set_grid_*
 Q/// \param[in] Vr = spatial scalar field : double array.
 V/// \param[in] Vt, Vp = spatial (theta, phi) vector components : double arrays.
 Q/// \param[out] Qlm = spherical harmonics coefficients :
-Q/// complex double arrays of size NLM.
+Q/// complex double arrays of size shtns->nlm.
 V/// \param[out] Slm,Tlm = spherical harmonics coefficients of \b Spheroidal and \b Toroidal scalars :
-V/// complex double arrays of size NLM.
+V/// complex double arrays of size shtns->nlm.
   #ifdef SHT_VAR_LTR
-/// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
+/// \param[in] llim = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
   #endif
 
-QX	void GEN3(spat_to_SH_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm SUPARG) {
-VX	void GEN3(spat_to_SHsphtor_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG) {
-3	void GEN3(spat_to_SHqst_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG) {
+QX	void GEN3(spat_to_SH_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
+VX	void GEN3(spat_to_SHsphtor_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
+3	void GEN3(spat_to_SHqst_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
 
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 	double *al, *wg, *ct, *st;
 V	double *l_2;
-	long int llim, imlim, m;
+	long int imlim, m;
 	long int ni, k;
 	long int i,i0, im,l;
   #if _GCC_VEC_
-Q	s2d qq[2*LMAX];
-V	s2d ss[2*LMAX];
-V	s2d tt[2*LMAX];
+Q	s2d qq[2*llim];
+V	s2d ss[2*llim];
+V	s2d tt[2*llim];
   #else
-Q	double qq[LMAX+1];
-V	double ss[LMAX+1];
-V	double tt[LMAX+1];
+Q	double qq[llim+1];
+V	double ss[llim+1];
+V	double tt[llim+1];
   #endif
 
   #ifndef SHT_AXISYM
@@ -81,7 +82,7 @@ V	double per[NLAT_2+2*NWAY] SSE;
 V	double por[NLAT_2+2*NWAY] SSE;
   #endif
 
-	llim = LTR;		imlim = MTR;
+	imlim = MTR;
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > llim) imlim = llim/MRES;
@@ -415,7 +416,7 @@ V			l=m-1;
 				y0[j] *= vdup(SHT_LEG_SCALEF);
 				scale[j] = vdup(1.0/SHT_LEG_SCALEF);
 			}
-			int ll = l >> 8;
+			long int ll = l >> 8;
 			do {		// sin(theta)^m
 				if (l&1) for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
 				l >>= 1;
@@ -533,7 +534,7 @@ V				Sl[l] = 0.0;		Tl[l] = 0.0;
 		do {
 Q			((v2d*)Qlm)[l] = vdup(0.0);
 V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
-		} while(++l < NLM);
+		} while(++l < shtns->nlm);
 	}
 	#endif
 

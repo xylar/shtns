@@ -32,13 +32,14 @@
 /// Only the \b axisymmetric (m=0) component is transformed, and the resulting spatial fields have size NLAT.
   #endif
 
-/// Truncation and spatial discretization are defined by \ref shtns_set_size and \ref shtns_precompute.
+/// Truncation and spatial discretization are defined by \ref shtns_create and \ref shtns_set_grid_*
+/// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by shtns_set_grid_*
 Q/// \param[in] Qlm = spherical harmonics coefficients :
-Q/// complex double arrays of size NLM [unmodified].
+Q/// complex double arrays of size shtns->nlm [unmodified].
 S/// \param[in] Slm = spherical harmonics coefficients of \b Spheroidal scalar :
-S/// complex double array of size NLM [unmodified].
+S/// complex double array of size shtns->nlm [unmodified].
 T/// \param[in] Tlm = spherical harmonics coefficients of \b Toroidal scalar :
-T/// complex double array of size NLM [unmodified].
+T/// complex double array of size shtns->nlm [unmodified].
 Q/// \param[out] Vr = spatial scalar field : double array.
   #ifndef SHT_AXISYM
 V/// \param[out] Vt, Vp = (theta,phi)-components of spatial vector : double arrays.
@@ -47,7 +48,9 @@ S/// \param[out] Vt = theta-component of spatial vector : double array.
 T/// \param[out] Vp = phi-component of spatial vector : double array.  
   #endif
   #ifdef SHT_VAR_LTR
-/// \param[in] ltr = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are ignored. 
+/// \param[in] llim = specify maximum degree of spherical harmonic. llim must be at most LMAX, and all spherical harmonic degree higher than llim are ignored. 
+  #else
+/// \param[in] llim MUST be shtns->lmax.
   #endif
 
   #ifdef SHT_3COMP
@@ -59,20 +62,20 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
 
-3	void GEN3(SHqst_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG) {
-QX	void GEN3(SH_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr SUPARG) {
+3	void GEN3(SHqst_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	void GEN3(SH_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	void GEN3(SHsphtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG) {
+VX	void GEN3(SHsphtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #else
 	#ifndef SHT_AXISYM
-S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp SUPARG) {
-T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp SUPARG) {
+S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
+T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
 	#else
-S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt SUPARG) {
-T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp SUPARG) {
+S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, long int llim) {
+T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp, long int llim) {
 	#endif
   #endif
-	
+
 Q	v2d *BrF;
   #ifndef SHT_AXISYM
 V	v2d *BtF, *BpF;
@@ -95,12 +98,12 @@ T	#define BP0(i) ((double *)BpF)[i]
   #endif
 Q	double *yl;
 V	double *dyl0;
-	long int llim, imlim, imlim_dct;
+	long int imlim, imlim_dct;
 	long int k,im,m,l;
   #ifdef _GCC_VEC_
-Q	v2d Ql0[(LTR+3)>>1];		// we need some zero-padding.
-S	v2d Sl0[(LTR+2)>>1];
-T	v2d Tl0[(LTR+2)>>1];
+Q	v2d Ql0[(llim+3)>>1];		// we need some zero-padding.
+S	v2d Sl0[(llim+2)>>1];
+T	v2d Tl0[(llim+2)>>1];
   #endif
 
   #ifndef SHT_AXISYM
@@ -120,14 +123,7 @@ S	BtF = (v2d*) Vt;
 T	BpF = (v2d*) Vp;
   #endif
 
-	llim = LTR;		// copy LTR to a local variable for faster access (inner loop limit)
 	imlim = MTR;
-	#ifndef SHT_NO_DCT
-		imlim_dct = MTR_DCT;
-		#ifdef SHT_VAR_LTR
-			if (imlim_dct*MRES > llim) imlim_dct = llim/MRES;
-		#endif
-	#endif
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > llim) imlim = llim/MRES;
 	#endif
@@ -151,7 +147,11 @@ T		Tl[l-1] = 0.0;
 	}
   #endif
   #ifndef SHT_NO_DCT
-	if (MTR_DCT >= 0) {	// dct for m=0.
+	imlim_dct = MTR_DCT;
+	if (imlim_dct >= 0) {	// dct for m=0.
+	#ifdef SHT_VAR_LTR
+		if (imlim_dct*MRES > llim) imlim_dct = llim/MRES;
+	#endif
 	#ifndef _GCC_VEC_
 Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
@@ -229,8 +229,8 @@ T				*((v2d*)(((double*)BpF)+k+2*j)) = p[j];
 	#endif
 			k+=2*NWAY;
 		#ifdef SHT_VAR_LTR
-Q			yl  += ((LMAX>>1) - (LTR>>1))*2;
-V			dyl0 += (((LMAX+1)>>1) - ((LTR+1)>>1))*2;
+Q			yl  += ((LMAX>>1) - (llim>>1))*2;
+V			dyl0 += (((LMAX+1)>>1) - ((llim+1)>>1))*2;
 		#endif
 V			l = k-1;
 Q		} while (k<=llim);
@@ -381,8 +381,8 @@ TB			BP0(NLAT-NWAY-k+j) = vlo_to_dbl(p[j]) - vhi_to_dbl(p[j]);
 		#endif
 	#endif
 		#ifdef SHT_VAR_LTR
-Q			yl  += ((LMAX>>1) - (LTR>>1))*2;
-V			dyl0 += (((LMAX+1)>>1) - ((LTR+1)>>1))*2;
+Q			yl  += ((LMAX>>1) - (llim>>1))*2;
+V			dyl0 += (((LMAX+1)>>1) - ((llim+1)>>1))*2;
 		#endif
 		} while (k < NLAT_2);
   #ifndef SHT_NO_DCT
@@ -437,8 +437,8 @@ V			BpF[k] = addi(pe, dpe);		BpF[k+1] = addi(po, dpo);
 V			l = (k < m) ? m : k+(m&1);
 			k+=2;
 		#ifdef SHT_VAR_LTR
-Q			yl+= (LMAX-LTR);
-V			dyl+= (LMAX-LTR);
+Q			yl+= (LMAX-llim);
+V			dyl+= (LMAX-llim);
 		#endif
 Q			l = (k < m) ? m : k-(m&1);
 V		} while (k<=llim+1-(m&1));
@@ -519,8 +519,8 @@ Q			BrF[k] = re + ro;
 QB			BrF[NLAT-1-k] = re - ro;
 			k++;
 		#ifdef SHT_VAR_LTR
-Q			yl  += (LMAX-LTR);
-V			dyl += (LMAX-LTR);
+Q			yl  += (LMAX-llim);
+V			dyl += (LMAX-llim);
 		#endif
 		} while (k < NLAT_2);
 		im++;

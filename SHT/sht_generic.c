@@ -31,18 +31,9 @@
 #endif
 #ifndef SUPARG
   #define SUPARG
-  #define PF2 pf2
-  #define PF3 pf3
-  #define PF4 pf4
-  #define PF6 pf6
-#else
-  #define PF2 pf2l
-  #define PF3 pf3l
-  #define PF4 pf4l
-  #define PF6 pf6l
 #endif
 #ifndef SUPARG2
-  #define SUPARG2
+  #define SUPARG2 , shtns->lmax
 #endif
 
 /// \name scalar transforms
@@ -63,6 +54,8 @@
 #undef ID_NME
 #undef SHT_NO_DCT
 
+// fly are compiled only once, with SHT_VAR_LTR
+#ifdef SHT_VAR_LTR
 #define NWAY 1
 #include "spat_to_SHst_fly.c"
 #include "SHst_to_spat_fly.c"
@@ -91,31 +84,32 @@
 #include "spat_to_SH_fly.c"
 #include "SH_to_spat_fly.c"
 #undef NWAY
+#endif
 
 /// Backward \b Scalar Spherical Harmonic Transform (synthesis).
 void GEN(SH_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr SUPARG)
 {
-	((PF2) shtns->fptr[IVAR][SHT_TYP_SSY])(shtns, Qlm, Vr SUPARG2);
+	((pf2l) shtns->fptr[IVAR][SHT_TYP_SSY])(shtns, Qlm, Vr SUPARG2);
 	return;
 }
 
 void GEN(spat_to_SH,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm SUPARG)
 {
-	((PF2) shtns->fptr[IVAR][SHT_TYP_SAN])(shtns, Vr, Qlm SUPARG2);
+	((pf2l) shtns->fptr[IVAR][SHT_TYP_SAN])(shtns, Vr, Qlm SUPARG2);
 	return;
 }
 
 /// Backward \b Vector Spherical Harmonic Transform (synthesis).
 void GEN(SHsphtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
-	((PF4) shtns->fptr[IVAR][SHT_TYP_VSY])(shtns, Slm, Tlm, Vt, Vp SUPARG2);
+	((pf4l) shtns->fptr[IVAR][SHT_TYP_VSY])(shtns, Slm, Tlm, Vt, Vp SUPARG2);
 	return;
 }
 
 /// \b Vector Spherical Harmonics Transform (analysis) : convert a spatial vector field (theta,phi components) to its spheroidal/toroidal spherical harmonic representation.
 void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
 {
-	((PF4) shtns->fptr[IVAR][SHT_TYP_VAN])(shtns, Vt, Vp, Slm, Tlm SUPARG2);
+	((pf4l) shtns->fptr[IVAR][SHT_TYP_VAN])(shtns, Vt, Vp, Slm, Tlm SUPARG2);
 	return;
 }
 
@@ -130,6 +124,8 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 #include "SHt_to_spat.c"
 #undef ID_NME
 
+// fly are compiled only once, with SHT_VAR_LTR
+#ifdef SHT_VAR_LTR
 #define NWAY 1
 #include "SHs_to_spat_fly.c"
 #include "SHt_to_spat_fly.c"
@@ -146,6 +142,7 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 #include "SHs_to_spat_fly.c"
 #include "SHt_to_spat_fly.c"
 #undef NWAY
+#endif
 
 #undef SHT_GRAD
 
@@ -153,28 +150,28 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 /// Spheroidal only synthesis.
 void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp SUPARG)
 {
-	((PF3) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt, Vp SUPARG2);
+	((pf3l) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt, Vp SUPARG2);
 	return;
 }
 
 /// Toroidal only synthesis.
 void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp SUPARG)
 {
-	((PF3) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, Vt, Vp SUPARG2);
+	((pf3l) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, Vt, Vp SUPARG2);
 	return;
 }
 #else
 /// Spheroidal m=0 only synthesis (results in theta component only).
 void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt SUPARG)
 {
-	((PF2) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt SUPARG2);
+	((pf2l) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt SUPARG2);
 	return;
 }
 
 /// Toroidal m=0 only synthesis (results in phi component only).
 void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp SUPARG)
 {
-	((PF2) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, Vp SUPARG2);
+	((pf2l) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, Vp SUPARG2);
 	return;
 }
 #endif
@@ -201,6 +198,8 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 #include "SHqst_to_spat.c"
 #undef ID_NME
 
+// fly are compiled only once, with SHT_VAR_LTR
+#ifdef SHT_VAR_LTR
 #define NWAY 1
 #include "spat_to_SHqst_fly.c"
 #include "SHqst_to_spat_fly.c"
@@ -213,51 +212,54 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 #include "spat_to_SHqst_fly.c"
 #include "SHqst_to_spat_fly.c"
 #undef NWAY
+#endif
 #undef SHT_3COMP
 
 // combining vector and scalar.
 void GEN(SHqst_to_spat_2,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
-	GEN(SH_to_spat,SUFFIX)(shtns, Qlm, Vr SUPARG2);
-	GEN(SHsphtor_to_spat,SUFFIX)(shtns, Slm, Tlm, Vt, Vp SUPARG2);
+	((pf2l) shtns->fptr[IVAR][SHT_TYP_SSY])(shtns, Qlm, Vr SUPARG2);
+	((pf4l) shtns->fptr[IVAR][SHT_TYP_VSY])(shtns, Slm, Tlm, Vt, Vp SUPARG2);
 }
 void GEN(spat_to_SHqst_2,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
 {
-	GEN(spat_to_SH,SUFFIX)(shtns, Vr, Qlm SUPARG2);
-	GEN(spat_to_SHsphtor,SUFFIX)(shtns, Vt, Vp, Slm, Tlm SUPARG2);
+	((pf2l) shtns->fptr[IVAR][SHT_TYP_SAN])(shtns, Vr, Qlm SUPARG2);
+	((pf4l) shtns->fptr[IVAR][SHT_TYP_VAN])(shtns, Vt, Vp, Slm, Tlm SUPARG2);
 }
 
 void GEN(spat_to_SHqst,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
 {
-	((PF6) shtns->fptr[IVAR][SHT_TYP_3AN])(shtns, Vr, Vt, Vp, Qlm, Slm, Tlm SUPARG2);
+	((pf6l) shtns->fptr[IVAR][SHT_TYP_3AN])(shtns, Vr, Vt, Vp, Qlm, Slm, Tlm SUPARG2);
 	return;
 }
 
 void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
-	((PF6) shtns->fptr[IVAR][SHT_TYP_3SY])(shtns, Qlm, Slm, Tlm, Vr, Vt, Vp SUPARG2);
+	((pf6l) shtns->fptr[IVAR][SHT_TYP_3SY])(shtns, Qlm, Slm, Tlm, Vr, Vt, Vp SUPARG2);
 	return;
 }
 
 /* FUNCTION POINTER ARRAY */
-void* GEN(sht_array, SUFFIX)[SHT_NTYP][SHT_NALG] = {
-		{ GEN(SH_to_spat_hyb, SUFFIX), NULL, NULL, GEN(SH_to_spat_fly2, SUFFIX),
-		  GEN(SH_to_spat_fly3, SUFFIX), GEN(SH_to_spat_fly4, SUFFIX), GEN(SH_to_spat_fly6, SUFFIX), GEN(SH_to_spat_fly8, SUFFIX) },
-		{ GEN(spat_to_SH_hyb, SUFFIX), NULL, NULL, GEN(spat_to_SH_fly2, SUFFIX),
-		  GEN(spat_to_SH_fly3, SUFFIX), GEN(spat_to_SH_fly4, SUFFIX), GEN(spat_to_SH_fly6, SUFFIX), GEN(spat_to_SH_fly8, SUFFIX) },
-		{ GEN(SHsphtor_to_spat_hyb, SUFFIX), NULL, GEN(SHsphtor_to_spat_fly1, SUFFIX), GEN(SHsphtor_to_spat_fly2, SUFFIX),
-		  GEN(SHsphtor_to_spat_fly3, SUFFIX), NULL, NULL, NULL },
-		{ GEN(spat_to_SHsphtor_hyb, SUFFIX), NULL, GEN(spat_to_SHsphtor_fly1, SUFFIX), GEN(spat_to_SHsphtor_fly2, SUFFIX),
-		  GEN(spat_to_SHsphtor_fly3, SUFFIX), NULL, NULL, NULL },
-		{ GEN(SHsph_to_spat_hyb, SUFFIX), NULL, GEN(SHsph_to_spat_fly1, SUFFIX), GEN(SHsph_to_spat_fly2, SUFFIX),
-		  GEN(SHsph_to_spat_fly3, SUFFIX), GEN(SHsph_to_spat_fly4, SUFFIX), NULL, NULL },
-		{ GEN(SHtor_to_spat_hyb, SUFFIX), NULL, GEN(SHtor_to_spat_fly1, SUFFIX), GEN(SHtor_to_spat_fly2, SUFFIX),
-		  GEN(SHtor_to_spat_fly3, SUFFIX), GEN(SHtor_to_spat_fly4, SUFFIX), NULL, NULL },
-		{ GEN(SHqst_to_spat_hyb, SUFFIX), GEN(SHqst_to_spat_2, SUFFIX), GEN(SHqst_to_spat_fly1, SUFFIX),
-		  GEN(SHqst_to_spat_fly2, SUFFIX), GEN(SHqst_to_spat_fly3, SUFFIX), NULL, NULL, NULL },
-		{ GEN(spat_to_SHqst_hyb, SUFFIX), GEN(spat_to_SHqst_2, SUFFIX), GEN(spat_to_SHqst_fly1, SUFFIX),
-		  GEN(spat_to_SHqst_fly2, SUFFIX), GEN(spat_to_SHqst_fly3, SUFFIX), NULL, NULL, NULL }
+void* GEN(sht_array, SUFFIX)[SHT_NALG][SHT_NTYP] = {
+/* hyb */	{ GEN(SH_to_spat_hyb, SUFFIX), GEN(spat_to_SH_hyb, SUFFIX), GEN(SHsphtor_to_spat_hyb, SUFFIX), GEN(spat_to_SHsphtor_hyb, SUFFIX), 
+				GEN(SHsph_to_spat_hyb, SUFFIX), GEN(SHtor_to_spat_hyb, SUFFIX), GEN(SHqst_to_spat_hyb, SUFFIX), GEN(spat_to_SHqst_hyb, SUFFIX) },
+/* s+v */	{ NULL, NULL, NULL, NULL, NULL, NULL, GEN(SHqst_to_spat_2, SUFFIX), GEN(spat_to_SHqst_2, SUFFIX) },
+#ifdef SHT_VAR_LTR
+/* fly1 */	{ NULL, NULL, GEN(SHsphtor_to_spat_fly1, SUFFIX), GEN(spat_to_SHsphtor_fly1, SUFFIX), 
+				GEN(SHsph_to_spat_fly1, SUFFIX), GEN(SHtor_to_spat_fly1, SUFFIX), GEN(SHqst_to_spat_fly1, SUFFIX), GEN(spat_to_SHqst_fly1, SUFFIX) },
+/* fly2 */	{ GEN(SH_to_spat_fly2, SUFFIX), GEN(spat_to_SH_fly2, SUFFIX), GEN(SHsphtor_to_spat_fly2, SUFFIX), GEN(spat_to_SHsphtor_fly2, SUFFIX), 
+				GEN(SHsph_to_spat_fly2, SUFFIX), GEN(SHtor_to_spat_fly2, SUFFIX), GEN(SHqst_to_spat_fly2, SUFFIX), GEN(spat_to_SHqst_fly2, SUFFIX) },
+/* fly3 */	{ GEN(SH_to_spat_fly3, SUFFIX), GEN(spat_to_SH_fly3, SUFFIX), GEN(SHsphtor_to_spat_fly3, SUFFIX), GEN(spat_to_SHsphtor_fly3, SUFFIX), 
+				GEN(SHsph_to_spat_fly3, SUFFIX), GEN(SHtor_to_spat_fly3, SUFFIX), GEN(SHqst_to_spat_fly3, SUFFIX), GEN(spat_to_SHqst_fly3, SUFFIX) },
+/* fly4 */	{ GEN(SH_to_spat_fly4, SUFFIX), GEN(spat_to_SH_fly4, SUFFIX), NULL, NULL, 
+				GEN(SHsph_to_spat_fly4, SUFFIX), GEN(SHtor_to_spat_fly4, SUFFIX), NULL, NULL },
+/* fly6 */	{ GEN(SH_to_spat_fly6, SUFFIX), GEN(spat_to_SH_fly6, SUFFIX), NULL, NULL, 
+				NULL, NULL, NULL, NULL },
+/* fly8 */	{ GEN(SH_to_spat_fly8, SUFFIX), GEN(spat_to_SH_fly8, SUFFIX), NULL, NULL, 
+				NULL, NULL, NULL, NULL }
+#endif
 };
+
 
 //@}
 
@@ -351,8 +353,4 @@ void GENF(spat_to_qst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double
 #undef SUPARGF2
 #undef SHT_AXISYM
 #undef SHT_VAR_LTR
-#undef PF2
-#undef PF3
-#undef PF4
-#undef PF6
 #undef IVAR
