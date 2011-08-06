@@ -31,9 +31,6 @@
 
 #include "shtns.h"
 
-void Set_MTR_DCT(shtns_cfg, int m);		// these functions are not meant to be public but are useful here.
-int Get_MTR_DCT(shtns_cfg);				//
-
 shtns_cfg shtns;
 
 complex double *Slm, *Slm0, *Tlm, *Tlm0, *Qlm;	// spherical harmonics l,m space
@@ -475,7 +472,7 @@ int main(int argc, char *argv[])
 {
 	complex double t1, t2;
 	double t,tmax,n2;
-	int i,im,m,l,jj, m_opt;
+	int i,im,m,l,jj;
 	clock_t tcpu;
 	ticks tik0, tik1;
 	double e0,e1;
@@ -539,7 +536,6 @@ int main(int argc, char *argv[])
 		fclose(fw);
 	}
 
-	m_opt = Get_MTR_DCT(shtns);
 /*
 	t1 = 1.0+2.0*I;
 	t2 = 1.0-I;
@@ -635,28 +631,10 @@ int main(int argc, char *argv[])
 
 //	printf("** performing %d scalar SHT with NL evaluation\n", SHT_ITER);
 	printf("** performing %d scalar SHT\n", SHT_ITER);
-  if (m_opt >= 0) {
-	printf(":: OPTIMAL\n");
-	Set_MTR_DCT(shtns, m_opt);
-	test_SHT();
-	printf(":: FULL DCT\n");
-	Set_MTR_DCT(shtns, MMAX);
-	test_SHT();
-  }
-	printf(":: NO DCT\n");
-	Set_MTR_DCT(shtns, -1);
+	printf(":: STD\n");
 	test_SHT();
 
-  if (m_opt >= 0) {
-	printf(":: OPTIMAL with LTR\n");
-	Set_MTR_DCT(shtns, m_opt);
-	test_SHT_l(LMAX/2);
-	printf(":: FULL DCT with LTR\n");
-	Set_MTR_DCT(shtns, MMAX);
-	test_SHT_l(LMAX/2);
-  }
-	printf(":: NO DCT with LTR\n");
-	Set_MTR_DCT(shtns, -1);
+	printf(":: LTR\n");
 	test_SHT_l(LMAX/2);
 
 #define TEST_VECT_SHT
@@ -666,41 +644,14 @@ int main(int argc, char *argv[])
 //	for (i=0;i<NLM;i++) Slm0[i] = 0.0;	// zero out Slm.
 
 	printf("** performing %d vector SHT\n", SHT_ITER);
-  if (m_opt >= 0) {
-	printf(":: OPTIMAL\n");
-	Set_MTR_DCT(shtns, m_opt);
-	test_SHT_vect();
-	printf(":: FULL DCT\n");
-	Set_MTR_DCT(shtns, MMAX);
-	test_SHT_vect();
-  }
-	printf(":: NO DCT\n");
-	Set_MTR_DCT(shtns, -1);
+	printf(":: STD\n");
 	test_SHT_vect();
 
-  if (m_opt >= 0) {
-	printf(":: OPTIMAL with LTR\n");
-	Set_MTR_DCT(shtns, m_opt);
-	test_SHT_vect_l(LMAX/2);
-	printf(":: FULL DCT with LTR\n");
-	Set_MTR_DCT(shtns, MMAX);
-	test_SHT_vect_l(LMAX/2);
-  }
-	printf(":: NO DCT with LTR\n");
-	Set_MTR_DCT(shtns, -1);
+	printf(":: LTR\n");
 	test_SHT_vect_l(LMAX/2);
 	
 	printf("** performing %d 3D vector SHT (no DCT) \n", SHT_ITER);
-  if (m_opt >= 0) {
-	printf(":: OPTIMAL\n");
-	Set_MTR_DCT(shtns, m_opt);
-	test_SHT_vect3d();
-	printf(":: FULL DCT\n");
-	Set_MTR_DCT(shtns, MMAX);
-	test_SHT_vect3d();
-  }
-	printf(":: NO DCT\n");
-	Set_MTR_DCT(shtns, -1);
+	printf(":: STD\n");
 	test_SHT_vect3d();
 
 #endif

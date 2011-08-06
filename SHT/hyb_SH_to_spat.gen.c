@@ -147,7 +147,6 @@ T		Tl[l-1] = 0.0;
   #endif
   #ifndef SHT_NO_DCT
 	imlim_dct = MTR_DCT;
-	if (imlim_dct >= 0) {	// dct for m=0.
 	#ifdef SHT_VAR_LTR
 		if (imlim_dct*MRES > llim) imlim_dct = llim/MRES;
 	#endif
@@ -263,8 +262,7 @@ V		#endif
 V			k++;
 V		} while (k<NLAT_2);
     #endif
-	} else {
-  #endif
+  #else		// ifndef SHT_NO_DCT
 	#ifndef _GCC_VEC_
 Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
@@ -384,9 +382,7 @@ Q			yl  += ((LMAX>>1) - (llim>>1))*2;
 V			dyl0 += (((LMAX+1)>>1) - ((llim+1)>>1))*2;
 		#endif
 		} while (k < NLAT_2);
-  #ifndef SHT_NO_DCT
-	}
-  #endif
+  #endif		// ifndef SHT_NO_DCT
 
   #ifndef SHT_AXISYM
 	im=1;

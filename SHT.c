@@ -1361,7 +1361,7 @@ double SHT_error(shtns_cfg shtns)
 }
 
 
-char* sht_name[SHT_NALG] = {"hyb", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
+char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
 char* sht_var[SHT_NVAR] = {"std", "ltr"};
 char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
@@ -1582,8 +1582,8 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 				printf("\nm=%d  ",m);
 			#endif
 			Set_MTR_DCT(shtns, m);
-			t = get_time(shtns, *nlp, 2, "sdct", sht_array[SHT_HYB][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
-			t += get_time(shtns, nloop, 4, "vdct", sht_array[SHT_HYB][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+			t = get_time(shtns, *nlp, 2, "sdct", sht_array[SHT_DCT][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
+			t += get_time(shtns, nloop, 4, "vdct", sht_array[SHT_DCT][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
 			PRINT_DOT
 		}

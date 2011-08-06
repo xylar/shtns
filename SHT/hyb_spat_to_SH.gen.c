@@ -105,7 +105,6 @@ V	    fftw_execute_dft_r2c(shtns->fft,Vp, BpF);
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
   #ifndef SHT_NO_DCT
-	if (MTR_DCT >= 0) {
 	#ifndef SHT_AXISYM
 Q		#define BR0	((double *)reo)
 V		#define BT0	((double *)tpeo)
@@ -241,8 +240,7 @@ V			Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
   #endif
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
-	} else {
-  #endif
+  #else		// ifndef SHT_NO_DCT
 		i=0;
 QE		double r0 = 0.0;
 Q		zl = shtns->zlm[0];
@@ -355,9 +353,7 @@ V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
 			l++;
       #endif
 		}
-  #ifndef SHT_NO_DCT
-	}
-  #endif
+  #endif		// ifndef SHT_NO_DCT
   #ifndef SHT_AXISYM
 	for (im=1;im<=imlim;im++) {
 		i0 = shtns->tm[im];
