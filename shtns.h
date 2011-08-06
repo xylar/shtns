@@ -159,16 +159,16 @@ void SHqst_to_lat(shtns_cfg, complex double *Qlm, complex double *Slm, complex d
 
 /// \name Truncated transforms at given degree l
 //@{
-void spat_to_SH_l(shtns_cfg, double *Vr, complex double *Qlm, int LTR);
-void SH_to_spat_l(shtns_cfg, complex double *Qlm, double *Vr, int LTR);
+void spat_to_SH_l(shtns_cfg, double *Vr, complex double *Qlm, int ltr);
+void SH_to_spat_l(shtns_cfg, complex double *Qlm, double *Vr, int ltr);
 
-void SHsphtor_to_spat_l(shtns_cfg, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int LTR);
-void SHsph_to_spat_l(shtns_cfg, complex double *Slm, double *Vt, double *Vp, int LTR);
-void SHtor_to_spat_l(shtns_cfg, complex double *Tlm, double *Vt, double *Vp, int LTR);
-void spat_to_SHsphtor_l(shtns_cfg, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR);
+void SHsphtor_to_spat_l(shtns_cfg, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int ltr);
+void SHsph_to_spat_l(shtns_cfg, complex double *Slm, double *Vt, double *Vp, int ltr);
+void SHtor_to_spat_l(shtns_cfg, complex double *Tlm, double *Vt, double *Vp, int ltr);
+void spat_to_SHsphtor_l(shtns_cfg, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int ltr);
 
-void spat_to_SHqst_l(shtns_cfg, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, int LTR);
-void SHqst_to_spat_l(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, int LTR);
+void spat_to_SHqst_l(shtns_cfg, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, int ltr);
+void SHqst_to_spat_l(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, int ltr);
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_l(shtns, S,Gt,Gp,ltr) SHsph_to_spat_l(shtns, S, Gt, Gp, ltr)

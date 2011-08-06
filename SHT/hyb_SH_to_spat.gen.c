@@ -97,8 +97,8 @@ T	#define BP0(i) ((double *)BpF)[i]
   #endif
 Q	double *yl;
 V	double *dyl0;
-	long int imlim, imlim_dct;
-	long int k,im,m,l;
+	long int k,m,l;
+	long int im, imlim, imlim_dct;
   #ifdef _GCC_VEC_
 Q	v2d Ql0[(llim+3)>>1];		// we need some zero-padding.
 S	v2d Sl0[(llim+2)>>1];
@@ -109,7 +109,7 @@ T	v2d Tl0[(llim+2)>>1];
 Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
-		long int nspat = ((NPHI>>1) +1)*NLAT;
+		unsigned long nspat = ((NPHI>>1) +1)*NLAT;
 QX		BrF = fftw_malloc( nspat * sizeof(complex double) );
 VX		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
 VX		BpF = BtF + nspat;
@@ -124,7 +124,7 @@ T	BpF = (v2d*) Vp;
 
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
-		if (imlim*MRES > llim) imlim = llim/MRES;
+		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
 	im=0;	m=0;
   #ifdef _GCC_VEC_
@@ -148,7 +148,7 @@ T		Tl[l-1] = 0.0;
   #ifndef SHT_NO_DCT
 	imlim_dct = MTR_DCT;
 	#ifdef SHT_VAR_LTR
-		if (imlim_dct*MRES > llim) imlim_dct = llim/MRES;
+		if (MTR_DCT*MRES > (int) llim) imlim_dct = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
 	#ifndef _GCC_VEC_
 Q		double* Ql = (double*) Qlm;

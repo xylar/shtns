@@ -60,8 +60,8 @@ Q	#define BR0(i) ((double *)BrF)[i]
 S	#define BT0(i) ((double *)BtF)[i]
 T	#define BP0(i) ((double *)BpF)[i]
   #endif
-	long int imlim;
-	long int k,im,m,l;
+	long int k,m,l;
+	long int im, imlim;
 	double *al, *ct, *st;
 Q	double Ql0[llim+1];
 S	double Sl0[llim+1];
@@ -71,7 +71,7 @@ T	double Tl0[llim];
 Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
-		long int nspat = ((NPHI>>1) +1)*NLAT;
+		unsigned long nspat = ((NPHI>>1) +1)*NLAT;
 QX		BrF = fftw_malloc( nspat * sizeof(complex double) );
 VX		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
 VX		BpF = BtF + nspat;
@@ -196,7 +196,7 @@ T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
   #ifndef SHT_AXISYM
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
-		if (imlim*MRES > llim) imlim = llim/MRES;
+		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
 //	#undef NWAY
 //V	#define NWAY 1

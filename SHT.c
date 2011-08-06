@@ -44,6 +44,8 @@ void shtns_runerr(const char * error_text)
 	exit(1);
 }
 
+/* PUBLIC useful functions */
+
 /// returns the l=0, m=0 SH coefficient corresponding to a uniform value of 1.
 double sh00_1(shtns_cfg shtns) {
 	return shtns->Y00_1;
@@ -64,50 +66,6 @@ double shlm_e1(shtns_cfg shtns, int l, int m) {
 	return(x);
 }
 
-
-/*  LEGENDRE FUNCTIONS  */
-#include "sht_legendre.c"
-
-
-/// \internal return the smallest power of 2 larger than n.
-int next_power_of_2(int n)
-{
-	int f = 1;
-	if ( (n<=0) || (n>(1<<(sizeof(int)*8-2))) ) return 0;
-	while (f<n) f*=2;
-	return f;
-}
-
-/// \internal find the closest integer that is larger than n and that contains only factors up to fmax.
-/// fmax is 7 for optimal FFTW fourier transforms.
-/// return only even integers for n>fmax.
-int fft_int(int n, int fmax)
-{
-	int k,f;
-
-	if (n<=fmax) return n;
-	if (fmax<2) return 0;
-	if (fmax==2) return next_power_of_2(n);
-
-	n -= 2-(n&1);		// only even n
-	do {
-		n+=2;	f=2;
-		while ((2*f <= n) && ((n&f)==0)) f *= 2;		// no divisions for factor 2.
-		k=3;
-		while ((k<=fmax) &&  (k*f <= n)) {
-			while ((k*f <= n) && (n%(k*f)==0)) f *= k;
-			k+=2;
-		}
-	} while (f != n);
-
-	k = next_power_of_2(n);			// what is the closest power of 2 ?
-	if ((k-n)*33 < n) return k;		// rather choose power of 2 if not too far (3%)
-
-	return n;
-}
-
-
-
 /// \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
 /// \ingroup init
 int nlm_calc(int lmax, int mmax, int mres)
@@ -116,17 +74,10 @@ int nlm_calc(int lmax, int mmax, int mres)
 	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
 }
 
-/// \internal returns an aproximation of the memory usage in mega bytes.
-/// \ingroup init
-double sht_mem_size(int lmax, int mmax, int mres, int nlat)
-{
-	double s = 1./(1024*1024);
-	s *= (nlat+1) * sizeof(double) * nlm_calc(lmax, mmax, mres);
-  #ifndef SHT_SCALAR_ONLY
-	s *= 3.0;		// scalar + vector arrays.
-  #endif
-	return s;
-}
+
+/*  LEGENDRE FUNCTIONS  */
+#include "sht_legendre.c"
+
 
 /*
 	SHT FUNCTIONS
@@ -306,8 +257,106 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 
 
 /*
-	INITIALIZATION FUNCTIONS
+	INTERNAL INITIALIZATION FUNCTIONS
 */
+
+char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
+char* sht_var[SHT_NVAR] = {"std", "ltr"};
+char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
+int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
+
+extern void* sht_array[SHT_NALG][SHT_NTYP];
+extern void* sht_array_l[SHT_NALG][SHT_NTYP];
+
+// big array holding all sht functions, variants and algorithms
+void* sht_func[SHT_NVAR][SHT_NTYP][SHT_NALG];
+
+/// \internal use on-the-fly alogorithm (guess without measuring)
+void set_sht_fly(shtns_cfg shtns)
+{
+  #define SET_SHT_FUNC(ivar) \
+	shtns->fptr[ivar][SHT_TYP_SSY] = sht_func[ivar][SHT_TYP_SSY][SHT_FLY2]; \
+	shtns->fptr[ivar][SHT_TYP_GSP] = sht_func[ivar][SHT_TYP_GSP][SHT_FLY2]; \
+	shtns->fptr[ivar][SHT_TYP_GTO] = sht_func[ivar][SHT_TYP_GTO][SHT_FLY2]; \
+	shtns->fptr[ivar][SHT_TYP_VSY] = sht_func[ivar][SHT_TYP_VSY][SHT_FLY2];	\
+	shtns->fptr[ivar][SHT_TYP_3SY] = sht_func[ivar][SHT_TYP_3SY][SHT_FLY2]; \
+	if (shtns->wg != NULL) { \
+		shtns->fptr[ivar][SHT_TYP_SAN] = sht_func[ivar][SHT_TYP_SAN][SHT_FLY4]; \
+		shtns->fptr[ivar][SHT_TYP_VAN] = sht_func[ivar][SHT_TYP_VAN][SHT_FLY2]; \
+		shtns->fptr[ivar][SHT_TYP_3AN] = sht_func[ivar][SHT_TYP_3AN][SHT_FLY2]; \
+	}
+
+	SET_SHT_FUNC(SHT_STD)
+	SET_SHT_FUNC(SHT_LTR)
+  #undef SET_SHT_FUNC
+}
+
+/// \internal set hyb alogorithm and copy all algos to sht_func array (should be called by shtns_create).
+void set_sht_default(shtns_cfg shtns)
+{
+	for (int it=0; it<SHT_NTYP; it++) {
+		for (int j=0; j<SHT_FLY1; j++) {	// copy variants to global array.
+			sht_func[SHT_STD][it][j] = sht_array[j][it];
+			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
+		}
+		for (int j=SHT_FLY1; j<SHT_NALG; j++) {	// on-the-fly only exist in LTR version
+			sht_func[SHT_STD][it][j] = sht_array_l[j][it];
+			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
+		}
+		for (int v=0; v<SHT_NVAR; v++)
+			shtns->fptr[v][it] = sht_func[v][it][SHT_MEM];
+	}
+}
+
+/// \internal return the smallest power of 2 larger than n.
+int next_power_of_2(int n)
+{
+	int f = 1;
+	if ( (n<=0) || (n>(1<<(sizeof(int)*8-2))) ) return 0;
+	while (f<n) f*=2;
+	return f;
+}
+
+/// \internal find the closest integer that is larger than n and that contains only factors up to fmax.
+/// fmax is 7 for optimal FFTW fourier transforms.
+/// return only even integers for n>fmax.
+int fft_int(int n, int fmax)
+{
+	int k,f;
+
+	if (n<=fmax) return n;
+	if (fmax<2) return 0;
+	if (fmax==2) return next_power_of_2(n);
+
+	n -= 2-(n&1);		// only even n
+	do {
+		n+=2;	f=2;
+		while ((2*f <= n) && ((n&f)==0)) f *= 2;		// no divisions for factor 2.
+		k=3;
+		while ((k<=fmax) &&  (k*f <= n)) {
+			while ((k*f <= n) && (n%(k*f)==0)) f *= k;
+			k+=2;
+		}
+	} while (f != n);
+
+	k = next_power_of_2(n);			// what is the closest power of 2 ?
+	if ((k-n)*33 < n) return k;		// rather choose power of 2 if not too far (3%)
+
+	return n;
+}
+
+
+/// \internal returns an aproximation of the memory usage in mega bytes.
+/// \ingroup init
+double sht_mem_size(int lmax, int mmax, int mres, int nlat)
+{
+	double s = 1./(1024*1024);
+	s *= (nlat+1) * sizeof(double) * nlm_calc(lmax, mmax, mres);
+  #ifndef SHT_SCALAR_ONLY
+	s *= 3.0;		// scalar + vector arrays.
+  #endif
+	return s;
+}
 
 /// \internal allocate arrays for SHT related to a given grid.
 void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
@@ -397,28 +446,6 @@ int free_unused_array(shtns_cfg shtns, void* p)
 	}
 	if (i == 0)  free(p);
 	return i;
-}
-
-/// \internal Generates an equi-spaced theta grid including the poles, for synthesis only.
-void EqualPolarGrid(shtns_cfg shtns)
-{
-	int j;
-	double f;
-
-	shtns->grid = SHT_GRID_POLES;
-#if SHT_VERBOSE > 0
-	printf("        => using Equaly Spaced Nodes including poles\n");
-#endif
-// cos theta of latidunal points (equaly spaced in theta)
-	f = M_PI/(NLAT-1.0);
-	for (j=0; j<NLAT; j++) {
-		shtns->ct[j] = cos(f*j);
-		shtns->st[j] = sin(f*j);
-		shtns->st_1[j] = 1.0/(shtns->st[j]);
-	}
-#if SHT_VERBOSE > 0
-	printf("     !! Warning : only synthesis (inverse transform) supported for this grid !\n");
-#endif
 }
 
 
@@ -1289,6 +1316,31 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 }
 #endif
 
+/// \internal Generates an equi-spaced theta grid including the poles, for synthesis only.
+void EqualPolarGrid(shtns_cfg shtns)
+{
+	int j;
+	double f;
+
+	shtns->grid = SHT_GRID_POLES;
+#if SHT_VERBOSE > 0
+	printf("        => using Equaly Spaced Nodes including poles\n");
+#endif
+// cos theta of latidunal points (equaly spaced in theta)
+	f = M_PI/(NLAT-1.0);
+	for (j=0; j<NLAT; j++) {
+		shtns->ct[j] = cos(f*j);
+		shtns->st[j] = sin(f*j);
+		shtns->st_1[j] = 1.0/(shtns->st[j]);
+	}
+#if SHT_VERBOSE > 0
+	printf("     !! Warning : only synthesis (inverse transform) supported for this grid !\n");
+#endif
+}
+
+
+/* TEST AND TIMING FUNCTIONS */
+
 /// \internal return the max error for a back-and-forth SHT transform.
 /// this function is used to internally measure the accuracy.
 double SHT_error(shtns_cfg shtns)
@@ -1358,55 +1410,6 @@ double SHT_error(shtns_cfg shtns)
 
 	fftw_free(Th);  fftw_free(Sh);  fftw_free(Tlm);  fftw_free(Slm);  fftw_free(Slm0);  fftw_free(Tlm0);
 	return(err);		// return max error.
-}
-
-
-char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
-char* sht_var[SHT_NVAR] = {"std", "ltr"};
-char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
-int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
-
-extern void* sht_array[SHT_NALG][SHT_NTYP];
-extern void* sht_array_l[SHT_NALG][SHT_NTYP];
-
-// big array holding all sht functions, variants and algorithms
-void* sht_func[SHT_NVAR][SHT_NTYP][SHT_NALG];
-
-/// \internal use on-the-fly alogorithm (guess without measuring)
-void set_sht_fly(shtns_cfg shtns)
-{
-  #define SET_SHT_FUNC(ivar) \
-	shtns->fptr[ivar][SHT_TYP_SSY] = sht_func[ivar][SHT_TYP_SSY][SHT_FLY2]; \
-	shtns->fptr[ivar][SHT_TYP_GSP] = sht_func[ivar][SHT_TYP_GSP][SHT_FLY2]; \
-	shtns->fptr[ivar][SHT_TYP_GTO] = sht_func[ivar][SHT_TYP_GTO][SHT_FLY2]; \
-	shtns->fptr[ivar][SHT_TYP_VSY] = sht_func[ivar][SHT_TYP_VSY][SHT_FLY2];	\
-	shtns->fptr[ivar][SHT_TYP_3SY] = sht_func[ivar][SHT_TYP_3SY][SHT_FLY2]; \
-	if (shtns->wg != NULL) { \
-		shtns->fptr[ivar][SHT_TYP_SAN] = sht_func[ivar][SHT_TYP_SAN][SHT_FLY4]; \
-		shtns->fptr[ivar][SHT_TYP_VAN] = sht_func[ivar][SHT_TYP_VAN][SHT_FLY2]; \
-		shtns->fptr[ivar][SHT_TYP_3AN] = sht_func[ivar][SHT_TYP_3AN][SHT_FLY2]; \
-	}
-
-	SET_SHT_FUNC(SHT_STD)
-	SET_SHT_FUNC(SHT_LTR)
-  #undef SET_SHT_FUNC
-}
-
-/// \internal set hyb alogorithm and copy all algos to sht_func array (should be called by shtns_create).
-void set_sht_default(shtns_cfg shtns)
-{
-	for (int it=0; it<SHT_NTYP; it++) {
-		for (int j=0; j<SHT_FLY1; j++) {	// copy variants to global array.
-			sht_func[SHT_STD][it][j] = sht_array[j][it];
-			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
-		}
-		for (int j=SHT_FLY1; j<SHT_NALG; j++) {	// on-the-fly only exist in LTR version
-			sht_func[SHT_STD][it][j] = sht_array_l[j][it];
-			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
-		}
-		for (int v=0; v<SHT_NVAR; v++)
-			shtns->fptr[v][it] = sht_func[v][it][SHT_MEM];
-	}
 }
 
 
@@ -1529,7 +1532,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 		if (ityp == 2) nloop = (nloop+1)/2;		// scalar ar done.
 		t0 = 1e100;
 		i0 = 0;
-		if (MTR_DCT < 0)	i0 = SHT_MEM;		// skip hybrid.
+		if (MTR_DCT < 0)	i0 = SHT_MEM;		// skip dct.
 		if (on_the_fly == 1) i0 = SHT_SV;		// only on-the-fly (SV is then also on-the-fly)
 		alg_end = SHT_NALG;
 		if ((ityp&1) && (analys == 0)) alg_end = SHT_FLY1;		// no on-the-fly analysis for regular grid.
@@ -1571,7 +1574,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 	if (dct > 0) {		// find the best DCT timings...
         minc = MMAX/20 + 1;             // don't test every single m.
 	#if SHT_VERBOSE > 1
-		printf("\nfinding best dct synthesis ...");
+		printf("finding best dct synthesis ...");
 	#endif
 		m = -1;		i = -1;		// reference = no dct.
 			t0 = get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
@@ -1579,7 +1582,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 			tnodct = t0;
 		for (m=0; m<=MMAX; m+=minc) {
 			#if SHT_VERBOSE > 1
-				printf("\nm=%d  ",m);
+				printf("\n\tm=%d  ",m);
 			#endif
 			Set_MTR_DCT(shtns, m);
 			t = get_time(shtns, *nlp, 2, "sdct", sht_array[SHT_DCT][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
@@ -1646,6 +1649,8 @@ void shtns_print_cfg(shtns_cfg shtns)
 	printf("\n");
 }
 
+/* PUBLIC INITIALIZATION & DESTRUCTION */
+
 /** \addtogroup init Initialization functions.
 */
 //@{
@@ -1694,7 +1699,6 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
 		shtns->ct = NULL;	shtns->st = NULL;
 		shtns->nphi = 0;	shtns->nlat = 0;	shtns->nlat_2 = 0;		// public data
-		shtns->mtr_dct = -1;		// dct is switched off
 	}
 
 	// copy sizes.
@@ -1847,7 +1851,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if (nl_order < 0) {	shtns.lshift = -nl_order;	nl_order = 1; }		// linear with a shift in l.
 */
 	shtns->nlorder = nl_order;
-	shtns->mtr_dct = -1;
+	shtns->mtr_dct = -1;		// dct is switched off
 	layout = flags & 0xFFFF00;
 	flags = flags & 255;	// clear higher bits.
 
@@ -2067,6 +2071,8 @@ shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nl
 
 
 #ifdef SHT_F77_API
+
+/* FORTRAN API */
 
 /** \addtogroup fortapi Fortran API.
 * Call from fortran without the trailing '_'.

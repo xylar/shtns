@@ -566,8 +566,6 @@ int main(int argc, char *argv[])
 //	do_fft_tests();
 //	exit(0);
 
-	Set_MTR_DCT(shtns, MMAX);
-
   if (NLM < 10000) {
 // SH_to_spat
 	for (i=0;i<NLM;i++) {

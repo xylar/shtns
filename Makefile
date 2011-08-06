@@ -59,7 +59,7 @@ SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
 
 # objects :
 SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
-	$(cmd) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
+	$(cmd) -O2 -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
 	@echo "DONE SHT.o"
 
 sht_std.o : sht_std.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c

@@ -41,10 +41,10 @@
 
 /// \internal computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
 /// works with very large values of n (up to 2700).
-long double a_sint_pow_n(long double val, long double cost, int n)
+long double a_sint_pow_n(long double val, long double cost, long int n)
 {
 	long double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
-	int k = n >> 7;
+	long int k = n >> 7;
 	if (sizeof(s2) > 8) k = 0;		// enough accuracy, we do not bother.
 
 	if (n&1) val *= sqrt(s2);	// = sin(t)
@@ -67,7 +67,7 @@ long double a_sint_pow_n(long double val, long double cost, int n)
 double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, double x)
 {
 	double *al;
-	int i,m;
+	long int i,m;
 	long double ymm, ymmp1;
 
 	m = im*MRES;
@@ -107,7 +107,7 @@ done:
 void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double cost, double *yl)
 {
 	double *al;
-	int l,m;
+	long int l,m;
 	int rescale = 0;		// flag for rescale.
 	long double ymm, ymmp1, x;
 

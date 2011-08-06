@@ -47,9 +47,9 @@ Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 	double *al, *wg, *ct, *st;
 V	double *l_2;
-	long int imlim, m;
 	long int ni, k;
-	long int i,i0, im,l;
+	long int i,i0, m,l;
+	long int imlim, im;
   #if _GCC_VEC_
 Q	s2d qq[2*llim];
 V	s2d ss[2*llim];
@@ -82,10 +82,10 @@ V	double per[NLAT_2+2*NWAY] SSE;
 V	double por[NLAT_2+2*NWAY] SSE;
   #endif
 
-	imlim = MTR;
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
+	imlim = MTR;
 	#ifdef SHT_VAR_LTR
-		if (imlim*MRES > llim) imlim = llim/MRES;
+		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
 Q	BrF = (complex double *) Vr;
 V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
@@ -93,7 +93,7 @@ V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 0) {
 	    if (SHT_FFT > 1) {		// alloc memory for the FFT
-	    	long int nspat = ((NPHI>>1) +1)*NLAT;
+	    	unsigned long nspat = ((NPHI>>1) +1)*NLAT;
 QX			BrF = fftw_malloc( nspat * sizeof(complex double) );
 VX			BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
 VX			BpF = BtF + nspat;
@@ -205,7 +205,7 @@ V					tt[l] -= dy1[j] * perk[j];
 		#else
 			k+=NWAY;
 		#endif
-		} while (k < NLAT_2);
+		} while (k < ni);
 		for (l=1; l<=llim; l++) {
 			#if _GCC_VEC_
 Q				Qlm[l] = vlo_to_dbl(qq[l]) + vhi_to_dbl(qq[l]);
@@ -378,7 +378,7 @@ V				for (int j=0; j<NWAY; j++)	t[1] -= DY1 * peik[j]  + Y1 * tork[j];
 		#else
 			k+=NWAY;
 		#endif
-		} while (k < NLAT_2);
+		} while (k < ni);
 		#undef Y0
 		#undef Y1
 V		#undef DY0
@@ -495,7 +495,7 @@ V					t[1] -= DY1 * peik[j]  + Y1 * tork[j];
 		#else
 			k+=NWAY;
 		#endif
-		} while (k < NLAT_2);
+		} while (k < ni);
 		#undef Y0
 		#undef Y1
 V		#undef DY0

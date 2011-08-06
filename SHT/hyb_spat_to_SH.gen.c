@@ -48,8 +48,8 @@ V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	double *zl;
 V	double *dzl0;
 V	struct DtDp *dzl;
-	long int ni, imlim;
-	long int i,i0, im,l;
+	long int i,i0, ni,l;
+	long int im, imlim;
 Q	complex double q0,q1;
 V	complex double s0,t0,s1,t1;
   #ifndef SHT_AXISYM
@@ -82,7 +82,7 @@ VB	#define po0(i)	tpeo0[4*(i)+3]
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
-		if (imlim*MRES > llim) imlim = llim/MRES;
+		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
 Q		BrF = (complex double *) Vr;
 V		BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
@@ -90,7 +90,7 @@ V		BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
   #ifndef SHT_AXISYM
 	if (SHT_FFT > 0) {
 	    if (SHT_FFT > 1) {		// alloc memory for the FFT
-	    	long int nspat = ((NPHI>>1) +1)*NLAT;
+	    	unsigned long nspat = ((NPHI>>1) +1)*NLAT;
 QX	    	BrF = fftw_malloc( nspat * sizeof(complex double) );
 VX	    	BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
 VX	    	BpF = BtF + nspat;
