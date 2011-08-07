@@ -22,6 +22,7 @@
 
 /// \internal \file sht_private.h private data used by sht transform functions.
 
+#include <stdlib.h>
 #include <complex.h>
 #include <math.h>
 // FFTW la derivee d/dx = ik	(pas de moins !)
@@ -42,11 +43,6 @@ enum sht_algos { SHT_DCT, SHT_MEM, SHT_SV, SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY
 
 // sht grids
 enum sht_grids { SHT_GRID_NONE, SHT_GRID_GAUSS, SHT_GRID_REG, SHT_GRID_POLES };
-
-
-struct DtDp {		// theta and phi derivatives stored together.
-	double t, p;
-};
 
 // pointer to various function types
 typedef void (*pf2l)(shtns_cfg, void*, void*, long int);
@@ -181,6 +177,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vdup(x) (x)
 	#define addi(a,b) ((a) + I*(b))
 #endif
+
+#define VSIZE (sizeof(s2d)/sizeof(double))
+
+struct DtDp {		// theta and phi derivatives stored together.
+	double t, p;
+};
 
 #define GLUE2(a,b) a##b
 #define GLUE3(a,b,c) a##b##c

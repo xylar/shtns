@@ -26,8 +26,6 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
-
 // global variables definitions
 #include "sht_private.h"
 
@@ -362,7 +360,6 @@ double sht_mem_size(int lmax, int mmax, int mres, int nlat)
 void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
 {
 	long int im,m, l0;
-	long int lstride;
 
 	l0 = ((NLAT+1)>>1)*2;		// round up to even
 	shtns->ct = (double *) VMALLOC( sizeof(double) * l0*3 );			/// ct[] (including st and st_1)
@@ -377,23 +374,26 @@ void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
   #endif
 
 // Allocate legendre functions lookup tables.
-	lstride = (LMAX+1);		lstride += (lstride&1);		// even stride.
-	shtns->ylm[0] = (double *) VMALLOC(sizeof(double)* (NLM-(LMAX+1)+lstride)*NLAT_2);		/// ylm[][]
+	long int nit = NLAT_2 + (NLAT_2 & 1);	// even (for sse2)
+	shtns->ylm[0] = (double *) VMALLOC(sizeof(double)* ((NLM-(LMAX+1))*NLAT_2 + (LMAX+1)*nit) );		/// ylm[][]
+	if (MMAX>0) shtns->ylm[1] = shtns->ylm[0] + nit*(LMAX+1);
   #ifndef SHT_SCALAR_ONLY
-	shtns->dylm[0] = (struct DtDp *) VMALLOC(sizeof(struct DtDp)* NLM*NLAT_2);				/// dylm[][]
+	shtns->dylm[0] = (struct DtDp *) VMALLOC(sizeof(struct DtDp)* ((NLM-(LMAX+1))*NLAT_2 + (LMAX)*nit/2) );		/// dylm[][]
+	if (MMAX>0) shtns->dylm[1] = shtns->dylm[0] + (nit/2)*(LMAX);		// phi-derivative is zero for m=0
   #endif
 	shtns->zlm[0] = (double *) VMALLOC(sizeof(double)* (NLM*NLAT_2 + (NLAT_2 & 1)));		/// zlm[][]
+	if (MMAX>0) shtns->zlm[1] = shtns->zlm[0] + NLAT_2*(LMAX+1) + (NLAT_2&1);
   #ifndef SHT_SCALAR_ONLY
 	shtns->dzlm[0] = (struct DtDp *) VMALLOC(sizeof(struct DtDp)* (NLM-1)*NLAT_2);		// remove l=0
+	if (MMAX>0) shtns->dzlm[1] = shtns->dzlm[0] + NLAT_2*(LMAX);
   #endif
-	for (im=0; im<MMAX; im++) {
-		m = im*MRES;	l0 = (m==0) ? 1 : m;
-		if (im>0) lstride = (LMAX+1 -m);
-		shtns->ylm[im+1] = shtns->ylm[im] + NLAT_2*lstride;
-		shtns->zlm[im+1] = shtns->zlm[im] + NLAT_2*(LMAX+1 -m) + ((m==0)*(NLAT_2&1));
+	for (im=1; im<MMAX; im++) {
+		m=im*MRES;
+		shtns->ylm[im+1] = shtns->ylm[im] + NLAT_2*(LMAX+1-m);
+		shtns->zlm[im+1] = shtns->zlm[im] + NLAT_2*(LMAX+1-m);
   #ifndef SHT_SCALAR_ONLY
-		shtns->dylm[im+1] = shtns->dylm[im] + NLAT_2*(LMAX+1 -m);
-		shtns->dzlm[im+1] = shtns->dzlm[im] + NLAT_2*(LMAX+1 -l0);
+		shtns->dylm[im+1] = shtns->dylm[im] + NLAT_2*(LMAX+1-m);
+		shtns->dzlm[im+1] = shtns->dzlm[im] + NLAT_2*(LMAX+1-m);
   #endif
 	}
 #if SHT_VERBOSE > 1
@@ -688,16 +688,15 @@ void OptimizeMatrices(shtns_cfg shtns, double eps)
 	double **ylm, **zlm;
 	struct DtDp** dylm;
 	struct DtDp** dzlm;
-	double *yg;
 	int im,m,l,it;
 
 	tm = shtns->tm;
 	ylm = shtns->ylm;		dylm = shtns->dylm;
 	zlm = shtns->zlm;		dzlm = shtns->dzlm;
 	
+	for (im=0;im<=MMAX;im++)	tm[im] = 0;
 /// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
 	if (eps > 0.0) {
-		tm[0] = 0;
 		for (im=1;im<=MMAX;im++) {
 			m = im*MRES;
 			tm[im] = NLAT_2;
@@ -749,22 +748,13 @@ void OptimizeMatrices(shtns_cfg shtns, double eps)
 			}
 		  }
 		}
-	} else {
-		for (im=0;im<=MMAX;im++)	tm[im] = 0;
 	}
 
 #ifndef SHT_SCALAR_ONLY
-/// Compression of dylm and dzlm for m=0, as .p is 0
-	im=0;	m=0;
-	yg = (double *) dylm[im];
-	long int lstride = LMAX + (LMAX & 1);	// we need an even stride here, for SSE2 alignement.
-	for (it=0; it<NLAT_2; it++) {
-		for (l=1; l<=LMAX; l++)		// start at l=1, as l=0 is null.
-			yg[it*lstride + (l-1)] = dylm[im][it*(LMAX+1) + l].t;
-		if (LMAX & 1) yg[it*lstride + LMAX] = 0.0;	// add some zero here for vectorization.
-	}
+/// Compression of dzlm for m=0, as .p is 0
 	if (dzlm[0] != NULL) {		// for sht_reg_poles there is no dzlm defined.
-		yg = (double *) dzlm[im];
+		im=0;	m=0;
+		double* yg = (double *) dzlm[im];
 		for (l=1; l<LMAX; l+=2) {		// l=0 is zero, so we start at l=1.
 			for (it=0; it<NLAT_2; it++) {
 				yg[(l-1)*NLAT_2 + it*2] = dzlm[im][(l-1)*NLAT_2 + it*2].t;	// l
@@ -780,33 +770,51 @@ void OptimizeMatrices(shtns_cfg shtns, double eps)
 #endif
 }
 
+// how to access the ylm matrix for im=0
+#define YL0(it, l)  ( shtns->ylm[0][ ((it)&(-VSIZE))*(LMAX+1) + (l)*VSIZE + ((it)&(VSIZE-1)) ] )
+#define DYL0(it, l) ( ((double*)(shtns->dylm[0]))[ ((it)&(-VSIZE))*LMAX + ((l)-1)*VSIZE + ((it)&(VSIZE-1)) ] )
+
+#define YLM(it, l, im) ( (im==0) ? YL0(it,l) : shtns->ylm[im][(it)*(LMAX-(im)*MRES+1) + ((l)-(im)*MRES)] )
+#define DTYLM(it, l, im) ( (im==0) ? ( (l==0) ? 0.0 : DYL0(it,l) ) : shtns->dylm[im][(it)*(LMAX-(im)*MRES+1) + ((l)-(im)*MRES)].t )
+#define DPYLM(it, l, im) ( (im==0) ? 0.0 : shtns->dylm[im][(it)*(LMAX-(im)*MRES+1) + ((l)-(im)*MRES)].p )
+
 /// \internal Precompute the matrix for SH synthesis.
 void init_SH_synth(shtns_cfg shtns)
 {
-	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
+	double *yl, *dyl;		// temp storage for derivative for legendre function values.
 	long int it,im,m,l;
-	long int lstride;
 	double *ct = shtns->ct;
 	double *st = shtns->st;
-	double **ylm = shtns->ylm;
-	struct DtDp** dylm = shtns->dylm;
 
-	for (im=0; im<=MMAX; im++) {
-		m = im*MRES;
-		lstride = LMAX-m+1;
-		if (im==0) lstride += (lstride&1);		// even stride for m=0.
-		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], ylm[im] + it*lstride, dtylm);	// fixed im legendre functions lookup table.
-			for (l=m; l<=LMAX; l++) {
+	yl = (double*) malloc( 2*sizeof(double) *(LMAX+1) );
+	dyl = yl + (LMAX+1);
+
+	{	im=0;	m=0;
+		long int nit = NLAT_2 + (NLAT_2&1);
+		for (it=0; it<nit; it++) {
+			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
+			for (l=0; l<=LMAX; l++)   YL0(it, l) = yl[l];
   #ifndef SHT_SCALAR_ONLY
-				dylm[im][it*(LMAX-m+1) + (l-m)].t = dtylm[l-m];
-				dylm[im][it*(LMAX-m+1) + (l-m)].p = ylm[im][it*lstride + (l-m)] *m;	// 1/sint(t) dYlm/dphi
+			for (l=1; l<=LMAX; l++)	 DYL0(it, l) = dyl[l];// DYL0(it, l) = dyl[l];
   #endif
-				if (m>0) ylm[im][it*lstride + (l-m)] *= st[it];
-			}
-			if ((im==0) && ((LMAX&1) == 0)) ylm[im][it*lstride + LMAX+1] = 0.0;	// add one zero for padding.
 		}
 	}
+	for (im=1; im<=MMAX; im++) {
+		double *ylm = shtns->ylm[im];
+		struct DtDp* dylm = shtns->dylm[im];
+		m = im*MRES;
+		for (it=0; it<NLAT_2; it++) {
+			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
+			for (l=m; l<=LMAX; l++) {
+				ylm[it*(LMAX-m+1) + (l-m)] = yl[l-m] * st[it];
+  #ifndef SHT_SCALAR_ONLY
+				dylm[it*(LMAX-m+1) + (l-m)].t = dyl[l-m];
+				dylm[it*(LMAX-m+1) + (l-m)].p = yl[l-m] *m;	// 1/sint(t) dYlm/dphi
+  #endif
+			}
+		}
+	}
+	free(yl);
 }
 
 
@@ -867,15 +875,11 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 
 // for analysis (decomposition, direct transform) : transpose and multiply by gauss weight and other normalizations.
 // interleave l and l+1 : this stores data in the way it will be read.
-	double **ylm = shtns->ylm;
 	double **zlm = shtns->zlm;
-	struct DtDp** dylm = shtns->dylm;
 	struct DtDp** dzlm = shtns->dzlm;
 	for (im=0; im<=MMAX; im++) {
 		m = im*MRES;
 		long int talign = 0;
-		long int lstride = LMAX-m+1;
-		if (im==0) lstride += (lstride&1);		// even stride for m=0.
 
 		for (it=0;it<NLAT_2;it++) {
 			double nz0, nz1, norm;
@@ -884,7 +888,7 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 			nz0 = norm;		nz1 = norm;
 			long int l0 = m;
 			if (m==0) {
-				zlm[im][it] = ylm[im][it*lstride] * norm;
+				zlm[im][it] = YL0(it, 0) * norm;
 				// les derivees sont nulles pour l=0
 				l0++;
 				talign = (NLAT_2&1);
@@ -893,22 +897,22 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 				if (SHT_NORM == sht_schmidt) {
 					nz0 = norm*(2*l+1);		nz1 = norm*(2*l+3);
 				}
-				zlm[im][(l-m)*NLAT_2 + it*2 +talign]    =  ylm[im][it*lstride + (l-m)]   * nz0;
-				zlm[im][(l-m)*NLAT_2 + it*2 +1 +talign] =  ylm[im][it*lstride + (l+1-m)] * nz1;
+				zlm[im][(l-m)*NLAT_2 + it*2 +talign]    =  YLM(it, l, im) * nz0;
+				zlm[im][(l-m)*NLAT_2 + it*2 +1 +talign] =  YLM(it, l+1, im) * nz1;
   #ifndef SHT_SCALAR_ONLY
-				dzlm[im][(l-l0)*NLAT_2 + it*2].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
-				dzlm[im][(l-l0)*NLAT_2 + it*2].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
-				dzlm[im][(l-l0)*NLAT_2 + it*2+1].t = dylm[im][it*(LMAX-m+1) + (l+1-m)].t * nz1 /((l+1)*(l+2));
-				dzlm[im][(l-l0)*NLAT_2 + it*2+1].p = dylm[im][it*(LMAX-m+1) + (l+1-m)].p * nz1 /((l+1)*(l+2));
+				dzlm[im][(l-l0)*NLAT_2 + it*2].t = DTYLM(it, l, im) * nz0 /(l*(l+1));
+				dzlm[im][(l-l0)*NLAT_2 + it*2].p = DPYLM(it, l, im) * nz0 /(l*(l+1));
+				dzlm[im][(l-l0)*NLAT_2 + it*2+1].t = DTYLM(it, l+1, im)  * nz1 /((l+1)*(l+2));
+				dzlm[im][(l-l0)*NLAT_2 + it*2+1].p = DPYLM(it, l+1, im) * nz1 /((l+1)*(l+2));
   #endif
 			}
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
 				if (SHT_NORM == sht_schmidt)
 					nz0 = norm*(2*l+1);
-				zlm[im][(l-m)*NLAT_2 + it +talign]    =  ylm[im][it*lstride + (l-m)]   * nz0;
+				zlm[im][(l-m)*NLAT_2 + it +talign]    =  YLM(it, l, im)   * nz0;
   #ifndef SHT_SCALAR_ONLY
-				dzlm[im][(l-l0)*NLAT_2 + it].t = dylm[im][it*(LMAX-m+1) + (l-m)].t * nz0 /(l*(l+1));
-				dzlm[im][(l-l0)*NLAT_2 + it].p = dylm[im][it*(LMAX-m+1) + (l-m)].p * nz0 /(l*(l+1));
+				dzlm[im][(l-l0)*NLAT_2 + it].t = DTYLM(it, l, im) * nz0 /(l*(l+1));
+				dzlm[im][(l-l0)*NLAT_2 + it].p = DPYLM(it, l, im) * nz0 /(l*(l+1));
   #endif
 			}
 		}
@@ -1064,12 +1068,7 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	init_SH_synth(shtns);
 
 	for (im=0; im<=MMAX; im++) {
-		double* yl = shtns->ylm[im];
-		struct DtDp* dyl = shtns->dylm[im];
 		m = im*MRES;
-		long int lstride = LMAX-m+1;
-		if (im==0) lstride += (lstride&1);		// even stride for m=0.
-
 	// go to DCT space
 		for (it=0;it<=KMAX;it+=2) {
 			for(l=m; l<=LMAX; l++) {
@@ -1081,18 +1080,18 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 		for (l=m; l<=LMAX; l++) {
 			if (m & 1) {	// m odd
 				for (it=0; it<NLAT_2; it++) {
-					Z[it] = yl[it*lstride + (l-m)] * st[it];	// P[l+1](x)	*st
+					Z[it] = YLM(it, l, im) * st[it];	// P[l+1](x)	*st
 #ifndef SHT_SCALAR_ONLY
-					dZt[it] = dyl[it*(LMAX-m+1) + (l-m)].t;	// P[l](x)	*1
-					dZp[it] = dyl[it*(LMAX-m+1) + (l-m)].p;		// P[l-1](x)	*1
+					dZt[it] = DTYLM(it, l, im);	// P[l](x)	*1
+					dZp[it] = DPYLM(it, l, im);		// P[l-1](x)	*1
 #endif
 				}
 			} else {	// m even
 				for (it=0; it<NLAT_2; it++) {
-					Z[it] = yl[it*lstride + (l-m)];		// P[l](x)	*1
+					Z[it] = YLM(it, l, im);				// P[l](x)	*1
 #ifndef SHT_SCALAR_ONLY
-					dZt[it] = dyl[it*(LMAX-m+1) + (l-m)].t *st[it];	// P[l+1](x)	*st
-					dZp[it] = yl[it*lstride + (l-m)] * m;	// P[l](x)	*st
+					dZt[it] = DTYLM(it, l, im) *st[it];	// P[l+1](x)	*st
+					dZp[it] = YLM(it, l, im) * m;	// P[l](x)	*st
 #endif
 				}
 			}
@@ -1435,9 +1434,7 @@ double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, vo
 	int i;
 	ticks tik0, tik1;
 
-#if SHT_VERBOSE > 1
-	if (fptr == NULL) shtns_runerr("[get_time] attempt to call NULL function");
-#endif
+	if (fptr == NULL) return(0.0);
 
 	tik1 = getticks();
 	for (i=0; i<nloop; i++) {
@@ -1576,10 +1573,12 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 	#if SHT_VERBOSE > 1
 		printf("finding best dct synthesis ...");
 	#endif
-		m = -1;		i = -1;		// reference = no dct.
+		m = -1;		i = -1;		t0 = 0.0;		// reference = no dct.
+		if (sht_array[SHT_DCT][SHT_TYP_SSY] != NULL)
 			t0 = get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
+		if (sht_array[SHT_DCT][SHT_TYP_VSY] != NULL)
 			t0 += get_time(shtns, nloop, 4, "v", shtns->fptr[SHT_STD][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-			tnodct = t0;
+		tnodct = t0;
 		for (m=0; m<=MMAX; m+=minc) {
 			#if SHT_VERBOSE > 1
 				printf("\n\tm=%d  ",m);
