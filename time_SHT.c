@@ -300,6 +300,41 @@ int test_SHT_vect()
 	return (int) tcpu;
 }
 
+int test_SHT_vect3d_l(int ltr)
+{
+	int jj,i;
+	clock_t tcpu;
+	double ts, ta;
+	
+	complex double *Q2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	
+	for (i=0;i<NLM;i++) {
+		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
+	}
+
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		SHqst_to_spat_l(shtns, Qlm,Slm,Tlm,NL,Sh,Th, ltr);
+	}
+	tcpu = clock() - tcpu;
+	ts = tcpu / (1000.*SHT_ITER);
+	tcpu = clock();
+		spat_to_SHqst_l(shtns, NL,Sh,Th,Qlm,Slm,Tlm, ltr);
+	for (jj=1; jj< SHT_ITER; jj++) {
+		spat_to_SHqst_l(shtns, NL,Sh,Th,Q2,S2,T2, ltr);
+	}
+	tcpu = clock() - tcpu;
+	ta = tcpu / (1000.*SHT_ITER);
+	printf("   3D vector SHT time : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
+
+	fftw_free(T2);	fftw_free(S2);	fftw_free(Q2);
+	vect_error(Slm, Tlm, Slm0, Tlm0, ltr);
+	scal_error(Qlm, Tlm0, ltr);
+	return (int) tcpu;
+}
+
 int test_SHT_vect3d()
 {
 	int jj,i;
@@ -631,7 +666,6 @@ int main(int argc, char *argv[])
 	printf("** performing %d scalar SHT\n", SHT_ITER);
 	printf(":: STD\n");
 	test_SHT();
-
 	printf(":: LTR\n");
 	test_SHT_l(LMAX/2);
 
@@ -644,13 +678,14 @@ int main(int argc, char *argv[])
 	printf("** performing %d vector SHT\n", SHT_ITER);
 	printf(":: STD\n");
 	test_SHT_vect();
-
 	printf(":: LTR\n");
 	test_SHT_vect_l(LMAX/2);
 	
 	printf("** performing %d 3D vector SHT (no DCT) \n", SHT_ITER);
 	printf(":: STD\n");
 	test_SHT_vect3d();
+	printf(":: LTR\n");
+	test_SHT_vect3d_l(LMAX/2);
 
 #endif
 

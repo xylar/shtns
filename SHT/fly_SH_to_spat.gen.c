@@ -514,8 +514,8 @@ Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
 		if (SHT_FFT > 1) {		// free memory
-Q			fftw_free(BrF);
-VX			fftw_free(BtF);		// this frees also BpF.
+Q			VFREE(BrF);
+VX			VFREE(BtF);		// this frees also BpF.
 		}
     } else {
 		k=1;	do {	// compress complex to real

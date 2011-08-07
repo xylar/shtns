@@ -69,10 +69,10 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *ct, *st;			///< cos(theta) and sin(theta) arrays (size nlat)
 /* END OF PUBLIC PART */
 
-	short sht_fft;				///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
-	short mtr_dct;				///< m truncation for dct. -1 means no dct at all.
-	unsigned short klim;		///< Limit to k for non-linear terms.
-	unsigned short nlorder;		///< order of non-linear terms to be resolved by SH transform.
+	short sht_fft;			///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
+	short mtr_dct;			///< m truncation for dct. -1 means no dct at all.
+	short nlorder;			///< order of non-linear terms to be resolved by SH transform.
+	unsigned short klim;	///< Limit to k for non-linear terms (dct)
 
 	unsigned short *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 	double *wg;					// Gauss weights for Gauss-Legendre quadrature.
@@ -185,3 +185,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 #define GLUE2(a,b) a##b
 #define GLUE3(a,b,c) a##b##c
 
+// how to allocate memory aligned on 16 bytes ? this works only if fftw was compiled with --enable-sse2...
+// in 64 bit system, malloc should be 16bytes aligned.
+#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
+#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )

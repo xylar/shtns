@@ -365,26 +365,26 @@ void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly)
 	long int lstride;
 
 	l0 = ((NLAT+1)>>1)*2;		// round up to even
-	shtns->ct = (double *) fftw_malloc( sizeof(double) * l0*3 );			/// ct[] (including st and st_1)
+	shtns->ct = (double *) VMALLOC( sizeof(double) * l0*3 );			/// ct[] (including st and st_1)
 	shtns->st = shtns->ct + l0;		shtns->st_1 = shtns->ct + 2*l0;
 
   if (on_the_fly == 0) {
-	shtns->ylm = (double **) fftw_malloc( sizeof(double *) * (MMAX+1)*3 );		/// ylm[] (including zlm and ykm_dct)
+	shtns->ylm = (double **) VMALLOC( sizeof(double *) * (MMAX+1)*3 );		/// ylm[] (including zlm and ykm_dct)
 	shtns->zlm = shtns->ylm + (MMAX+1);		shtns->ykm_dct = shtns->ylm + (MMAX+1)*2;
   #ifndef SHT_SCALAR_ONLY
-	shtns->dylm = (struct DtDp **) fftw_malloc( sizeof(struct DtDp *) * (MMAX+1)*3);		/// dylm[] (including dzlm and dykm_dct)
+	shtns->dylm = (struct DtDp **) VMALLOC( sizeof(struct DtDp *) * (MMAX+1)*3);		/// dylm[] (including dzlm and dykm_dct)
 	shtns->dzlm = shtns->dylm + (MMAX+1);		shtns->dykm_dct = shtns->dylm + (MMAX+1)*2;
   #endif
 
 // Allocate legendre functions lookup tables.
 	lstride = (LMAX+1);		lstride += (lstride&1);		// even stride.
-	shtns->ylm[0] = (double *) fftw_malloc(sizeof(double)* (NLM-(LMAX+1)+lstride)*NLAT_2);		/// ylm[][]
+	shtns->ylm[0] = (double *) VMALLOC(sizeof(double)* (NLM-(LMAX+1)+lstride)*NLAT_2);		/// ylm[][]
   #ifndef SHT_SCALAR_ONLY
-	shtns->dylm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* NLM*NLAT_2);				/// dylm[][]
+	shtns->dylm[0] = (struct DtDp *) VMALLOC(sizeof(struct DtDp)* NLM*NLAT_2);				/// dylm[][]
   #endif
-	shtns->zlm[0] = (double *) fftw_malloc(sizeof(double)* (NLM*NLAT_2 + (NLAT_2 & 1)));		/// zlm[][]
+	shtns->zlm[0] = (double *) VMALLOC(sizeof(double)* (NLM*NLAT_2 + (NLAT_2 & 1)));		/// zlm[][]
   #ifndef SHT_SCALAR_ONLY
-	shtns->dzlm[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* (NLM-1)*NLAT_2);		// remove l=0
+	shtns->dzlm[0] = (struct DtDp *) VMALLOC(sizeof(struct DtDp)* (NLM-1)*NLAT_2);		// remove l=0
   #endif
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;	l0 = (m==0) ? 1 : m;
@@ -410,21 +410,21 @@ void free_SHTarrays(shtns_cfg shtns)
 	shtns->fft = NULL;		shtns->ifft = NULL;		shtns->sht_fft = 0;
 
 	if (shtns->dylm != NULL) {
-		if (shtns->dzlm[0] != NULL) fftw_free(shtns->dzlm[0]);
+		if (shtns->dzlm[0] != NULL) VFREE(shtns->dzlm[0]);
 		shtns->dzlm[0] = NULL;
-		if (shtns->dylm != NULL) fftw_free(shtns->dylm[0]);
+		if (shtns->dylm != NULL) VFREE(shtns->dylm[0]);
 		shtns->dylm[0] = NULL;
-		fftw_free(shtns->dylm);		shtns->dylm = NULL;
+		VFREE(shtns->dylm);		shtns->dylm = NULL;
 	}
 	if (shtns->ylm != NULL) {
-		if (shtns->zlm[0] != NULL) fftw_free(shtns->zlm[0]);
+		if (shtns->zlm[0] != NULL) VFREE(shtns->zlm[0]);
 		shtns->zlm[0] = NULL;
-		if (shtns->ylm[0] != NULL) fftw_free(shtns->ylm[0]);
+		if (shtns->ylm[0] != NULL) VFREE(shtns->ylm[0]);
 		shtns->ylm[0] = NULL;
-		fftw_free(shtns->ylm);		shtns->ylm = NULL;
+		VFREE(shtns->ylm);		shtns->ylm = NULL;
 	}
 	if (shtns->ct != NULL) {
-		fftw_free(shtns->ct);		shtns->ct = NULL;
+		VFREE(shtns->ct);		shtns->ct = NULL;
 	}
 }
 
@@ -486,8 +486,8 @@ int planFFT(shtns_cfg shtns, int layout)
 #endif
 
 // Allocate dummy Spatial Fields.
-	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
-	Sh = (double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	ShF = (complex double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
+	Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
 	fft = NULL;		ifft = NULL;
 
 // IFFT : unnormalized.  FFT : must be normalized.
@@ -539,7 +539,7 @@ int planFFT(shtns_cfg shtns, int layout)
 	printf("\n");
 #endif
 
-	fftw_free(Sh);		fftw_free(ShF);
+	VFREE(Sh);		VFREE(ShF);
   } else {
 	if (theta_inc != 1) shtns_runerr("only contiguous spatial data is supported for Nphi=1");
 #if SHT_VERBOSE > 0
@@ -564,7 +564,7 @@ void planDCT(shtns_cfg shtns)
 	
 // real NPHI=1, allocate only once since it does not change.
 	if ((shtns->dct_r1 == NULL)||(shtns->idct_r1 == NULL)) {
-		Sh = (double *) fftw_malloc( NLAT * sizeof(double) );
+		Sh = (double *) VMALLOC( NLAT * sizeof(double) );
 		if (shtns->dct_r1 == NULL) {
 			r2r_kind = FFTW_REDFT10;
 			shtns->dct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
@@ -573,7 +573,7 @@ void planDCT(shtns_cfg shtns)
 			r2r_kind = FFTW_REDFT01;
 			shtns->idct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
 		}
-		fftw_free(Sh);
+		VFREE(Sh);
 		if ((shtns->dct_r1 == NULL)||(shtns->idct_r1 == NULL))
 			shtns_runerr("[FFTW] (i)dct_r1 planning failed !");
 #if SHT_VERBOSE > 2
@@ -585,7 +585,7 @@ void planDCT(shtns_cfg shtns)
 #ifndef SHT_AXISYM
 	if (shtns->idct != NULL) fftw_destroy_plan(shtns->idct);
 	// Allocate dummy Spatial Fields.
-	Sh = (double *) fftw_malloc((NPHI/2 +1) * NLAT*2 * sizeof(double));
+	Sh = (double *) VMALLOC((NPHI/2 +1) * NLAT*2 * sizeof(double));
 
 	dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
 	hdims[0].n = MTR_DCT+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
@@ -620,7 +620,7 @@ void planDCT(shtns_cfg shtns)
 #endif
 		}
 	}
-	fftw_free(Sh);
+	VFREE(Sh);
 #endif
 }
 #endif
@@ -920,14 +920,14 @@ void free_SH_dct(shtns_cfg shtns)
 {
 	if (shtns->zlm_dct0 == NULL) return;
 
-	if (shtns->dzlm_dct0 != NULL)	fftw_free(shtns->dzlm_dct0);
+	if (shtns->dzlm_dct0 != NULL)	VFREE(shtns->dzlm_dct0);
 	shtns->dzlm_dct0 = NULL;
-	if (shtns->zlm_dct0 != NULL)	fftw_free(shtns->zlm_dct0);
+	if (shtns->zlm_dct0 != NULL)	VFREE(shtns->zlm_dct0);
 	shtns->zlm_dct0 = NULL;
 
-	if ((shtns->dykm_dct != NULL)&&(shtns->dykm_dct[0] != NULL))	fftw_free(shtns->dykm_dct[0]);
+	if ((shtns->dykm_dct != NULL)&&(shtns->dykm_dct[0] != NULL))	VFREE(shtns->dykm_dct[0]);
 	shtns->dykm_dct[0] = NULL;
-	if ((shtns->ykm_dct != NULL)&&(shtns->ykm_dct[0] != NULL))	fftw_free(shtns->ykm_dct[0]);
+	if ((shtns->ykm_dct != NULL)&&(shtns->ykm_dct[0] != NULL))	VFREE(shtns->ykm_dct[0]);
 	shtns->ykm_dct[0] = NULL;
 
 	if (shtns->idct != NULL)	fftw_destroy_plan(shtns->idct);	// free unused dct plans
@@ -1015,13 +1015,13 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 #if SHT_VERBOSE > 1
 	printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
 #endif
-	shtns->ykm_dct[0] = (double *) fftw_malloc(sizeof(double)* sk);
+	shtns->ykm_dct[0] = (double *) VMALLOC(sizeof(double)* sk);
 #ifndef SHT_SCALAR_ONLY
-	shtns->dykm_dct[0] = (struct DtDp *) fftw_malloc(sizeof(struct DtDp)* dsk);
+	shtns->dykm_dct[0] = (struct DtDp *) VMALLOC(sizeof(struct DtDp)* dsk);
 #endif
-	shtns->zlm_dct0 = (double *) fftw_malloc( sizeof(double)* it );
+	shtns->zlm_dct0 = (double *) VMALLOC( sizeof(double)* it );
 #ifndef SHT_SCALAR_ONLY
-	shtns->dzlm_dct0 = (double *) fftw_malloc( sizeof(double)* im );
+	shtns->dzlm_dct0 = (double *) VMALLOC( sizeof(double)* im );
 #endif
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
@@ -1352,12 +1352,12 @@ double SHT_error(shtns_cfg shtns)
 	
 	srand( time(NULL) );	// init random numbers.
 	
-	Tlm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	Slm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	Sh = (double *) fftw_malloc( NSPAT_ALLOC(shtns) * sizeof(double) );
-	Th = (double *) fftw_malloc( NSPAT_ALLOC(shtns) * sizeof(double) );
+	Tlm0 = (complex double *) VMALLOC(sizeof(complex double)* NLM);
+	Slm0 = (complex double *) VMALLOC(sizeof(complex double)* NLM);
+	Slm = (complex double *) VMALLOC(sizeof(complex double)* NLM);
+	Tlm = (complex double *) VMALLOC(sizeof(complex double)* NLM);
+	Sh = (double *) VMALLOC( NSPAT_ALLOC(shtns) * sizeof(double) );
+	Th = (double *) VMALLOC( NSPAT_ALLOC(shtns) * sizeof(double) );
 
 // m = nphi/2 is also real if nphi is even.
 	nlm_cplx = ( MMAX*2 == NPHI ) ? LiM(shtns, MRES*MMAX,MMAX) : NLM;
@@ -1408,7 +1408,7 @@ double SHT_error(shtns_cfg shtns)
 #endif
 #endif
 
-	fftw_free(Th);  fftw_free(Sh);  fftw_free(Tlm);  fftw_free(Slm);  fftw_free(Slm0);  fftw_free(Tlm0);
+	VFREE(Th);  VFREE(Sh);  VFREE(Tlm);  VFREE(Slm);  VFREE(Slm0);  VFREE(Tlm0);
 	return(err);		// return max error.
 }
 
@@ -1489,8 +1489,8 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 	m = 2*(NPHI/2+1) * NLAT * sizeof(double);
 	i = sizeof(complex double)* NLM;
 	if (i>m) m=i;
-	Qh = (double *) fftw_malloc(m);		Sh = (double *) fftw_malloc(m);		Th = (double *) fftw_malloc(m);
-	Qlm = (complex double *) fftw_malloc(m);	Slm = (complex double *) fftw_malloc(m);	Tlm = (complex double *) fftw_malloc(m);
+	Qh = (double *) VMALLOC(m);		Sh = (double *) VMALLOC(m);		Th = (double *) VMALLOC(m);
+	Qlm = (complex double *) VMALLOC(m);	Slm = (complex double *) VMALLOC(m);	Tlm = (complex double *) VMALLOC(m);
 
 	for (i=0;i<NLM;i++) {
 		int l = shtns->li[i];
@@ -1599,7 +1599,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int on_the_fly)
 		printf("\n");
 	#endif
 done:
-	fftw_free(Tlm);	fftw_free(Slm);	fftw_free(Qlm);	fftw_free(Th);	fftw_free(Sh);	fftw_free(Qh);
+	VFREE(Tlm);	VFREE(Slm);	VFREE(Qlm);	VFREE(Th);	VFREE(Sh);	VFREE(Qh);
 	if (dct > 0) {
 		return(tdct/tnodct);
 	} else	return(0.0);
@@ -1988,9 +1988,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	{
 		MTR_DCT = -1;		// we do not use DCT !!!
 	  #ifndef SHT_SCALAR_ONLY
-		fftw_free(shtns->dzlm[0]);		shtns->dzlm[0] = NULL;
+		VFREE(shtns->dzlm[0]);		shtns->dzlm[0] = NULL;
 	  #endif
-		fftw_free(shtns->zlm[0]);		shtns->zlm[0] = NULL;		// no inverse transform, mark as unused.
+		VFREE(shtns->zlm[0]);		shtns->zlm[0] = NULL;		// no inverse transform, mark as unused.
 		EqualPolarGrid(shtns);
 		if (on_the_fly == 0) {
 			init_SH_synth(shtns);
@@ -2083,29 +2083,33 @@ shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nl
 /// Initializes spherical harmonic transforms of given size using Gauss algorithm and no approximation
 void shtns_init_sh_gauss_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_set_size(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
-	shtns_precompute(sht_gauss | *layout, 0, *nlat, *nphi);
+	shtns_reset();
+	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
+	shtns_set_grid(shtns, sht_gauss | *layout, 0, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transforms of given size using Fastest available algorithm and polar optimization.
 void shtns_init_sh_auto_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_set_size(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
-	shtns_precompute(sht_auto | *layout, 1.e-10, *nlat, *nphi);
+	shtns_reset();
+	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
+	shtns_set_grid(shtns, sht_auto | *layout, 1.e-10, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transforms of given size using a regular grid and agressive optimizations.
 void shtns_init_sh_reg_fast_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_set_size(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
-	shtns_precompute(sht_reg_fast | *layout, 1.e-6, *nlat, *nphi);
+	shtns_reset();
+	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
+	shtns_set_grid(shtns, sht_reg_fast | *layout, 1.e-6, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transform SYNTHESIS ONLY of given size using a regular grid including poles.
 void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_set_size(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
-	shtns_precompute(sht_reg_poles | *layout, 0, *nlat, *nphi);
+	shtns_reset();
+	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
+	shtns_set_grid(shtns, sht_reg_poles | *layout, 0, *nlat, *nphi);
 }
 
 /// Defines the size and convention of the transform.
@@ -2113,7 +2117,8 @@ void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nla
 /// \see shtns_set_size
 void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm)
 {
-	shtns_set_size(*lmax, *mmax, *mres, *norm);
+	shtns_reset();
+	shtns_create(*lmax, *mmax, *mres, *norm);
 }
 
 /// Precompute matrices for synthesis and analysis.
@@ -2121,13 +2126,18 @@ void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm)
 /// \see shtns_precompute
 void shtns_precompute_(int *type, int *layout, double *eps, int *nlat, int *nphi)
 {
-	shtns_precompute(*type | *layout, *eps, *nlat, *nphi);
+	shtns_set_grid(sht_data, *type | *layout, *eps, *nlat, *nphi);
 }
 
 /// Same as shtns_precompute_ but choose optimal nlat and/or nphi.
 void shtns_precompute_auto_(int *type, int *layout, double *eps, int *nl_order, int *nlat, int *nphi)
 {
-	shtns_precompute_auto(*type | *layout, *eps, *nl_order, nlat, nphi);
+	shtns_set_grid_auto(sht_data, *type | *layout, *eps, *nl_order, nlat, nphi);
+}
+
+/// Clear everything
+void shtns_reset_() {
+	shtns_reset();
 }
 
 /// returns nlm, the number of complex*16 elements in an SH array.
@@ -2141,15 +2151,14 @@ void shtns_calc_nlm_(int *nlm, int *lmax, int *mmax, int *mres)
 /// call from fortran using \code call shtns_lmidx(lm, l, m) \endcode
 void shtns_lmidx_(int *lm, int *l, int *m)
 {
-    *lm = LM(*l, *m) + 1;
+    *lm = LM(sht_data, *l, *m) + 1;
 }
 
 /// fills the given array with the cosine of the co-latitude angle (NLAT real*8)
 void shtns_cos_array_(double *costh)
 {
-	int i;	
-	for (i=0; i<shtns.nlat; i++)
-		costh[i] = ct[i];
+	for (int i=0; i<sht_data->nlat; i++)
+		costh[i] = sht_data->ct[i];
 }
 
 /** \name Point evaluation of Spherical Harmonics
@@ -2159,14 +2168,14 @@ Evaluate at a given point (\f$cos(\theta)\f$ and \f$\phi\f$) a spherical harmoni
 /// \see SH_to_point for argument description
 void shtns_sh_to_point_(double *spat, complex double *Qlm, double *cost, double *phi)
 {
-	*spat = SH_to_point(Qlm, *cost, *phi);
+	*spat = SH_to_point(sht_data, Qlm, *cost, *phi);
 }
 
 /// \see SHqst_to_point for argument description
 void shtns_qst_to_point_(double *vr, double *vt, double *vp,
 		complex double *Qlm, complex double *Slm, complex double *Tlm, double *cost, double *phi)
 {
-	SHqst_to_point(Qlm, Slm, Tlm, *cost, *phi, vr, vt, vp);
+	SHqst_to_point(sht_data, Qlm, Slm, Tlm, *cost, *phi, vr, vt, vp);
 }
 //@}
 

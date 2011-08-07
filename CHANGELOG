@@ -2,8 +2,8 @@ SHTns is a library for Spherical Harmonic Transform written in C, aimed at
 	numerical simulation (fluid flows, mhd, ...) in spherical geometries.
 
 v2.0  (? August 2011)
-	- allow multiple transforms with different sizes, normalizations and grids.
-	- changes to interface : most functions now require a handle to identify the transform.
+	- allow multiple transforms with different sizes, normalizations and grids (C interfcace only).
+	- changes to C interface : most functions now require a handle to identify the transform. (Fortran interface unchanged)
 	- lots of small improvements, speedups and a few bugfixes.
 	- requires FFTW v3.3.
 

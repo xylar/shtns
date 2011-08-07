@@ -539,8 +539,8 @@ V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	#endif
 
   	if (SHT_FFT > 1) {		// free memory
-Q	    fftw_free(BrF - NLAT*(imlim+1));
-VX	    fftw_free(BtF - NLAT*(imlim+1));	// this frees also BpF.
+Q	    VFREE(BrF - NLAT*(imlim+1));
+VX	    VFREE(BtF - NLAT*(imlim+1));	// this frees also BpF.
 	}
   #endif
 

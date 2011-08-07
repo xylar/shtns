@@ -110,10 +110,10 @@ Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
 	if (SHT_FFT > 1) {		// alloc memory for the FFT
 		unsigned long nspat = ((NPHI>>1) +1)*NLAT;
-QX		BrF = fftw_malloc( nspat * sizeof(complex double) );
-VX		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
+QX		BrF = VMALLOC( nspat * sizeof(complex double) );
+VX		BtF = VMALLOC( 2* nspat * sizeof(complex double) );
 VX		BpF = BtF + nspat;
-3		BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
+3		BrF = VMALLOC( 3* nspat * sizeof(complex double) );
 3		BtF = BrF + nspat;		BpF = BtF + nspat;
 	}
   #else
@@ -566,8 +566,8 @@ Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
 		if (SHT_FFT > 1) {		// free memory
-Q			fftw_free(BrF);
-VX			fftw_free(BtF);	// this frees also BpF.
+Q			VFREE(BrF);
+VX			VFREE(BtF);	// this frees also BpF.
 		}
     } else {
 		k=1;	do {	// compress complex to real

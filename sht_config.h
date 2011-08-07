@@ -29,7 +29,7 @@
 #define SHTNS_MAX_MEMORY 2048
 
 /// Compile the \ref fortapi
-//#define SHT_F77_API
+#define SHT_F77_API
 
 
 /// Minimum performance improve for DCT in \ref sht_auto mode. If not atained, we switch back to gauss.
