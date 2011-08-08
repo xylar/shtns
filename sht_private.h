@@ -178,8 +178,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define addi(a,b) ((a) + I*(b))
 #endif
 
-#define VSIZE (sizeof(s2d)/sizeof(double))
-
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
 };

@@ -58,7 +58,7 @@ VB	v2d tpeo[4*NLAT_2];	// theta and phi even and odd parts
 Q	#define reo0 ((double*)reo)
 V	#define tpeo0 ((double*)tpeo)
   #else
-QB	double reo0[2*NLAT_2] SSE;	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
+QB	double reo0[2*NLAT_2+2] SSE;	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 VB	double tpeo0[4*NLAT_2] SSE;	// theta and phi even and odd parts
   #endif
 
@@ -269,6 +269,7 @@ VB			pe0(i) = (e+f)*np;		po0(i) = (e-f)*np;
  B			i++;
  B		} while(i<ni);
   #endif
+QX		ro0(ni) = 0.0;		re0(ni) = 0.0;		// allow some overflow.
 Q		zl += ni + (ni&1);		// SSE alignement
 		l=1;			// l=0 is zero for the vector transform.
 Q		v2d* Ql = (v2d*) Qlm;		// virtual pointer for l=0 and im
@@ -305,16 +306,20 @@ QO			Ql[l+1] = q1;
 VE			Sl[l] = s0;		Tl[l+1] = t1;
 VO			Tl[l] = t0;		Sl[l+1] = s1;
   #else
-Q			v2d q = vdup(0.0);
-V			v2d s = vdup(0.0);		v2d t = vdup(0.0);
+V			s2d s = vdup(0.0);		s2d t = vdup(0.0);
+Q			s2d q = vdup(0.0);
+QX			s2d q1 = vdup(0.0);
 			do {
-Q				q += ((v2d*) zl)[0] * ((v2d*) reo0)[i];
-V				s += ((v2d*) dzl0)[0] * ((v2d*) tpeo0)[2*i];
-V				t -= ((v2d*) dzl0)[0] * ((v2d*) tpeo0)[2*i+1];
-Q				zl +=2;
-V				dzl0 +=2;
+V				s += ((s2d*) dzl0)[i] * ((s2d*) tpeo0)[2*i];
+V				t -= ((s2d*) dzl0)[i] * ((s2d*) tpeo0)[2*i+1];
+Q				q += ((s2d*) zl)[i] * ((s2d*) reo0)[i];
 				i++;
+QX				q1 += ((s2d*) zl)[i] * ((s2d*) reo0)[i];		// reduce dependency
+QX				i++;
 			} while(i < ni);
+QX			q += q1;
+Q			zl += 2*ni;
+V			dzl0 += 2*ni;
 Q			Ql[l] = vlo_to_cplx(q);		Ql[l+1] = vhi_to_cplx(q);
 V			Sl[l] = vlo_to_cplx(s);		Sl[l+1] = vhi_to_cplx(s);
 V			Tl[l] = vlo_to_cplx(t);		Tl[l+1] = vhi_to_cplx(t);

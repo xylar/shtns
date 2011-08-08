@@ -78,6 +78,7 @@ T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, 
 Q	v2d *BrF;
   #ifndef SHT_AXISYM
 V	v2d *BtF, *BpF;
+V	struct DtDp *dyl;
 Q	complex double re,ro;
 V	complex double te,to, pe,po;
 V	complex double dte,dto, dpe,dpo;
@@ -96,11 +97,9 @@ T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	long int k,m,l;
 	long int im, imlim, imlim_dct;
-QX	double QST0[(llim+1)];
-VX	double QST0[(llim*2)];
-3	double QST0[(llim*3+1)];
-  #ifndef SHT_NO_DCT
-Q	s2d Ql0[(llim+3)>>1];		// we need some zero-padding.
+  #ifdef _GCC_VEC_
+QX	s2d Ql0[(llim+4)>>1];		// we need some zero-padding.
+3	s2d Ql0[(llim+2)>>1];		// we need some zero-padding.
 S	s2d Sl0[(llim+2)>>1];
 T	s2d Tl0[(llim+2)>>1];
   #endif
@@ -127,27 +126,28 @@ T	BpF = (v2d*) Vp;
 		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
 	im=0;	m=0;
-  	{	// merge the m=0 coefficients into one stream (strip zero imaginary part).
-		double* QST = QST0;
-Q		*QST++ = (double) Qlm[0];		// l=0
+  #ifdef _GCC_VEC_
+  	{	// store the m=0 coefficients in an efficient & vectorizable way.
+Q		double* Ql = (double*) &Ql0;
+S		double* Sl = (double*) &Sl0;
+T		double* Tl = (double*) &Tl0;
+Q		Ql[0] = (double) Qlm[0];		// l=0
 		l=1;
-		do {
-Q			*QST++ = (double) Qlm[l];
-Q			*QST++ = (double) Qlm[l+1];
-T			*QST++ = (double) Tlm[l];
-S			*QST++ = (double) Slm[l];
-T			*QST++ = (double) Tlm[l+1];
-S			*QST++ = (double) Slm[l+1];
-			l+=2;
-		} while(l<llim);
-		if (l==llim) {
-Q			*QST++ = (double) Qlm[l];
-T			*QST++ = (double) Tlm[l];
-S			*QST++ = (double) Slm[l];
-		}
+		do {		// for m=0, compress the complex Q,S,T to double
+S			Sl[l-1] = (double) Slm[l];
+T			Tl[l-1] = (double) Tlm[l];
+Q			Ql[l] = (double) Qlm[l];
+			l++;
+		} while(l<=llim);		// l=llim+1
+QX		Ql[l] = 0.0;	Ql[l+1] = 0.0;		Ql[l+2] = 0.0;
+S		Sl[l-1] = 0.0;
+T		Tl[l-1] = 0.0;
+3		Sl[l] = 0.0;	Tl[l] = 0.0;	Ql[l] = 0.0;
 	}
+  #endif
   #ifndef SHT_NO_DCT
-	imlim_dct = MTR_DCT;
+	{
+		imlim_dct = MTR_DCT;
 	#ifdef SHT_VAR_LTR
 		if (MTR_DCT*MRES > (int) llim) imlim_dct = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
@@ -157,7 +157,7 @@ S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
 	#endif
 Q		double* yl = shtns->ykm_dct[im];
-V		double* dyl0 = (double*) shtns->dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
+V		double* dyl0 = (double *) shtns->dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
 V		l = 1;
 		do {
@@ -263,35 +263,47 @@ V		#endif
 V			k++;
 V		} while (k<NLAT_2);
     #endif
+	}
   #else		// ifndef SHT_NO_DCT
+	{
+	#ifndef _GCC_VEC_
+Q		double* Ql = (double*) Qlm;
+S		double* Sl = (double*) Slm;
+T		double* Tl = (double*) Tlm;
+	#endif
 		k=0;
-Q		s2d* yl  = (s2d *) shtns->ylm[0];
-V		s2d* dyl0 = (s2d *) shtns->dylm[0];	// only theta derivative (d/dphi = 0 for m=0)
+Q		s2d* yl  = (s2d*) shtns->ylm[im];
+V		s2d* dyl0 = (s2d*) shtns->dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
 		do {	// ops : NLAT_2 * [ (lmax-m+1) + 4]	: almost twice as fast.
-			double* QST = (double*) &QST0;
-Q			s2d re = yl[0] * vdup(*QST++);		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+	#ifndef _GCC_VEC_
+			l=1;
+Q			re = yl[0] * Ql[0];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
 Q			yl++;
-Q			s2d ro = vdup(0.0);
-S			s2d te = vdup(0.0);	s2d to = vdup(0.0);
-T			s2d pe = vdup(0.0);	s2d po = vdup(0.0);
-			for (long int l = llim-1; l>0; l-=2) {	// compute even and odd parts
-Q				ro += yl[0] * vdup(*QST++);
-QB				re += yl[1] * vdup(*QST++);
-T				pe -= dyl0[0] * vdup(*QST++);	// m=0 : everything is real.
-SB				te += dyl0[0] * vdup(*QST++);
-TB				po -= dyl0[1] * vdup(*QST++);
-S				to += dyl0[1] * vdup(*QST++);
+Q			ro = 0.0;
+S			te = 0.0;	to = 0.0;
+T			pe = 0.0;	po = 0.0;
+			while (l<llim) {	// compute even and odd parts
+Q				ro += yl[0] * Ql[2*l];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
+QB				re += yl[1] * Ql[2*l+2];	// ro += ylm[im][k*(LMAX-m+1) + (l+1-m)] * Qlm[LiM(l+1,im)];
+T				pe -= dyl0[0] * Tl[2*l];	// m=0 : everything is real.
+SB				te += dyl0[0] * Sl[2*l];
+TB				po -= dyl0[1] * Tl[2*l+2];
+S				to += dyl0[1] * Sl[2*l+2];
+				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
 			}
-			if (llim&1) {
-Q				ro += yl[0] * vdup(*QST++);
-TB				pe -= dyl0[0] * vdup(*QST++);
-S				te += dyl0[0] * vdup(*QST++);
-Q				yl++;
-V				dyl0++;
+			if (l==llim) {
+Q				ro += yl[0] * Ql[2*l];
+TB				pe -= dyl0[0] * Tl[2*l];
+S				te += dyl0[0] * Sl[2*l];
+V				dyl0+=2;
 			}
-	  #ifndef _GCC_VEC_
+Q			yl++;
+		#ifdef SHT_VAR_LTR
+Q			yl  += ((LMAX>>1) - (llim>>1))*2;
+V			dyl0 += (((LMAX+1)>>1) - ((llim+1)>>1))*2;
+		#endif
 Q			BR0(k) = re + ro;
 V		#ifndef SHT_AXISYM
 V			BT0(k) = 0.0;		BP0(k) = 0.0;		// required for partial tor or sph transform
@@ -304,34 +316,58 @@ VB			BT0(NLAT-1-k) = 0.0;		BP0(NLAT-1-k) = 0.0;		// required for partial tor or 
 VB		#endif
 SB			BT0(NLAT-1-k) = te - to;
 TB			BP0(NLAT-1-k) = pe - po;
-	  #else
-Q			BR0(k) = vlo_to_dbl(re + ro);
-Q			BR0(k+1) = vhi_to_dbl(re + ro);
+	#else
+			l=0;
+S			s2d t = vdup(0.0);
+T			s2d p = vdup(0.0);
+Q			s2d r = vdup(0.0);
+QX			s2d r1 = vdup(0.0);
+			do {
+S				t += dyl0[l] * Sl0[l];		// { te, to }
+T				p -= dyl0[l] * Tl0[l];		// { pe, po }
+Q				r += yl[l]   * Ql0[l];		// { re, ro }
+				l++;
+QX				r1 += yl[l]   * Ql0[l];	// reduce dependency
+QX				l++;
+Q			} while (2*l <= llim);
+VX			} while (2*l < llim);
+QX			r += r1;
+Q			yl  += (LMAX+2)>>1;
+V			dyl0 += (LMAX+1)>>1;
+		#if __SSE3__
+	/*	alternate code, which may be faster (slightly) on SSE3.	*/
+Q			r = addi(r,r);		// { re-ro , re+ro }
+S			t = addi(t,t);		// { te-to , te+to }
+T			p = addi(p,p);		// { pe-po , pe+po }
+Q			BR0(k) = vhi_to_dbl(r);
 V		#ifndef SHT_AXISYM
 V			BT0(k) = 0.0;		BP0(k) = 0.0;		// required for partial tor or sph transform
-V			BT0(k+1) = 0.0;		BP0(k+1) = 0.0;		// required for partial tor or sph transform
 V		#endif
-S			BT0(k) = vlo_to_dbl(te + to);			// Bt = dS/dt
-S			BT0(k+1) = vhi_to_dbl(te + to);			// Bt = dS/dt
-T			BP0(k) = vlo_to_dbl(pe + po);			// Bp = - dT/dt
-T			BP0(k+1) = vhi_to_dbl(pe + po);			// Bp = - dT/dt
-QB			BR0(NLAT-2-k) = vhi_to_dbl(re - ro);
-QB			BR0(NLAT-1-k) = vlo_to_dbl(re - ro);
+S			BT0(k) = vhi_to_dbl(t);	// Bt = dS/dt
+T			BP0(k) = vhi_to_dbl(p);	// Bp = - dT/dt
+QB			BR0(NLAT-1-k) = vlo_to_dbl(r);
 VB		#ifndef SHT_AXISYM
-VB			BT0(NLAT-2-k) = 0.0;		BP0(NLAT-2-k) = 0.0;		// required for partial tor or sph transform
 VB			BT0(NLAT-1-k) = 0.0;		BP0(NLAT-1-k) = 0.0;		// required for partial tor or sph transform
 VB		#endif
-SB			BT0(NLAT-2-k) = vhi_to_dbl(te - to);
-SB			BT0(NLAT-1-k) = vlo_to_dbl(te - to);
-TB			BP0(NLAT-2-k) = vhi_to_dbl(pe - po);
-TB			BP0(NLAT-1-k) = vlo_to_dbl(pe - po);
-	  #endif
-			k+=VSIZE;
-		#ifdef SHT_VAR_LTR
-Q			yl  += (LMAX - llim);
-V			dyl0 += (LMAX - llim);
+SB			BT0(NLAT-1-k) = vlo_to_dbl(t);
+TB			BP0(NLAT-1-k) = vlo_to_dbl(p);
+		#else
+Q			BR0(k) = vhi_to_dbl(r) + vlo_to_dbl(r);
+V		#ifndef SHT_AXISYM
+V			BT0(k) = 0.0;		BP0(k) = 0.0;		// required for partial tor or sph transform
+V		#endif
+S			BT0(k) = vhi_to_dbl(t) + vlo_to_dbl(t);	// Bt = dS/dt
+T			BP0(k) = vhi_to_dbl(p) + vlo_to_dbl(p);	// Bp = - dT/dt
+QB			BR0(NLAT-1-k) = vlo_to_dbl(r) - vhi_to_dbl(r);
+VB		#ifndef SHT_AXISYM
+VB			BT0(NLAT-1-k) = 0.0;		BP0(NLAT-1-k) = 0.0;		// required for partial tor or sph transform
+VB		#endif
+SB			BT0(NLAT-1-k) = vlo_to_dbl(t) - vhi_to_dbl(t);
+TB			BP0(NLAT-1-k) = vlo_to_dbl(p) - vhi_to_dbl(p);
 		#endif
-		} while (k < NLAT_2);
+	#endif
+		} while (++k < NLAT_2);
+	}
   #endif		// ifndef SHT_NO_DCT
 
   #ifndef SHT_AXISYM
@@ -345,8 +381,8 @@ V	BtF += NLAT;	BpF += NLAT;
 Q		v2d* Ql = (v2d*) &Qlm[l];		// virtual pointer for l=0 and im
 S		v2d* Sl = (v2d*) &Slm[l];
 T		v2d* Tl = (v2d*) &Tlm[l];
-Q		double *yl = shtns->ykm_dct[im];
-V		struct DtDp *dyl = shtns->dykm_dct[im];
+Q		double* yl = shtns->ykm_dct[im];
+V		dyl = shtns->dykm_dct[im];
 		k=0;	l=m;
 		do {
 Q			v2d re = vdup(0.0);		v2d ro = vdup(0.0);
@@ -420,8 +456,8 @@ V			BtF[k] = vdup(0.0);		BpF[k] = vdup(0.0);
 VB			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zeroes
 			k++;
 		}
-Q		double *yl  = shtns->ylm[im];
-V		struct DtDp *dyl = shtns->dylm[im];
+Q		double* yl  = shtns->ylm[im];
+V		dyl = shtns->dylm[im];
 		do {	// ops : NLAT_2 * [ (lmax-m+1)*2 + 4]	: almost twice as fast.
 			l=m;
 Q			v2d re = vdup(0.0); 	v2d ro = vdup(0.0);

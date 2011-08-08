@@ -370,7 +370,7 @@ double legendre_Pl(const int l, double x)
 /// \note Reference:  Numerical Recipes, Cornell press.
 void gauss_nodes(long double *x, long double *w, int n)
 {
-	long int i,l,m;
+	long int i,l,m, k;
 	long double z, z1, p1, p2, p3, pp;
 	long double eps;
 
@@ -382,7 +382,7 @@ void gauss_nodes(long double *x, long double *w, int n)
 
 	m = (n+1)/2;
 	for (i=1;i<=m;i++) {
-		int k=10;		// maximum Newton iteration count to prevent infinite loop.
+		k=10;		// maximum Newton iteration count to prevent infinite loop.
 		z = (1.0 - (n-1.)/(8.*n*n*n)) * cos(M_PI*(i-0.25)/(n+0.5));	// initial guess
 		do {
 			p1 = z;		// P_1
@@ -401,6 +401,7 @@ void gauss_nodes(long double *x, long double *w, int n)
 		x[n-i] = -z;
 		w[n-i] = w[i-1];
 	}
+	if (n&1) x[n/2] = 0.0;		// exactly zero.
 
 // as we started with initial guesses, we should check if the gauss points are actually unique.
 	for (i=m-1; i>0; i--) {
