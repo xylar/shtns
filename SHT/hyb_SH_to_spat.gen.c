@@ -55,9 +55,8 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
 
 // 3 components not possible with DCT acceleration.
 3	#define SHT_NO_DCT
-	#define NWAY 1
 
-// MTR_DCT : -1 => no dct
+// MTR_DCT : <0 => SHT_NO_DCT must be defined !!! mem only transform
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
 
@@ -156,8 +155,8 @@ Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
 	#endif
-Q		double* yl = shtns->ykm_dct[im];
-V		double* dyl0 = (double *) shtns->dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
+Q		s2d* yl = (s2d*) shtns->ykm_dct[im];
+V		s2d* dyl0 = (s2d*) shtns->dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
 		k=0;
 V		l = 1;
 		do {
@@ -191,46 +190,41 @@ VX			BP0(k) = 0.0;	BP0(k+1) = 0.0;
 VX		#endif
 S			BT0(k) = te;	BT0(k+1) = to;
 T			BP0(k) = pe;	BP0(k+1) = po;
-	#else
-Q			v2d r[NWAY];
-S			v2d t[NWAY];
-T			v2d p[NWAY];
-			for (int j=0; j<NWAY; j++) {
-Q				r[j] = vdup(0.0);
-S				t[j] = vdup(0.0);
-T				p[j] = vdup(0.0);
-			}
-			l >>= 1;	// l = l/2;
-			do {
-				for (int j=0; j<NWAY; j++) {
-Q					r[j] += ((v2d*) yl)[j]   * Ql0[l];		// { re, ro }
-S					t[j] += ((v2d*) dyl0)[j] * Sl0[l];		// { te, to }
-T					p[j] -= ((v2d*) dyl0)[j] * Tl0[l];		// { pe, po }
-				}
-				l++;
-Q				yl+=2*NWAY;
-V				dyl0+=2*NWAY;
-Q			} while(2*l <= llim);
-V			} while(2*l < llim);
-			for (int j=0; j<NWAY; j++) {
-		#ifndef SHT_AXISYM
-Q				BR0(k+2*j) = vlo_to_dbl(r[j]);		BR0(k+1+2*j) = vhi_to_dbl(r[j]);
-VX				BT0(k+2*j) = 0.0;					BT0(k+1+2*j) = 0.0;
-S				BT0(k+2*j) = vlo_to_dbl(t[j]);		BT0(k+1+2*j) = vhi_to_dbl(t[j]);
-VX				BP0(k+2*j) = 0.0;					BP0(k+1+2*j) = 0.0;
-T				BP0(k+2*j) = vlo_to_dbl(p[j]);		BP0(k+1+2*j) = vhi_to_dbl(p[j]);
-		#else
-Q				*((v2d*)(((double*)BrF)+k+2*j)) = r[j];
-S				*((v2d*)(((double*)BtF)+k+2*j)) = t[j];
-T				*((v2d*)(((double*)BpF)+k+2*j)) = p[j];
-		#endif
-			}
-	#endif
-			k+=2*NWAY;
 		#ifdef SHT_VAR_LTR
 Q			yl  += ((LMAX>>1) - (llim>>1))*2;
 V			dyl0 += (((LMAX+1)>>1) - ((llim+1)>>1))*2;
 		#endif
+	#else
+S			s2d t = vdup(0.0);
+T			s2d p = vdup(0.0);
+Q			s2d r = vdup(0.0);
+QX			s2d r1 = vdup(0.0);
+			l >>= 1;	// l = l/2;
+			do {
+Q				r += yl[l]   * Ql0[l];		// { re, ro }
+S				t += dyl0[l] * Sl0[l];		// { te, to }
+T				p -= dyl0[l] * Tl0[l];		// { pe, po }
+				l++;
+QX				r1 += yl[l]   * Ql0[l];		// { re, ro }
+QX				l++;
+Q			} while(2*l <= llim);
+V			} while(2*l < llim);
+QX			r += r1;
+Q			yl  += (LMAX -k)>>1;
+V			dyl0 += (LMAX+1 -k)>>1;
+		#ifndef SHT_AXISYM
+Q				BR0(k) = vlo_to_dbl(r);		BR0(k+1) = vhi_to_dbl(r);
+VX				BT0(k) = 0.0;				BT0(k+1) = 0.0;
+S				BT0(k) = vlo_to_dbl(t);		BT0(k+1) = vhi_to_dbl(t);
+VX				BP0(k) = 0.0;				BP0(k+1) = 0.0;
+T				BP0(k) = vlo_to_dbl(p);		BP0(k+1) = vhi_to_dbl(p);
+		#else
+Q				*((s2d*)(((double*)BrF)+k)) = r;
+S				*((s2d*)(((double*)BtF)+k)) = t;
+T				*((s2d*)(((double*)BpF)+k)) = p;
+		#endif
+	#endif
+			k+=2;
 V			l = k-1;
 Q		} while (k<=llim);
 V		} while (k<=llim+1);
@@ -517,7 +511,6 @@ V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
 
     if (NPHI>1) {
     #ifndef SHT_NO_DCT
-		if (MTR_DCT >= 0) {
 Q			fftw_execute_r2r(shtns->idct,(double *) BrF, (double *) BrF);		// iDCT
 V			fftw_execute_r2r(shtns->idct,(double *) BtF, (double *) BtF);		// iDCT
 V			fftw_execute_r2r(shtns->idct,(double *) BpF, (double *) BpF);		// iDCT
@@ -546,7 +539,6 @@ V					((v2d *)BtF)[im*NLAT + k+1] *= sin_2;	((v2d *)BpF)[im*NLAT + k+1] *= sin_2
 V					k+=2;
 V				} while(k<NLAT);
 V			}
-		}
     #endif
 Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
@@ -563,7 +555,6 @@ V			Vp[k] = ((double *)BpF)[2*k];
 			k++;
 		} while(k<NLAT);
     #ifndef SHT_NO_DCT
-		if (MTR_DCT >= 0) {
 Q			fftw_execute_r2r(shtns->idct_r1,Vr, Vr);		// iDCT m=0
 S			fftw_execute_r2r(shtns->idct_r1,Vt, Vt);		// iDCT m=0
 T			fftw_execute_r2r(shtns->idct_r1,Vp, Vp);		// iDCT m=0
@@ -580,12 +571,10 @@ T			Vp[2*k] *= sin_1;		Vp[2*k+1] *= sin_2;
 V		#endif
 V				k++;
 V			} while (k<NLAT_2);
-		}
     #endif
     }
   #endif
 
-	#undef NWAY
 Q	#undef BR0
 V	#undef BT0
 V	#undef BP0

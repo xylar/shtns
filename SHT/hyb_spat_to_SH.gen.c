@@ -120,9 +120,9 @@ Q		fftw_execute_r2r(shtns->dct_m0,(double *) BrF, BR0);		// DCT out-of-place.
 V		fftw_execute_r2r(shtns->dct_m0,(double *) BtF, BT0);		// DCT out-of-place.
 V		fftw_execute_r2r(shtns->dct_m0,(double *) BpF, BP0);		// DCT out-of-place.
 	#else
-Q		#define BR0	((double *)BrF)
-V		#define BT0	((double *)BtF)
-V		#define BP0	((double *)BpF)
+Q		#define BR0	reo0
+V		#define BT0	tpeo0
+V		#define BP0	(tpeo0 +NLAT)
 Q		if (NPHI > 1) {
 Q			s2d np = vdup(NPHI);
 Q			i=0;	do {
@@ -142,12 +142,16 @@ V			BP0[2*i] *= sin_1;		BP0[2*i+1] *= sin_2;
 V		#endif
 V			i++;
 V		} while (i<ni);
-Q		fftw_execute_r2r(shtns->dct_r1,(double *) BrF, (double *) BrF);	// DCT in-place.
-V		fftw_execute_r2r(shtns->dct_r1,(double *) BtF, (double *) BtF);	// DCT in-place.
-V		fftw_execute_r2r(shtns->dct_r1,(double *) BpF, (double *) BpF);	// DCT in-place.
+Q		fftw_execute_r2r(shtns->dct_r1,(double *) BrF, BR0);	// DCT out-of-place.
+V		fftw_execute_r2r(shtns->dct_r1,(double *) BtF, BT0);	// DCT out-of-place.
+V		fftw_execute_r2r(shtns->dct_r1,(double *) BpF, BP0);	// DCT out-of-place.
 	#endif
-		long int klim = shtns->klim;
 		l=0;
+		long int klim = shtns->klim;
+		#ifdef SHT_VAR_LTR
+			i = (llim * SHT_NL_ORDER) + 2;		// sum truncation
+			if (i < klim) klim = i;
+		#endif
 Q		v2d* Ql = (v2d*) Qlm;
 V		v2d* Sl = (v2d*) Slm;	v2d* Tl = (v2d*) Tlm;
 Q		zl = shtns->zlm_dct0;
@@ -157,9 +161,8 @@ V		s1 = 0.0;	t1 = 0.0;		// l=0 : Sl = Tl = 0
 V	#else
 V		v2d s = vdup(0.0);		v2d t = vdup(0.0);		// l=0 : Sl = Tl = 0
 V	#endif
+QX		BR0[klim] = 0;		BR0[klim+1] = 0;		// allow some overflow.
 	#ifdef SHT_VAR_LTR
-		i = (llim * SHT_NL_ORDER) + 2;		// sum truncation
-		if (i < klim) klim = i;
 		while(l < llim) {
 	#else
 		do {		// l < LMAX
@@ -170,43 +173,37 @@ V			Sl[l] = s1;		Tl[l] = t1;
 Q			q0 = 0.0;	q1 = 0.0;
 V			s0 = 0.0;	t1 = 0.0;	t0 = 0.0;	s1 = 0.0;
 			do {
-Q				q0 += BR0[i]   * zl[0];
-Q				q1 += BR0[i+1] * zl[1];
-V				s0 += BT0[i]   * dzl0[0];
-V				t0 -= BP0[i]   * dzl0[0];
-V				s1 += BT0[i+1] * dzl0[1];
-V				t1 -= BP0[i+1] * dzl0[1];
-Q				zl+=2;
-V				dzl0+=2;
+Q				q0 += BR0[i]   * zl[i];
+Q				q1 += BR0[i+1] * zl[i+1];
+V				s0 += BT0[i]   * dzl0[i];
+V				t0 -= BP0[i]   * dzl0[i];
+V				s1 += BT0[i+1] * dzl0[i+1];
+V				t1 -= BP0[i+1] * dzl0[i+1];
 				i+=2;
 			} while(i<klim);
-		#ifdef SHT_VAR_LTR
-Q			zl += (shtns->klim-i);
-V			dzl0 += (shtns->klim-i);
-		#endif
 Q			Ql[l] = q0;		Ql[l+1] = q1;
 V			Sl[l+1] = s0;	Tl[l+1] = t0;
 	  #else
 V			Sl[l] = vhi_to_cplx(s);		Tl[l] = vhi_to_cplx(t);
-Q			v2d q = vdup(0.0);
 V			s = vdup(0.0);		t = vdup(0.0);
+Q			s2d q = vdup(0.0);
+QX			s2d q1 = vdup(0.0);
 			i >>= 1;	// i = i/2
 			do {
-Q				q += ((v2d*) zl)[0] * ((v2d*) BR0)[i];
-V				s += ((v2d*) dzl0)[0] * ((v2d*) BT0)[i];
-V				t -= ((v2d*) dzl0)[0] * ((v2d*) BP0)[i];
-Q				zl +=2;
-V				dzl0 +=2;
+Q				q += ((s2d*) zl)[i] * ((s2d*) BR0)[i];
+V				s += ((s2d*) dzl0)[i] * ((s2d*) BT0)[i];
+V				t -= ((s2d*) dzl0)[i] * ((s2d*) BP0)[i];
 				i++;
+QX				q1 += ((s2d*) zl)[i] * ((s2d*) BR0)[i];
+QX				i++;
 			} while(2*i < klim);
-		#ifdef SHT_VAR_LTR
-Q			zl += (shtns->klim-2*i);
-V			dzl0 += (shtns->klim-2*i);
-		#endif
+QX			q += q1;
 Q			Ql[l]   = vlo_to_cplx(q);		Ql[l+1] = vhi_to_cplx(q);
 V			Sl[l+1] = vlo_to_cplx(s);		Tl[l+1] = vlo_to_cplx(t);
 	  #endif
 			l+=2;
+Q			zl += (shtns->klim - l);
+V			dzl0 += (shtns->klim -l);
 	#ifndef SHT_VAR_LTR
 		} while(l<llim);
 	#else
@@ -221,8 +218,7 @@ V	#endif
 Q			q0 = 0.0;
 Q			i=l;	// l < klim
 Q			do {
-Q				q0 += BR0[i] * zl[0];
-Q				zl+=2;
+Q				q0 += BR0[i] * zl[i];
 Q				i+=2;
 Q			} while(i<klim);
 Q			((complex double *) Ql)[l] = q0;

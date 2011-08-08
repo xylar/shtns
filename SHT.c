@@ -573,8 +573,8 @@ void planDCT(shtns_cfg shtns)
 	if ((shtns->dct_r1 == NULL)||(shtns->idct_r1 == NULL)) {
 		Sh = (double *) VMALLOC( NLAT * sizeof(double) );
 		if (shtns->dct_r1 == NULL) {
-			r2r_kind = FFTW_REDFT10;
-			shtns->dct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
+			r2r_kind = FFTW_REDFT10;		// out-of-place.
+			shtns->dct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
 		}
 		if (shtns->idct_r1 == NULL) {
 			r2r_kind = FFTW_REDFT01;
@@ -608,7 +608,6 @@ void planDCT(shtns_cfg shtns)
 #endif
 		if (shtns->dct_m0 == NULL) {
 			r2r_kind = FFTW_REDFT10;
-//			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh, &ndct, 2, 2*NLAT, &r2r_kind, shtns->fftw_plan_mode);
 			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
 			if (shtns->dct_m0 == NULL)
 				shtns_runerr("[FFTW] dct_m0 planning failed !");
@@ -1023,6 +1022,7 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 			dsk += LMAX+1 - l;
 		}
 	}
+	if (MMAX == 0) sk+=3;	// allow some overflow.
 	for (l=0, it=0; l<=LMAX; l+=2)	// how much memory for zlm_dct0 ?
 		it += (2*NLAT_2 -l);
 	for (l=1, im=0; l<=LMAX; l+=2)	// how much memory for dzlm_dct0 ?
@@ -1262,6 +1262,7 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 			}
 			if ((m==0) && ((LMAX & 1) == 0)) {	yg[0] = 0;		yg++;	}		// SSE2 padding.
 		}
+		if (MMAX==0) for (int j=0; j<3; j++) yg[j] = 0;		// allow some overflow.
 #ifndef SHT_SCALAR_ONLY		
 		dyg = shtns->dykm_dct[im];
 		for (it=0; it<= KMAX; it+=2) {
@@ -1650,9 +1651,10 @@ void shtns_print_cfg(shtns_cfg shtns)
 		printf("\n  %4s:",sht_var[iv]);
 		for (int it=0; it<SHT_NTYP; it++) {
 			for (int ia=0; ia<SHT_NALG; ia++) {
-				if (sht_func[iv][it][ia] == shtns->fptr[iv][it]) {
-					printf("%5s ",sht_name[ia]);
-					break;
+				if (shtns->fptr[iv][it] == NULL) {
+					printf(" none ");	break;
+				} else if (sht_func[iv][it][ia] == shtns->fptr[iv][it]) {
+					printf("%5s ",sht_name[ia]);	break;
 				}
 			}
 		}
