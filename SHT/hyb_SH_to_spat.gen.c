@@ -53,9 +53,6 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
 /// \param[in] llim MUST be shtns->lmax.
   #endif
 
-// 3 components not possible with DCT acceleration.
-3	#define SHT_NO_DCT
-
 // MTR_DCT : <0 => SHT_NO_DCT must be defined !!! mem only transform
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
@@ -76,6 +73,8 @@ T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, 
 
 Q	v2d *BrF;
   #ifndef SHT_AXISYM
+// with m>0, 3 components not possible with DCT acceleration
+3	#define SHT_NO_DCT
 V	v2d *BtF, *BpF;
 V	struct DtDp *dyl;
 Q	complex double re,ro;
@@ -157,32 +156,36 @@ T		double* Tl = (double*) Tlm;
 	#endif
 Q		s2d* yl = (s2d*) shtns->ykm_dct[im];
 V		s2d* dyl0 = (s2d*) shtns->dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
-		k=0;
-V		l = 1;
-		do {
-Q			l = k;
 	#ifndef _GCC_VEC_
-Q			re = 0.0;	ro = 0.0;
+Q		re = 0.0;	ro = 0.0;
+QE		re = yl[0]  * Ql[0];
+QO		ro = yl[1]  * Ql[2];
+Q		yl+=2;
+		k=0;	l = 2;
+		do {
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
+SO			te =  dyl0[0] * Sl[2*l-2];		// l-1
+TE			pe = -dyl0[0] * Tl[2*l-2];		// l-1
+V			dyl0 ++;
 			while(l<llim) {
 QE				re += yl[0]  * Ql[2*l];
 QO				ro += yl[1]  * Ql[2*l+2];
-SO				te += dyl0[0] * Sl[2*l];
-TE				pe -= dyl0[0] * Tl[2*l];
-SE				to += dyl0[1] * Sl[2*l+2];
-TO				po -= dyl0[1] * Tl[2*l+2];
+SE				to += dyl0[0] * Sl[2*l];
+TO				po -= dyl0[0] * Tl[2*l];
+SO				te += dyl0[1] * Sl[2*l+2];
+TE				pe -= dyl0[1] * Tl[2*l+2];
 				l+=2;
 Q				yl+=2;
 V				dyl0+=2;
 			}
 			if (l==llim) {
 QE				re += yl[0]  * Ql[2*l];
-SO				te += dyl0[0] * Sl[2*l];
-TE				pe -= dyl0[0] * Tl[2*l];
+SE				to += dyl0[0] * Sl[2*l];
+TO				po -= dyl0[0] * Tl[2*l];
 Q				yl+=2;
-V				dyl0+=2;
 			}
+V			dyl0++;
 Q			BR0(k) = re;	BR0(k+1) = ro;
 VX		#ifndef SHT_AXISYM
 VX			BT0(k) = 0.0;	BT0(k+1) = 0.0;			// required for tor or sph only transform
@@ -190,25 +193,30 @@ VX			BP0(k) = 0.0;	BP0(k+1) = 0.0;
 VX		#endif
 S			BT0(k) = te;	BT0(k+1) = to;
 T			BP0(k) = pe;	BP0(k+1) = po;
+Q			re = 0.0;	ro = 0.0;
 		#ifdef SHT_VAR_LTR
 Q			yl  += ((LMAX>>1) - (llim>>1))*2;
 V			dyl0 += (((LMAX+1)>>1) - ((llim+1)>>1))*2;
 		#endif
+			k+=2;
+			l = k;
+		} while (k<=llim+1);
 	#else
+Q		s2d r = yl[0] * Ql0[0];		// first Q [l=0 and 1]
+		l=0;	k=0;
+		do {
+			l >>= 1;	// l = l/2;
 S			s2d t = vdup(0.0);
 T			s2d p = vdup(0.0);
-Q			s2d r = vdup(0.0);
 QX			s2d r1 = vdup(0.0);
-			l >>= 1;	// l = l/2;
 			do {
-Q				r += yl[l]   * Ql0[l];		// { re, ro }
+Q				r += yl[l+1] * Ql0[l+1];	// { re, ro }
 S				t += dyl0[l] * Sl0[l];		// { te, to }
 T				p -= dyl0[l] * Tl0[l];		// { pe, po }
-				l++;
-QX				r1 += yl[l]   * Ql0[l];		// { re, ro }
-QX				l++;
-Q			} while(2*l <= llim);
-V			} while(2*l < llim);
+V				l++;
+QX				r1 += yl[l+2] * Ql0[l+2];	// { re, ro }
+QX				l+=2;
+			} while(2*l < llim);
 QX			r += r1;
 Q			yl  += (LMAX -k)>>1;
 V			dyl0 += (LMAX+1 -k)>>1;
@@ -223,11 +231,12 @@ Q				*((s2d*)(((double*)BrF)+k)) = r;
 S				*((s2d*)(((double*)BtF)+k)) = t;
 T				*((s2d*)(((double*)BpF)+k)) = p;
 		#endif
-	#endif
+Q			r = vdup(0.0);
 			k+=2;
-V			l = k-1;
-Q		} while (k<=llim);
+			l = k-1;
+QX		} while (k<=llim);
 V		} while (k<=llim+1);
+	#endif
 		while (k<NLAT) {	// dct padding (NLAT is even)
 Q			BR0(k) = 0.0;	BR0(k+1) = 0.0;
 		#ifndef SHT_AXISYM
