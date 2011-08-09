@@ -91,14 +91,13 @@ Q	BrF = (complex double *) Vr;
 V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 
   #ifndef SHT_AXISYM
-	if (SHT_FFT > 0) {
-	    if (SHT_FFT > 1) {		// alloc memory for the FFT
-	    	unsigned long nspat = ((NPHI>>1) +1)*NLAT;
-QX			BrF = fftw_malloc( nspat * sizeof(complex double) );
-VX			BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
-VX			BpF = BtF + nspat;
-3			BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
-3			BtF = BrF + nspat;		BpF = BtF + nspat;
+	if (shtns->ncplx_fft >= 0) {
+	    if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
+QX			BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
+VX			BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(complex double) );
+VX			BpF = BtF + shtns->ncplx_fft;
+3			BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
+3			BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	    }
 Q		fftw_execute_dft_r2c(shtns->fft,Vr, BrF);
 V		fftw_execute_dft_r2c(shtns->fft,Vt, BtF);
@@ -538,7 +537,7 @@ V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	}
 	#endif
 
-  	if (SHT_FFT > 1) {		// free memory
+  	if (shtns->ncplx_fft > 0) {		// free memory
 Q	    VFREE(BrF - NLAT*(imlim+1));
 VX	    VFREE(BtF - NLAT*(imlim+1));	// this frees also BpF.
 	}

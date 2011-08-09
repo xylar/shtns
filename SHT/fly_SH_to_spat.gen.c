@@ -65,13 +65,12 @@ T	double Tl0[llim];
   #ifndef SHT_AXISYM
 Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
-	if (SHT_FFT > 1) {		// alloc memory for the FFT
-		unsigned long nspat = ((NPHI>>1) +1)*NLAT;
-QX		BrF = fftw_malloc( nspat * sizeof(complex double) );
-VX		BtF = fftw_malloc( 2* nspat * sizeof(complex double) );
-VX		BpF = BtF + nspat;
-3		BrF = fftw_malloc( 3* nspat * sizeof(complex double) );
-3		BtF = BrF + nspat;		BpF = BtF + nspat;
+	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
+QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
+VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(complex double) );
+VX		BpF = BtF + shtns->ncplx_fft;
+3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
+3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
   #else
 	#ifdef SHT_GRAD
@@ -512,7 +511,7 @@ V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
 Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
-		if (SHT_FFT > 1) {		// free memory
+		if (shtns->ncplx_fft > 0) {		// free memory
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.
 		}

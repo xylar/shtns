@@ -436,7 +436,7 @@ void free_SHTarrays(shtns_cfg shtns)
 {
 	if (shtns->fft != NULL)		fftw_destroy_plan(shtns->fft);
 	if (shtns->ifft != NULL)	fftw_destroy_plan(shtns->ifft);
-	shtns->fft = NULL;		shtns->ifft = NULL;		shtns->sht_fft = 0;
+	shtns->fft = NULL;		shtns->ifft = NULL;		shtns->ncplx_fft = -1;	// no fft
 
 	if (shtns->dylm != NULL) {
 		if (shtns->dzlm[0] != NULL) VFREE(shtns->dzlm[0]);
@@ -481,7 +481,7 @@ int free_unused_array(shtns_cfg shtns, void* p)
 /// \internal initialize FFTs using FFTW.
 /// \param[in] layout defines the spatial layout (see \ref spat).
 /// returns the number of double to be allocated for a spatial field.
-int planFFT(shtns_cfg shtns, int layout)
+void planFFT(shtns_cfg shtns, int layout)
 {
 	double cost_ip, cost_oop;
 	complex double *ShF;
@@ -489,96 +489,103 @@ int planFFT(shtns_cfg shtns, int layout)
 	fftw_plan fft2, ifft2, fft, ifft;
 	int nfft, ncplx, nreal;
 	int theta_inc, phi_inc, phi_embed;
+	int in_place = 1;		// try to use in-place fft.
 
 	if (NPHI <= 2*MMAX) shtns_runerr("the sampling condition Nphi > 2*Mmax is not met.");
 
-	switch (layout) {
-		case SHT_NATIVE_LAYOUT : 	theta_inc=1;  phi_inc=NLAT;  phi_embed=2*(NPHI/2+1);  break;
-		case SHT_THETA_CONTIGUOUS :	theta_inc=1;  phi_inc=NLAT;  phi_embed=NPHI;  break;
-		default :
-		case SHT_PHI_CONTIGUOUS :	phi_inc=1;  theta_inc=NPHI;  phi_embed=NPHI;  break;
+	if (NPHI==1) 	// no FFT needed.
+	{
+		if (theta_inc != 1) shtns_runerr("only contiguous spatial data is supported for Nphi=1");
+		#if SHT_VERBOSE > 0
+			printf("        => no fft : Mmax=0, Nphi=1, Nlat=%d\n",NLAT);
+		#endif
+		shtns->nspat = NLAT;
+		shtns->ncplx_fft = -1;	// no fft.
 	}
-
-  if (NPHI>1) {
-	SHT_FFT = 1;		// yes, do some fft
-	nfft = NPHI;
-	ncplx = NPHI/2 +1;
-	nreal = phi_embed;
-	if ((theta_inc != 1)||(phi_inc != NLAT)||(nreal < 2*ncplx)) {
-		SHT_FFT = 2;		// we need to do the fft out-of-place.
-	}
-
-#if SHT_VERBOSE > 0
-	printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc,phi_embed);
-	if (NPHI <= (SHT_NL_ORDER+1)*MMAX)	printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
-	if (NPHI != fft_int(NPHI,7))		printf("     !! Warning : Nphi is not optimal for FFTW !\n");
-#endif
-
-// Allocate dummy Spatial Fields.
-	ShF = (complex double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
-	Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
-	fft = NULL;		ifft = NULL;
-
-// IFFT : unnormalized.  FFT : must be normalized.
-	cost_ip = 0.0;		cost_oop = 0.0;
-	if (SHT_FFT == 1) {		// in-place FFT allowed
-		ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
-		if (ifft2 != NULL) {
-			fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
-			if (fft2 != NULL) {
-				cost_ip = SHT_NL_ORDER * fftw_cost(ifft2) + fftw_cost(fft2);
-			} else {
-				fftw_destroy_plan(ifft2);	ifft2 = NULL;	SHT_FFT = 2;
-			}
-		} else SHT_FFT = 2;
-	}
-#if SHT_VERBOSE > 1
-	if (cost_ip > 0.0) {	printf("          in-place cost : ifft=%g, fft=%g", fftw_cost(ifft2), fftw_cost(fft2));	fflush(stdout);	}
-#endif
-	if ((SHT_FFT > 1) || (cost_ip > 0.0)) {		// out-of-place FFT
-		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
-		if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
-		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
-		if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
-		cost_oop = SHT_NL_ORDER * fftw_cost(ifft) + fftw_cost(fft);
-	}
-#if SHT_VERBOSE > 1
-	if (cost_oop > 0.0)	printf("    out-of-place cost : ifft=%g, fft=%g\n", fftw_cost(ifft), fftw_cost(fft));
-#endif
-	if (SHT_FFT == 1) {
-		if ((cost_oop >= cost_ip) || (cost_oop == 0.0)) {		// switch to in-place transforms.
-			if (fft != NULL) fftw_destroy_plan(fft);
-			if (ifft != NULL) fftw_destroy_plan(ifft);
-			fft = fft2;		ifft = ifft2;
-		} else {		// out-of-place is faster
-			fftw_destroy_plan(fft2);	fftw_destroy_plan(ifft2);
-			SHT_FFT = 2;		// switch to out-of-place.
+	else	/* NPHI > 1 */
+	{
+		switch (layout) {
+			case SHT_NATIVE_LAYOUT : 	theta_inc=1;  phi_inc=NLAT;  phi_embed=2*(NPHI/2+1);  break;
+			case SHT_THETA_CONTIGUOUS :	theta_inc=1;  phi_inc=NLAT;  phi_embed=NPHI;  break;
+			default :
+			case SHT_PHI_CONTIGUOUS :	phi_inc=1;  theta_inc=NPHI;  phi_embed=NPHI;  break;
 		}
+		nfft = NPHI;
+		ncplx = NPHI/2 +1;
+		nreal = phi_embed;
+		if ((theta_inc != 1)||(phi_inc != NLAT)||(nreal < 2*ncplx))  in_place = 0;		// we need to do the fft out-of-place.
+
+		#if SHT_VERBOSE > 0
+			printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc,phi_embed);
+			if (NPHI <= (SHT_NL_ORDER+1)*MMAX)	printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
+			if (NPHI != fft_int(NPHI,7))		printf("     !! Warning : Nphi is not optimal for FFTW !\n");
+		#endif
+
+	// Allocate dummy Spatial Fields.
+		ShF = (complex double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
+		Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
+		fft = NULL;		ifft = NULL;
+
+	// IFFT : unnormalized.  FFT : must be normalized.
+		cost_ip = 0.0;		cost_oop = 0.0;
+		if (in_place) {		// in-place FFT allowed
+			ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
+			if (ifft2 != NULL) {
+				fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
+				if (fft2 != NULL) {
+					cost_ip = SHT_NL_ORDER * fftw_cost(ifft2) + fftw_cost(fft2);
+				} else {
+					fftw_destroy_plan(ifft2);	ifft2 = NULL;	in_place = 0;
+				}
+			} else in_place = 0;
+		}
+		#if SHT_VERBOSE > 1
+			if (cost_ip > 0.0) {	printf("          in-place cost : ifft=%g, fft=%g", fftw_cost(ifft2), fftw_cost(fft2));	fflush(stdout);	}
+		#endif
+		if ((in_place == 0) || (cost_ip > 0.0)) {		// out-of-place FFT
+			ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
+			if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
+			fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
+			if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
+			cost_oop = SHT_NL_ORDER * fftw_cost(ifft) + fftw_cost(fft);
+		}
+		#if SHT_VERBOSE > 1
+			if (cost_oop > 0.0)	printf("    out-of-place cost : ifft=%g, fft=%g\n", fftw_cost(ifft), fftw_cost(fft));
+		#endif
+		if (in_place) {
+			if ((cost_oop >= cost_ip) || (cost_oop == 0.0)) {		// switch to in-place transforms.
+				if (fft != NULL) fftw_destroy_plan(fft);
+				if (ifft != NULL) fftw_destroy_plan(ifft);
+				fft = fft2;		ifft = ifft2;
+			} else {		// out-of-place is faster
+				fftw_destroy_plan(fft2);	fftw_destroy_plan(ifft2);
+				in_place = 0;		// switch to out-of-place.
+			}
+		}
+		shtns->fft = fft;		shtns->ifft = ifft;
+
+		#if SHT_VERBOSE > 0
+			if (in_place == 0) printf("        ** out-of-place fft **\n");
+		#endif
+		#if SHT_VERBOSE > 2
+			printf(" *** fft plan :\n");
+			fftw_print_plan(fft);
+			printf("\n *** ifft plan :\n");
+			fftw_print_plan(ifft);
+			printf("\n");
+		#endif
+		if (in_place) {
+			shtns->ncplx_fft = 0;		// fft is done in-place, no allocation needed.
+		} else {
+			shtns->ncplx_fft = ncplx * NLAT;		// fft is done out-of-place, store allocation size.
+			phi_embed = NPHI;
+		}
+		shtns->nspat = phi_embed * NLAT;
+		VFREE(Sh);		VFREE(ShF);
 	}
-	shtns->fft = fft;		shtns->ifft = ifft;
 
-#if SHT_VERBOSE > 0
-	if (SHT_FFT > 1) printf("        ** out-of-place fft **\n");
-#endif
-#if SHT_VERBOSE > 2
-	printf(" *** fft plan :\n");
-	fftw_print_plan(fft);
-	printf("\n *** ifft plan :\n");
-	fftw_print_plan(ifft);
-	printf("\n");
-#endif
-
-	VFREE(Sh);		VFREE(ShF);
-  } else {
-	if (theta_inc != 1) shtns_runerr("only contiguous spatial data is supported for Nphi=1");
-#if SHT_VERBOSE > 0
-	printf("        => no fft : Mmax=0, Nphi=1, Nlat=%d\n",NLAT);
-#endif
-	SHT_FFT = 0;	// no fft.
-  }
 	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
 	shtns->dct_r1 = NULL;	shtns->idct_r1 = NULL;
-	return(phi_embed * NLAT);
 }
 
 #ifndef SHT_NO_DCT
@@ -1873,7 +1880,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 {
 	double t;
 	int im,m;
-	int layout, nspat;
+	int layout;
 	int nloop = 0;
 	int n_gauss = 0;
 	int on_the_fly = 0;
@@ -1884,6 +1891,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if (nl_order == 0) nl_order = SHT_DEFAULT_NL_ORDER;
 	if (nl_order < 0) {	shtns.lshift = -nl_order;	nl_order = 1; }		// linear with a shift in l.
 */
+	shtns->nspat = 0;
 	shtns->nlorder = nl_order;
 	shtns->mtr_dct = -1;		// dct is switched off
 	layout = flags & 0xFFFF00;
@@ -1949,7 +1957,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
 
 	alloc_SHTarrays(shtns, on_the_fly);		// allocate dynamic arrays
-	nspat = planFFT(shtns, layout);		// initialize fftw
+	planFFT(shtns, layout);		// initialize fftw
 	shtns->zlm_dct0 = NULL;		// used as a flag.
 	init_sht_array(shtns);		// array of SHT functions is now set.
 
@@ -2008,7 +2016,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 					*nlat = n_gauss;
 					NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
 					alloc_SHTarrays(shtns, on_the_fly);
-					nspat = planFFT(shtns, layout);		// fft must be replanned because NLAT has changed.
+					planFFT(shtns, layout);		// fft must be replanned because NLAT has changed.
 				}
 			}
 		}
@@ -2064,7 +2072,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
   #if SHT_VERBOSE > 0
 	printf("        => SHTns is ready.\n");
   #endif
-	return(nspat);	// returns the number of doubles to be allocated for a spatial field.
+	return(shtns->nspat);	// returns the number of doubles to be allocated for a spatial field.
 }
 
 

@@ -63,30 +63,34 @@ struct shtns_info {		// MUST start with "int nlm;"
 	int *lmidx;					///< (virtual) index in SH array of given im (size mmax+1) : LiM(l,im) = lmidx[im] + l
 	unsigned short *li;			///< degree l for given mode number (size nlm) : li[lm] 
 	double *ct, *st;			///< cos(theta) and sin(theta) arrays (size nlat)
+	unsigned nspat;				///< number of real value that must be allocated in a spatial field.
 /* END OF PUBLIC PART */
 
-	short sht_fft;			///< How to perform fft : 0=no fft, 1=in-place, 2=out-of-place.
-	short mtr_dct;			///< m truncation for dct. -1 means no dct at all.
-	short nlorder;			///< order of non-linear terms to be resolved by SH transform.
-	unsigned short klim;	///< Limit to k for non-linear terms (dct)
+	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
+	unsigned short *tm;		///< start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+	double *wg;				///< Gauss weights for Gauss-Legendre quadrature.
+	double *st_1;			///< 1/sin(theta);
 
-	unsigned short *tm;			// start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-	double *wg;					// Gauss weights for Gauss-Legendre quadrature.
-	double *st_1;				// 1/sin(theta);
+	fftw_plan ifft, fft;		// plans for FFTW.
 
-	fftw_plan ifft, fft;			// plans for FFTW.
-
+	/* Legendre function generation arrays */
 	double *al0;	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
 	double *bl0;	double **blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
 	double *l_2;	// array of size (LMAX+1) containing 1./l(l+1) for increasing integer l.
 
 	void* fptr[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 
+	/* MEM matrices */
 	double **ylm;		// matrix for inverse transform (synthesis)
 	struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
 	double **zlm;		// matrix for direct transform (analysis)
 	struct DtDp** dzlm;
 
+	/* DCT stuff */
+	short mtr_dct;			///< m truncation for dct. -1 means no dct at all.
+	short nlorder;			///< order of non-linear terms to be resolved by SH transform.
+	unsigned short klim;	///< Limit to k for non-linear terms (dct)
+	short dummy;			// alignement.
 	fftw_plan idct, dct_m0;			// (I)DCT for NPHI>1
 	fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
 	double **ykm_dct;	// matrix for inverse transform (synthesis) using dct.
@@ -94,6 +98,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *zlm_dct0;	// matrix for direct transform (analysis), only m=0
 	double *dzlm_dct0;
 
+	/* other misc informations */
 	double Y00_1, Y10_ct, Y11_st;
 	shtns_cfg next;		// pointer to next sht_setup or NULL (records a chained list of SHT setup).
 	short norm;			// store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
