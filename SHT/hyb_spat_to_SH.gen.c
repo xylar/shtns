@@ -105,12 +105,12 @@ V	    fftw_execute_dft_r2c(shtns->fft,Vp, BpF);
 
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
   #ifndef SHT_NO_DCT
+V	double* st_1 = shtns->st_1;
 	#ifndef SHT_AXISYM
 Q		#define BR0	((double *)reo)
 V		#define BT0	((double *)tpeo)
 V		#define BP0	((double *)tpeo + NLAT)
 V		l = (NPHI==1) ? 1 : 2;		// stride of source data.
-V		double* st_1 = shtns->st_1;
 V		i=0;	i0=0;	do {
 V			double sin_1 = st_1[i];
 V			((double *)BtF)[i0] *= sin_1; 	((double *)BpF)[i0] *= sin_1;
@@ -133,7 +133,7 @@ Q		}
 V		i=0;	do {
 V			s2d np = vdup(NPHI);
 V		#ifdef _GCC_VEC_
-V			v2d sin_1 = ((v2d *)st_1)[i] * np;
+V			s2d sin_1 = ((s2d *)st_1)[i] * np;
 V			((v2d*) BtF)[i] *= sin_1; 	((v2d*) BpF)[i] *= sin_1;
 V		#else
 V			double sin_1 = st_1[2*i] * np;		double sin_2 = st_1[2*i+1] * np;

@@ -157,14 +157,14 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt,
 /// Spheroidal m=0 only synthesis (results in theta component only).
 void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt SUPARG)
 {
-	((pf2l) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt SUPARG2);
+	((pf3l) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt, NULL SUPARG2);
 	return;
 }
 
 /// Toroidal m=0 only synthesis (results in phi component only).
 void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp SUPARG)
 {
-	((pf2l) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, Vp SUPARG2);
+	((pf3l) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, NULL, Vp SUPARG2);
 	return;
 }
 #endif
@@ -188,7 +188,10 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 
 #define ID_NME hyb
 #include "spat_to_SHqst.c"
-// no hybrid SHqst_to_spat possible.
+// hybrid SHqst_to_spat possible only of axisymmetric transform
+  #ifdef SHT_AXISYM
+  #include "SHqst_to_spat.c"
+  #endif
 #undef ID_NME
 
 // fly are compiled only once, with SHT_VAR_LTR
@@ -255,7 +258,11 @@ void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex dou
 /* FUNCTION POINTER ARRAY */
 void* GEN(sht_array, SUFFIX)[SHT_NALG][SHT_NTYP] = {
 /* hyb */	{ GEN(SH_to_spat_hyb, SUFFIX), GEN(spat_to_SH_hyb, SUFFIX), GEN(SHsphtor_to_spat_hyb, SUFFIX), GEN(spat_to_SHsphtor_hyb, SUFFIX), 
+#ifdef SHT_AXISYM
+				GEN(SHsph_to_spat_hyb, SUFFIX), GEN(SHtor_to_spat_hyb, SUFFIX), GEN(SHqst_to_spat_hyb, SUFFIX), GEN(spat_to_SHqst_hyb, SUFFIX) },
+#else
 				GEN(SHsph_to_spat_hyb, SUFFIX), GEN(SHtor_to_spat_hyb, SUFFIX), NULL, GEN(spat_to_SHqst_hyb, SUFFIX) },
+#endif
 /* mem */	{ GEN(SH_to_spat_mem, SUFFIX), GEN(spat_to_SH_mem, SUFFIX), GEN(SHsphtor_to_spat_mem, SUFFIX), GEN(spat_to_SHsphtor_mem, SUFFIX), 
 				GEN(SHsph_to_spat_mem, SUFFIX), GEN(SHtor_to_spat_mem, SUFFIX), GEN(SHqst_to_spat_mem, SUFFIX), GEN(spat_to_SHqst_mem, SUFFIX) },
 /* s+v */	{ NULL, NULL, NULL, NULL, NULL, NULL, GEN(SHqst_to_spat_2, SUFFIX), GEN(spat_to_SHqst_2, SUFFIX) },

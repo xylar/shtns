@@ -29,8 +29,8 @@ hfiles = sht_private.h sht_config.h shtns.h
 
 default : libshtns.a
 
-libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o #sht_m0.o sht_m0ltr.o
-	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o #sht_m0.o sht_m0ltr.o
+libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	@echo " "
 	@cat COPYRIGHT
 

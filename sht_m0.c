@@ -28,7 +28,6 @@
 // axisymmetric transform
 #define SHT_AXISYM
 // truncation at LMAX and MMAX
-#define LTR LMAX
 #define MTR MMAX
 #undef SHT_VAR_LTR
 
@@ -38,4 +37,5 @@
  * these work for any MMAX, and will only transform m=0, to/from arrays with NLAT contiguous theta-values.
  */
 //@{
+#define IVAR SHT_M0
 #include "SHT/sht_generic.c"

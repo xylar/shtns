@@ -259,12 +259,14 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 */
 
 char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
-char* sht_var[SHT_NVAR] = {"std", "ltr"};
+char* sht_var[SHT_NVAR] = {"std", "ltr", "m0", "m0ltr"};
 char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
 extern void* sht_array[SHT_NALG][SHT_NTYP];
 extern void* sht_array_l[SHT_NALG][SHT_NTYP];
+extern void* sht_array_m0[SHT_NALG][SHT_NTYP];
+extern void* sht_array_m0l[SHT_NALG][SHT_NTYP];
 
 // big array holding all sht functions, variants and algorithms
 void* sht_func[SHT_NVAR][SHT_NTYP][SHT_NALG];
@@ -286,24 +288,44 @@ void set_sht_fly(shtns_cfg shtns)
 
 	SET_SHT_FUNC(SHT_STD)
 	SET_SHT_FUNC(SHT_LTR)
+	SET_SHT_FUNC(SHT_M0)
+	SET_SHT_FUNC(SHT_M0LTR)
   #undef SET_SHT_FUNC
 }
 
-/// \internal set hyb alogorithm and copy all algos to sht_func array (should be called by shtns_create).
-void set_sht_default(shtns_cfg shtns)
+/// \internal choose memory algorithm everywhere.
+void set_sht_mem(shtns_cfg shtns) {
+	for (int it=0; it<SHT_NTYP; it++) {
+		for (int v=0; v<SHT_NVAR; v++)
+			shtns->fptr[v][it] = sht_func[v][it][SHT_MEM];
+	}
+}
+
+/// \internal copy all algos to sht_func array (should be called by set_grid befor choosing variants).
+/// if nphi is 1, axisymmetric algorythms are used.
+void init_sht_array(shtns_cfg shtns)
 {
 	for (int it=0; it<SHT_NTYP; it++) {
 		for (int j=0; j<SHT_FLY1; j++) {	// copy variants to global array.
 			sht_func[SHT_STD][it][j] = sht_array[j][it];
 			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
+			sht_func[SHT_M0][it][j] = sht_array_m0[j][it];
+			sht_func[SHT_M0LTR][it][j] = sht_array_m0l[j][it];
 		}
 		for (int j=SHT_FLY1; j<SHT_NALG; j++) {	// on-the-fly only exist in LTR version
 			sht_func[SHT_STD][it][j] = sht_array_l[j][it];
 			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
+			sht_func[SHT_M0][it][j] = sht_array_m0l[j][it];
+			sht_func[SHT_M0LTR][it][j] = sht_array_m0l[j][it];
 		}
-		for (int v=0; v<SHT_NVAR; v++)
-			shtns->fptr[v][it] = sht_func[v][it][SHT_MEM];
+		if (shtns->nphi == 1) {		// axisymmetric transform requested.
+			for (int j=0; j<SHT_NALG; j++) {	// copy m0 to std in global array.
+				sht_func[SHT_STD][it][j] = sht_func[SHT_M0][it][j];
+				sht_func[SHT_LTR][it][j] = sht_func[SHT_M0LTR][it][j];
+			}
+		}
 	}
+	set_sht_mem(shtns);		// default transform is MEM
 }
 
 /// \internal return the smallest power of 2 larger than n.
@@ -510,19 +532,19 @@ int planFFT(shtns_cfg shtns, int layout)
 			}
 		} else SHT_FFT = 2;
 	}
-	if ((SHT_FFT > 1) || (cost_ip > 0.0)) {		// out-of-place FFT
 #if SHT_VERBOSE > 1
-		if (cost_ip > 0.0) {	printf("          in-place cost : ifft=%g, fft=%g", fftw_cost(ifft2), fftw_cost(fft2));	fflush(stdout);	}
+	if (cost_ip > 0.0) {	printf("          in-place cost : ifft=%g, fft=%g", fftw_cost(ifft2), fftw_cost(fft2));	fflush(stdout);	}
 #endif
+	if ((SHT_FFT > 1) || (cost_ip > 0.0)) {		// out-of-place FFT
 		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 		if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 		if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
 		cost_oop = SHT_NL_ORDER * fftw_cost(ifft) + fftw_cost(fft);
-#if SHT_VERBOSE > 1
-		if (cost_ip > 0.0)	printf("    out-of-place cost : ifft=%g, fft=%g\n", fftw_cost(ifft), fftw_cost(fft));
-#endif
 	}
+#if SHT_VERBOSE > 1
+	if (cost_oop > 0.0)	printf("    out-of-place cost : ifft=%g, fft=%g\n", fftw_cost(ifft), fftw_cost(fft));
+#endif
 	if (SHT_FFT == 1) {
 		if ((cost_oop >= cost_ip) || (cost_oop == 0.0)) {		// switch to in-place transforms.
 			if (fft != NULL) fftw_destroy_plan(fft);
@@ -1707,7 +1729,6 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		void **p0 = (void**) &shtns->tm;	// first pointer in struct.
 		void **p1 = (void**) &shtns->Y00_1;	// first non-pointer.
 		while(p0 < p1)	 *p0++ = NULL;		// write NULL to every pointer.
-		set_sht_default(shtns);		// default SHT is hyb.
 		shtns->lmidx = (int*) (shtns + 1);		// lmidx is stored at the end of the struct...
 		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
 		shtns->ct = NULL;	shtns->st = NULL;
@@ -1930,6 +1951,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	alloc_SHTarrays(shtns, on_the_fly);		// allocate dynamic arrays
 	nspat = planFFT(shtns, layout);		// initialize fftw
 	shtns->zlm_dct0 = NULL;		// used as a flag.
+	init_sht_array(shtns);		// array of SHT functions is now set.
 
 	if (flags == sht_reg_dct) {		// pure dct.
 		#ifdef SHT_NO_DCT

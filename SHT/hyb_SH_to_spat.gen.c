@@ -62,13 +62,8 @@ QX	void GEN3(SH_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, do
   #ifndef SHT_GRAD
 VX	void GEN3(SHsphtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-	#ifndef SHT_AXISYM
 S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
 T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
-	#else
-S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, long int llim) {
-T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp, long int llim) {
-	#endif
   #endif
 
 Q	v2d *BrF;
@@ -114,6 +109,10 @@ VX		BpF = BtF + nspat;
 3		BtF = BrF + nspat;		BpF = BtF + nspat;
 	}
   #else
+	#ifdef SHT_GRAD
+S		if (Vp != NULL) for(int i=0; i<NLAT; i++) Vp[i] = 0.0;
+T		if (Vt != NULL) for(int i=0; i<NLAT; i++) Vt[i] = 0.0;
+	#endif
 Q	BrF = (v2d*) Vr;
 S	BtF = (v2d*) Vt;
 T	BpF = (v2d*) Vp;
