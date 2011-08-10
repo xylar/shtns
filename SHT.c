@@ -483,7 +483,7 @@ int free_unused_array(shtns_cfg shtns, void* p)
 /// returns the number of double to be allocated for a spatial field.
 void planFFT(shtns_cfg shtns, int layout)
 {
-	double cost_ip, cost_oop;
+	double cost_fft_ip, cost_fft_oop, cost_ifft_ip, cost_ifft_oop;
 	complex double *ShF;
 	double *Sh;
 	fftw_plan fft2, ifft2, fft, ifft;
@@ -500,6 +500,7 @@ void planFFT(shtns_cfg shtns, int layout)
 		#endif
 		shtns->nspat = NLAT;
 		shtns->ncplx_fft = -1;	// no fft.
+		shtns->fft = NULL;		shtns->ifft = NULL;
 	}
 	else	/* NPHI > 1 */
 	{
@@ -523,49 +524,57 @@ void planFFT(shtns_cfg shtns, int layout)
 	// Allocate dummy Spatial Fields.
 		ShF = (complex double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
 		Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
-		fft = NULL;		ifft = NULL;
+		fft = NULL;		ifft = NULL;	fft2 = NULL;	ifft2 = NULL;
 
 	// IFFT : unnormalized.  FFT : must be normalized.
-		cost_ip = 0.0;		cost_oop = 0.0;
-		if (in_place) {		// in-place FFT allowed
+		cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
+		if (in_place) {		// in-place FFT (if allowed)
 			ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 			if (ifft2 != NULL) {
 				fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 				if (fft2 != NULL) {
-					cost_ip = SHT_NL_ORDER * fftw_cost(ifft2) + fftw_cost(fft2);
-				} else {
-					fftw_destroy_plan(ifft2);	ifft2 = NULL;	in_place = 0;
+					cost_fft_ip = fftw_cost(fft2);		cost_ifft_ip = fftw_cost(ifft2);
+					#if SHT_VERBOSE > 1
+						printf("          in-place cost : ifft=%g, fft=%g", cost_ifft_ip, cost_fft_ip);	fflush(stdout);
+					#endif
 				}
-			} else in_place = 0;
+			}
 		}
-		#if SHT_VERBOSE > 1
-			if (cost_ip > 0.0) {	printf("          in-place cost : ifft=%g, fft=%g", fftw_cost(ifft2), fftw_cost(fft2));	fflush(stdout);	}
-		#endif
-		if ((in_place == 0) || (cost_ip > 0.0)) {		// out-of-place FFT
+		if ( (in_place == 0) || (cost_fft_ip * cost_ifft_ip > 0.0) ) {		// out-of-place FFT
 			ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 			if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 			fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 			if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
-			cost_oop = SHT_NL_ORDER * fftw_cost(ifft) + fftw_cost(fft);
+			cost_fft_oop = fftw_cost(fft);		cost_ifft_oop = fftw_cost(ifft);
+			#if SHT_VERBOSE > 1
+				printf("    out-of-place cost : ifft=%g, fft=%g\n", cost_ifft_oop, cost_fft_oop);
+			#endif
 		}
-		#if SHT_VERBOSE > 1
-			if (cost_oop > 0.0)	printf("    out-of-place cost : ifft=%g, fft=%g\n", fftw_cost(ifft), fftw_cost(fft));
-		#endif
+		if ( (cost_fft_ip * cost_ifft_ip > 0.0) && (cost_fft_oop * cost_ifft_oop > 0.0) ) {		// both have been succesfully timed.
+			if ( cost_fft_oop + SHT_NL_ORDER*cost_ifft_oop < cost_fft_ip + SHT_NL_ORDER*cost_ifft_ip )
+				in_place = 0;		// disable in-place, because out-of-place is faster.
+		}
+
 		if (in_place) {
-			if ((cost_oop >= cost_ip) || (cost_oop == 0.0)) {		// switch to in-place transforms.
-				if (fft != NULL) fftw_destroy_plan(fft);
-				if (ifft != NULL) fftw_destroy_plan(ifft);
-				fft = fft2;		ifft = ifft2;
-			} else {		// out-of-place is faster
-				fftw_destroy_plan(fft2);	fftw_destroy_plan(ifft2);
-				in_place = 0;		// switch to out-of-place.
-			}
+			/* IN-PLACE FFT */
+			if (fft != NULL)  fftw_destroy_plan(fft);
+			if (ifft != NULL) fftw_destroy_plan(ifft);
+			fft = fft2;		ifft = ifft2;
+			shtns->ncplx_fft = 0;		// fft is done in-place, no allocation needed.
+		} else {
+			/* OUT-OF-PLACE FFT */
+			if (fft2 != NULL)  fftw_destroy_plan(fft2);		// use OUT-OF-PLACE FFT
+			if (ifft2 != NULL) fftw_destroy_plan(ifft2);
+			shtns->ncplx_fft = ncplx * NLAT;		// fft is done out-of-place, store allocation size.
+			phi_embed = NPHI;
+			#if SHT_VERBOSE > 0
+				printf("        ** out-of-place fft **\n");
+			#endif
 		}
 		shtns->fft = fft;		shtns->ifft = ifft;
+		shtns->nspat = phi_embed * NLAT;
+		VFREE(Sh);		VFREE(ShF);
 
-		#if SHT_VERBOSE > 0
-			if (in_place == 0) printf("        ** out-of-place fft **\n");
-		#endif
 		#if SHT_VERBOSE > 2
 			printf(" *** fft plan :\n");
 			fftw_print_plan(fft);
@@ -573,14 +582,6 @@ void planFFT(shtns_cfg shtns, int layout)
 			fftw_print_plan(ifft);
 			printf("\n");
 		#endif
-		if (in_place) {
-			shtns->ncplx_fft = 0;		// fft is done in-place, no allocation needed.
-		} else {
-			shtns->ncplx_fft = ncplx * NLAT;		// fft is done out-of-place, store allocation size.
-			phi_embed = NPHI;
-		}
-		shtns->nspat = phi_embed * NLAT;
-		VFREE(Sh);		VFREE(ShF);
 	}
 
 	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
@@ -1923,18 +1924,22 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
 	t = sht_mem_size(shtns->lmax, shtns->mmax, shtns->mres, *nlat);
-	if ( (t > SHTNS_MAX_MEMORY) && (on_the_fly == 0) ) {		// huge transform has been requested
+	#if SHT_VERBOSE > 1
+		printf("Memory required for precomputed matrices (estimate) : %.3f Mb\n",t);
+	#endif
+	if ( t > SHTNS_MAX_MEMORY ) {		// huge transform has been requested
 		on_the_fly = 1;
 		if ( (flags == sht_reg_dct) || (flags == sht_reg_fast) ) shtns_runerr("Memory limit exceeded, try using sht_gauss or increase SHTNS_MAX_MEMORY in sht_config.h");
 		if (flags != sht_reg_poles) {
 			flags = sht_gauss;
 			if (n_gauss > 0) *nlat = n_gauss;
 		}
-		if (quick_init == 0) {
-			if (*nphi > 256) shtns->fftw_plan_mode = FFTW_PATIENT;		// do not waste too much time finding optimal fftw.
-			if (*nphi > 512) shtns->fftw_plan_mode = FFTW_MEASURE;
-		}
 //		if (t > 10*SHTNS_MAX_MEMORY) quick_init =1;			// do not time such large transforms.
+	}
+	if (quick_init == 0) {		// do not waste too much time finding optimal fftw.
+		// fftw_set_timelimit(60.0);		// do not search plans for more than 1 minute (does it work well ???)
+		if (*nphi > 512) shtns->fftw_plan_mode = FFTW_PATIENT;
+		if (*nphi > 1024) shtns->fftw_plan_mode = FFTW_MEASURE;
 	}
 
 	if (flags == sht_auto) {
