@@ -1691,6 +1691,9 @@ void shtns_print_cfg(shtns_cfg shtns)
 	printf("\n");
 }
 
+/// \internal returns 1 if val cannot fit in dest (unsigned)
+#define IS_TOO_LARGE(val, dest) (sizeof(dest) >= sizeof(val)) ? 0 : ( ( val >= (1<<(8*sizeof(dest))) ) ? 1 : 0 )
+
 /* PUBLIC INITIALIZATION & DESTRUCTION */
 
 /** \addtogroup init Initialization functions.
@@ -1719,10 +1722,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 
 //	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
 	if (lmax < 2) shtns_runerr("lmax must be at least 2");
-	if (sizeof(shtns->lmax) < sizeof(int)) {
-		int llim = 1 << (8*sizeof(shtns->lmax)-1);
-		if (lmax >= llim) shtns_runerr("lmax too large");
-	}
+	if (IS_TOO_LARGE(lmax, shtns->lmax)) shtns_runerr("lmax too large");
 #ifdef SHT_AXISYM
 	if (mmax != 0) shtns_runerr("axisymmetric version : only Mmax=0 allowed");
 #endif
@@ -1949,8 +1949,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		}
 	}
 
-	if (*nlat <= LMAX) shtns_runerr("NLAT_2*2 should be at least LMAX+1");
-	
+	if (IS_TOO_LARGE(*nlat, shtns->nlat)) shtns_runerr("Nlat too large");
+	if (IS_TOO_LARGE(*nphi, shtns->nphi)) shtns_runerr("Nphi too large");
+
 	// copy to global variables.
 #ifdef SHT_AXISYM
 	shtns->nphi = 1;
