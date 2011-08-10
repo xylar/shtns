@@ -1,27 +1,20 @@
-*** BUG ***
-+ fixed critical bug in SHtor_to_spat or SHsph_to_spat that lead to wrong results  (31/1/2011)
-+ NPHI>MMAX*2 is right condition for the sampling theorem to apply.	(16/10/2008)
-+ Bug found in SHT.c : here are the correct versions of LiM() and LM marcros :	(16/10/2008)
-	#define LiM(l,im) ( (im*(2*LMAX+2 -MRES*(im+1)))/2 + l )
-	#define LM(l,m) ( (m*(2*LMAX+2 -(m+MRES)))/(2*MRES) + l )
-+ Bug found in SHT.c : LMAX odd was treated incorrectly. (25/10/2008)
-
-+ Fixed bug : sparse SHT did not work with out-of-place FFT.
-
+*** KNOWN BUGS ***
 - We rely on fftw to allocate aligned memory. This only works if fftw has been compiled with sse2 support !!
   => we should therefore use our own aligned memory allocation ... (or use autoconf ?)
 
 *** TODO ***
-+ change architecture for more than one algo !
-+ compare in-place/out-of-place ffts and choose best
 - split the fft and the legendre transform so that they can be done independantly ?
+   -OR- allow to deactivate fft.
+- use split-array (FFTW guru interface) : seems more natural for on-the-fly transforms
+- AVX support (may benefit from split-arrays also !)
+- Using OpenCL may be interesting !
 
-new functions :
-  precompute_auto() will choose size (and maybe in-place/out-of-place) according to nl_order.
-  precompute_advanced() allow to set a complex layout.
-  suggest_size() will suggest sizes for nphi and nlat.
+- split m=0 and m>0 ??
+- Implement l even/odd sub-transforms.
+- Implement sperate m sub-transforms.
 
-*** Optimizations ***
+
+*** OPTIMIZATIONS ***
 
 for m=0, z[k] is zero up to l-1
          dtz[k] is zero up to l-2
@@ -31,15 +24,11 @@ for m=2, z[k] is constant up to l-1
          dtz[k] is constant up to l-2
 for m=3, z[k] is constant up to l-2
 
-- there is a need for a merged (3 components) DCT version
-- *** there is a need for transposed version !! ***
-
-*** On-the-fly ***
-+ m=0 : compress complex to real beforehand.
-- split m=0 and m>0 ??
-
+- there may be a need for a merged (3 components) DCT version [done for m=0]
+- *** there is a need for transposed version !! *** (why ??)
 - Optimize m=0 and NPHI=1 (don't need to go to "complex" representation)
-- Using CUDA may be interesting !
+
+*** NOTES ****
 
 + cache optimization have been performed for m=0 and are quite impressive at high LMAX.
 + cache optimizations associated with polar optimization for m>0.
@@ -47,35 +36,16 @@ for m=3, z[k] is constant up to l-2
 + tested transposed version of gauss algorithm. It does not perform much better (speedup <2% for "time_SHT -transpose")
 + the combined 3-component transforms are up to 25% faster than sacalar+vector with SSE.
 
-TIP:
 + LM_LOOP : translating an integer to a double is SLOW. So if l or l(l+1) is used in the computation, using an array is faster.
      furthermore, it seems that cache misses has less penalty than branch misses.
      LM loop with li[lm] array access seems faster... (at least for 4 arrays access).
 
-*** SHT.c
-
-- Implement l even/odd sub-transforms.
-- Implement sperate m sub-transforms.
-
 - SHT e/o does not work in DCT space. (ok in Gauss version as of r72)
 
-for SHsphtor_to_spat, maybe storing .t and .p together is not the best... => I think it is.
-
-- SHT : implement even and odd l sub-cases.
-	should not change array sizes. only SHT function calls may (must) be different.
--!!!	grid.c should also treat even/odd sub-cases. !!!
-
-+ NLAT odd is now allowed (but not for DCT)
-
-*** NOTES :
 DCT SHT is ok for LMAX=1300 and NLAT_2=1024. changeset 70:f901295a7862
 DCT tested up to LMAX=2045. changeset 218:d0d6a8e1e22b
 DCT tested up to LMAX=2700. changeset 244:76e0128a9ef7 (with mres=135)
 
-Run-time setup for everything.
-DCT is about 25% faster than GAUSS for xshells dj_ref case (axisym).
-
-Using long double for computing the legendre associated functions does not improve precision
-(if SHT are computed in double precisions !)
+DCT is measured about 25% faster than GAUSS for xshells dj_ref case (axisym).
 
 QGdynamo now successfully uses SHTns : the speedup is quite impressive x2.2 for a reasonable size.

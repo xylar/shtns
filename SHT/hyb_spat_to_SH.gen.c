@@ -40,8 +40,13 @@ V/// complex double arrays of size shtns->nlm.
   #endif
 
 QX	void GEN3(spat_to_SH_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
-VX	void GEN3(spat_to_SHsphtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
 3	void GEN3(spat_to_SHqst_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
+  #ifndef SHT_GRAD
+VX	void GEN3(spat_to_SHsphtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
+  #else
+S	void GEN3(spat_to_SHsph_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, complex double *Slm, long int llim) {
+T	void GEN3(spat_to_SHtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vp, complex double *Tlm, long int llim) {
+  #endif
 
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
@@ -51,33 +56,43 @@ V	struct DtDp *dzl;
 	long int i,i0, ni,l;
 	long int im, imlim;
 Q	complex double q0,q1;
-V	complex double s0,t0,s1,t1;
+S	complex double s0,s1;
+T	complex double t0,t1;
   #ifndef SHT_AXISYM
-QB	v2d reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
-VB	v2d tpeo[4*NLAT_2];	// theta and phi even and odd parts
+Q	v2d reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
+V	v2d tpeo[4*NLAT_2];	// theta and phi even and odd parts
 Q	#define reo0 ((double*)reo)
 V	#define tpeo0 ((double*)tpeo)
+V	#define te0(i)	tpeo0[4*(i)]
+V	#define to0(i)	tpeo0[4*(i)+1]
+V	#define pe0(i)	tpeo0[4*(i)+2]
+V	#define po0(i)	tpeo0[4*(i)+3]
+V	#define vteo0(i)	tpeo[2*(i)]
+V	#define vpeo0(i)	tpeo[2*(i)+1]
   #else
-QB	double reo0[2*NLAT_2+2] SSE;	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
-VB	double tpeo0[4*NLAT_2] SSE;	// theta and phi even and odd parts
+Q	double reo0[2*NLAT_2+2] SSE;	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
+S	double teo0[2*NLAT_2+2] SSE;
+T	double peo0[2*NLAT_2+2] SSE;
+S	#define te0(i)	teo0[2*(i)]
+S	#define to0(i)	teo0[2*(i)+1]
+T	#define pe0(i)	peo0[2*(i)]
+T	#define po0(i)	peo0[4*(i)+1]
+S	#define vteo0(i)	((s2d*) teo0)[i]
+T	#define vpeo0(i)	((s2d*) peo0)[i]
   #endif
 
 QX	#define ZL(i) vdup(zl[i])
 3	#define ZL(i) vdup(dzl[i].p)
 
 // defines how to access even and odd parts of data
-QB	#define re(i)	reo[2*(i)]
-QB	#define ro(i)	reo[2*(i)+1]
-VB	#define te(i)	tpeo[4*(i)]
-VB	#define to(i)	tpeo[4*(i)+1]
-VB	#define pe(i)	tpeo[4*(i)+2]
-VB	#define po(i)	tpeo[4*(i)+3]
-QB	#define re0(i)	reo0[2*(i)+1]
-QB	#define ro0(i)	reo0[2*(i)]
-VB	#define te0(i)	tpeo0[4*(i)]
-VB	#define to0(i)	tpeo0[4*(i)+1]
-VB	#define pe0(i)	tpeo0[4*(i)+2]
-VB	#define po0(i)	tpeo0[4*(i)+3]
+Q	#define re(i)	reo[2*(i)]
+Q	#define ro(i)	reo[2*(i)+1]
+V	#define te(i)	tpeo[4*(i)]
+V	#define to(i)	tpeo[4*(i)+1]
+V	#define pe(i)	tpeo[4*(i)+2]
+V	#define po(i)	tpeo[4*(i)+3]
+Q	#define re0(i)	reo0[2*(i)+1]
+Q	#define ro0(i)	reo0[2*(i)]
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 	imlim = MTR;
@@ -85,7 +100,8 @@ VB	#define po0(i)	tpeo0[4*(i)+3]
 		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
 Q		BrF = (complex double *) Vr;
-V		BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
+S		BtF = (complex double *) Vt;
+T		BpF = (complex double *) Vp;
 
   #ifndef SHT_AXISYM
 	if (shtns->ncplx_fft >= 0) {
@@ -120,8 +136,8 @@ V		fftw_execute_r2r(shtns->dct_m0,(double *) BtF, BT0);		// DCT out-of-place.
 V		fftw_execute_r2r(shtns->dct_m0,(double *) BpF, BP0);		// DCT out-of-place.
 	#else
 Q		#define BR0	reo0
-V		#define BT0	tpeo0
-V		#define BP0	(tpeo0 +NLAT)
+S		#define BT0	teo0
+T		#define BP0	peo0
 Q		if (NPHI > 1) {
 Q			s2d np = vdup(NPHI);
 Q			i=0;	do {
@@ -133,17 +149,18 @@ V		i=0;	do {
 V			s2d np = vdup(NPHI);
 V		#ifdef _GCC_VEC_
 V			s2d sin_1 = ((s2d *)st_1)[i] * np;
-V			((v2d*) BtF)[i] *= sin_1; 	((v2d*) BpF)[i] *= sin_1;
+S			((v2d*) BtF)[i] *= sin_1;
+T		 	((v2d*) BpF)[i] *= sin_1;
 V		#else
 V			double sin_1 = st_1[2*i] * np;		double sin_2 = st_1[2*i+1] * np;
-V			BT0[2*i] *= sin_1;		BT0[2*i+1] *= sin_2;
-V			BP0[2*i] *= sin_1;		BP0[2*i+1] *= sin_2;
+S			BT0[2*i] *= sin_1;		BT0[2*i+1] *= sin_2;
+T			BP0[2*i] *= sin_1;		BP0[2*i+1] *= sin_2;
 V		#endif
 V			i++;
 V		} while (i<ni);
 Q		fftw_execute_r2r(shtns->dct_r1,(double *) BrF, BR0);	// DCT out-of-place.
-V		fftw_execute_r2r(shtns->dct_r1,(double *) BtF, BT0);	// DCT out-of-place.
-V		fftw_execute_r2r(shtns->dct_r1,(double *) BpF, BP0);	// DCT out-of-place.
+S		fftw_execute_r2r(shtns->dct_r1,(double *) BtF, BT0);	// DCT out-of-place.
+T		fftw_execute_r2r(shtns->dct_r1,(double *) BpF, BP0);	// DCT out-of-place.
 	#endif
 		l=0;
 		long int klim = shtns->klim;
@@ -152,13 +169,16 @@ V		fftw_execute_r2r(shtns->dct_r1,(double *) BpF, BP0);	// DCT out-of-place.
 			if (i < klim) klim = i;
 		#endif
 Q		v2d* Ql = (v2d*) Qlm;
-V		v2d* Sl = (v2d*) Slm;	v2d* Tl = (v2d*) Tlm;
+S		v2d* Sl = (v2d*) Slm;
+T		v2d* Tl = (v2d*) Tlm;
 Q		zl = shtns->zlm_dct0;
 V		dzl0 = shtns->dzlm_dct0;
 V	#ifndef _GCC_VEC_
-V		s1 = 0.0;	t1 = 0.0;		// l=0 : Sl = Tl = 0
+S		s1 = 0.0;		// l=0 : Sl = 0
+T		t1 = 0.0;		// l=0 : Tl = 0
 V	#else
-V		v2d s = vdup(0.0);		v2d t = vdup(0.0);		// l=0 : Sl = Tl = 0
+S		v2d s = vdup(0.0);		// l=0 : Sl = 0
+T		v2d t = vdup(0.0);		// l=0 : Tl = 0
 V	#endif
 QX		BR0[klim] = 0;		BR0[klim+1] = 0;		// allow some overflow.
 	#ifdef SHT_VAR_LTR
@@ -168,37 +188,43 @@ QX		BR0[klim] = 0;		BR0[klim+1] = 0;		// allow some overflow.
 	#endif
 			i=l;	// l < klim
 	  #ifndef _GCC_VEC_
-V			Sl[l] = s1;		Tl[l] = t1;
+S			Sl[l] = s1;
+T			Tl[l] = t1;
 Q			q0 = 0.0;	q1 = 0.0;
-V			s0 = 0.0;	t1 = 0.0;	t0 = 0.0;	s1 = 0.0;
+S			s0 = 0.0;	s1 = 0.0;
+T			t0 = 0.0;	t1 = 0.0;
 			do {
 Q				q0 += BR0[i]   * zl[i];
 Q				q1 += BR0[i+1] * zl[i+1];
-V				s0 += BT0[i]   * dzl0[i];
-V				t0 -= BP0[i]   * dzl0[i];
-V				s1 += BT0[i+1] * dzl0[i+1];
-V				t1 -= BP0[i+1] * dzl0[i+1];
+S				s0 += BT0[i]   * dzl0[i];
+T				t0 -= BP0[i]   * dzl0[i];
+S				s1 += BT0[i+1] * dzl0[i+1];
+T				t1 -= BP0[i+1] * dzl0[i+1];
 				i+=2;
 			} while(i<klim);
 Q			Ql[l] = q0;		Ql[l+1] = q1;
-V			Sl[l+1] = s0;	Tl[l+1] = t0;
+S			Sl[l+1] = s0;
+T			Tl[l+1] = t0;
 	  #else
-V			Sl[l] = vhi_to_cplx(s);		Tl[l] = vhi_to_cplx(t);
-V			s = vdup(0.0);		t = vdup(0.0);
+S			Sl[l] = vhi_to_cplx(s);
+T			Tl[l] = vhi_to_cplx(t);
+S			s = vdup(0.0);
+T			t = vdup(0.0);
 Q			s2d q = vdup(0.0);
 QX			s2d q1 = vdup(0.0);
 			i >>= 1;	// i = i/2
 			do {
 Q				q += ((s2d*) zl)[i] * ((s2d*) BR0)[i];
-V				s += ((s2d*) dzl0)[i] * ((s2d*) BT0)[i];
-V				t -= ((s2d*) dzl0)[i] * ((s2d*) BP0)[i];
+S				s += ((s2d*) dzl0)[i] * ((s2d*) BT0)[i];
+T				t -= ((s2d*) dzl0)[i] * ((s2d*) BP0)[i];
 				i++;
 QX				q1 += ((s2d*) zl)[i] * ((s2d*) BR0)[i];
 QX				i++;
 			} while(2*i < klim);
 QX			q += q1;
 Q			Ql[l]   = vlo_to_cplx(q);		Ql[l+1] = vhi_to_cplx(q);
-V			Sl[l+1] = vlo_to_cplx(s);		Tl[l+1] = vlo_to_cplx(t);
+S			Sl[l+1] = vlo_to_cplx(s);
+T			Tl[l+1] = vlo_to_cplx(t);
 	  #endif
 			l+=2;
 Q			zl += (shtns->klim - l);
@@ -210,9 +236,11 @@ V			dzl0 += (shtns->klim -l);
 	#endif
 		if (l == llim) {
 V	#ifndef _GCC_VEC_
-V			Sl[l] = s1;		Tl[l] = t1;
+S			Sl[l] = s1;
+T			Tl[l] = t1;
 V	#else
-V			((v2d*) Sl)[l] = vhi_to_cplx(s);		((v2d*) Tl)[l] = vhi_to_cplx(t);
+S			((v2d*) Sl)[l] = vhi_to_cplx(s);
+T			((v2d*) Tl)[l] = vhi_to_cplx(t);
 V	#endif
 Q			q0 = 0.0;
 Q			i=l;	// l < klim
@@ -224,17 +252,19 @@ Q			((complex double *) Ql)[l] = q0;
 			l++;
 		}
 Q	#undef BR0
-V	#undef BT0
-V	#undef BP0
+S	#undef BT0
+T	#undef BP0
   #ifdef SHT_VAR_LTR
 		while( l<=LMAX ) {
 Q			Ql[l] = vdup(0.0);
-V			Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
+S			Sl[l] = vdup(0.0);
+T			Tl[l] = vdup(0.0);
 			l++;
 		}
   #endif
 Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
+S		BtF += NLAT;
+T		BpF += NLAT;
   #else		// ifndef SHT_NO_DCT
 		i=0;
 QE		double r0 = 0.0;
@@ -253,30 +283,28 @@ Q		zl = shtns->zlm[0];
 			s2d np = vdup(NPHI);
 Q			s2d a = vdup(((double*)BrF)[i*STEP]);		s2d b = vdup(((double*)BrF)[(NLAT-1-i)*STEP]);
 Q			a = subadd(a,b) XNP;
-QB			((s2d*) reo0)[i] = a;		// assume odd is first, then even.
-QE			r0 += zl[i] * vhi_to_dbl(a);	// even part is used.
-VB			s2d c = vdup(((double*)BtF)[i*STEP]);		s2d d = vdup(((double*)BtF)[(NLAT-1-i)*STEP]);
-VB			c = subadd(c,d) XNP;		((s2d*) tpeo0)[2*i] = vxchg(c);
-VB			s2d e = vdup(((double*)BpF)[i*STEP]);		s2d f = vdup(((double*)BpF)[(NLAT-1-i)*STEP]);
-VB			e = subadd(e,f) XNP;		((s2d*) tpeo0)[2*i+1] = vxchg(e);
- B			i++;
-Q		  #ifndef SHT_3COMP
-Q			s2d g = vdup(((double*)BrF)[i*STEP]);		s2d h = vdup(((double*)BrF)[(NLAT-1-i)*STEP]);
-Q			g = subadd(g,h) XNP;
-QB			((s2d*) reo0)[i] = g;		// assume odd is first, then even.
-QE			r1 += zl[i] * vhi_to_dbl(g);	// even part is used, reduce data dependency
-Q			i++;
-Q		  #endif
+Q			((s2d*) reo0)[i] = a;		// assume odd is first, then even.
+Q			r0 += zl[i] * vhi_to_dbl(a);	// even part is used.
+S			s2d c = vdup(((double*)BtF)[i*STEP]);		s2d d = vdup(((double*)BtF)[(NLAT-1-i)*STEP]);
+S			c = subadd(c,d) XNP;		vteo0(i) = vxchg(c);
+T			s2d e = vdup(((double*)BpF)[i*STEP]);		s2d f = vdup(((double*)BpF)[(NLAT-1-i)*STEP]);
+T			e = subadd(e,f) XNP;		vpeo0(i) = vxchg(e);
+			i++;
+QX			s2d g = vdup(((double*)BrF)[i*STEP]);		s2d h = vdup(((double*)BrF)[(NLAT-1-i)*STEP]);
+QX			g = subadd(g,h) XNP;
+QX			((s2d*) reo0)[i] = g;		// assume odd is first, then even.
+QX			r1 += zl[i] * vhi_to_dbl(g);	// even part is used, reduce data dependency
+QX			i++;
 		#else
- B			double np = NPHI;
-QB			double a = ((double*)BrF)[i*STEP];		double b = ((double*)BrF)[(NLAT-1-i)*STEP];
-QB			ro0(i) = (a-b) XNP;		re0(i) = (a+b) XNP;
-QB			r0 += zl[i] * ((a+b) XNP);
-VB			double c = ((double*)BtF)[i*STEP];		double d = ((double*)BtF)[(NLAT-1-i)*STEP];
-VB			te0(i) = (c+d) XNP;		to0(i) = (c-d) XNP;
-VB			double e = ((double*)BpF)[i*STEP];		double f = ((double*)BpF)[(NLAT-1-i)*STEP];
-VB			pe0(i) = (e+f) XNP;		po0(i) = (e-f) XNP;
- B			i++;
+			double np = NPHI;
+Q			double a = ((double*)BrF)[i*STEP];		double b = ((double*)BrF)[(NLAT-1-i)*STEP];
+Q			ro0(i) = (a-b) XNP;		re0(i) = (a+b) XNP;
+Q			r0 += zl[i] * ((a+b) XNP);
+S			double c = ((double*)BtF)[i*STEP];		double d = ((double*)BtF)[(NLAT-1-i)*STEP];
+S			te0(i) = (c+d) XNP;		to0(i) = (c-d) XNP;
+T			double e = ((double*)BpF)[i*STEP];		double f = ((double*)BpF)[(NLAT-1-i)*STEP];
+T			pe0(i) = (e+f) XNP;		po0(i) = (e-f) XNP;
+ 			i++;
 		#endif
 		} while(i<ni);
 		#undef STEP
@@ -286,12 +314,15 @@ QX		ro0(ni) = 0.0;		re0(ni) = 0.0;		// allow some overflow.
 Q		zl += ni + (ni&1);		// SSE alignement
 		l=1;			// l=0 is zero for the vector transform.
 Q		v2d* Ql = (v2d*) Qlm;		// virtual pointer for l=0 and im
-V		v2d* Sl = (v2d*) Slm;	v2d* Tl = (v2d*) Tlm;		// virtual pointer for l=0 and im
+S		v2d* Sl = (v2d*) Slm;		// virtual pointer for l=0 and im
+T		v2d* Tl = (v2d*) Tlm;		// virtual pointer for l=0 and im
 V		dzl0 = (double *) shtns->dzlm[0];		// only theta derivative (d/dphi = 0 for m=0)
-QB		BrF += NLAT;
-VB		BtF += NLAT;	BpF += NLAT;
+Q		BrF += NLAT;
+S		BtF += NLAT;
+T		BpF += NLAT;
 Q		((complex double *)Ql)[0] = r0;
-V		Sl[0] = vdup(0.0);	Tl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
+S		Sl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
+T		Tl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
 	#ifdef SHT_VAR_LTR
 		while (l<llim) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 	#else
@@ -299,32 +330,33 @@ V		Sl[0] = vdup(0.0);	Tl[0] = vdup(0.0);	// l=0 is zero for the vector transform
 	#endif
 			i=0;
   #ifndef _GCC_VEC_
-QE			double q0 = 0.0;
-QO			double q1 = 0.0;
-VE			double s0 = 0.0;	double t1 = 0.0;
-VO			double t0 = 0.0;	double s1 = 0.0;
+Q			double q0 = 0.0;
+Q			double q1 = 0.0;
+S			double s0 = 0.0;	double s1 = 0.0;
+T			double t0 = 0.0;	double t1 = 0.0;
 			do {
-QE				q0 += zl[0] * ro0(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				q1 += zl[1] * re0(i);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
-VO				s0 += dzl0[0] * te0(i);
-VE				t0 -= dzl0[0] * pe0(i);
-VE				s1 += dzl0[1] * to0(i);
-VO				t1 -= dzl0[1] * po0(i);
+Q				q0 += zl[0] * ro0(i);	// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+Q				q1 += zl[1] * re0(i);	// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+S				s0 += dzl0[0] * te0(i);
+T				t0 -= dzl0[0] * pe0(i);
+S				s1 += dzl0[1] * to0(i);
+T				t1 -= dzl0[1] * po0(i);
 Q				zl +=2;
 V				dzl0 +=2;
 				i++;
 			} while(i < ni);
-QE			Ql[l] = q0;
-QO			Ql[l+1] = q1;
-VE			Sl[l] = s0;		Tl[l+1] = t1;
-VO			Tl[l] = t0;		Sl[l+1] = s1;
+Q			Ql[l] = q0;
+Q			Ql[l+1] = q1;
+S			Sl[l] = s0;		Sl[l+1] = s1;
+T			Tl[l] = t0;		Tl[l+1] = t1;
   #else
-V			s2d s = vdup(0.0);		s2d t = vdup(0.0);
+S			s2d s = vdup(0.0);
+T			s2d t = vdup(0.0);
 Q			s2d q = vdup(0.0);
 QX			s2d q1 = vdup(0.0);
 			do {
-V				s += ((s2d*) dzl0)[i] * ((s2d*) tpeo0)[2*i];
-V				t -= ((s2d*) dzl0)[i] * ((s2d*) tpeo0)[2*i+1];
+S				s += ((s2d*) dzl0)[i] * vteo0(i);
+T				t -= ((s2d*) dzl0)[i] * vpeo0(i);
 Q				q += ((s2d*) zl)[i] * ((s2d*) reo0)[i];
 				i++;
 QX				q1 += ((s2d*) zl)[i] * ((s2d*) reo0)[i];		// reduce dependency
@@ -334,8 +366,8 @@ QX			q += q1;
 Q			zl += 2*ni;
 V			dzl0 += 2*ni;
 Q			Ql[l] = vlo_to_cplx(q);		Ql[l+1] = vhi_to_cplx(q);
-V			Sl[l] = vlo_to_cplx(s);		Sl[l+1] = vhi_to_cplx(s);
-V			Tl[l] = vlo_to_cplx(t);		Tl[l+1] = vhi_to_cplx(t);
+S			Sl[l] = vlo_to_cplx(s);		Sl[l+1] = vhi_to_cplx(s);
+T			Tl[l] = vlo_to_cplx(t);		Tl[l+1] = vhi_to_cplx(t);
   #endif
 			l+=2;
 	#ifndef SHT_VAR_LTR
@@ -349,32 +381,31 @@ V			Tl[l] = vlo_to_cplx(t);		Tl[l+1] = vhi_to_cplx(t);
 			if (l != LMAX) lstride=2;
 	  #endif
 QX			double q1 = 0.0;		// reduce dependency by unrolling loop
-QE			double q0 = 0.0;
-VE			double s0 = 0.0;
-VO			double t0 = 0.0;
+Q			double q0 = 0.0;
+S			double s0 = 0.0;
+T			double t0 = 0.0;
 			i=0;	do {
-QE				q0 += zl[0] * ro0(i);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-VE				s0 += dzl0[0] * te0(i);
-VO				t0 -= dzl0[0] * pe0(i);
+Q				q0 += zl[0] * ro0(i);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+S				s0 += dzl0[0] * te0(i);
+T				t0 -= dzl0[0] * pe0(i);
 Q				zl += lstride;
 V				dzl0 += lstride;
 				i++;
-		#ifndef SHT_3COMP
-QE				q1 += zl[0] * ro0(i);
-Q				zl += lstride;
-Q				i++;
-		#endif
+QX				q1 += zl[0] * ro0(i);
+QX				zl += lstride;
+QX				i++;
 			} while(i<ni);
 QX			q0 += q1;
-QE			((complex double *)Ql)[l] = q0;
-VE			((complex double *)Sl)[l] = s0;
-VO			((complex double *)Tl)[l] = t0;
+Q			((complex double *)Ql)[l] = q0;
+S			((complex double *)Sl)[l] = s0;
+T			((complex double *)Tl)[l] = t0;
 	  #ifdef SHT_VAR_LTR
 	  		l++;
 		}
 	    while( l<=LMAX ) {
 Q			Ql[l] = vdup(0.0);
-V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
+S			Sl[l] = vdup(0.0);
+T			Tl[l] = vdup(0.0);
 			l++;
       #endif
 		}
@@ -382,18 +413,15 @@ V			Sl[l] = vdup(0.0);	Tl[l] = vdup(0.0);
   #ifndef SHT_AXISYM
 	for (im=1;im<=imlim;im++) {
 		i0 = shtns->tm[im];
- B		i=i0;
- B		do {	// compute symmetric and antisymmetric parts.
-		  #ifdef SHT_3COMP
-QB			s2d sin = vdup(shtns->st[i]);
-QB			v2d q0 = ((v2d *)BrF)[i];	v2d q1 = ((v2d *)BrF)[NLAT-1-i];		re(i) = (q0+q1)*sin;	ro(i) = (q0-q1)*sin;
-		  #else
-QB			v2d q0 = ((v2d *)BrF)[i];	v2d q1 = ((v2d *)BrF)[NLAT-1-i];		re(i) = q0+q1;	ro(i) = q0-q1;		  
-		  #endif
-VB			v2d t0 = ((v2d *)BtF)[i];	v2d t1 = ((v2d *)BtF)[NLAT-1-i];		te(i) = t0+t1;	to(i) = t0-t1;
-VB			v2d s0 = ((v2d *)BpF)[i];	v2d s1 = ((v2d *)BpF)[NLAT-1-i];		pe(i) = s0+s1;	po(i) = s0-s1;
- B			i++;
- B		} while (i<ni);
+ 		i=i0;
+		do {	// compute symmetric and antisymmetric parts.
+3			s2d sin = vdup(shtns->st[i]);
+3			v2d q0 = ((v2d *)BrF)[i];	v2d q1 = ((v2d *)BrF)[NLAT-1-i];		re(i) = (q0+q1)*sin;	ro(i) = (q0-q1)*sin;
+QX			v2d q0 = ((v2d *)BrF)[i];	v2d q1 = ((v2d *)BrF)[NLAT-1-i];		re(i) = q0+q1;	ro(i) = q0-q1;		  
+V			v2d t0 = ((v2d *)BtF)[i];	v2d t1 = ((v2d *)BtF)[NLAT-1-i];		te(i) = t0+t1;	to(i) = t0-t1;
+V			v2d s0 = ((v2d *)BpF)[i];	v2d s1 = ((v2d *)BpF)[NLAT-1-i];		pe(i) = s0+s1;	po(i) = s0-s1;
+ 			i++;
+ 		} while (i<ni);
 		l = LiM(shtns, 0,im);
 Q		v2d* Ql = (v2d*) &Qlm[l];	// virtual pointer for l=0 and im
 V		v2d* Sl = (v2d*) &Slm[l];		v2d* Tl = (v2d*) &Tlm[l];
@@ -404,31 +432,31 @@ V		dzl = shtns->dzlm[im];
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 		while (l<llim) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
-QE			v2d q0 = vdup(0.0);
-QO			v2d q1 = vdup(0.0);
-VE			v2d s0 = vdup(0.0);	v2d t1 = vdup(0.0);		v2d s0i = vdup(0.0);	v2d t1i = vdup(0.0);
-VO			v2d t0 = vdup(0.0);	v2d s1 = vdup(0.0);		v2d t0i = vdup(0.0);	v2d s1i = vdup(0.0);
+Q			v2d q0 = vdup(0.0);
+Q			v2d q1 = vdup(0.0);
+V			v2d s0 = vdup(0.0);	v2d t1 = vdup(0.0);		v2d s0i = vdup(0.0);	v2d t1i = vdup(0.0);
+V			v2d t0 = vdup(0.0);	v2d s1 = vdup(0.0);		v2d t0i = vdup(0.0);	v2d s1i = vdup(0.0);
 			i=i0;	do {		// tm[im] : polar optimization
-VE				s0  += vdup(dzl[0].t) *to(i);		// ref: these E. Dormy p 72.
-VO				t0  -= vdup(dzl[0].t) *po(i);
-VO				s1  += vdup(dzl[1].t) *te(i);
-VE				t1  -= vdup(dzl[1].t) *pe(i);
-VE				s0i -= vdup(dzl[0].p) *pe(i);
-VO				t0i -= vdup(dzl[0].p) *te(i);
-VO				s1i -= vdup(dzl[1].p) *po(i);
-VE				t1i -= vdup(dzl[1].p) *to(i);
-QE				q0  += re(i) * ZL(0);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
-QO				q1  += ro(i) * ZL(1);		// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
+V				s0  += vdup(dzl[0].t) *to(i);		// ref: these E. Dormy p 72.
+V				t0  -= vdup(dzl[0].t) *po(i);
+V				s1  += vdup(dzl[1].t) *te(i);
+V				t1  -= vdup(dzl[1].t) *pe(i);
+V				s0i -= vdup(dzl[0].p) *pe(i);
+V				t0i -= vdup(dzl[0].p) *te(i);
+V				s1i -= vdup(dzl[1].p) *po(i);
+V				t1i -= vdup(dzl[1].p) *to(i);
+Q				q0  += re(i) * ZL(0);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+Q				q1  += ro(i) * ZL(1);		// Qlm[LiM(l+1,im)] += zlm[im][(l+1-m)*NLAT/2 + i] * fm[i];
 Q				zl +=2;
 V				dzl +=2;
 				i++;
 			} while (i < ni);
 3			q0 *= vdup((l*(l+1))*m_1);
 3			q1 *= vdup(((l+1)*(l+2))*m_1);
-VE			Sl[l] = addi(s0,s0i);	Tl[l+1] = addi(t1,t1i);
-VO			Tl[l] = addi(t0,t0i);	Sl[l+1] = addi(s1,s1i);
-QE			Ql[l] = q0;
-QO			Ql[l+1] = q1;
+V			Sl[l] = addi(s0,s0i);	Tl[l+1] = addi(t1,t1i);
+V			Tl[l] = addi(t0,t0i);	Sl[l+1] = addi(s1,s1i);
+Q			Ql[l] = q0;
+Q			Ql[l+1] = q1;
 			l+=2;
 		}
 		if (l==llim) {
@@ -436,23 +464,23 @@ QO			Ql[l+1] = q1;
 	  #ifdef SHT_VAR_LTR
 			if (l != LMAX) lstride=2;
 	  #endif
-QE			v2d q0 = vdup(0.0);	// Qlm[LiM(l,im)] = 0.0;
-VE			v2d s0 = vdup(0.0);	v2d s0i = vdup(0.0);
-VO			v2d t0 = vdup(0.0);	v2d t0i = vdup(0.0);
+Q			v2d q0 = vdup(0.0);	// Qlm[LiM(l,im)] = 0.0;
+V			v2d s0 = vdup(0.0);	v2d s0i = vdup(0.0);
+V			v2d t0 = vdup(0.0);	v2d t0i = vdup(0.0);
 			i=i0;	do {		// tm[im] : polar optimization
-VE				s0  += vdup(dzl[0].t) *to(i);
-VO				t0  -= vdup(dzl[0].t) *po(i);
-VE				s0i -= vdup(dzl[0].p) *pe(i);
-VO				t0i -= vdup(dzl[0].p) *te(i);
-QE				q0  += re(i) * ZL(0);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
+V				s0  += vdup(dzl[0].t) *to(i);
+V				t0  -= vdup(dzl[0].t) *po(i);
+V				s0i -= vdup(dzl[0].p) *pe(i);
+V				t0i -= vdup(dzl[0].p) *te(i);
+Q				q0  += re(i) * ZL(0);		// Qlm[LiM(l,im)] += zlm[im][(l-m)*NLAT/2 + i] * fp[i];
 Q				zl  += lstride;
 V				dzl += lstride;
 				i++;
 			} while(i<ni);
 3			q0 *= vdup((l*(l+1))*m_1);
-VE			Sl[l] = addi(s0,s0i);
-VO			Tl[l] = addi(t0,t0i);
-QE			Ql[l] = q0;
+V			Sl[l] = addi(s0,s0i);
+V			Tl[l] = addi(t0,t0i);
+Q			Ql[l] = q0;
 	  #ifdef SHT_VAR_LTR
 	  		l++;
 		}
@@ -498,4 +526,6 @@ V	#undef teo0
 V	#undef peo0
 Q	#undef reo0
 V	#undef tpeo0
+V	#undef vteo0
+V	#undef vpeo0
   }

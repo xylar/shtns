@@ -110,32 +110,26 @@ V	l_2 = shtns->l_2;
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
 		i=0;
 Q		double r0 = 0.0;
-  #ifndef SHT_AXISYM
-		i0 = (NPHI==1) ? 1 : 2;		// stride of source data.
+		#ifdef SHT_AXISYM
+			#define STEP 1
+			#define XNP *NPHI
+		#else
+			#define STEP 2
+			#define XNP
+		#endif
  		do {	// compute symmetric and antisymmetric parts.
- 			double w = wg[i];
-Q			double a = ((double*)BrF)[i*i0];		double b = ((double*)BrF)[(NLAT-1)*i0 -i*i0];
+ 			double w = wg[i] XNP;
+Q			double a = ((double*)BrF)[i*STEP];		double b = ((double*)BrF)[(NLAT-1)*STEP -i*STEP];
 Q			ror[i] = (a-b)*w;		rer[i] = (a+b)*w;
 Q			r0 += ((a+b)*w);
-V			double c = ((double*)BtF)[i*i0];		double d = ((double*)BtF)[(NLAT-1)*i0 -i*i0];
+V			double c = ((double*)BtF)[i*STEP];		double d = ((double*)BtF)[(NLAT-1)*STEP -i*STEP];
 V			ter[i] = (c+d)*w;		tor[i] = (c-d)*w;
-V			double e = ((double*)BpF)[i*i0];		double f = ((double*)BpF)[(NLAT-1)*i0 -i*i0];
+V			double e = ((double*)BpF)[i*STEP];		double f = ((double*)BpF)[(NLAT-1)*STEP -i*STEP];
 V			per[i] = (e+f)*w;		por[i] = (e-f)*w;
  			i++;
  		} while(i<ni);
-  #else
- 		do {	// compute symmetric and antisymmetric parts.
- 			double np = wg[i]*NPHI;
-Q			double a = ((double*)BrF)[i];		double b = ((double*)BrF)[NLAT-1-i];
-Q			ror[i] = (a-b)*np;		rer[i] = (a+b)*np;
-Q			r0 += ((a+b)*np);
-V			double c = ((double*)BtF)[i];		double d = ((double*)BtF)[NLAT-1-i];
-V			ter[i] = (c+d)*np;		tor[i] = (c-d)*np;
-V			double e = ((double*)BpF)[i];		double f = ((double*)BpF)[NLAT-1-i];
-V			per[i] = (e+f)*np;		por[i] = (e-f)*np;
-			i++;
- 		} while(i<ni);
-  #endif
+ 		#undef XNP
+ 		#undef STEP
 		do {
 Q			rer[i] = 0.0;		ror[i] = 0.0;
 V			ter[i] = 0.0;		tor[i] = 0.0;

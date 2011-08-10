@@ -42,6 +42,8 @@ GSP=hyb_spat_to_SH.gen.c
 SC=spat_to_SH.c
 VE=spat_to_SHst.c
 V3=spat_to_SHqst.c
+VS0=spat_to_SHs.c
+VT0=spat_to_SHt.c
 
 #sparse
 GSPEO=sparse_spat_to_SH.gen.c
@@ -120,10 +122,14 @@ $(SC) : $(GSP) Makefile
 	@echo "// To modify it, please consider modifying $(GSP)" >> $(SC)
 	@cp $(SC) $(VE)
 	@cp $(SC) $(V3)
+	@cp $(SC) $(VS0)
+	@cp $(SC) $(VT0)
 #EVEN/ODD
 	@sed $(eo) $(scal) $(GSP) >> $(SC)
 	@sed $(eo) $(vect) $(GSP) >> $(VE)
 	@sed $(eo) $(v3d)  $(GSP) >> $(V3)
+	@sed $(eo) $(sph)  $(GSP) >> $(VS0)
+	@sed $(eo) $(tor)  $(GSP) >> $(VT0)
 	@echo "spat_to_SH* code generated."
 
 # sparse_SH_to_spat generation
