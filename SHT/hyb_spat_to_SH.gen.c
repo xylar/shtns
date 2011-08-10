@@ -238,32 +238,50 @@ V		BtF += NLAT;	BpF += NLAT;
   #else		// ifndef SHT_NO_DCT
 		i=0;
 QE		double r0 = 0.0;
+QX		double r1 = 0.0;
 Q		zl = shtns->zlm[0];
-  #ifndef SHT_AXISYM
-		i0 = (NPHI==1) ? 1 : 2;		// stride of source data.
- B		do {	// compute symmetric and antisymmetric parts.
-QB			double a = ((double*)BrF)[i*i0];		double b = ((double*)BrF)[(NLAT-1)*i0 -i*i0];
-QB			ro0(i) = a-b;		re0(i) = a+b;
-QB			r0 += zl[i] * (a+b);
-VB			double c = ((double*)BtF)[i*i0];		double d = ((double*)BtF)[(NLAT-1)*i0 -i*i0];
-VB			te0(i) = c+d;		to0(i) = c-d;
-VB			double e = ((double*)BpF)[i*i0];		double f = ((double*)BpF)[(NLAT-1)*i0 -i*i0];
-VB			pe0(i) = e+f;		po0(i) = e-f;
+		// stride of source data. => now we assume NPHI>1 else SHT_AXISYM is defined.
+	#ifndef SHT_AXISYM
+		#define STEP 2
+		#define XNP
+	#else
+		#define STEP 1
+		#define XNP *np
+	#endif
+		do {	// compute symmetric and antisymmetric parts.
+		#if _GCC_VEC_ && __SSE3__
+			s2d np = vdup(NPHI);
+Q			s2d a = vdup(((double*)BrF)[i*STEP]);		s2d b = vdup(((double*)BrF)[(NLAT-1-i)*STEP]);
+Q			a = subadd(a,b) XNP;
+QB			((s2d*) reo0)[i] = a;		// assume odd is first, then even.
+QE			r0 += zl[i] * vhi_to_dbl(a);	// even part is used.
+VB			s2d c = vdup(((double*)BtF)[i*STEP]);		s2d d = vdup(((double*)BtF)[(NLAT-1-i)*STEP]);
+VB			c = subadd(c,d) XNP;		((s2d*) tpeo0)[2*i] = vxchg(c);
+VB			s2d e = vdup(((double*)BpF)[i*STEP]);		s2d f = vdup(((double*)BpF)[(NLAT-1-i)*STEP]);
+VB			e = subadd(e,f) XNP;		((s2d*) tpeo0)[2*i+1] = vxchg(e);
  B			i++;
- B		} while(i<ni);
-  #else
- B		do {	// compute symmetric and antisymmetric parts.
+Q		  #ifndef SHT_3COMP
+Q			s2d g = vdup(((double*)BrF)[i*STEP]);		s2d h = vdup(((double*)BrF)[(NLAT-1-i)*STEP]);
+Q			g = subadd(g,h) XNP;
+QB			((s2d*) reo0)[i] = g;		// assume odd is first, then even.
+QE			r1 += zl[i] * vhi_to_dbl(g);	// even part is used, reduce data dependency
+Q			i++;
+Q		  #endif
+		#else
  B			double np = NPHI;
-QB			double a = ((double*)BrF)[i];		double b = ((double*)BrF)[NLAT-1-i];
-QB			ro0(i) = (a-b)*np;		re0(i) = (a+b)*np;
-QB			r0 += zl[i] * ((a+b)*np);
-VB			double c = ((double*)BtF)[i];		double d = ((double*)BtF)[NLAT-1-i];
-VB			te0(i) = (c+d)*np;		to0(i) = (c-d)*np;
-VB			double e = ((double*)BpF)[i];		double f = ((double*)BpF)[NLAT-1-i];
-VB			pe0(i) = (e+f)*np;		po0(i) = (e-f)*np;
+QB			double a = ((double*)BrF)[i*STEP];		double b = ((double*)BrF)[(NLAT-1-i)*STEP];
+QB			ro0(i) = (a-b) XNP;		re0(i) = (a+b) XNP;
+QB			r0 += zl[i] * ((a+b) XNP);
+VB			double c = ((double*)BtF)[i*STEP];		double d = ((double*)BtF)[(NLAT-1-i)*STEP];
+VB			te0(i) = (c+d) XNP;		to0(i) = (c-d) XNP;
+VB			double e = ((double*)BpF)[i*STEP];		double f = ((double*)BpF)[(NLAT-1-i)*STEP];
+VB			pe0(i) = (e+f) XNP;		po0(i) = (e-f) XNP;
  B			i++;
- B		} while(i<ni);
-  #endif
+		#endif
+		} while(i<ni);
+		#undef STEP
+		#undef XNP
+QX		r0 += r1;
 QX		ro0(ni) = 0.0;		re0(ni) = 0.0;		// allow some overflow.
 Q		zl += ni + (ni&1);		// SSE alignement
 		l=1;			// l=0 is zero for the vector transform.
@@ -330,6 +348,7 @@ V			Tl[l] = vlo_to_cplx(t);		Tl[l+1] = vhi_to_cplx(t);
 	  #ifdef SHT_VAR_LTR
 			if (l != LMAX) lstride=2;
 	  #endif
+QX			double q1 = 0.0;		// reduce dependency by unrolling loop
 QE			double q0 = 0.0;
 VE			double s0 = 0.0;
 VO			double t0 = 0.0;
@@ -340,7 +359,13 @@ VO				t0 -= dzl0[0] * pe0(i);
 Q				zl += lstride;
 V				dzl0 += lstride;
 				i++;
+		#ifndef SHT_3COMP
+QE				q1 += zl[0] * ro0(i);
+Q				zl += lstride;
+Q				i++;
+		#endif
 			} while(i<ni);
+QX			q0 += q1;
 QE			((complex double *)Ql)[l] = q0;
 VE			((complex double *)Sl)[l] = s0;
 VO			((complex double *)Tl)[l] = t0;

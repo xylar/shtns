@@ -495,7 +495,6 @@ void planFFT(shtns_cfg shtns, int layout)
 
 	if (NPHI==1) 	// no FFT needed.
 	{
-		if (theta_inc != 1) shtns_runerr("only contiguous spatial data is supported for Nphi=1");
 		#if SHT_VERBOSE > 0
 			printf("        => no fft : Mmax=0, Nphi=1, Nlat=%d\n",NLAT);
 		#endif

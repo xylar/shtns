@@ -681,7 +681,7 @@ int main(int argc, char *argv[])
 	printf(":: LTR\n");
 	test_SHT_vect_l(LMAX/2);
 	
-	printf("** performing %d 3D vector SHT (no DCT) \n", SHT_ITER);
+	printf("** performing %d 3D vector SHT\n", SHT_ITER);
 	printf(":: STD\n");
 	test_SHT_vect3d();
 	printf(":: LTR\n");
