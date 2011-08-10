@@ -829,7 +829,7 @@ void init_SH_synth(shtns_cfg shtns)
 
 	{	im=0;	m=0;
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array_hp(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
 			for (l=0; l<=LMAX; l++)   YL0(it, l) = yl[l];
   #ifndef SHT_SCALAR_ONLY
 			for (l=1; l<=LMAX; l++)	 DYL0(it, l) = dyl[l];// DYL0(it, l) = dyl[l];
@@ -843,7 +843,7 @@ void init_SH_synth(shtns_cfg shtns)
 		struct DtDp* dylm = shtns->dylm[im];
 		m = im*MRES;
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array_hp(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				ylm[it*(LMAX-m+1) + (l-m)] = yl[l-m] * st[it];
   #ifndef SHT_SCALAR_ONLY

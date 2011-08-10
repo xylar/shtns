@@ -32,20 +32,37 @@
  precomputed once for all by \ref legendre_precomp.
 */
 
-// range checking for legendre functions. Comment out for slightly faster legendre function generation.
-//#define LEG_RANGE_CHECK
-
 #if SHT_VERBOSE > 1
   #define LEG_RANGE_CHECK
 #endif
 
-/// \internal computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
-/// works with very large values of n (up to 2700).
-long double a_sint_pow_n(long double val, long double cost, long int n)
+/// \internal high precision version of \ref a_sint_pow_n
+long double a_sint_pow_n_hp(long double val, long double cost, long int n)
 {
 	long double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
 	long int k = n >> 7;
 	if (sizeof(s2) > 8) k = 0;		// enough accuracy, we do not bother.
+
+	if (n&1) val *= sqrtl(s2);	// = sin(t)
+	do {
+		if (n&2) val *= s2;
+		n >>= 1;
+		s2 *= s2;
+	} while(n > k);
+	n >>= 1;
+	while(n > 0) {		// take care of very large power n
+		n--;
+		val *= s2;		
+	}
+	return val;		// = sint(t)^n
+}
+
+/// \internal computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
+/// works with very large values of n (up to 2700).
+double a_sint_pow_n(double val, double cost, int n)
+{
+	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
+	int k = n >> 7;
 
 	if (n&1) val *= sqrt(s2);	// = sin(t)
 	do {
@@ -60,6 +77,7 @@ long double a_sint_pow_n(long double val, long double cost, long int n)
 	}
 	return val;		// = sint(t)^n
 }
+
 
 /// \internal Returns the value of a legendre polynomial of degree l and order im*MRES, noramalized for spherical harmonics, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
@@ -94,17 +112,14 @@ double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, double x)
 		ymmp1 = al[1]*x*ymmp1 + al[0]*ymm;
 	}
 done:
-	if (m>0) ymmp1 *= a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, m);
+	if (m>0) ymmp1 *= a_sint_pow_n_hp(1.0/SHT_LEG_SCALEF, x, m);
 	return ((double) ymmp1);
 }
 
-/// \internal Compute values of legendre polynomials noramalized for spherical harmonics,
-/// for a range of l=m..lmax, at given m and x, using recurrence.
-/// Requires a previous call to \ref legendre_precomp().
-/// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
-/// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
-/// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
-void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double cost, double *yl)
+
+
+/// \internal high precision version of \ref legendre_sphPlm_array
+void legendre_sphPlm_array_hp(shtns_cfg shtns, const int lmax, const int im, const double cost, double *yl)
 {
 	double *al;
 	long int l,m;
@@ -122,7 +137,7 @@ void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const 
 	ymm = al[0];	// l=m
 	if (m>0) {
 		if ((lmax <= SHT_L_RESCALE) || (sizeof(ymm) > 8)) {
-			ymm = a_sint_pow_n(ymm, x, m);
+			ymm = a_sint_pow_n_hp(ymm, x, m);
 		} else {
 			rescale = 1;
 			ymm *= SHT_LEG_SCALEF;
@@ -148,7 +163,7 @@ void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const 
 	}
 done:
 	if (rescale != 0) {
-		ymm = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, m);
+		ymm = a_sint_pow_n_hp(1.0/SHT_LEG_SCALEF, x, m);
 		for (l=m; l<=lmax; l++) {		// rescale.
 			yl[l] *= ymm;
 		}
@@ -156,17 +171,55 @@ done:
 	return;
 }
 
-
-/// \internal Compute values of a legendre polynomial normalized for spherical harmonics derivatives, for a range of l=m..lmax, using recurrence.
-/// Requires a previous call to \ref legendre_precomp(). Output is not directly compatible with GSL :
-/// - if m=0 : returns ylm(x)  and  d(ylm)/d(theta) = -sin(theta)*d(ylm)/dx
-/// - if m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta).
-/// This way, there are no singularities, everything is well defined for x=[-1,1], for any m.
+/// \internal Compute values of legendre polynomials noramalized for spherical harmonics,
+/// for a range of l=m..lmax, at given m and x, using recurrence.
+/// Requires a previous call to \ref legendre_precomp().
+/// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
 /// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
-/// \param sint = sqrt(1-x^2) to avoid recomputation of sqrt.
-/// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
-/// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
-void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
+/// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
+void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double cost, double *yl)
+{
+	double *al;
+	int l,m;
+	double ymm, ymmp1, x;
+
+	if ((im>0) && (lmax > SHT_L_RESCALE)) {		// switch to high precision code.
+		legendre_sphPlm_array_hp(shtns, lmax, im, cost, yl);
+		return;
+	}
+
+	m = im*MRES;
+#ifdef LEG_RANGE_CHECK
+	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_array");
+#endif
+
+	x = cost;
+	al = shtns->alm[im];
+	yl -= m;			// shift pointer
+	ymm = al[0];	// l=m
+	if (m>0) ymm = a_sint_pow_n(ymm, x, m);
+	yl[m] = ymm;
+	if (lmax==m) return;
+
+	ymmp1 = ymm * al[1] * x;		// l=m+1
+	yl[m+1] = ymmp1;
+	al+=2;
+	if (lmax==m+1) return;
+
+	for (l=m+2; l<lmax; l+=2) {
+		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
+		ymmp1 = al[3]*x*ymm   + al[2]*ymmp1;
+		yl[l] = ymm;
+		yl[l+1] = ymmp1;
+		al+=4;
+	}
+	if (l==lmax) {
+		yl[l] = al[1]*x*ymmp1 + al[0]*ymm;
+	}
+}
+
+/// \internal high precision version of \ref legendre_sphPlm_deriv_array
+void legendre_sphPlm_deriv_array_hp(shtns_cfg shtns, const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
 {
 	double *al;
 	long int l,m;
@@ -188,8 +241,8 @@ void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, 
 		l = m-1;
 		if ((lmax <= SHT_L_RESCALE) || (sizeof(y0) > 8)) {
 			if (l&1) {
-				y0 = a_sint_pow_n(y0, x, l-1) * sint;		// avoid computation of sqrt
-			} else  y0 = a_sint_pow_n(y0, x, l);
+				y0 = a_sint_pow_n_hp(y0, x, l-1) * sint;		// avoid computation of sqrt
+			} else  y0 = a_sint_pow_n_hp(y0, x, l);
 		} else {
 			rescale = 1;
 			y0 *= SHT_LEG_SCALEF;
@@ -225,13 +278,78 @@ done:
 	if (rescale != 0) {
 		l = m-1;			// compute  sin(theta)^(m-1)
 		if (l&1) {
-			y0 = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, l-1) * sint;		// avoid computation of sqrt
-		} else  y0 = a_sint_pow_n(1.0/SHT_LEG_SCALEF, x, l);
+			y0 = a_sint_pow_n_hp(1.0/SHT_LEG_SCALEF, x, l-1) * sint;		// avoid computation of sqrt
+		} else  y0 = a_sint_pow_n_hp(1.0/SHT_LEG_SCALEF, x, l);
 		for (l=m; l<=lmax; l++) {
 			yl[l] *= y0;		dyl[l] *= y0;		// rescale
 		}
 	}
 	return;
+}
+
+/// \internal Compute values of a legendre polynomial normalized for spherical harmonics derivatives, for a range of l=m..lmax, using recurrence.
+/// Requires a previous call to \ref legendre_precomp(). Output is not directly compatible with GSL :
+/// - if m=0 : returns ylm(x)  and  d(ylm)/d(theta) = -sin(theta)*d(ylm)/dx
+/// - if m>0 : returns ylm(x)/sin(theta)  and  d(ylm)/d(theta).
+/// This way, there are no singularities, everything is well defined for x=[-1,1], for any m.
+/// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
+/// \param sint = sqrt(1-x^2) to avoid recomputation of sqrt.
+/// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
+/// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
+void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
+{
+	double *al;
+	int l,m;
+	double x, st, y0, y1, dy0, dy1;
+
+	if ((im>0) && (lmax > SHT_L_RESCALE)) {		// switch to high precision code.
+		legendre_sphPlm_deriv_array_hp(shtns, lmax, im, cost, sint, yl, dyl);
+		return;
+	}
+
+	x = cost;
+	m = im*MRES;
+#ifdef LEG_RANGE_CHECK
+	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
+#endif
+	al = shtns->alm[im];
+	yl -= m;	dyl -= m;			// shift pointers
+
+	st = sint;
+	y0 = al[0];
+	dy0 = 0.0;
+	if (m>0) {		// m > 0
+		l = m-1;
+		if (l&1) {
+			y0 = a_sint_pow_n(y0, x, l-1) * sint;		// avoid computation of sqrt
+		} else  y0 = a_sint_pow_n(y0, x, l);
+		dy0 = x*m*y0;
+		st *= st;			// st = sin(theta)^2 is used in the recurrence for m>0
+	}
+	yl[m] = y0;		// l=m
+	dyl[m] = dy0;
+	if (lmax==m) return;		// done.
+
+	y1 = al[1] * x * y0;
+	dy1 = al[1]*( x*dy0 - st*y0 );
+	yl[m+1] = y1;		// l=m+1
+	dyl[m+1] = dy1;
+	if (lmax==m+1) return;		// done.
+	al+=2;
+
+	for (l=m+2; l<lmax; l+=2) {
+		y0 = al[1]*x*y1 + al[0]*y0;
+		dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
+		yl[l] = y0;		dyl[l] = dy0;
+		y1 = al[3]*x*y0 + al[2]*y1;
+		dy1 = al[3]*(x*dy0 - y0*st) + al[2]*dy1;
+		yl[l+1] = y1;		dyl[l+1] = dy1;
+		al+=4;
+	}
+	if (l==lmax) {
+		yl[l] = al[1]*x*y1 + al[0]*y0;
+		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
+	}
 }
 
 /// \internal Precompute constants for the recursive generation of Legendre associated functions, with given normalization.
