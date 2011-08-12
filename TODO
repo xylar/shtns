@@ -9,9 +9,14 @@
 - AVX support (may benefit from split-arrays also !)
 - Using OpenCL may be interesting !
 
-- split m=0 and m>0 ??
-- Implement l even/odd sub-transforms.
-- Implement sperate m sub-transforms.
+- m=0 :
+	* nphi=1 : no fft // stride = 1
+	* nphi>1 : fft should be replaced be phi-averaging => then call (nphi=1) version. [handles stride problem]
+
+- split m=0 and m>0 ?? [allow faster operation with on-the-fly at different NWAY]
+
+- Implement l even/odd sub-transforms ???
+- Implement sperate m sub-transforms ???
 
 
 *** OPTIMIZATIONS ***

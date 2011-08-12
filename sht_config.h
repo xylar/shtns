@@ -32,8 +32,8 @@
 #define SHT_F77_API
 
 
-/// Minimum performance improve for DCT in \ref sht_auto mode. If not atained, we switch back to gauss.
-#define MIN_PERF_IMPROVE_DCT 0.95
+/// Minimum performance improve for DCT in \ref sht_auto mode. If not atained, we may switch back to gauss.
+#define MIN_PERF_IMPROVE_DCT 1.05
 /// Try to enforce at least this accuracy for DCT in sht_auto mode.
 #define MIN_ACCURACY_DCT 1.e-8
 
@@ -52,9 +52,6 @@
 /// I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 is supported) !
 /// (set to zero to disable, may be useful for calling from Fortran)
 #define _GCC_VEC_ 1
-
-// if SHT_SCALAR_ONLY is defined, it will disable the vector transform (which saves some memory)
-//#define SHT_SCALAR_ONLY
 
 // if SHT_AXISYM is defined, an axisymmetric-only transform will be compiled.
 //#define SHT_AXISYM

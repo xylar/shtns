@@ -31,14 +31,24 @@ enum shtns_norm {
 
 /// different SHT types and algorithms
 enum shtns_type {
-	sht_gauss,	///< use <b>gaussian grid</b> and quadrature. highest accuracy.
-	sht_auto,	///< use a regular grid if dct is faster with goog accuracy, otherwise defaults to gauss.
+	sht_gauss,		///< use <b>gaussian grid</b> and quadrature.
+	sht_auto,		///< use a regular grid if dct is faster, otherwise defaults to gauss.
 	sht_reg_fast,	///< use fastest algorithm, on a <b>regular grid</b>, mixing dct and regular quadrature.
 	sht_reg_dct,	///< use pure dct algorithm, on a <b>regular grid</b>.
 	sht_quick_init, ///< gauss grid, with minimum initialization time (useful for pre/post-processing)
 	sht_reg_poles,	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. Useful for vizualisation.
 	sht_gauss_fly	///< legendre polynomials are recomputed on-the-fly for each transform (may be faster on some machines, saves memory and bandwidth).
 };
+
+#define SHT_NATIVE_LAYOUT 0			///< Tells shtns_init to use \ref native
+#define SHT_THETA_CONTIGUOUS 256	///< use \ref theta_fast
+#define SHT_PHI_CONTIGUOUS (256*2)	///< use \ref phi_fast
+
+#define SHT_NO_CS_PHASE (256*4)		///< don't include Condon-Shortley phase (add to last argument of \ref shtns_create)
+#define SHT_REAL_NORM (256*8)		///< use a "real" normalization. (add to last argument of \ref shtns_create)
+
+#define SHT_SCALAR_ONLY (256*16)	///< don't compute vector matrices. (add to flags in shtns_set_grid)
+
 
 #ifndef SHTNS_PRIVATE
 struct shtns_info {		// allow read-only access to some data (useful for optimization and helper macros)
@@ -53,6 +63,7 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 	const unsigned short *const li;	///< degree l for given mode number (size nlm) : li[lm] 
 	const double *const ct;			///< cos(theta) array (size nlat)
 	const double *const st;			///< sin(theta) array (size nlat)
+	const unsigned nspat;			///< number of real numbers that must be allocated in a spatial field.
 };
 #endif
 
@@ -73,16 +84,10 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 #define LM_L_LOOP( shtns, action ) { int lm=0; do { int l=shtns->li[lm]; action } while(++lm < shtns->nlm); }
 //@}
 
-#define SHT_NATIVE_LAYOUT 0			///< Tells shtns_init to use \ref native
-#define SHT_THETA_CONTIGUOUS 256	///< use \ref theta_fast
-#define SHT_PHI_CONTIGUOUS (256*2)	///< use \ref phi_fast
-
-#define SHT_NO_CS_PHASE (256*4)	///< don't include Condon-Shortley phase (add to last argument of \ref shtns_set_size)
-#define SHT_REAL_NORM (256*8)	///< use a "real" normalization. (add to last argument of \ref shtns_set_size)
 
 /// total number of 'doubles' required for a spatial field (includes FFTW reserved space).
 /// only the first shtns.nlat*shtns.nphi are real spatial data, the remaining is used by the Fourier Transform. more info : \ref spat
-#define NSPAT_ALLOC(shtns) (shtns->nlat*(shtns->nphi/2+1)*2)
+#define NSPAT_ALLOC(shtns) (shtns->nspat)
 
 // HELPER MACROS //
 
@@ -98,12 +103,14 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 //@{
 /// Simple initialization of the spherical harmonic transforms of given size. Calls \ref shtns_set_size and \ref shtns_precompute.
 shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nlat, int nphi);
-/// defines the sizes of the spectral description. Use for advanced initialization.
+/// Defines the sizes of the spectral description. Use for advanced initialization.
 shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm);
-/// precompute everything for a given spatial grid. Use for advanced initialization, after \ref shtns_set_size.
+/// Precompute everything for a given spatial grid. Use for advanced initialization, after \ref shtns_set_size.
 int shtns_set_grid(shtns_cfg, enum shtns_type flags, double eps, int nlat, int nphi);
-/// precompute everything and choose the optimal nlat and nphi for a given non-linear order.
+/// Precompute everything and choose the optimal nlat and nphi for a given non-linear order.
 int shtns_set_grid_auto(shtns_cfg, enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi);
+/// Copy a given config but allow a different (smaller) mmax and the possibility to enable/disable fft.
+shtns_cfg shtns_create_with_grid(shtns_cfg, int mmax, int nofft);
 
 /// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require any previous setup.
 int nlm_calc(int lmax, int mmax, int mres);

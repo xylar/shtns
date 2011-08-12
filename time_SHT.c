@@ -495,6 +495,7 @@ void usage()
 	printf(" -gauss : force gauss grid\n");
 	printf(" -fly : force gauss grid with on-the-fly computations only\n");
 	printf(" -quickinit : force gauss grid and fast initialiation time (but suboptimal fourier transforms)\n");
+	printf(" -scalar : use only scalar transforms (disable vector)\n");
 	printf(" -reg : force regular grid\n");
 	printf(" -oop : force out-of-place transform\n");
 	printf(" -transpose : force transpose data (ie phi varies fastest)\n");
@@ -516,6 +517,7 @@ int main(int argc, char *argv[])
 	enum shtns_norm shtnorm = sht_orthonormal;		// default to "orthonormal" SH.
 	int layout = SHT_NATIVE_LAYOUT;
 	int nlorder = 0;
+	int vector = 1;
 	char name[20];
 	FILE* fw;
 
@@ -555,8 +557,10 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"oop") == 0) layout = SHT_THETA_CONTIGUOUS;
 		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
 		if (strcmp(name,"nlorder") == 0) nlorder = t;
+		if (strcmp(name,"scalar") == 0) vector = 0;
 	}
 
+	if (vector == 0) layout |= SHT_SCALAR_ONLY;
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
 	NLM = shtns->nlm;
@@ -617,9 +621,11 @@ int main(int argc, char *argv[])
 //	write_vect("ylm0",Slm, NLM*2);
 	SH_to_spat(shtns, Slm,Sh);
 	write_mx("spat",Sh,NPHI,NLAT);
-	SHsphtor_to_spat(shtns, Slm,Tlm,Sh,Th);
-	write_mx("spatt",Sh,NPHI,NLAT);
-	write_mx("spatp",Th,NPHI,NLAT);
+	if (vector) {
+		SHsphtor_to_spat(shtns, Slm,Tlm,Sh,Th);
+		write_mx("spatt",Sh,NPHI,NLAT);
+		write_mx("spatp",Th,NPHI,NLAT);
+	}
 
 //	SHqst_to_lat(Slm,Slm,Tlm,ct[0],Sh,Th,Th,NPHI/2,LMAX,MMAX);
 //	write_vect("spat_lat", Sh, NPHI/2);
@@ -669,25 +675,26 @@ int main(int argc, char *argv[])
 	printf(":: LTR\n");
 	test_SHT_l(LMAX/2);
 
-#define TEST_VECT_SHT
-#ifdef TEST_VECT_SHT
-	Slm0[LM(shtns, 0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
-	Tlm0[LM(shtns, 0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
-//	for (i=0;i<NLM;i++) Slm0[i] = 0.0;	// zero out Slm.
+	if (vector) {
+		Slm0[LM(shtns, 0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+		Tlm0[LM(shtns, 0,0)] = 0.0;	// l=0, m=0 n'a pas de signification sph/tor
+	//	for (i=0;i<NLM;i++) Slm0[i] = 0.0;	// zero out Slm.
 
-	printf("** performing %d vector SHT\n", SHT_ITER);
-	printf(":: STD\n");
-	test_SHT_vect();
-	printf(":: LTR\n");
-	test_SHT_vect_l(LMAX/2);
-	
-	printf("** performing %d 3D vector SHT\n", SHT_ITER);
-	printf(":: STD\n");
-	test_SHT_vect3d();
-	printf(":: LTR\n");
-	test_SHT_vect3d_l(LMAX/2);
+		printf("** performing %d vector SHT\n", SHT_ITER);
+		printf(":: STD\n");
+		test_SHT_vect();
+		printf(":: LTR\n");
+		test_SHT_vect_l(LMAX/2);
+		
+		printf("** performing %d 3D vector SHT\n", SHT_ITER);
+		printf(":: STD\n");
+		test_SHT_vect3d();
+		printf(":: LTR\n");
+		test_SHT_vect3d_l(LMAX/2);
+	}
 
-#endif
+	shtns_create(LMAX, MMAX, MRES, shtnorm);		// test memory allocation and management.
+	shtns_create_with_grid(shtns, MMAX/2, 1);
 
 // free memory and resources (to track memory leaks)
 	fftw_free(Qlm);		fftw_free(Tlm);		fftw_free(Slm);
