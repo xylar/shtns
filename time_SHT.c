@@ -694,7 +694,7 @@ int main(int argc, char *argv[])
 	}
 
 	shtns_create(LMAX, MMAX, MRES, shtnorm);		// test memory allocation and management.
-	shtns_create_with_grid(shtns, MMAX/2, 1);
+//	shtns_create_with_grid(shtns, MMAX/2, 1);
 
 // free memory and resources (to track memory leaks)
 	fftw_free(Qlm);		fftw_free(Tlm);		fftw_free(Slm);

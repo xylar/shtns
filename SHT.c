@@ -862,7 +862,7 @@ void init_SH_synth(shtns_cfg shtns)
 
 	{	im=0;	m=0;
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array_hp(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
 			for (l=0; l<=LMAX; l++)   YL0(it, l) = yl[l];
 			for (l=LMAX+1; l<=LMAX+3; l++)	YL0(it, l) = 0.0;	// allow overflow.
 			if (vector) {
@@ -876,7 +876,7 @@ void init_SH_synth(shtns_cfg shtns)
 		struct DtDp* dylm = vector ? shtns->dylm[im] : NULL;
 		m = im*MRES;
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array_hp(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				ylm[it*(LMAX-m+1) + (l-m)] = yl[l-m] * st[it];
 				if (vector) {
@@ -955,10 +955,8 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 		long int talign = 0;
 
 		for (it=0;it<NLAT_2;it++) {
-			double nz0, nz1, norm;
-			norm = shtns->wg[it];
+			double norm = shtns->wg[it];
 			if ( (m>0) && (shtns->norm & SHT_REAL_NORM) )	norm *= 2;		// "Real" norm : zlm must be doubled for m>0
-			nz0 = norm;		nz1 = norm;
 			long int l0 = m;
 			if (m==0) {
 				zlm[im][it] = YL0(it, 0) * norm;
@@ -967,25 +965,28 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 				talign = (NLAT_2&1);
 			}
 			for (l=l0; l<LMAX; l+=2) {
+				double nz0 = norm;		double nz1 = norm;
 				if (SHT_NORM == sht_schmidt) {
-					nz0 = norm*(2*l+1);		nz1 = norm*(2*l+3);
+					nz0 *= (2*l+1);		nz1 *= (2*l+3);
 				}
 				zlm[im][(l-m)*NLAT_2 + it*2 +talign]    =  YLM(it, l, im) * nz0;
 				zlm[im][(l-m)*NLAT_2 + it*2 +1 +talign] =  YLM(it, l+1, im) * nz1;
 				if (vector) {
-					dzlm[im][(l-l0)*NLAT_2 + it*2].t = DTYLM(it, l, im) * nz0 /(l*(l+1));
-					dzlm[im][(l-l0)*NLAT_2 + it*2].p = DPYLM(it, l, im) * nz0 /(l*(l+1));
-					dzlm[im][(l-l0)*NLAT_2 + it*2+1].t = DTYLM(it, l+1, im)  * nz1 /((l+1)*(l+2));
-					dzlm[im][(l-l0)*NLAT_2 + it*2+1].p = DPYLM(it, l+1, im) * nz1 /((l+1)*(l+2));
+					nz0 *= shtns->l_2[l];		nz1 *= shtns->l_2[l+1];
+					dzlm[im][(l-l0)*NLAT_2 + it*2].t = DTYLM(it, l, im) * nz0;
+					dzlm[im][(l-l0)*NLAT_2 + it*2].p = DPYLM(it, l, im) * nz0;
+					dzlm[im][(l-l0)*NLAT_2 + it*2+1].t = DTYLM(it, l+1, im)  * nz1;
+					dzlm[im][(l-l0)*NLAT_2 + it*2+1].p = DPYLM(it, l+1, im) * nz1;
 				}
 			}
 			if (l==LMAX) {		// last l is stored right away, without interleaving.
-				if (SHT_NORM == sht_schmidt)
-					nz0 = norm*(2*l+1);
-				zlm[im][(l-m)*NLAT_2 + it +talign]    =  YLM(it, l, im)   * nz0;
+				double nz0 = norm;
+				if (SHT_NORM == sht_schmidt)	nz0 *= (2*l+1);
+				zlm[im][(l-m)*NLAT_2 + it +talign]    =  YLM(it, l, im) * nz0;
 				if (vector) {
-					dzlm[im][(l-l0)*NLAT_2 + it].t = DTYLM(it, l, im) * nz0 /(l*(l+1));
-					dzlm[im][(l-l0)*NLAT_2 + it].p = DPYLM(it, l, im) * nz0 /(l*(l+1));
+					nz0 *= shtns->l_2[l];
+					dzlm[im][(l-l0)*NLAT_2 + it].t = DTYLM(it, l, im) * nz0;
+					dzlm[im][(l-l0)*NLAT_2 + it].p = DPYLM(it, l, im) * nz0;
 				}
 			}
 		}
@@ -1859,7 +1860,10 @@ shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 			shtns->lmidx[im] = base->lmidx[im];
 			shtns->tm[im] = base->tm[im];
 		}
-		if (mmax < shtns->mtr_dct) shtns->mtr_dct = mmax;		// adjut mtr_dct if required.
+		if (mmax < shtns->mtr_dct) {
+			shtns->idct = NULL;		// do not destroy the plan of the source.
+			Set_MTR_DCT(shtns, mmax);		// adjut mtr_dct if required.
+		}
 		if (mmax == 0) {
 			// TODO we may disable fft and replace with a phi-averaging function ...
 			// ... then switch to axisymmetric functions :
