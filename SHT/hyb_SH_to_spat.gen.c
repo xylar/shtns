@@ -92,7 +92,7 @@ T	#define BP0(i) ((double *)BpF)[i]
 	long int im, imlim, imlim_dct;
   #ifdef _GCC_VEC_
 QX	s2d Ql0[(llim+4)>>1];		// we need some zero-padding.
-3	s2d Ql0[(llim+2)>>1];		// we need some zero-padding.
+3	s2d Ql0[(llim+3)>>1];		// we need some zero-padding.
 S	s2d Sl0[(llim+2)>>1];
 T	s2d Tl0[(llim+2)>>1];
   #endif
@@ -135,10 +135,10 @@ T			Tl[l-1] = (double) Tlm[l];
 Q			Ql[l] = (double) Qlm[l];
 			l++;
 		} while(l<=llim);		// l=llim+1
-QX		Ql[l] = 0.0;	Ql[l+1] = 0.0;		Ql[l+2] = 0.0;
 S		Sl[l-1] = 0.0;
 T		Tl[l-1] = 0.0;
-3		Sl[l] = 0.0;	Tl[l] = 0.0;	Ql[l] = 0.0;
+3		Sl[l] = 0.0;	Tl[l] = 0.0;	Ql[l] = 0.0;	Ql[l+1] = 0.0;
+QX		Ql[l] = 0.0;	Ql[l+1] = 0.0;		Ql[l+2] = 0.0;
 	}
   #endif
   #ifndef SHT_NO_DCT
@@ -214,7 +214,8 @@ T				p -= dyl0[l] * Tl0[l];		// { pe, po }
 V				l++;
 QX				r1 += yl[l+2] * Ql0[l+2];	// { re, ro }
 QX				l+=2;
-			} while(2*l < llim);
+QX			} while(2*l < llim-1);		// 2*(l+1) <= llim
+V			} while(2*l < llim);
 QX			r += r1;
 Q			yl  += (LMAX -k)>>1;
 V			dyl0 += (LMAX+1 -k)>>1;
@@ -229,11 +230,11 @@ Q				*((s2d*)(((double*)BrF)+k)) = r;
 S				*((s2d*)(((double*)BtF)+k)) = t;
 T				*((s2d*)(((double*)BpF)+k)) = p;
 		#endif
-Q			r = vdup(0.0);
+			l = k+1;
 			k+=2;
-			l = k-1;
-QX		} while (k<=llim);
-V		} while (k<=llim+1);
+Q			r = vdup(0.0);
+QX		} while (l<llim);	//	(k<=llim);
+V		} while (l<=llim);	//	(k<=llim+1);
 	#endif
 		while (k<NLAT) {	// dct padding (NLAT is even)
 Q			BR0(k) = 0.0;	BR0(k+1) = 0.0;
