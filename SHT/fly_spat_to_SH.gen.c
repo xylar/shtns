@@ -87,10 +87,10 @@ V	double por[NLAT_2+2*NWAY] SSE;
 	#ifdef SHT_VAR_LTR
 		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
-Q	BrF = (complex double *) Vr;
-V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 
   #ifndef SHT_AXISYM
+Q	BrF = (complex double *) Vr;
+V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 	if (shtns->ncplx_fft >= 0) {
 	    if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
 QX			BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
@@ -110,26 +110,29 @@ V	l_2 = shtns->l_2;
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
 		i=0;
 Q		double r0 = 0.0;
-		#ifdef SHT_AXISYM
-			#define STEP 1
-			#define XNP *NPHI
+		#ifndef SHT_AXISYM
+Q			#define BR0(i) ((double*)BrF)[(i)*2]
+S			#define BT0(i) ((double*)BtF)[(i)*2]
+T			#define BP0(i) ((double*)BpF)[(i)*2]
 		#else
-			#define STEP 2
-			#define XNP
+Q			#define BR0(i) Vr[i]
+S			#define BT0(i) Vt[i]
+T			#define BP0(i) Vp[i]
 		#endif
  		do {	// compute symmetric and antisymmetric parts.
- 			double w = wg[i] XNP;
-Q			double a = ((double*)BrF)[i*STEP];		double b = ((double*)BrF)[(NLAT-1)*STEP -i*STEP];
+ 			double w = wg[i];
+Q			double a = BR0(i);		double b = BR0(NLAT-1-i);
 Q			ror[i] = (a-b)*w;		rer[i] = (a+b)*w;
 Q			r0 += ((a+b)*w);
-V			double c = ((double*)BtF)[i*STEP];		double d = ((double*)BtF)[(NLAT-1)*STEP -i*STEP];
+V			double c = BT0(i);		double d = BT0(NLAT-1-i);
 V			ter[i] = (c+d)*w;		tor[i] = (c-d)*w;
-V			double e = ((double*)BpF)[i*STEP];		double f = ((double*)BpF)[(NLAT-1)*STEP -i*STEP];
+V			double e = BP0(i);		double f = BP0(NLAT-1-i);
 V			per[i] = (e+f)*w;		por[i] = (e-f)*w;
  			i++;
- 		} while(i<ni);
- 		#undef XNP
- 		#undef STEP
+		} while(i<ni);
+Q		#undef BR0
+S		#undef BT0
+T		#undef BP0
 		do {
 Q			rer[i] = 0.0;		ror[i] = 0.0;
 V			ter[i] = 0.0;		tor[i] = 0.0;
@@ -140,8 +143,6 @@ V			per[i] = 0.0;		por[i] = 0.0;
 	#else
 		} while(i<ni+NWAY-1);
 	#endif
-Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
 Q		Qlm[0] = r0 * shtns->bl0[0];					// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
@@ -218,6 +219,8 @@ V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 
   #ifndef SHT_AXISYM
 	for (im=1;im<=imlim;im++) {
+Q		BrF += NLAT;
+V		BtF += NLAT;	BpF += NLAT;
 		i0 = shtns->tm[im];
 		m = im*MRES;
 	#if _GCC_VEC_
@@ -257,8 +260,6 @@ V			per[i] = 0.0;		pei[i] = 0.0;		por[i] = 0.0;		poi[i] = 0.0;
 	#else
 		} while (i < ni+NWAY-1);
 	#endif
-Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
 
 		k=i0;		// i0 must be even.
 		#if _GCC_VEC_
@@ -532,8 +533,8 @@ V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	#endif
 
   	if (shtns->ncplx_fft > 0) {		// free memory
-Q	    VFREE(BrF - NLAT*(imlim+1));
-VX	    VFREE(BtF - NLAT*(imlim+1));	// this frees also BpF.
+Q	    VFREE(BrF - NLAT*imlim);
+VX	    VFREE(BtF - NLAT*imlim);	// this frees also BpF.
 	}
   #endif
 

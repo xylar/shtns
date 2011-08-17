@@ -48,8 +48,6 @@ S	void GEN3(spat_to_SHsph_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, complex d
 T	void GEN3(spat_to_SHtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vp, complex double *Tlm, long int llim) {
   #endif
 
-Q	complex double *BrF;		// contains the Fourier transformed data
-V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	double *zl;
 V	double *dzl0;
 V	struct DtDp *dzl;
@@ -59,6 +57,8 @@ Q	complex double q0,q1;
 S	complex double s0,s1;
 T	complex double t0,t1;
   #ifndef SHT_AXISYM
+Q	complex double *BrF;		// contains the Fourier transformed data
+V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	v2d reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 V	v2d tpeo[4*NLAT_2];	// theta and phi even and odd parts
 Q	#define reo0 ((double*)reo)
@@ -99,11 +99,11 @@ Q	#define ro0(i)	reo0[2*(i)]
 	#ifdef SHT_VAR_LTR
 		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
-Q		BrF = (complex double *) Vr;
-S		BtF = (complex double *) Vt;
-T		BpF = (complex double *) Vp;
 
   #ifndef SHT_AXISYM
+Q	BrF = (complex double *) Vr;
+S	BtF = (complex double *) Vt;
+T	BpF = (complex double *) Vp;
 	if (shtns->ncplx_fft >= 0) {
 	    if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
 QX	    	BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
@@ -125,11 +125,10 @@ V	double* st_1 = shtns->st_1;
 Q		#define BR0	((double *)reo)
 V		#define BT0	((double *)tpeo)
 V		#define BP0	((double *)tpeo + NLAT)
-V		l = (NPHI==1) ? 1 : 2;		// stride of source data.
-V		i=0;	i0=0;	do {
+V		i=0;  do {	// we assume NPHI>1 (else SHT_AXISYM should be defined).
 V			double sin_1 = st_1[i];
-V			((double *)BtF)[i0] *= sin_1; 	((double *)BpF)[i0] *= sin_1;
-V			i++;	i0+=l;
+V			((double *)BtF)[i*2] *= sin_1; 	((double *)BpF)[i*2] *= sin_1;
+V			i++;
 V		} while (i<NLAT);
 Q		fftw_execute_r2r(shtns->dct_m0,(double *) BrF, BR0);		// DCT out-of-place.
 V		fftw_execute_r2r(shtns->dct_m0,(double *) BtF, BT0);		// DCT out-of-place.
@@ -138,29 +137,21 @@ V		fftw_execute_r2r(shtns->dct_m0,(double *) BpF, BP0);		// DCT out-of-place.
 Q		#define BR0	reo0
 S		#define BT0	teo0
 T		#define BP0	peo0
-Q		if (NPHI > 1) {
-Q			s2d np = vdup(NPHI);
-Q			i=0;	do {
-Q				((v2d*) BrF)[i] *= np;
-Q				i++;
-Q			} while (i<ni);
-Q		}
 V		i=0;	do {
-V			s2d np = vdup(NPHI);
 V		#ifdef _GCC_VEC_
-V			s2d sin_1 = ((s2d *)st_1)[i] * np;
-S			((v2d*) BtF)[i] *= sin_1;
-T		 	((v2d*) BpF)[i] *= sin_1;
+V			s2d sin_1 = ((s2d *)st_1)[i];
+S			((s2d*) Vt)[i] *= sin_1;
+T		 	((s2d*) Vp)[i] *= sin_1;
 V		#else
-V			double sin_1 = st_1[2*i] * np;		double sin_2 = st_1[2*i+1] * np;
-S			BT0[2*i] *= sin_1;		BT0[2*i+1] *= sin_2;
-T			BP0[2*i] *= sin_1;		BP0[2*i+1] *= sin_2;
+V			double sin_1 = st_1[2*i];		double sin_2 = st_1[2*i+1];
+S			Vt[2*i] *= sin_1;		Vt[2*i+1] *= sin_2;
+T			Vp[2*i] *= sin_1;		Vp[2*i+1] *= sin_2;
 V		#endif
 V			i++;
 V		} while (i<ni);
-Q		fftw_execute_r2r(shtns->dct_r1,(double *) BrF, BR0);	// DCT out-of-place.
-S		fftw_execute_r2r(shtns->dct_r1,(double *) BtF, BT0);	// DCT out-of-place.
-T		fftw_execute_r2r(shtns->dct_r1,(double *) BpF, BP0);	// DCT out-of-place.
+Q		fftw_execute_r2r(shtns->dct_r1,Vr, BR0);	// DCT out-of-place.
+S		fftw_execute_r2r(shtns->dct_r1,Vt, BT0);	// DCT out-of-place.
+T		fftw_execute_r2r(shtns->dct_r1,Vp, BP0);	// DCT out-of-place.
 	#endif
 		l=0;
 		long int klim = shtns->klim;
@@ -254,61 +245,56 @@ Q			((complex double *) Ql)[l] = q0;
 Q	#undef BR0
 S	#undef BT0
 T	#undef BP0
-  #ifdef SHT_VAR_LTR
+	#ifdef SHT_VAR_LTR
 		while( l<=LMAX ) {
 Q			Ql[l] = vdup(0.0);
 S			Sl[l] = vdup(0.0);
 T			Tl[l] = vdup(0.0);
 			l++;
 		}
-  #endif
-Q		BrF += NLAT;
-S		BtF += NLAT;
-T		BpF += NLAT;
+	#endif
   #else		// ifndef SHT_NO_DCT
 		i=0;
 QE		double r0 = 0.0;
 QX		double r1 = 0.0;
 Q		zl = shtns->zlm[0];
-		// stride of source data. => now we assume NPHI>1 else SHT_AXISYM is defined.
+		// stride of source data : we assume NPHI>1 (else SHT_AXISYM should be defined).
 	#ifndef SHT_AXISYM
-		#define STEP 2
-		#define XNP
+Q		#define BR0(i) vdup(((double*)BrF)[(i)*2])
+S		#define BT0(i) vdup(((double*)BtF)[(i)*2])
+T		#define BP0(i) vdup(((double*)BpF)[(i)*2])
 	#else
-		#define STEP 1
-		#define XNP *np
+Q		#define BR0(i) vdup(Vr[i])
+S		#define BT0(i) vdup(Vt[i])
+T		#define BP0(i) vdup(Vp[i])
 	#endif
 		do {	// compute symmetric and antisymmetric parts.
+Q			s2d a = BR0(i);		s2d b = BR0(NLAT-1-i);
+S			s2d c = BT0(i);		s2d d = BT0(NLAT-1-i);
+T			s2d e = BP0(i);		s2d f = BP0(NLAT-1-i);
 		#if _GCC_VEC_ && __SSE3__
-			s2d np = vdup(NPHI);
-Q			s2d a = vdup(((double*)BrF)[i*STEP]);		s2d b = vdup(((double*)BrF)[(NLAT-1-i)*STEP]);
-Q			a = subadd(a,b) XNP;
+Q			a = subadd(a,b);
 Q			((s2d*) reo0)[i] = a;		// assume odd is first, then even.
 Q			r0 += zl[i] * vhi_to_dbl(a);	// even part is used.
-S			s2d c = vdup(((double*)BtF)[i*STEP]);		s2d d = vdup(((double*)BtF)[(NLAT-1-i)*STEP]);
-S			c = subadd(c,d) XNP;		vteo0(i) = vxchg(c);
-T			s2d e = vdup(((double*)BpF)[i*STEP]);		s2d f = vdup(((double*)BpF)[(NLAT-1-i)*STEP]);
-T			e = subadd(e,f) XNP;		vpeo0(i) = vxchg(e);
+S			c = subadd(c,d);		vteo0(i) = vxchg(c);
+T			e = subadd(e,f);		vpeo0(i) = vxchg(e);
 			i++;
-QX			s2d g = vdup(((double*)BrF)[i*STEP]);		s2d h = vdup(((double*)BrF)[(NLAT-1-i)*STEP]);
-QX			g = subadd(g,h) XNP;
+QX			s2d g = BR0(i);		s2d h = BR0(NLAT-1-i);
+QX			g = subadd(g,h);
 QX			((s2d*) reo0)[i] = g;		// assume odd is first, then even.
 QX			r1 += zl[i] * vhi_to_dbl(g);	// even part is used, reduce data dependency
 QX			i++;
 		#else
-			double np = NPHI;
-Q			double a = ((double*)BrF)[i*STEP];		double b = ((double*)BrF)[(NLAT-1-i)*STEP];
-Q			ro0(i) = (a-b) XNP;		re0(i) = (a+b) XNP;
-Q			r0 += zl[i] * ((a+b) XNP);
-S			double c = ((double*)BtF)[i*STEP];		double d = ((double*)BtF)[(NLAT-1-i)*STEP];
-S			te0(i) = (c+d) XNP;		to0(i) = (c-d) XNP;
-T			double e = ((double*)BpF)[i*STEP];		double f = ((double*)BpF)[(NLAT-1-i)*STEP];
-T			pe0(i) = (e+f) XNP;		po0(i) = (e-f) XNP;
+Q			ro0(i) = (a-b);		re0(i) = (a+b);
+Q			r0 += zl[i] * (a+b);
+S			te0(i) = (c+d);		to0(i) = (c-d);
+T			pe0(i) = (e+f);		po0(i) = (e-f);
  			i++;
 		#endif
 		} while(i<ni);
-		#undef STEP
-		#undef XNP
+Q		#undef BR0
+S		#undef BT0
+T		#undef BP0
 QX		r0 += r1;
 QX		ro0(ni) = 0.0;		re0(ni) = 0.0;		// allow some overflow.
 Q		zl += ni + (ni&1);		// SSE alignement
@@ -317,9 +303,6 @@ Q		v2d* Ql = (v2d*) Qlm;		// virtual pointer for l=0 and im
 S		v2d* Sl = (v2d*) Slm;		// virtual pointer for l=0 and im
 T		v2d* Tl = (v2d*) Tlm;		// virtual pointer for l=0 and im
 V		dzl0 = (double *) shtns->dzlm[0];		// only theta derivative (d/dphi = 0 for m=0)
-Q		BrF += NLAT;
-S		BtF += NLAT;
-T		BpF += NLAT;
 Q		((complex double *)Ql)[0] = r0;
 S		Sl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
 T		Tl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
@@ -412,6 +395,8 @@ T			Tl[l] = vdup(0.0);
   #endif		// ifndef SHT_NO_DCT
   #ifndef SHT_AXISYM
 	for (im=1;im<=imlim;im++) {
+Q		BrF += NLAT;
+V		BtF += NLAT;	BpF += NLAT;
 		i0 = shtns->tm[im];
  		i=i0;
 		do {	// compute symmetric and antisymmetric parts.
@@ -429,8 +414,6 @@ V		v2d* Sl = (v2d*) &Slm[l];		v2d* Tl = (v2d*) &Tlm[l];
 3		double m_1 = 1.0/l;
 Q		zl = shtns->zlm[im];
 V		dzl = shtns->dzlm[im];
-Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
 		while (l<llim) {		// ops : NLAT/2 * (2*(LMAX-m+1) + 4) : almost twice as fast.
 Q			v2d q0 = vdup(0.0);
 Q			v2d q1 = vdup(0.0);
@@ -503,8 +486,8 @@ V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	#endif
 
   	if (shtns->ncplx_fft > 0) {		// free memory
-Q	    VFREE(BrF - NLAT*(imlim+1));
-VX	    VFREE(BtF - NLAT*(imlim+1));	// this frees also BpF.
+Q	    VFREE(BrF - NLAT*imlim);
+VX	    VFREE(BtF - NLAT*imlim);	// this frees also BpF.
 	}
   #endif
 

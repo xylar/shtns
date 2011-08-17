@@ -507,7 +507,8 @@ V			BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
 Q	BrF -= NLAT*(imlim+1);		// restore original pointer
 V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
 
-    if (NPHI>1) {
+    // NPHI > 1 as SHT_AXISYM is not defined.
+	if (shtns->ncplx_fft >= 0) {
 Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
@@ -515,14 +516,7 @@ V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.
 		}
-    } else {
-		k=1;	do {	// compress complex to real
-Q			Vr[k] = ((double *)BrF)[2*k];
-V			Vt[k] = ((double *)BtF)[2*k];
-V			Vp[k] = ((double *)BpF)[2*k];
-			k++;
-		} while(k<NLAT);
-    }
+	}
   #endif
 
 Q	#undef BR0

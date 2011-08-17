@@ -517,7 +517,7 @@ V			BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
 Q	BrF -= NLAT*(imlim+1);		// restore original pointer
 V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
 
-    if (NPHI>1) {
+    // NPHI > 1 as SHT_AXISYM is not defined.
     #ifndef SHT_NO_DCT
 Q			fftw_execute_r2r(shtns->idct,(double *) BrF, (double *) BrF);		// iDCT
 V			fftw_execute_r2r(shtns->idct,(double *) BtF, (double *) BtF);		// iDCT
@@ -548,6 +548,7 @@ V					k+=2;
 V				} while(k<NLAT);
 V			}
     #endif
+	if (shtns->ncplx_fft >= 0) {
 Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
@@ -555,32 +556,7 @@ V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
 Q			VFREE(BrF);
 VX			VFREE(BtF);	// this frees also BpF.
 		}
-    } else {
-		k=1;	do {	// compress complex to real
-Q			Vr[k] = ((double *)BrF)[2*k];
-V			Vt[k] = ((double *)BtF)[2*k];
-V			Vp[k] = ((double *)BpF)[2*k];
-			k++;
-		} while(k<NLAT);
-    #ifndef SHT_NO_DCT
-Q			fftw_execute_r2r(shtns->idct_r1,Vr, Vr);		// iDCT m=0
-S			fftw_execute_r2r(shtns->idct_r1,Vt, Vt);		// iDCT m=0
-T			fftw_execute_r2r(shtns->idct_r1,Vp, Vp);		// iDCT m=0
-V			double* st_1 = shtns->st_1;
-V			k=0;	do {
-V		#ifdef _GCC_VEC_
-V				v2d sin_1 = ((v2d *)st_1)[k];
-S				((v2d *)Vt)[k] *= sin_1;
-T				((v2d *)Vp)[k] *= sin_1;
-V		#else
-V			double sin_1 = st_1[2*k]; 	double sin_2 = st_1[2*k+1];
-S			Vt[2*k] *= sin_1;		Vt[2*k+1] *= sin_2;
-T			Vp[2*k] *= sin_1;		Vp[2*k+1] *= sin_2;
-V		#endif
-V				k++;
-V			} while (k<NLAT_2);
-    #endif
-    }
+	}
   #endif
 
 Q	#undef BR0

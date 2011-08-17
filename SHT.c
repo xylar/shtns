@@ -1631,9 +1631,9 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 		#endif
 		minc = MMAX/20 + 1;             // don't test every single m.
 		m = -1;		i = -1;		t0 = 0.0;		// reference = no dct.
-		if (sht_array[SHT_DCT][SHT_TYP_SSY] != NULL)
+		if (sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT] != NULL)
 			t0 += get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
-		if ( (sht_array[SHT_DCT][SHT_TYP_VSY] != NULL) && (vector) )
+		if ( (sht_func[SHT_STD][SHT_TYP_VSY][SHT_DCT] != NULL) && (vector) )
 			t0 += get_time(shtns, nloop, 4, "v", shtns->fptr[SHT_STD][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 		tnodct = t0;
 		for (m=0; m<=MMAX; m+=minc) {
@@ -1641,9 +1641,9 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 				printf("\n\tm=%d :",m);
 			#endif
 			Set_MTR_DCT(shtns, m);
-			t = get_time(shtns, *nlp, 2, "sdct", sht_array[SHT_DCT][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
+			t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
 			if (vector)
-				t += get_time(shtns, nloop, 4, "vdct", sht_array[SHT_DCT][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+				t += get_time(shtns, nloop, 4, "vdct", sht_func[SHT_STD][SHT_TYP_VSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
 			PRINT_DOT
 		}
