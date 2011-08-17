@@ -260,7 +260,7 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 */
 
 char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
-char* sht_var[SHT_NVAR] = {"std", "ltr", "m0", "m0ltr"};
+char* sht_var[SHT_NVAR] = {"std", "ltr"};
 char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
@@ -293,23 +293,20 @@ void set_sht_mem(shtns_cfg shtns) {
 /// if nphi is 1, axisymmetric algorythms are used.
 void init_sht_array_func(shtns_cfg shtns)
 {
-	for (int it=0; it<SHT_NTYP; it++) {
-		for (int j=0; j<SHT_FLY1; j++) {	// copy variants to global array.
-			sht_func[SHT_STD][it][j] = sht_array[j][it];
+	int it, j;
+
+	for (it=0; it<SHT_NTYP; it++) {
+		for (j=0; j<SHT_NALG; j++) {
 			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
-			sht_func[SHT_M0][it][j] = sht_array_m0[j][it];
-			sht_func[SHT_M0LTR][it][j] = sht_array_m0l[j][it];
-		}
-		for (int j=SHT_FLY1; j<SHT_NALG; j++) {	// on-the-fly only exist in LTR version
-			sht_func[SHT_STD][it][j] = sht_array_l[j][it];
-			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
-			sht_func[SHT_M0][it][j] = sht_array_m0l[j][it];
-			sht_func[SHT_M0LTR][it][j] = sht_array_m0l[j][it];
-		}
-		if (shtns->nphi == 1) {		// axisymmetric transform requested.
-			for (int j=0; j<SHT_NALG; j++) {	// copy m0 to std in global array.
-				sht_func[SHT_STD][it][j] = sht_func[SHT_M0][it][j];
-				sht_func[SHT_LTR][it][j] = sht_func[SHT_M0LTR][it][j];
+			if (j >= SHT_FLY1) {
+				sht_func[SHT_STD][it][j] = sht_array_l[j][it];		// on-the-fly only exist in LTR version
+			} else  sht_func[SHT_STD][it][j] = sht_array[j][it];
+
+			if ((shtns->nphi == 1)&&(j != SHT_SV)) {		// axisymmetric transform requested (but not for special case S+V)
+				sht_func[SHT_LTR][it][j] = sht_array_m0l[j][it];
+				if (j >= SHT_FLY1) {
+					sht_func[SHT_STD][it][j] = sht_array_m0l[j][it];		// on-the-fly only exist in LTR version
+				} else  sht_func[SHT_STD][it][j] = sht_array_m0[j][it];
 			}
 		}
 	}

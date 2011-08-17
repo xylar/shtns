@@ -179,16 +179,3 @@ void SHqst_to_spat_l(shtns_cfg, complex double *Qlm, complex double *Slm, comple
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_l(shtns, S,Gt,Gp,ltr) SHsph_to_spat_l(shtns, S, Gt, Gp, ltr)
-
-/*! \name Axisymmetric transforms m=0 only
- * these work for any MMAX, and will only transform m=0, to/from arrays with NLAT contiguous theta-values.
- *///@{
-void spat_to_SH_m0(shtns_cfg, double *Vr, complex double *Qlm);
-void SH_to_spat_m0(shtns_cfg, complex double *Qlm, double *Vr);
-void SHsphtor_to_spat_m0(shtns_cfg, complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
-void SHsph_to_spat_m0(shtns_cfg, complex double *Slm, double *Vt);
-void SHtor_to_spat_m0(shtns_cfg, complex double *Tlm, double *Vp);
-void spat_to_SHsphtor_m0(shtns_cfg, double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
-//@}
-/// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_m0
-#define SH_to_grad_spat_m0(shtns, S,Gt) SHsph_to_spat_m0(shtns, S, Gt)

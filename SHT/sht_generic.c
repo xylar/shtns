@@ -79,6 +79,7 @@
 #undef NWAY
 #endif
 
+#ifdef IVAR
 /// Backward \b Scalar Spherical Harmonic Transform (synthesis).
 void GEN(SH_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr SUPARG)
 {
@@ -105,6 +106,7 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 	((pf4l) shtns->fptr[IVAR][SHT_TYP_VAN])(shtns, Vt, Vp, Slm, Tlm SUPARG2);
 	return;
 }
+#endif
 
 //@}
 
@@ -139,6 +141,7 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 
 #undef SHT_GRAD
 
+#ifdef IVAR
 #ifndef SHT_AXISYM
 /// Spheroidal only synthesis.
 void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp SUPARG)
@@ -167,6 +170,7 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 	((pf3l) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, NULL, Vp SUPARG2);
 	return;
 }
+#endif
 #endif
 
 
@@ -211,6 +215,7 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 #endif
 #undef SHT_3COMP
 
+#ifdef IVAR
 // combining vector and scalar.
 void GEN(SHqst_to_spat_2,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
@@ -234,6 +239,7 @@ void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex dou
 	((pf6l) shtns->fptr[IVAR][SHT_TYP_3SY])(shtns, Qlm, Slm, Tlm, Vr, Vt, Vp SUPARG2);
 	return;
 }
+#endif
 
 
 /* functions without dct, at the end for SHT_NO_DCT must no interfere with others */
@@ -265,7 +271,11 @@ void* GEN(sht_array, SUFFIX)[SHT_NALG][SHT_NTYP] = {
 #endif
 /* mem */	{ GEN(SH_to_spat_mem, SUFFIX), GEN(spat_to_SH_mem, SUFFIX), GEN(SHsphtor_to_spat_mem, SUFFIX), GEN(spat_to_SHsphtor_mem, SUFFIX), 
 				GEN(SHsph_to_spat_mem, SUFFIX), GEN(SHtor_to_spat_mem, SUFFIX), GEN(SHqst_to_spat_mem, SUFFIX), GEN(spat_to_SHqst_mem, SUFFIX) },
+#ifdef IVAR
 /* s+v */	{ NULL, NULL, NULL, NULL, NULL, NULL, GEN(SHqst_to_spat_2, SUFFIX), GEN(spat_to_SHqst_2, SUFFIX) },
+#else
+/* s+v */	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+#endif
 #ifdef SHT_VAR_LTR
 /* fly1 */	{ NULL, NULL, GEN(SHsphtor_to_spat_fly1, SUFFIX), GEN(spat_to_SHsphtor_fly1, SUFFIX), 
 				GEN(SHsph_to_spat_fly1, SUFFIX), GEN(SHtor_to_spat_fly1, SUFFIX), GEN(SHqst_to_spat_fly1, SUFFIX), GEN(spat_to_SHqst_fly1, SUFFIX) },
@@ -286,7 +296,7 @@ void* GEN(sht_array, SUFFIX)[SHT_NALG][SHT_NTYP] = {
 //@}
 
 // Fortran 77 api
-#ifdef SHT_F77_API
+#if defined(SHT_F77_API) && defined(IVAR)
 
 extern shtns_cfg sht_data;
 
