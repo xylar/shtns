@@ -834,9 +834,12 @@ void OptimizeMatrices(shtns_cfg shtns, double eps)
 			}
 		}
 	}
-	if ( (zlm[0] != NULL) &&(MMAX==0) && (NLAT_2 & 1) && (!(LMAX & 1)) ) {		// NLAT_2 odd + LMAX even
-		zlm[0][(LMAX+1)*NLAT_2 +1] = 0.0;	// overflow for im=0
-		zlm[0][(LMAX+1)*NLAT_2 +2] = 0.0;
+	if ((zlm[0] != NULL) && (NLAT_2 & 1)) {
+		zlm[0][NLAT_2] = 0.0;		// take care to write 0.0 for this sse2 padding value.
+		if ( (MMAX==0) && (!(LMAX & 1)) ) {		// NLAT_2 odd + LMAX even
+			zlm[0][(LMAX+1)*NLAT_2 +1] = 0.0;	// overflow for im=0
+			zlm[0][(LMAX+1)*NLAT_2 +2] = 0.0;
+		}
 	}
 }
 
@@ -2043,7 +2046,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		#if SHT_VERBOSE > 0
 					printf("     !! Not enough accuracy (%.3g) => DCT disabled.\n",t);
 		#endif
+		#if SHT_VERBOSE < 2
 					Set_MTR_DCT(shtns, -1);		// turn off DCT.
+		#endif
 				}
 			}
 		}
