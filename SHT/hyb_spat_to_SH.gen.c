@@ -76,7 +76,7 @@ T	double peo0[2*NLAT_2+2] SSE;
 S	#define te0(i)	teo0[2*(i)]
 S	#define to0(i)	teo0[2*(i)+1]
 T	#define pe0(i)	peo0[2*(i)]
-T	#define po0(i)	peo0[4*(i)+1]
+T	#define po0(i)	peo0[2*(i)+1]
 S	#define vteo0(i)	((s2d*) teo0)[i]
 T	#define vpeo0(i)	((s2d*) peo0)[i]
   #endif

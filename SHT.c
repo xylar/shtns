@@ -1562,11 +1562,12 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 			tcpu = clock();
 			t0 = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_TYP_SSY][SHT_FLY2], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			tcpu = clock() - tcpu;		tt = 1.e-6 * tcpu;
-			if (tt >= 0.2) break;			// we should not exceed 1 second
+			if (tt >= SHT_TIME_LIMIT) break;			// we should not exceed 1 second
 			t = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_TYP_SSY][SHT_FLY2], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			r = fabs(2.0*(t-t0)/(t+t0));
 			#if SHT_VERBOSE > 1
 				printf(", nloop=%d, r=%g, m=%d (real time = %g s)\n",nloop,r,m,tt);
+				if (tt >= 0.01) break;		// faster timing in debug mode.
 			#endif
 			PRINT_DOT
 		} while((nloop<10000)&&(m < 3));
@@ -2109,6 +2110,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		if (t > 1.e-3) shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
   #endif
 	}
+//	set_sht_fly(shtns, SHT_TYP_VAN);
   #if SHT_VERBOSE > 0
 	printf("        => SHTns is ready.\n");
   #endif

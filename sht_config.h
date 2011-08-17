@@ -61,3 +61,6 @@
 
 /// minimum NLAT to consider the use of DCT acceleration.
 #define SHT_MIN_NLAT_DCT 64
+
+/// time-limit for timing individual transforms (in seconds)
+#define SHT_TIME_LIMIT 0.2
