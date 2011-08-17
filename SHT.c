@@ -396,6 +396,62 @@ int free_unused(shtns_cfg shtns, void* pp)
 	return (n-1);
 }
 
+/// Free matrices if on-the-fly has been selected.
+void free_unused_matrices(shtns_cfg shtns)
+{
+	int count[SHT_NTYP];
+	int it, iv, ia, iv2;
+
+	for (it=0; it<SHT_NTYP; it++) {
+		count[it] = 0;
+		for (iv=0; iv<SHT_NVAR; iv++) {
+			if (shtns->fptr[iv][it] != NULL) {
+				for (ia=0; ia<SHT_SV; ia++)		// count occurences to mem algo
+					for (iv2=0; iv2<SHT_NVAR; iv2++)
+						if (sht_func[iv2][it][ia] == shtns->fptr[iv][it]) count[it]++;
+			}
+		}
+		#if SHT_VERBOSE > 1
+			printf(" %d ",count[it]);
+		#endif
+	}
+
+	if (shtns->dylm == NULL) {		// no vector transform : do not try to free
+		count[SHT_TYP_VAN] = 1;		count[SHT_TYP_VSY] = 1;
+	}
+
+	if (count[SHT_TYP_3AN] == 0) {		// analysis may be freed.
+		if ((count[SHT_TYP_VAN] == 0) && (shtns->dzlm[0] != NULL)) {
+			PRINT_VERB("freeing vector analysis matrix\n");
+			VFREE(shtns->dzlm[0]);	shtns->dzlm[0] = NULL;
+		}
+		if ((count[SHT_TYP_SAN] == 0) && (shtns->zlm[0] != NULL)) {
+			PRINT_VERB("freeing scalar analysis matrix\n");
+			VFREE(shtns->zlm[0]);	shtns->zlm[0] = NULL;
+		}
+	} else if (shtns->mmax > 0) {	// scalar may be reduced to m=0
+		if ((count[SHT_TYP_SAN] == 0) && (shtns->zlm[0] != NULL)) {
+			PRINT_VERB("keeping scalar analysis matrix up to m=0\n");
+			shtns->zlm[0] = VREALLOC(shtns->zlm[0], ((LMAX+1)*NLAT_2 +3)*sizeof(double));
+		}
+	}
+	if (count[SHT_TYP_3SY] == 0) {		// synthesis may be freed.
+		if ((count[SHT_TYP_VSY] + count[SHT_TYP_GSP] + count[SHT_TYP_GTO] == 0) && (shtns->dylm[0] != NULL)) {
+			PRINT_VERB("freeing vector synthesis matrix\n");
+			VFREE(shtns->dylm[0]);	shtns->dylm[0] = NULL;
+		}
+		if ((count[SHT_TYP_SSY] == 0) && (shtns->ylm[0] != NULL)) {
+			PRINT_VERB("freeing scalar synthesis matrix\n");
+			VFREE(shtns->ylm[0]);	shtns->ylm[0] = NULL;
+		}
+	} else if (shtns->mmax > 0) {	// scalar may be reduced to m=0
+		if ((count[SHT_TYP_SSY] == 0) && (shtns->ylm[0] != NULL)) {
+			PRINT_VERB("keeping scalar synthesis matrix up to m=0\n");
+			shtns->ylm[0] = VREALLOC(shtns->ylm[0], (LMAX+2)*NLAT_2*sizeof(double));
+		}
+	}
+}
+
 
 /// \internal allocate arrays for SHT related to a given grid.
 void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
@@ -1465,12 +1521,6 @@ double SHT_error(shtns_cfg shtns, int vector)
 #include "cycle.h"
 #include <time.h>
 
-#if SHT_VERBOSE > 1
-  #define PRINT_VERB(msg) printf(msg)
-#else
-  #define PRINT_VERB(msg) (0)
-#endif
-
 #if SHT_VERBOSE == 1
   #define PRINT_DOT 	{	printf(".");	fflush(stdout);	}
 #else
@@ -1695,13 +1745,12 @@ void shtns_print_cfg(shtns_cfg shtns)
 	for (int iv=0; iv<SHT_NVAR; iv++) {
 		printf("\n  %4s:",sht_var[iv]);
 		for (int it=0; it<SHT_NTYP; it++) {
-			for (int ia=0; ia<SHT_NALG; ia++) {
-				if (shtns->fptr[iv][it] == NULL) {
-					printf(" none ");	break;
-				} else if (sht_func[iv][it][ia] == shtns->fptr[iv][it]) {
-					printf("%5s ",sht_name[ia]);	break;
-				}
-			}
+			if (shtns->fptr[iv][it] != NULL) {
+				for (int ia=0; ia<SHT_NALG; ia++)
+					if (sht_func[iv][it][ia] == shtns->fptr[iv][it]) {
+						printf("%5s ",sht_name[ia]);	break;
+					}
+			} else  printf(" none ");
 		}
 	}
 	printf("\n");
@@ -2099,6 +2148,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 
 	if (quick_init == 0) {
 		choose_best_sht(shtns, &nloop, vector, 0);
+		if (on_the_fly == 0) free_unused_matrices(shtns);
 		t = SHT_error(shtns, vector);		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		printf("        + SHT accuracy = %.3g\n",t);

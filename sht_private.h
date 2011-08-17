@@ -194,3 +194,12 @@ struct DtDp {		// theta and phi derivatives stored together.
 // in 64 bit system, malloc should be 16bytes aligned.
 #define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
 #define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
+#define VREALLOC(p,s)	( (sizeof(void*) >= 8) ? realloc(p,s) : p )
+
+// verbose printing
+#if SHT_VERBOSE > 1
+  #define PRINT_VERB(msg) printf(msg)
+#else
+  #define PRINT_VERB(msg) (0)
+#endif
+

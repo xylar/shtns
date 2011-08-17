@@ -53,12 +53,6 @@
 /// (set to zero to disable, may be useful for calling from Fortran)
 #define _GCC_VEC_ 1
 
-// if SHT_AXISYM is defined, an axisymmetric-only transform will be compiled.
-//#define SHT_AXISYM
-
-// if SHT_NO_DCT is defined, no DCT support will be compiled. (Gauss-legendre only).
-//#define SHT_NO_DCT
-
 /// minimum NLAT to consider the use of DCT acceleration.
 #define SHT_MIN_NLAT_DCT 64
 
