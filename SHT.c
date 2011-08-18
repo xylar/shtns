@@ -399,6 +399,7 @@ int free_unused(shtns_cfg shtns, void* pp)
 /// Free matrices if on-the-fly has been selected.
 void free_unused_matrices(shtns_cfg shtns)
 {
+	long int marray_size = (MMAX+1)*sizeof(double) + (MIN_ALIGNMENT-1);
 	int count[SHT_NTYP];
 	int it, iv, ia, iv2;
 
@@ -417,37 +418,37 @@ void free_unused_matrices(shtns_cfg shtns)
 	}
 
 	if (shtns->dylm == NULL) {		// no vector transform : do not try to free
-		count[SHT_TYP_VAN] = 1;		count[SHT_TYP_VSY] = 1;
+		count[SHT_TYP_VAN] = -1;		count[SHT_TYP_VSY] = -1;
 	}
 
 	if (count[SHT_TYP_3AN] == 0) {		// analysis may be freed.
-		if ((count[SHT_TYP_VAN] == 0) && (shtns->dzlm[0] != NULL)) {
+		if (count[SHT_TYP_VAN] == 0) {
 			PRINT_VERB("freeing vector analysis matrix\n");
-			VFREE(shtns->dzlm[0]);	shtns->dzlm[0] = NULL;
+			free_unused(shtns, &shtns->dzlm);
 		}
-		if ((count[SHT_TYP_SAN] == 0) && (shtns->zlm[0] != NULL)) {
+		if (count[SHT_TYP_SAN] == 0) {
 			PRINT_VERB("freeing scalar analysis matrix\n");
-			VFREE(shtns->zlm[0]);	shtns->zlm[0] = NULL;
+			free_unused(shtns, &shtns->zlm);
 		}
 	} else if (shtns->mmax > 0) {	// scalar may be reduced to m=0
-		if ((count[SHT_TYP_SAN] == 0) && (shtns->zlm[0] != NULL)) {
+		if ((count[SHT_TYP_SAN] == 0) && (ref_count(shtns, &shtns->zlm) == 1)) {
 			PRINT_VERB("keeping scalar analysis matrix up to m=0\n");
-			shtns->zlm[0] = VREALLOC(shtns->zlm[0], ((LMAX+1)*NLAT_2 +3)*sizeof(double));
+			shtns->zlm = realloc(shtns->zlm, ((LMAX+1)*NLAT_2 +3)*sizeof(double) + marray_size );
 		}
 	}
 	if (count[SHT_TYP_3SY] == 0) {		// synthesis may be freed.
-		if ((count[SHT_TYP_VSY] + count[SHT_TYP_GSP] + count[SHT_TYP_GTO] == 0) && (shtns->dylm[0] != NULL)) {
+		if (count[SHT_TYP_VSY] + count[SHT_TYP_GSP] + count[SHT_TYP_GTO] == 0) {
 			PRINT_VERB("freeing vector synthesis matrix\n");
-			VFREE(shtns->dylm[0]);	shtns->dylm[0] = NULL;
+			free_unused(shtns, &shtns->dylm);
 		}
-		if ((count[SHT_TYP_SSY] == 0) && (shtns->ylm[0] != NULL)) {
+		if (count[SHT_TYP_SSY] == 0) {
 			PRINT_VERB("freeing scalar synthesis matrix\n");
-			VFREE(shtns->ylm[0]);	shtns->ylm[0] = NULL;
+			free_unused(shtns, &shtns->ylm);
 		}
 	} else if (shtns->mmax > 0) {	// scalar may be reduced to m=0
-		if ((count[SHT_TYP_SSY] == 0) && (shtns->ylm[0] != NULL)) {
+		if ((count[SHT_TYP_SSY] == 0) && (ref_count(shtns, &shtns->ylm) == 1)) {
 			PRINT_VERB("keeping scalar synthesis matrix up to m=0\n");
-			shtns->ylm[0] = VREALLOC(shtns->ylm[0], (LMAX+2)*NLAT_2*sizeof(double));
+			shtns->ylm = realloc(shtns->ylm, (LMAX+2)*NLAT_2*sizeof(double) + marray_size );
 		}
 	}
 }
@@ -456,7 +457,8 @@ void free_unused_matrices(shtns_cfg shtns)
 /// \internal allocate arrays for SHT related to a given grid.
 void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
 {
-	long int im,m, l0;
+	long int im, l0;
+	long int size, marray_size, lstride;
 
 	l0 = ((NLAT+1)>>1)*2;		// round up to even
 	shtns->ct = (double *) VMALLOC( sizeof(double) * l0*3 );			/// ct[] (including st and st_1)
@@ -464,82 +466,51 @@ void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
 	
 	shtns->ylm = NULL;		shtns->dylm = NULL;			// synthesis
 	shtns->zlm = NULL;		shtns->dzlm = NULL;			// analysis
-	shtns->ykm_dct = NULL;	shtns->dykm_dct = NULL;		// dct
 
-  if (on_the_fly == 0) {
-	shtns->ylm = (double **) VMALLOC( sizeof(double *) * (MMAX+1)*3 );		/// ylm[] (including zlm and ykm_dct)
-	shtns->zlm = shtns->ylm + (MMAX+1);		shtns->ykm_dct = shtns->ylm + (MMAX+1)*2;
-	if (vect) {
-		shtns->dylm = (struct DtDp **) VMALLOC( sizeof(struct DtDp *) * (MMAX+1)*3);		/// dylm[] (including dzlm and dykm_dct)
-		shtns->dzlm = shtns->dylm + (MMAX+1);		shtns->dykm_dct = shtns->dylm + (MMAX+1)*2;
-	}
+	if (on_the_fly == 0) {		// Allocate legendre functions lookup tables.
+		marray_size = (MMAX+1)*sizeof(double*) + (MIN_ALIGNMENT-1);		// for sse2 alignement
 
-// Allocate legendre functions lookup tables.
-	long int lstride = (LMAX+1);		lstride += (lstride&1);		// even stride.
-	long int size = sizeof(double) * ((NLM-(LMAX+1)+lstride)*NLAT_2);
-	if (MMAX == 0) size += 3*sizeof(double);	// some overflow needed.
-	shtns->ylm[0] = (double *) VMALLOC(size);		/// ylm[][]
-	if (MMAX>0) shtns->ylm[1] = shtns->ylm[0] + NLAT_2*lstride;
-	if (vect) {
-		lstride = LMAX;		lstride += (lstride&1);		// even stride.
-		size = sizeof(struct DtDp) * ((NLM-(LMAX+1) +lstride/2)*NLAT_2);
-		if (MMAX == 0) size += 2*sizeof(double);	// some overflow needed.
-		shtns->dylm[0] = (struct DtDp *) VMALLOC(size);		/// dylm[][]
-		if (MMAX>0) shtns->dylm[1] = shtns->dylm[0] + (lstride/2)*NLAT_2;		// phi-derivative is zero for m=0
-	}
-	if (analys) {
-		size = sizeof(double) * (NLM*NLAT_2 + (NLAT_2 & 1));
-		if (MMAX == 0) size += 2*(NLAT_2 & 1)*((LMAX+1) & 1) * sizeof(double);
-		shtns->zlm[0] = (double *) VMALLOC(size);		/// zlm[][]
-		if (MMAX>0) shtns->zlm[1] = shtns->zlm[0] + NLAT_2*(LMAX+1) + (NLAT_2&1);
+		/* ylm */
+		lstride = (LMAX+1);		lstride += (lstride&1);		// even stride.
+		size = sizeof(double) * ((NLM-(LMAX+1)+lstride)*NLAT_2);
+		if (MMAX == 0) size += 3*sizeof(double);			// some overflow needed.
+		shtns->ylm = (double **) malloc( marray_size + size );
+		shtns->ylm[0] = (double *) PTR_ALIGN( shtns->ylm + (MMAX+1) );
+		if (MMAX>0) shtns->ylm[1] = shtns->ylm[0] + NLAT_2*lstride;
+		for (im=1; im<MMAX; im++) shtns->ylm[im+1] = shtns->ylm[im] + NLAT_2*(LMAX+1-im*MRES);
+		/* dylm */		
 		if (vect) {
-			shtns->dzlm[0] = (struct DtDp *) VMALLOC(sizeof(struct DtDp)* (NLM-1)*NLAT_2);		// remove l=0
-			if (MMAX>0) shtns->dzlm[1] = shtns->dzlm[0] + NLAT_2*(LMAX);
+			lstride = LMAX;		lstride += (lstride&1);		// even stride.
+			size = sizeof(struct DtDp) * ((NLM-(LMAX+1) +lstride/2)*NLAT_2);
+			if (MMAX == 0) size += 2*sizeof(double);	// some overflow needed.
+			shtns->dylm = (struct DtDp **) malloc( marray_size + size );
+			shtns->dylm[0] = (struct DtDp *) PTR_ALIGN( shtns->dylm + (MMAX+1) );
+			if (MMAX>0) shtns->dylm[1] = shtns->dylm[0] + (lstride/2)*NLAT_2;		// phi-derivative is zero for m=0
+			for (im=1; im<MMAX; im++) shtns->dylm[im+1] = shtns->dylm[im] + NLAT_2*(LMAX+1-im*MRES);
+		}
+		if (analys) {
+			/* zlm */
+			size = sizeof(double) * (NLM*NLAT_2 + (NLAT_2 & 1));
+			if (MMAX == 0) size += 2*(NLAT_2 & 1)*((LMAX+1) & 1) * sizeof(double);
+			shtns->zlm = (double **) malloc( marray_size + size );
+			shtns->zlm[0] = (double *) PTR_ALIGN( shtns->zlm + (MMAX+1) );
+			if (MMAX>0) shtns->zlm[1] = shtns->zlm[0] + NLAT_2*(LMAX+1) + (NLAT_2&1);
+			for (im=1; im<MMAX; im++) shtns->zlm[im+1] = shtns->zlm[im] + NLAT_2*(LMAX+1-im*MRES);
+			/* dzlm */
+			if (vect) {
+				size = sizeof(struct DtDp)* (NLM-1)*NLAT_2;		// remove l=0
+				shtns->dzlm = (struct DtDp **) malloc( marray_size + size );
+				shtns->dzlm[0] = (struct DtDp *) PTR_ALIGN( shtns->dzlm + (MMAX+1) );
+				if (MMAX>0) shtns->dzlm[1] = shtns->dzlm[0] + NLAT_2*(LMAX);
+				for (im=1; im<MMAX; im++) shtns->dzlm[im+1] = shtns->dzlm[im] + NLAT_2*(LMAX+1-im*MRES);
+			}
 		}
 	}
-	for (im=1; im<MMAX; im++) {
-		m=im*MRES;
-		shtns->ylm[im+1] = shtns->ylm[im] + NLAT_2*(LMAX+1-m);
-		if (analys) shtns->zlm[im+1] = shtns->zlm[im] + NLAT_2*(LMAX+1-m);
-		if (vect) {
-			shtns->dylm[im+1] = shtns->dylm[im] + NLAT_2*(LMAX+1-m);
-			if (analys) shtns->dzlm[im+1] = shtns->dzlm[im] + NLAT_2*(LMAX+1-m);
-		}
-	}
-#if SHT_VERBOSE > 1
-	printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
-#endif
-  }
+	#if SHT_VERBOSE > 1
+		printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
+	#endif
 }
 
-/// \internal free arrays allocated by alloc_SHTarrays.
-void free_SHTarrays(shtns_cfg shtns)
-{
-	if (ref_count(shtns, &shtns->fft) == 1)  fftw_destroy_plan(shtns->fft);
-	if (ref_count(shtns, &shtns->ifft) == 1) fftw_destroy_plan(shtns->ifft);
-	shtns->fft = NULL;		shtns->ifft = NULL;		shtns->ncplx_fft = -1;	// no fft
-
-	if (ref_count(shtns, &shtns->dylm) == 1) {
-		if (shtns->dzlm[0] != NULL) VFREE(shtns->dzlm[0]);
-		shtns->dzlm[0] = NULL;
-		if (shtns->dylm != NULL) VFREE(shtns->dylm[0]);
-		shtns->dylm[0] = NULL;
-		VFREE(shtns->dylm);
-	}
-	shtns->dylm = NULL;		shtns->dzlm = NULL;		shtns->dykm_dct = NULL;
-
-	if (ref_count(shtns, &shtns->ylm) == 1) {
-		if (shtns->zlm[0] != NULL) VFREE(shtns->zlm[0]);
-		shtns->zlm[0] = NULL;
-		if (shtns->ylm[0] != NULL) VFREE(shtns->ylm[0]);
-		shtns->ylm[0] = NULL;
-		VFREE(shtns->ylm);
-	}
-	shtns->ylm = NULL;		shtns->zlm = NULL;		shtns->ykm_dct = NULL;
-
-	if (ref_count(shtns, &shtns->ct) == 1)	VFREE(shtns->ct);
-	shtns->ct = NULL;		shtns->st = NULL;
-}
 
 /// \internal free arrays allocated by init_SH_dct
 void free_SH_dct(shtns_cfg shtns)
@@ -547,24 +518,34 @@ void free_SH_dct(shtns_cfg shtns)
 	if (shtns->zlm_dct0 == NULL) return;
 
 	if (ref_count(shtns, &shtns->dzlm_dct0) == 1) VFREE(shtns->dzlm_dct0);
-	shtns->dzlm_dct0 = NULL;
 	if (ref_count(shtns, &shtns->zlm_dct0) == 1)  VFREE(shtns->zlm_dct0);
-	shtns->zlm_dct0 = NULL;
+	shtns->dzlm_dct0 = NULL;	shtns->zlm_dct0 = NULL;
 
-	if (ref_count(shtns, &shtns->dykm_dct) == 1) {
-		if (shtns->dykm_dct[0] != NULL)		VFREE(shtns->dykm_dct[0]);
-		shtns->dykm_dct[0] = NULL;
-	}
-	if (ref_count(shtns, &shtns->ykm_dct)  == 1) {
-		if (shtns->ykm_dct[0] != NULL)	VFREE(shtns->ykm_dct[0]);
-		shtns->ykm_dct[0] = NULL;
-	}
+	free_unused(shtns, &shtns->dykm_dct);
+	free_unused(shtns, &shtns->ykm_dct);
 
 	if (ref_count(shtns, &shtns->idct) == 1)    fftw_destroy_plan(shtns->idct);		// free unused dct plans
 	if (ref_count(shtns, &shtns->dct_m0) == 1)  fftw_destroy_plan(shtns->dct_m0);
 	if (ref_count(shtns, &shtns->dct_r1) == 1)  fftw_destroy_plan(shtns->dct_r1);
 	if (ref_count(shtns, &shtns->idct_r1) == 1) fftw_destroy_plan(shtns->idct_r1);
 	shtns->idct = NULL;		shtns->dct_m0 = NULL;		shtns->idct_r1 = NULL;		shtns->dct_r1 = NULL;
+}
+
+/// \internal free arrays allocated by alloc_SHTarrays.
+void free_SHTarrays(shtns_cfg shtns)
+{
+	free_SH_dct(shtns);
+	free_unused(shtns, &shtns->ylm);
+	free_unused(shtns, &shtns->dylm);
+	free_unused(shtns, &shtns->zlm);
+	free_unused(shtns, &shtns->dzlm);
+
+	if (ref_count(shtns, &shtns->ct) == 1)	VFREE(shtns->ct);
+	shtns->ct = NULL;		shtns->st = NULL;
+
+	if (ref_count(shtns, &shtns->fft) == 1)  fftw_destroy_plan(shtns->fft);
+	if (ref_count(shtns, &shtns->ifft) == 1) fftw_destroy_plan(shtns->ifft);
+	shtns->fft = NULL;		shtns->ifft = NULL;		shtns->ncplx_fft = -1;	// no fft
 }
 
 
@@ -1058,7 +1039,6 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	fftw_plan dct, idct;
 	double *yk, *yk0, *dyk0, *yg;		// temp storage
 	struct DtDp *dyg, *dyk;
-	double dtylm[LMAX+1];		// temp storage for derivative : d(P_l^m(x))/dx
 	double iylm_fft_norm;
 	long int it,im,m,l;
 	long int sk, dsk;
@@ -1068,6 +1048,7 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	double *ct = shtns->ct;
 	double *st = shtns->st;
 	double *st_1 = shtns->st_1;
+	long int marray_size = sizeof(void*)*(MMAX+1) + (MIN_ALIGNMENT-1);
 	int vector = (shtns->dylm != NULL);
 
 	shtns->grid = GRID_REGULAR;
@@ -1130,10 +1111,16 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 #if SHT_VERBOSE > 1
 	printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
 #endif
-	shtns->ykm_dct[0] = (double *) VMALLOC(sizeof(double)* sk);
-	if (vector)  shtns->dykm_dct[0] = (struct DtDp *) VMALLOC(sizeof(struct DtDp)* dsk);
+	shtns->ykm_dct = (double **) malloc( marray_size + sizeof(double)*sk );
+	shtns->ykm_dct[0] = (double *) PTR_ALIGN( shtns->ykm_dct + (MMAX+1) );
+	if (vector) {
+		shtns->dykm_dct = (struct DtDp **) malloc( marray_size + sizeof(struct DtDp)*dsk );
+		shtns->dykm_dct[0] = (struct DtDp *) PTR_ALIGN( shtns->dykm_dct + (MMAX+1) );
+	}
 	shtns->zlm_dct0 = (double *) VMALLOC( sizeof(double)* it );
-	if (vector)  shtns->dzlm_dct0 = (double *) VMALLOC( sizeof(double)* im );
+	if (vector) {
+		shtns->dzlm_dct0 = (double *) VMALLOC( sizeof(double)* im );
+	}
 	for (im=0; im<MMAX; im++) {
 		m = im*MRES;
 		for (it=0, sk=0; it<= KMAX; it+=2) {
@@ -1567,12 +1554,10 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 {
 	complex double *Qlm, *Slm, *Tlm;
 	double *Qh, *Sh, *Th;
-	char *nb;
 	int m, i, i0, minc, nloop, alg_end;
 	int typ_lim = SHT_NTYP;		// time every type.
 	double t0, t, tt, r;
 	double tdct, tnodct;
-	ticks tik0, tik1;
 	clock_t tcpu;
 	int on_the_fly_only = (shtns->ylm == NULL);		// only on-the-fly.
 	int otf_analys = (shtns->wg != NULL);			// on-the-fly analysis supported.
@@ -1894,7 +1879,6 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 /// Copy a given config but allow a different (smaller) mmax and the possibility to enable/disable fft.
 shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 {
-	int nloop;
 	shtns_cfg shtns;
 
 	if (mmax > base->mmax) return (NULL);		// fail if mmax larger than source config.

@@ -95,12 +95,12 @@ Q	#define re0(i)	reo0[2*(i)+1]
 Q	#define ro0(i)	reo0[2*(i)]
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
+
+  #ifndef SHT_AXISYM
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
 		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
-
-  #ifndef SHT_AXISYM
 Q	BrF = (complex double *) Vr;
 S	BtF = (complex double *) Vt;
 T	BpF = (complex double *) Vp;
@@ -260,34 +260,37 @@ QX		double r1 = 0.0;
 Q		zl = shtns->zlm[0];
 		// stride of source data : we assume NPHI>1 (else SHT_AXISYM should be defined).
 	#ifndef SHT_AXISYM
-Q		#define BR0(i) vdup(((double*)BrF)[(i)*2])
-S		#define BT0(i) vdup(((double*)BtF)[(i)*2])
-T		#define BP0(i) vdup(((double*)BpF)[(i)*2])
+Q		#define BR0(i) ((double*)BrF)[(i)*2]
+S		#define BT0(i) ((double*)BtF)[(i)*2]
+T		#define BP0(i) ((double*)BpF)[(i)*2]
 	#else
-Q		#define BR0(i) vdup(Vr[i])
-S		#define BT0(i) vdup(Vt[i])
-T		#define BP0(i) vdup(Vp[i])
+Q		#define BR0(i) Vr[i]
+S		#define BT0(i) Vt[i]
+T		#define BP0(i) Vp[i]
 	#endif
 		do {	// compute symmetric and antisymmetric parts.
-Q			s2d a = BR0(i);		s2d b = BR0(NLAT-1-i);
-S			s2d c = BT0(i);		s2d d = BT0(NLAT-1-i);
-T			s2d e = BP0(i);		s2d f = BP0(NLAT-1-i);
 		#if _GCC_VEC_ && __SSE3__
+Q			s2d a = vdup(BR0(i));		s2d b = vdup(BR0(NLAT-1-i));
 Q			a = subadd(a,b);
 Q			((s2d*) reo0)[i] = a;		// assume odd is first, then even.
 Q			r0 += zl[i] * vhi_to_dbl(a);	// even part is used.
+S			s2d c = vdup(BT0(i));		s2d d = vdup(BT0(NLAT-1-i));
 S			c = subadd(c,d);		vteo0(i) = vxchg(c);
+T			s2d e = vdup(BP0(i));		s2d f = vdup(BP0(NLAT-1-i));
 T			e = subadd(e,f);		vpeo0(i) = vxchg(e);
 			i++;
-QX			s2d g = BR0(i);		s2d h = BR0(NLAT-1-i);
+QX			s2d g = vdup(BR0(i));		s2d h = vdup(BR0(NLAT-1-i));
 QX			g = subadd(g,h);
 QX			((s2d*) reo0)[i] = g;		// assume odd is first, then even.
 QX			r1 += zl[i] * vhi_to_dbl(g);	// even part is used, reduce data dependency
 QX			i++;
 		#else
+Q			double a = BR0(i);		double b = BR0(NLAT-1-i);
 Q			ro0(i) = (a-b);		re0(i) = (a+b);
 Q			r0 += zl[i] * (a+b);
+S			double c = BT0(i);		double d = BT0(NLAT-1-i);
 S			te0(i) = (c+d);		to0(i) = (c-d);
+T			double e = BP0(i);		double f = BP0(NLAT-1-i);
 T			pe0(i) = (e+f);		po0(i) = (e-f);
  			i++;
 		#endif

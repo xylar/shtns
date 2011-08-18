@@ -83,12 +83,12 @@ V	double por[NLAT_2+2*NWAY] SSE;
   #endif
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
+
+  #ifndef SHT_AXISYM
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
 		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
-
-  #ifndef SHT_AXISYM
 Q	BrF = (complex double *) Vr;
 V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 	if (shtns->ncplx_fft >= 0) {

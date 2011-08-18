@@ -83,7 +83,7 @@ T	BpF = (v2d*) Vp;
   #endif
 
 	ct = shtns->ct;		st = shtns->st;
-	im=0;	m=0;
+	im=0;
  		l=1;
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double

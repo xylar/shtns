@@ -1,7 +1,9 @@
 #!/bin/bash
 # script to test many sht cases
 
-echo "beginning test suite" > test_suite.log
+id=`hg id`
+log="test_suite.log"
+echo "beginning test suite for $id" > $log
 
 for switch in "" "-oop" "-transpose" "-schmidt" "-4pi"
 do
@@ -13,11 +15,11 @@ do
       do
         c="./time_SHT $lmax -mmax=$mmax $mode $switch -iter=1"
         echo $c
-        echo "---" >> test_suite.log
-        echo "*** $c *** " >> test_suite.log
+        echo "---" >> $log
+        echo "*** $c *** " >> $log
         $c > tmp.out
         cat tmp.out | grep ERROR
-        cat tmp.out >> test_suite.log
+        cat tmp.out >> $log
       done
     done
   done
@@ -26,9 +28,9 @@ done
 # do also a huge transform :
 c="./time_SHT 2047 -mres=15 -quickinit -iter=1"
 echo $c
-echo "---" >> test_suite.log
-echo "*** $c *** " >> test_suite.log
+echo "---" >> $log
+echo "*** $c *** " >> $log
 $c > tmp.out
 cat tmp.out | grep ERROR
-cat tmp.out >> test_suite.log
+cat tmp.out >> $log
 

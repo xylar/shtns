@@ -117,11 +117,13 @@ S	BtF = (v2d*) Vt;
 T	BpF = (v2d*) Vp;
   #endif
 
-	imlim = MTR;
-	#ifdef SHT_VAR_LTR
-		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+	#ifndef SHT_AXISYM
+		imlim = MTR;
+		#ifdef SHT_VAR_LTR
+			if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+		#endif
 	#endif
-	im=0;	m=0;
+	im=0;
   #ifdef _GCC_VEC_
   	{	// store the m=0 coefficients in an efficient & vectorizable way.
 Q		double* Ql = (double*) &Ql0;

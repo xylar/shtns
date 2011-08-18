@@ -31,7 +31,6 @@ Q=SH_to_spat.c
 S=SHs_to_spat.c
 T=SHt_to_spat.c
 QST=SHqst_to_spat.c
-GSHEO=sparse_SH_to_spat.gen.c
 STEO=SHeost_to_spat.c
 QEO=SHeo_to_spat.c
 SEO=SHeos_to_spat.c
@@ -44,11 +43,6 @@ VE=spat_to_SHst.c
 V3=spat_to_SHqst.c
 VS0=spat_to_SHs.c
 VT0=spat_to_SHt.c
-
-#sparse
-GSPEO=sparse_spat_to_SH.gen.c
-SCEO=spat_to_SHeo.c
-VEEO=spat_to_SHeost.c
 
 #fly : SH_to_spat
 FSH=fly_SH_to_spat.gen.c

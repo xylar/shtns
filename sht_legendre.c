@@ -372,10 +372,14 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 
 	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
 
-	im = ((MMAX+2)>>1)*2;		// alloc memory for arrays.
-	alm = (double **) malloc( im * sizeof(double *) + (2*NLM)*sizeof(double) );
-	al0 = (double *) (alm + im);
+	im = (MMAX+1)*sizeof(double*) + (MIN_ALIGNMENT-1);		// alloc memory for arrays + sse alignement.
+	alm = (double **) malloc( im + (2*NLM)*sizeof(double) );
+	al0 = (double *) PTR_ALIGN( alm + (MMAX+1) );
 	bl0 = al0;		blm = alm;		// by default analysis recurrence is the same
+	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
+		blm = (double **) malloc( im + (2*NLM)*sizeof(double) );
+		bl0 = (double *) PTR_ALIGN( blm + (MMAX+1) );
+	}
 
 /// - Precompute the factors alm and blm of the recurrence relation :
   if (norm == sht_schmidt) {

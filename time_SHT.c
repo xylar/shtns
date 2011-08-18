@@ -119,7 +119,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 
 double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0, complex double *Tlm0, int ltr)
 {
-	long int jj,i, nlm_cplx;
+	long int jj,i;
 	double tmax,t,n2;
 
 // compute error :
@@ -161,7 +161,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 
 int test_SHT()
 {
-	long int jj,i, nlm_cplx;
+	long int jj,i;
 	clock_t tcpu;
 	double ts, ta;
 
