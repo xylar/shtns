@@ -67,7 +67,7 @@ double shlm_e1(shtns_cfg shtns, int l, int m) {
 
 /// \code return (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2; \endcode */
 /// \ingroup init
-int nlm_calc(int lmax, int mmax, int mres)
+long nlm_calc(long lmax, long mmax, long mres)
 {
 	if (mmax*mres > lmax) mmax = lmax/mres;
 	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres

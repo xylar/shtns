@@ -53,7 +53,7 @@ typedef void (*pf6l)(shtns_cfg, void*, void*, void*, void*, void*, void*, long i
 /// structure containing useful information about the SHT.
 struct shtns_info {		// MUST start with "int nlm;"
 /* PUBLIC PART (if modified, shtns.h should be modified acordingly) */
-	int nlm;					///< total number of (l,m) spherical harmonics components.
+	unsigned int nlm;			///< total number of (l,m) spherical harmonics components.
 	unsigned short lmax;		///< maximum degree (lmax) of spherical harmonics.
 	unsigned short mmax;		///< maximum order (mmax*mres) of spherical harmonics.
 	unsigned short mres;		///< the periodicity along the phi axis.
@@ -63,7 +63,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	int *lmidx;					///< (virtual) index in SH array of given im (size mmax+1) : LiM(l,im) = lmidx[im] + l
 	unsigned short *li;			///< degree l for given mode number (size nlm) : li[lm] 
 	double *ct, *st;			///< cos(theta) and sin(theta) arrays (size nlat)
-	unsigned nspat;				///< number of real numbers that must be allocated in a spatial field.
+	unsigned int nspat;			///< number of real numbers that must be allocated in a spatial field.
 /* END OF PUBLIC PART */
 
 	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).

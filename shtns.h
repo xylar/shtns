@@ -52,7 +52,7 @@ enum shtns_type {
 
 #ifndef SHTNS_PRIVATE
 struct shtns_info {		// allow read-only access to some data (useful for optimization and helper macros)
-	const int nlm;					///< total number of (l,m) spherical harmonics components.
+	const unsigned int nlm;			///< total number of (l,m) spherical harmonics components.
 	const unsigned short lmax;		///< maximum degree (lmax) of spherical harmonics.
 	const unsigned short mmax;		///< maximum order (mmax*mres) of spherical harmonics.
 	const unsigned short mres;		///< the periodicity along the phi axis.
@@ -63,7 +63,7 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 	const unsigned short *const li;	///< degree l for given mode number (size nlm) : li[lm] 
 	const double *const ct;			///< cos(theta) array (size nlat)
 	const double *const st;			///< sin(theta) array (size nlat)
-	const unsigned nspat;			///< number of real numbers that must be allocated in a spatial field.
+	const unsigned int nspat;		///< number of real numbers that must be allocated in a spatial field.
 };
 #endif
 
@@ -113,7 +113,7 @@ int shtns_set_grid_auto(shtns_cfg, enum shtns_type flags, double eps, int nl_ord
 shtns_cfg shtns_create_with_grid(shtns_cfg, int mmax, int nofft);
 
 /// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require any previous setup.
-int nlm_calc(int lmax, int mmax, int mres);
+long nlm_calc(long lmax, long mmax, long mres);
 
 void shtns_reset();				///< destroy all configs, free memory, and go back to initial state.
 void shtns_destroy(shtns_cfg);	///< free memory of given config, which cannot be used afterwards.
