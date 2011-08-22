@@ -496,17 +496,20 @@ V					t[1] -= DY1 * peik[j]  + Y1 * tork[j];
 V		#undef DY0
 V		#undef DY1
 	  }
+3		s2d m_1 = vdup(1.0/m);
 		l = LiM(shtns, m, im);
-Q		complex double *Ql = &Qlm[l];
-V		complex double *Sl = &Slm[l];
-V		complex double *Tl = &Tlm[l];
-3		double m_1 = 1.0/m;
+Q		v2d *Ql = (v2d*) &Qlm[l];
+V		v2d *Sl = (v2d*) &Slm[l];
+V		v2d *Tl = (v2d*) &Tlm[l];
 		#if _GCC_VEC_
 			for (l=0; l<=llim-m; l++) {
-Q				Ql[l] = vlo_to_dbl(qq[2*l]) + vhi_to_dbl(qq[2*l]) + I*(vlo_to_dbl(qq[2*l+1]) + vhi_to_dbl(qq[2*l+1]));
-3				Ql[l] *= m_1;
-V				Sl[l] = (vlo_to_dbl(ss[2*l]) + vhi_to_dbl(ss[2*l]) + I*(vlo_to_dbl(ss[2*l+1]) + vhi_to_dbl(ss[2*l+1])))*l_2[l+m];
-V				Tl[l] = (vlo_to_dbl(tt[2*l]) + vhi_to_dbl(tt[2*l]) + I*(vlo_to_dbl(tt[2*l+1]) + vhi_to_dbl(tt[2*l+1])))*l_2[l+m];
+Q				s2d qa = _mm_unpacklo_pd(qq[2*l], qq[2*l+1]);		s2d qb = _mm_unpackhi_pd(qq[2*l], qq[2*l+1]);
+QX				Ql[l] = qa + qb;
+3				Ql[l] = (qa + qb)*m_1;
+V				s2d sa = _mm_unpacklo_pd(ss[2*l], ss[2*l+1]);		s2d sb = _mm_unpackhi_pd(ss[2*l], ss[2*l+1]);
+V				s2d ta = _mm_unpacklo_pd(tt[2*l], tt[2*l+1]);		s2d tb = _mm_unpackhi_pd(tt[2*l], tt[2*l+1]);
+V				Sl[l] = (sa + sb)*vdup(l_2[l+m]);
+V				Tl[l] = (ta + tb)*vdup(l_2[l+m]);
 			}
 		#else
 V			for (l=0; l<=llim-m; l++) {
@@ -517,8 +520,8 @@ V			}
 		#endif
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1-m; l<=LMAX-m; l++) {
-Q				Ql[l] = 0.0;
-V				Sl[l] = 0.0;		Tl[l] = 0.0;
+Q				Ql[l] = vdup(0.0);
+V				Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
 			}
 		#endif
 	}
