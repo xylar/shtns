@@ -461,8 +461,7 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 		}
 	}
 
-	shtns->al0 = al0;		shtns->alm = alm;
-	shtns->bl0 = bl0;		shtns->blm = blm;
+	shtns->alm = alm;		shtns->blm = blm;
 }
 
 /// \internal returns the value of the Legendre Polynomial of degree l.

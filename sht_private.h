@@ -74,8 +74,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	fftw_plan ifft, fft;		// plans for FFTW.
 
 	/* Legendre function generation arrays */
-	double *al0;	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
-	double *bl0;	double **blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
+	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
+	double **blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
 	double *l_2;	// array of size (LMAX+1) containing 1./l(l+1) for increasing integer l.
 
 	void* fptr[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
@@ -170,8 +170,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vdup(x) _mm_set1_pd(x)
 	// vxchg(a) exchange hi and lo component of vector a
 	#define vxchg(a) _mm_shuffle_pd(a,a,1)
-	#define vlo_to_cplx(a) _mm_shuffle_pd(a, vdup(0.0), 0)
-	#define vhi_to_cplx(a) _mm_shuffle_pd(a, vdup(0.0), 1)
+	#define vlo_to_cplx(a) _mm_unpacklo_pd(a, vdup(0.0))
+	#define vhi_to_cplx(a) _mm_unpackhi_pd(a, vdup(0.0))
 	#define vlo_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 0)
 	#define vhi_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 1)
 #else

@@ -107,6 +107,10 @@ VX		BpF = BtF + shtns->ncplx_fft;
 3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
   #else
 	#ifdef SHT_GRAD
 S		if (Vp != NULL) for(int i=0; i<NLAT; i++) Vp[i] = 0.0;
@@ -117,12 +121,6 @@ S	BtF = (v2d*) Vt;
 T	BpF = (v2d*) Vp;
   #endif
 
-	#ifndef SHT_AXISYM
-		imlim = MTR;
-		#ifdef SHT_VAR_LTR
-			if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
-		#endif
-	#endif
 	im=0;
   #ifdef _GCC_VEC_
   	{	// store the m=0 coefficients in an efficient & vectorizable way.

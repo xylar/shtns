@@ -45,7 +45,7 @@ VX	void GEN3(spat_to_SHsphtor_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, doub
 
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
-	double *al, *wg, *ct, *st;
+	double *alm, *al, *wg, *ct, *st;
 V	double *l_2;
 	long int ni, k;
 	long int i,i0, m,l;
@@ -82,13 +82,7 @@ V	double per[NLAT_2+2*NWAY] SSE;
 V	double por[NLAT_2+2*NWAY] SSE;
   #endif
 
-	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
-
   #ifndef SHT_AXISYM
-	imlim = MTR;
-	#ifdef SHT_VAR_LTR
-		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
-	#endif
 Q	BrF = (complex double *) Vr;
 V	BtF = (complex double *) Vt;	BpF = (complex double *) Vp;
 	if (shtns->ncplx_fft >= 0) {
@@ -103,12 +97,18 @@ Q		fftw_execute_dft_r2c(shtns->fft,Vr, BrF);
 V		fftw_execute_dft_r2c(shtns->fft,Vt, BtF);
 V		fftw_execute_dft_r2c(shtns->fft,Vp, BpF);
 	}
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
   #endif
 
+	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
 V	l_2 = shtns->l_2;
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
 		i=0;
+		alm = shtns->blm[0];
 Q		double r0 = 0.0;
 		#ifndef SHT_AXISYM
 Q			#define BR0(i) ((double*)BrF)[(i)*2]
@@ -143,7 +143,7 @@ V			per[i] = 0.0;		por[i] = 0.0;
 	#else
 		} while(i<ni+NWAY-1);
 	#endif
-Q		Qlm[0] = r0 * shtns->bl0[0];					// l=0 is done.
+Q		Qlm[0] = r0 * alm[0];					// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
 		for (l=1;l<=llim;l++) {
@@ -151,7 +151,7 @@ Q			qq[l] = vdup(0.0);
 V			ss[l] = vdup(0.0);		tt[l] = vdup(0.0);
 		}
 		do {
-			al = shtns->bl0;
+			al = alm;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d sint[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rerk[NWAY], rork[NWAY];		// help the compiler to cache into registers.
@@ -222,6 +222,7 @@ V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 		i0 = shtns->tm[im];
+		alm = shtns->blm[im];
 		m = im*MRES;
 	#if _GCC_VEC_
 		i0=(i0>>1)*2;		// stay on a 16 byte boundary
@@ -291,7 +292,7 @@ Q			double* q = (double *) &Qlm[l];
 V			double* s = (double *) &Slm[l];
 V			double* t = (double *) &Tlm[l];
 		#endif
-			al = shtns->blm[im];
+			al = alm;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rerk[NWAY], reik[NWAY], rork[NWAY], roik[NWAY];		// help the compiler to cache into registers.
@@ -392,7 +393,7 @@ Q			double* q = (double *) &Qlm[l];
 V			double* s = (double *) &Slm[l];
 V			double* t = (double *) &Tlm[l];
 		#endif
-			al = shtns->blm[im];
+			al = alm;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY], scale[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rerk[NWAY], reik[NWAY], rork[NWAY], roik[NWAY];		// help the compiler to cache into registers.

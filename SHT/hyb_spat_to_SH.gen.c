@@ -94,13 +94,7 @@ V	#define po(i)	tpeo[4*(i)+3]
 Q	#define re0(i)	reo0[2*(i)+1]
 Q	#define ro0(i)	reo0[2*(i)]
 
-	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
-
   #ifndef SHT_AXISYM
-	imlim = MTR;
-	#ifdef SHT_VAR_LTR
-		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
-	#endif
 Q	BrF = (complex double *) Vr;
 S	BtF = (complex double *) Vt;
 T	BpF = (complex double *) Vp;
@@ -116,8 +110,13 @@ Q	    fftw_execute_dft_r2c(shtns->fft,Vr, BrF);
 V	    fftw_execute_dft_r2c(shtns->fft,Vt, BtF);
 V	    fftw_execute_dft_r2c(shtns->fft,Vp, BpF);
 	}
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
   #endif
 
+	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 	im = 0;		// dzl.p = 0.0 : and evrything is REAL
   #ifndef SHT_NO_DCT
 V	double* st_1 = shtns->st_1;
@@ -255,8 +254,6 @@ T			Tl[l] = vdup(0.0);
 	#endif
   #else		// ifndef SHT_NO_DCT
 		i=0;
-QE		double r0 = 0.0;
-QX		double r1 = 0.0;
 Q		zl = shtns->zlm[0];
 		// stride of source data : we assume NPHI>1 (else SHT_AXISYM should be defined).
 	#ifndef SHT_AXISYM
@@ -268,23 +265,32 @@ Q		#define BR0(i) Vr[i]
 S		#define BT0(i) Vt[i]
 T		#define BP0(i) Vp[i]
 	#endif
+	#if _GCC_VEC_ && __SSE3__
+Q		s2d r0v = vdup(0.0);
 		do {	// compute symmetric and antisymmetric parts.
-		#if _GCC_VEC_ && __SSE3__
 Q			s2d a = vdup(BR0(i));		s2d b = vdup(BR0(NLAT-1-i));
+QX			s2d g = vdup(BR0(i+1));		s2d h = vdup(BR0(NLAT-2-i));
 Q			a = subadd(a,b);
+QX			g = subadd(g,h);
 Q			((s2d*) reo0)[i] = a;		// assume odd is first, then even.
-Q			r0 += zl[i] * vhi_to_dbl(a);	// even part is used.
+3			r0v += vdup(zl[i]) * a;	// even part is used.
+QX			((s2d*) reo0)[i+1] = g;		// assume odd is first, then even.
+QX			a = _mm_unpackhi_pd(a, g);
+QX			r0v += *((s2d*)(zl+i)) * a;	// even part is used, reduce data dependency
 S			s2d c = vdup(BT0(i));		s2d d = vdup(BT0(NLAT-1-i));
 S			c = subadd(c,d);		vteo0(i) = vxchg(c);
 T			s2d e = vdup(BP0(i));		s2d f = vdup(BP0(NLAT-1-i));
 T			e = subadd(e,f);		vpeo0(i) = vxchg(e);
-			i++;
-QX			s2d g = vdup(BR0(i));		s2d h = vdup(BR0(NLAT-1-i));
-QX			g = subadd(g,h);
-QX			((s2d*) reo0)[i] = g;		// assume odd is first, then even.
-QX			r1 += zl[i] * vhi_to_dbl(g);	// even part is used, reduce data dependency
-QX			i++;
-		#else
+V			i++;
+QX			i+=2;
+		} while(i<ni);
+QX		r0v += vxchg(r0v);
+QX		((s2d*) reo0)[ni] = vdup(0.0);		// allow some overflow.
+Q		((v2d*)Qlm)[0] = vhi_to_cplx(r0v);
+	#else
+Q		double r0 = 0.0;
+QX		double r1 = 0.0;
+		do {	// compute symmetric and antisymmetric parts.
 Q			double a = BR0(i);		double b = BR0(NLAT-1-i);
 Q			ro0(i) = (a-b);		re0(i) = (a+b);
 Q			r0 += zl[i] * (a+b);
@@ -293,20 +299,20 @@ S			te0(i) = (c+d);		to0(i) = (c-d);
 T			double e = BP0(i);		double f = BP0(NLAT-1-i);
 T			pe0(i) = (e+f);		po0(i) = (e-f);
  			i++;
-		#endif
 		} while(i<ni);
+QX		r0 += r1;
+QX		ro0(ni) = 0.0;		re0(ni) = 0.0;		// allow some overflow.
+Q		Qlm[0] = r0;
+	#endif
 Q		#undef BR0
 S		#undef BT0
 T		#undef BP0
-QX		r0 += r1;
-QX		ro0(ni) = 0.0;		re0(ni) = 0.0;		// allow some overflow.
 Q		zl += ni + (ni&1);		// SSE alignement
 		l=1;			// l=0 is zero for the vector transform.
 Q		v2d* Ql = (v2d*) Qlm;		// virtual pointer for l=0 and im
 S		v2d* Sl = (v2d*) Slm;		// virtual pointer for l=0 and im
 T		v2d* Tl = (v2d*) Tlm;		// virtual pointer for l=0 and im
 V		dzl0 = (double *) shtns->dzlm[0];		// only theta derivative (d/dphi = 0 for m=0)
-Q		((complex double *)Ql)[0] = r0;
 S		Sl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
 T		Tl[0] = vdup(0.0);	// l=0 is zero for the vector transform.
 	#ifdef SHT_VAR_LTR

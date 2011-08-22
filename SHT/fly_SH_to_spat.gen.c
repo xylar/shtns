@@ -57,7 +57,7 @@ T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	long int k,m,l;
 	long int im, imlim;
-	double *al, *ct, *st;
+	double *alm, *al, *ct, *st;
 Q	double Ql0[llim+1];
 S	double Sl0[llim+1];
 T	double Tl0[llim];
@@ -72,6 +72,10 @@ VX		BpF = BtF + shtns->ncplx_fft;
 3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
   #else
 	#ifdef SHT_GRAD
 S		if (Vp != NULL) for(int i=0; i<NLAT; i++) Vp[i] = 0.0;
@@ -85,6 +89,7 @@ T	BpF = (v2d*) Vp;
 	ct = shtns->ct;		st = shtns->st;
 	im=0;
  		l=1;
+		alm = shtns->alm[0];
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double
 Q			Ql0[l] = (double) Qlm[l];	//	Ql[l+1] = (double) Qlm[l+1];
@@ -94,7 +99,7 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 		} while(l<=llim);
 		k=0;
 		do {
-			l=0;	al = shtns->al0;
+			l=0;	al = alm;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d sint[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d re[NWAY], ro[NWAY];
@@ -192,10 +197,6 @@ T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
 		} while (k < NLAT_2);
 
   #ifndef SHT_AXISYM
-	imlim = MTR;
-	#ifdef SHT_VAR_LTR
-		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
-	#endif
 //	#undef NWAY
 //V	#define NWAY 1
 //QX	#define NWAY 2
@@ -205,6 +206,7 @@ V	BtF += NLAT;	BpF += NLAT;
 	for(im=1; im<=imlim; im++) {
 		m = im*MRES;
 		l = LiM(shtns, 0,im);
+		alm = shtns->alm[im];
 Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
 T		complex double* Tl = &Tlm[l];
@@ -220,7 +222,7 @@ V			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zer
 			k++;
 		}
 		do {
-			al = shtns->alm[im];
+			al = alm;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];
@@ -360,7 +362,7 @@ V			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zer
 			k++;
 		}
 		do {
-			al = shtns->alm[im];
+			al = alm;
 			s2d cost[NWAY], y0[NWAY], y1[NWAY], scale[NWAY];
 V			s2d st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			s2d rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];

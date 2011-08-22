@@ -1823,8 +1823,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 				larrays_ok = 1;
 			}
 			if ( (s2->lmax >= lmax) && (s2->norm == norm) ) {		// we can reuse the legendre tables.
-				shtns->al0 = s2->al0;		shtns->alm = s2->alm;
-				shtns->bl0 = s2->bl0;		shtns->blm = s2->blm;
+				shtns->alm = s2->alm;		shtns->blm = s2->blm;
 				legendre_ok = 1;
 			}
 		}
