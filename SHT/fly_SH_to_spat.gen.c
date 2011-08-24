@@ -347,6 +347,7 @@ V		BtF += NLAT;	BpF += NLAT;
 	for(im=1; im<=imlim; im++) {
 		m = im*MRES;
 		l = LiM(shtns, 0,im);
+		alm = shtns->alm[im];
 Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
 T		complex double* Tl = &Tlm[l];

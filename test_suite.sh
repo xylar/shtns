@@ -5,6 +5,16 @@ id=`hg id`
 log="test_suite.log"
 echo "beginning test suite for $id" > $log
 
+# first, do a huge transform :
+c="./time_SHT 2047 -mres=15 -quickinit -iter=1"
+echo $c
+echo "---" >> $log
+echo "*** $c *** " >> $log
+$c > tmp.out
+cat tmp.out | grep ERROR
+cat tmp.out >> $log
+
+
 for switch in "" "-oop" "-transpose" "-schmidt" "-4pi"
 do
   for mode in "-quickinit" "-gauss" "-reg" "-fly"
@@ -25,12 +35,4 @@ do
   done
 done
 
-# do also a huge transform :
-c="./time_SHT 2047 -mres=15 -quickinit -iter=1"
-echo $c
-echo "---" >> $log
-echo "*** $c *** " >> $log
-$c > tmp.out
-cat tmp.out | grep ERROR
-cat tmp.out >> $log
 
