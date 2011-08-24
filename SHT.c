@@ -653,7 +653,6 @@ void planFFT(shtns_cfg shtns, int layout)
 	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
 }
 
-#ifndef SHT_NO_DCT
 /// \internal initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
 void planDCT(shtns_cfg shtns)
 {
@@ -699,12 +698,10 @@ void planDCT(shtns_cfg shtns)
 	#endif
 
 }
-#endif
 
 /// \internal SET MTR_DCT and updates fftw_plan for DCT's
 void Set_MTR_DCT(shtns_cfg shtns, int m)
 {
-#ifndef SHT_NO_DCT
 	if ((shtns->zlm_dct0 == NULL)||(m == MTR_DCT)) return;
 	if ( m < 0 ) {	// don't use dct
 		shtns->mtr_dct = -1;
@@ -713,7 +710,6 @@ void Set_MTR_DCT(shtns_cfg shtns, int m)
 		shtns->mtr_dct = m;
 		planDCT(shtns);
 	}
-#endif
 }
 
 /// \internal returns the m-truncation of DCT part of synthesis
@@ -1003,8 +999,6 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 	}
 }
 
-
-#ifndef SHT_NO_DCT
 /// \internal Computes the matrices required for SH transform on a regular grid (with or without DCT).
 /// \param analysis : 0 => synthesis only.
 void init_SH_dct(shtns_cfg shtns, int analysis)
@@ -1379,7 +1373,6 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	free(dyk);	free(yk);
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
-#endif
 
 /// \internal Generates an equi-spaced theta grid including the poles, for synthesis only.
 void EqualPolarGrid(shtns_cfg shtns)
@@ -1629,7 +1622,6 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 		if (ityp == 4) ityp++;		// skip second gradient
 	} while(++ityp < typ_lim);
 
-#ifndef SHT_NO_DCT
 	if (dct_mtr != 0) {		// find the best DCT timings...
  		#if SHT_VERBOSE > 1
 			printf("finding best mtr_dct ...");	fflush(stdout);
@@ -1658,7 +1650,6 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 			printf(" mtr_dct=%d  (%.1f%% performance gain)", MTR_DCT*MRES, 100.*(tnodct/tdct-1.));
 		#endif
 	}
-#endif
 
 done:
 	#if SHT_VERBOSE > 0
@@ -1950,9 +1941,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	flags = flags & 255;	// clear higher bits.
 
 	switch (flags) {
-	  #ifdef SHT_NO_DCT
-		case sht_auto : flags = sht_gauss;  break;		// auto means gauss if dct is disabled.
-	  #endif
 		case sht_gauss_fly :  flags = sht_gauss;  on_the_fly = 1;  break;
 		case sht_quick_init : flags = sht_gauss;  quick_init = 1;  break;
 		case sht_reg_poles :  analys = 0;         quick_init = 1;  break;
@@ -2011,9 +1999,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
 
 	if (flags == sht_reg_dct) {		// pure dct.
-		#ifdef SHT_NO_DCT
-			runerr("DCT not supported. recompile without setting SHT_NO_DCT in sht_config.h");
-		#endif
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
 		init_SH_dct(shtns, 1);
 		OptimizeMatrices(shtns, eps);
@@ -2024,7 +2009,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
 		init_SH_dct(shtns, 1);
 		OptimizeMatrices(shtns, eps);
-	#ifndef SHT_NO_DCT
 		if (NLAT >= SHT_MIN_NLAT_DCT) {			// dct requires large NLAT to perform well.
 			t = choose_best_sht(shtns, &nloop, vector, 1);		// find optimal MTR_DCT.
 			if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) n_gauss)/NLAT;	// we can revert to gauss with a smaller nlat.
@@ -2042,7 +2026,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 				}
 			}
 		}
-	#endif
 		if (MTR_DCT < 0) {			// free memory used by DCT and disables DCT.
 			free_SH_dct(shtns);			// free now useless arrays.
 			if (flags == sht_auto) {

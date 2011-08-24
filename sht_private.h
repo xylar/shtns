@@ -187,7 +187,7 @@ struct DtDp {		// theta and phi derivatives stored together.
 #define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
 
 #define MIN_ALIGNMENT 16
-/// align pointer on MIN_ALIGNMENT
+/// align pointer on MIN_ALIGNMENT (must be a power of 2)
 #define PTR_ALIGN(p) ((((size_t)(p)) + (MIN_ALIGNMENT-1)) & (~((size_t)(MIN_ALIGNMENT-1))))
 
 // verbose printing
