@@ -78,8 +78,8 @@ VX		BpF = BtF + shtns->ncplx_fft;
 	#endif
   #else
 	#ifdef SHT_GRAD
-S		if (Vp != NULL) for(int i=0; i<NLAT; i++) Vp[i] = 0.0;
-T		if (Vt != NULL) for(int i=0; i<NLAT; i++) Vt[i] = 0.0;
+S		if (Vp != NULL) { k=0; do { ((s2d*)Vp)[k]=vdup(0.0); } while(++k<NLAT/2); Vp[NLAT-1]=0.0; }
+T		if (Vt != NULL) { k=0; do { ((s2d*)Vt)[k]=vdup(0.0); } while(++k<NLAT/2); Vt[NLAT-1]=0.0; }
 	#endif
 Q	BrF = (v2d*) Vr;
 S	BtF = (v2d*) Vt;

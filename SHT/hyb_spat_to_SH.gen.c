@@ -148,9 +148,9 @@ T			Vp[2*i] *= sin_1;		Vp[2*i+1] *= sin_2;
 V		#endif
 V			i++;
 V		} while (i<ni);
-Q		fftw_execute_r2r(shtns->dct_r1,Vr, BR0);	// DCT out-of-place.
-S		fftw_execute_r2r(shtns->dct_r1,Vt, BT0);	// DCT out-of-place.
-T		fftw_execute_r2r(shtns->dct_r1,Vp, BP0);	// DCT out-of-place.
+Q		fftw_execute_r2r(shtns->dct_m0,Vr, BR0);	// DCT out-of-place.
+S		fftw_execute_r2r(shtns->dct_m0,Vt, BT0);	// DCT out-of-place.
+T		fftw_execute_r2r(shtns->dct_m0,Vp, BP0);	// DCT out-of-place.
 	#endif
 		l=0;
 		long int klim = shtns->klim;

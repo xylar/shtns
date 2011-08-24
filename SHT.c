@@ -526,9 +526,7 @@ void free_SH_dct(shtns_cfg shtns)
 
 	if (ref_count(shtns, &shtns->idct) == 1)    fftw_destroy_plan(shtns->idct);		// free unused dct plans
 	if (ref_count(shtns, &shtns->dct_m0) == 1)  fftw_destroy_plan(shtns->dct_m0);
-	if (ref_count(shtns, &shtns->dct_r1) == 1)  fftw_destroy_plan(shtns->dct_r1);
-	if (ref_count(shtns, &shtns->idct_r1) == 1) fftw_destroy_plan(shtns->idct_r1);
-	shtns->idct = NULL;		shtns->dct_m0 = NULL;		shtns->idct_r1 = NULL;		shtns->dct_r1 = NULL;
+	shtns->idct = NULL;		shtns->dct_m0 = NULL;
 }
 
 /// \internal free arrays allocated by alloc_SHTarrays.
@@ -653,7 +651,6 @@ void planFFT(shtns_cfg shtns, int layout)
 	}
 
 	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
-	shtns->dct_r1 = NULL;	shtns->idct_r1 = NULL;
 }
 
 #ifndef SHT_NO_DCT
@@ -665,66 +662,42 @@ void planDCT(shtns_cfg shtns)
 	fftw_r2r_kind r2r_kind;
 	fftw_iodim dims, hdims[2];
 	double Sh0[NLAT] SSE;				// temp storage on the stack, aligned.
-	
-// real NPHI=1, allocate only once since it does not change.
-	if ((shtns->dct_r1 == NULL)||(shtns->idct_r1 == NULL)) {
-		Sh = (double *) VMALLOC( NLAT * sizeof(double) );
-		if (shtns->dct_r1 == NULL) {
-			r2r_kind = FFTW_REDFT10;		// out-of-place.
-			shtns->dct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
-		}
-		if (shtns->idct_r1 == NULL) {
-			r2r_kind = FFTW_REDFT01;
-			shtns->idct_r1 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
-		}
-		VFREE(Sh);
-		if ((shtns->dct_r1 == NULL)||(shtns->idct_r1 == NULL))
-			shtns_runerr("[FFTW] (i)dct_r1 planning failed !");
-#if SHT_VERBOSE > 2
-			printf(" *** idct_r1 plan :\n");	fftw_print_plan(shtns->idct_r1);
-			printf("\n *** dct_r1 plan :\n");	fftw_print_plan(shtns->dct_r1);	printf("\n");
-#endif
-	}
 
-#ifndef SHT_AXISYM
-	if (shtns->idct != NULL) fftw_destroy_plan(shtns->idct);
 	// Allocate dummy Spatial Fields.
 	Sh = (double *) VMALLOC((NPHI/2 +1) * NLAT*2 * sizeof(double));
 
-	dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
-	hdims[0].n = MTR_DCT+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
-	hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
+	if (shtns->dct_m0 == NULL) {		// allocate only once since it does not change.
+		int stride = (NPHI>1) ? 2 : 1;
+		r2r_kind = FFTW_REDFT10;		// out-of-place.
+		shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, stride, stride*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
+		if (shtns->dct_m0 == NULL)
+			shtns_runerr("[FFTW] dct_m0 planning failed !");
+	#if SHT_VERBOSE > 2
+		printf(" *** dct_m0 plan :\n");		fftw_print_plan(shtns->dct_m0);	printf("\n");
+	#endif
+	}
 
-	if (NPHI>1) {		// complex data for NPHI>1, recompute as it does depend on MTR_DCT
+	if (NPHI > 1) {		// complex data for NPHI>1, recompute as it does depend on MTR_DCT
+		if (shtns->idct != NULL) fftw_destroy_plan(shtns->idct);
+
+		dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
+		hdims[0].n = MTR_DCT+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
+		hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
 		r2r_kind = FFTW_REDFT01;
 		shtns->idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, shtns->fftw_plan_mode);
-		if (shtns->idct == NULL)
-			shtns_runerr("[FFTW] idct planning failed !");
-#if SHT_VERBOSE > 2
-			printf(" *** idct plan :\n");	fftw_print_plan(shtns->idct);	printf("\n");
-#endif
-		if (shtns->dct_m0 == NULL) {
-			r2r_kind = FFTW_REDFT10;
-			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 2, 2*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
-			if (shtns->dct_m0 == NULL)
-				shtns_runerr("[FFTW] dct_m0 planning failed !");
-#if SHT_VERBOSE > 2
-				printf(" *** dct_m0 plan :\n");		fftw_print_plan(shtns->dct_m0);	printf("\n");
-#endif
-		}
-	} else {	// NPHI==1
-		if (shtns->dct_m0 == NULL) {
-			r2r_kind = FFTW_REDFT10;
-			shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
-			if (shtns->dct_m0 == NULL)
-				shtns_runerr("[FFTW] dct_m0 planning failed !");
-#if SHT_VERBOSE > 2
-				printf(" *** dct_m0 plan :\n");		fftw_print_plan(shtns->dct_m0);	printf("\n");
-#endif
+	} else {		// NPHI == 1
+		if (shtns->idct == NULL) {
+			r2r_kind = FFTW_REDFT01;
+			shtns->idct = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
 		}
 	}
+
 	VFREE(Sh);
-#endif
+	if (shtns->idct == NULL)  shtns_runerr("[FFTW] idct planning failed !");
+	#if SHT_VERBOSE > 2
+		printf(" *** idct plan :\n");	fftw_print_plan(shtns->idct);	printf("\n");
+	#endif
+
 }
 #endif
 
@@ -734,10 +707,10 @@ void Set_MTR_DCT(shtns_cfg shtns, int m)
 #ifndef SHT_NO_DCT
 	if ((shtns->zlm_dct0 == NULL)||(m == MTR_DCT)) return;
 	if ( m < 0 ) {	// don't use dct
-		MTR_DCT = -1;
+		shtns->mtr_dct = -1;
 	} else {
 		if (m>MMAX) m=MMAX;
-		MTR_DCT = m;
+		shtns->mtr_dct = m;
 		planDCT(shtns);
 	}
 #endif
@@ -1776,9 +1749,6 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 //	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
 	if (lmax < 2) shtns_runerr("lmax must be at least 2");
 	if (IS_TOO_LARGE(lmax, shtns->lmax)) shtns_runerr("lmax too large");
-#ifdef SHT_AXISYM
-	if (mmax != 0) shtns_runerr("axisymmetric version : only Mmax=0 allowed");
-#endif
 	if (mmax*mres > lmax) shtns_runerr("MMAX*MRES should not exceed LMAX");
 	if (mres <= 0) shtns_runerr("MRES must be > 0");
 
@@ -1802,13 +1772,8 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	if (norm & SHT_REAL_NORM)
 		mpos_renorm = 0.5;		// normalization for 'real' spherical harmonics.
 
-#ifdef SHT_AXISYM
-	shtns->mmax = 0;		shtns->mres = 2;		shtns->nphi = 1;
-#else
-	MMAX = mmax;	MRES = mres;
-#endif
-	LMAX = lmax;
-	NLM = nlm_calc(LMAX, MMAX, MRES);
+	shtns->mmax = mmax;		shtns->mres = mres;		shtns->lmax = lmax;
+	shtns->nlm = nlm_calc(LMAX, MMAX, MRES);
 #if SHT_VERBOSE > 0
 	shtns_print_version();
 	printf("        ");		shtns_print_cfg(shtns);
@@ -2038,13 +2003,8 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if (IS_TOO_LARGE(*nphi, shtns->nphi)) shtns_runerr("Nphi too large");
 
 	// copy to global variables.
-#ifdef SHT_AXISYM
-	shtns->nphi = 1;
-	if (*nphi != 1) shtns_runerr("axisymmetric version : only Nphi=1 allowed");
-#else
-	NPHI = *nphi;
-#endif
-	NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
+	shtns->nphi = *nphi;
+	shtns->nlat_2 = (*nlat+1)/2;	shtns->nlat = *nlat;
 
 	planFFT(shtns, layout);		// initialize fftw
 	shtns->zlm_dct0 = NULL;		// used as a flag.
@@ -2098,7 +2058,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 				if (n_gauss > 0) {		// we should use the optimal size for gauss-legendre
 					free_SHTarrays(shtns);
 					*nlat = n_gauss;
-					NLAT_2 = (*nlat+1)/2;	NLAT = *nlat;
+					shtns->nlat_2 = (*nlat+1)/2;	shtns->nlat = *nlat;
 					planFFT(shtns, layout);		// fft must be replanned because NLAT has changed.
 				}
 			}

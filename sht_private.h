@@ -91,8 +91,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	short nlorder;			///< order of non-linear terms to be resolved by SH transform.
 	unsigned short klim;	///< Limit to k for non-linear terms (dct)
 	short dummy;			// alignement.
-	fftw_plan idct, dct_m0;			// (I)DCT for NPHI>1
-	fftw_plan idct_r1, dct_r1;		// (I)DCT for axisymmetric case, NPHI=1
+	fftw_plan idct, dct_m0;			// (I)DCT
 	double **ykm_dct;	// matrix for inverse transform (synthesis) using dct.
 	struct DtDp** dykm_dct;	// theta and phi derivative of Ykm matrix.
 	double *zlm_dct0;	// matrix for direct transform (analysis), only m=0
@@ -107,22 +106,14 @@ struct shtns_info {		// MUST start with "int nlm;"
 	// the end should be aligned on the size of int, to allow the storage of small arrays.
 };
 
-// define shortcuts to sizes + allow compile-time optimizations when SHT_AXISYM is defined.
+// define shortcuts to sizes.
+#define NLM shtns->nlm
 #define LMAX shtns->lmax
 #define NLAT shtns->nlat
 #define NLAT_2 shtns->nlat_2
-#ifndef SHT_AXISYM
-  #define NPHI shtns->nphi
-  #define MMAX shtns->mmax
-  #define MRES shtns->mres
-  #define SHT_FFT shtns->sht_fft
-#else
-  #define NPHI 1
-  #define MMAX 0
-  #define MRES 1
-  #define SHT_FFT 0
-#endif
-#define NLM shtns->nlm
+#define NPHI shtns->nphi
+#define MMAX shtns->mmax
+#define MRES shtns->mres
 #define MTR_DCT shtns->mtr_dct
 #define SHT_NL_ORDER shtns->nlorder
 

@@ -113,8 +113,8 @@ VX		BpF = BtF + shtns->ncplx_fft;
 	#endif
   #else
 	#ifdef SHT_GRAD
-S		if (Vp != NULL) for(int i=0; i<NLAT; i++) Vp[i] = 0.0;
-T		if (Vt != NULL) for(int i=0; i<NLAT; i++) Vt[i] = 0.0;
+S		if (Vp != NULL) { k=0; do { ((s2d*)Vp)[k]=vdup(0.0); } while(++k<NLAT/2); Vp[NLAT-1]=0.0; }
+T		if (Vt != NULL) { k=0; do { ((s2d*)Vt)[k]=vdup(0.0); } while(++k<NLAT/2); Vt[NLAT-1]=0.0; }
 	#endif
 Q	BrF = (v2d*) Vr;
 S	BtF = (v2d*) Vt;
@@ -133,8 +133,7 @@ Q		Ql[0] = (double) Qlm[0];		// l=0
 S			Sl[l-1] = (double) Slm[l];
 T			Tl[l-1] = (double) Tlm[l];
 Q			Ql[l] = (double) Qlm[l];
-			l++;
-		} while(l<=llim);		// l=llim+1
+		} while(++l<=llim);		// l=llim+1
 S		Sl[l-1] = 0.0;
 T		Tl[l-1] = 0.0;
 3		Sl[l] = 0.0;	Tl[l] = 0.0;	Ql[l] = 0.0;	Ql[l+1] = 0.0;
@@ -248,9 +247,9 @@ T			BP0(k) = 0.0;	BP0(k+1) = 0.0;
 			k+=2;
 		}
     #ifdef SHT_AXISYM
-Q		fftw_execute_r2r(shtns->idct_r1,Vr, Vr);		// iDCT m=0
-S		fftw_execute_r2r(shtns->idct_r1,Vt, Vt);		// iDCT m=0
-T		fftw_execute_r2r(shtns->idct_r1,Vp, Vp);		// iDCT m=0
+Q		fftw_execute_r2r(shtns->idct,Vr, Vr);		// iDCT m=0
+S		fftw_execute_r2r(shtns->idct,Vt, Vt);		// iDCT m=0
+T		fftw_execute_r2r(shtns->idct,Vp, Vp);		// iDCT m=0
 V		double* st_1 = shtns->st_1;
 V		k=0;	do {
 V		#ifdef _GCC_VEC_

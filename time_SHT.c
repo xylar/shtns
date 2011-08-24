@@ -187,6 +187,35 @@ int test_SHT()
 	return (int) tcpu;
 }
 
+int test_SHT_m0()
+{
+	long int jj,i;
+	clock_t tcpu;
+	double ts, ta;
+
+	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
+
+	tcpu = clock();
+	for (jj=0; jj< SHT_ITER; jj++) {
+		SHsph_to_spat(shtns, Slm,Sh,NULL);
+	}
+	tcpu = clock() - tcpu;
+	ts = tcpu / (1000.*SHT_ITER);
+
+	tcpu = clock();
+	SHtor_to_spat(shtns, Slm, NULL, Sh);
+	for (jj=1; jj< SHT_ITER; jj++) {
+		SHtor_to_spat(shtns, Slm, NULL, Sh);
+	}
+	tcpu = clock() - tcpu;
+	ta = tcpu / (1000.*SHT_ITER);
+	printf("   SHT time : \t synthesis = %f ms \t analysis = %f ms\n", ts, ta);
+
+	scal_error(Slm, Slm0, LMAX);
+	return (int) tcpu;
+}
+
+
 /*
 int test_SHT_parity(int eo)
 {
@@ -691,6 +720,12 @@ int main(int argc, char *argv[])
 		test_SHT_vect3d();
 		printf(":: LTR\n");
 		test_SHT_vect3d_l(LMAX/2);
+	}
+
+	if (NPHI == 1) {		// test the special m=0 transforms
+		printf("** performing %d m=0 gradient SHT\n", SHT_ITER);
+		printf(":: STD\n");
+		test_SHT_m0();
 	}
 
 	shtns_create(LMAX, MMAX, MRES, shtnorm);		// test memory allocation and management.
