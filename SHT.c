@@ -1929,6 +1929,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	int vector = !(flags & SHT_SCALAR_ONLY);
 	int analys = 1;
 
+	#ifdef _GCC_VEC_
+		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
+	#endif
 	if (nl_order <= 0) nl_order = SHT_DEFAULT_NL_ORDER;
 /*	shtns.lshift = 0;
 	if (nl_order == 0) nl_order = SHT_DEFAULT_NL_ORDER;

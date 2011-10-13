@@ -174,6 +174,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	// typedef union {v2d v; complex double c; double d[2]; double r; } vcplx;
 	#define vdup(x) (x)
 	#define addi(a,b) ((a) + I*(b))
+	#define vlo_to_dbl(a) (a)
+	#define vhi_to_dbl(a) (a)
 #endif
 
 struct DtDp {		// theta and phi derivatives stored together.
