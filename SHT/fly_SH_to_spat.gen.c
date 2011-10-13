@@ -98,7 +98,7 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 			l++;
 		} while(l<=llim);
 		k=0;	nk = NLAT_2;
-	#ifdef _GCC_VEC_
+	#if _GCC_VEC_
 		nk = (nk+1)>>1;
 	#endif
 		do {
@@ -160,22 +160,6 @@ T					po[j] -= dy0[j] * vdup(Tl0[l-1]);
 				}
 			}
 		#if _GCC_VEC_
-		  #ifndef SHT_AXISYM
-			for (int j=0; j<NWAY; j++) {
-Q				BR0(2*(j+k)) = vlo_to_dbl(re[j]+ro[j]);
-Q				BR0(2*(j+k)+1) = vhi_to_dbl(re[j]+ro[j]);
-Q				BR0(NLAT-2-2*(j+k)) = vhi_to_dbl(re[j]-ro[j]);
-Q				BR0(NLAT-1-2*(j+k)) = vlo_to_dbl(re[j]-ro[j]);
-S				BT0(2*(j+k)) = vlo_to_dbl(te[j]+to[j]);
-S				BT0(2*(j+k)+1) = vhi_to_dbl(te[j]+to[j]);
-S				BT0(NLAT-2-2*(j+k)) = vhi_to_dbl(te[j]-to[j]);
-S				BT0(NLAT-1-2*(j+k)) = vlo_to_dbl(te[j]-to[j]);
-T				BP0(2*(j+k)) = vlo_to_dbl(pe[j]+po[j]);
-T				BP0(2*(j+k)+1) = vhi_to_dbl(pe[j]+po[j]);
-T				BP0(NLAT-2-2*(j+k)) = vhi_to_dbl(pe[j]-po[j]);
-T				BP0(NLAT-1-2*(j+k)) = vlo_to_dbl(pe[j]-po[j]);
-			}
-		  #else
 			for (int j=0; j<NWAY; j++) {
 Q				BrF[j+k] = re[j]+ro[j];
 Q				BrF[NLAT_2-1-(j+k)] = vxchg(re[j]-ro[j]);
@@ -184,7 +168,6 @@ S				BtF[NLAT_2-1-(j+k)] = vxchg(te[j]-to[j]);
 T				BpF[j+k] = pe[j]+po[j];
 T				BpF[NLAT_2-1-(j+k)] = vxchg(pe[j]-po[j]);
 			}
-		  #endif
 		#else
 			for (int j=0; j<NWAY; j++) {
 Q				BR0(k+j) = (re[j]+ro[j]);
@@ -202,8 +185,13 @@ T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
 //	#undef NWAY
 //V	#define NWAY 1
 //QX	#define NWAY 2
-Q	BrF += NLAT;
-V	BtF += NLAT;	BpF += NLAT;
+	#if _GCC_VEC_
+Q		BrF += NLAT_2;
+V		BtF += NLAT_2;	BpF += NLAT_2;
+	#else
+Q		BrF += NLAT;
+V		BtF += NLAT;	BpF += NLAT;
+	#endif
   if (llim <= SHT_L_RESCALE_FLY) {
 	for(im=1; im<=imlim; im++) {
 		m = im*MRES;
@@ -213,18 +201,24 @@ Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
 T		complex double* Tl = &Tlm[l];
 		k=0;	l=shtns->tm[im];
+	#if _GCC_VEC_
 		l>>=1;		// stay on a 16 byte boundary
 		while (k<l) {	// polar optimization
-Q			BrF[2*k] = vdup(0.0);		BrF[2*k+1] = vdup(0.0);
-Q			BrF[NLAT+2*(k-l)] = vdup(0.0);		BrF[NLAT+2*(k-l)+1] = vdup(0.0);
-V			BtF[2*k] = vdup(0.0);		BtF[2*k+1] = vdup(0.0);
-V			BpF[2*k] = vdup(0.0);		BpF[2*k+1] = vdup(0.0);
-V			BtF[NLAT+2*(k-l)] = vdup(0.0);		BtF[NLAT+2*(k-l)+1] = vdup(0.0);
-V			BpF[NLAT+2*(k-l)] = vdup(0.0);		BpF[NLAT+2*(k-l)+1] = vdup(0.0);
+Q			BrF[k] = vdup(0.0);				BrF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
+Q			BrF[NLAT_2-l+k] = vdup(0.0);	BrF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
+V			BtF[k] = vdup(0.0);				BtF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
+V			BtF[NLAT_2-l+k] = vdup(0.0);	BtF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
+V			BpF[k] = vdup(0.0);				BpF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
+V			BpF[NLAT_2-l+k] = vdup(0.0);	BpF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
 			k++;
 		}
-	#ifndef _GCC_VEC_
-		k *= 2;
+	#else
+		while (k<l) {	// polar optimization
+Q			BrF[k] = 0.0;		BrF[NLAT-l+k] = vdup(0.0);
+V			BtF[k] = 0.0;		BtF[NLAT-l+k] = vdup(0.0);
+V			BpF[k] = 0.0;		BpF[NLAT-l+k] = vdup(0.0);
+			k++;
+		}
 	#endif
 		do {
 			al = alm;
@@ -305,18 +299,24 @@ V			#undef DY1
 3			for (int j=0; j<NWAY; j++) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
 		#if _GCC_VEC_
 			for (int j=0; j<NWAY; j++) {
-Q				((complex double *)BrF)[2*(k+j)] = vlo_to_dbl(rer[j]+ror[j]) + I*vlo_to_dbl(rei[j]+roi[j]);
-Q				((complex double *)BrF)[2*(k+j)+1] = vhi_to_dbl(rer[j]+ror[j]) + I*vhi_to_dbl(rei[j]+roi[j]);
-Q				((complex double *)BrF)[NLAT-2-2*(k+j)] = vhi_to_dbl(rer[j]-ror[j]) + I*vhi_to_dbl(rei[j]-roi[j]);
-Q				((complex double *)BrF)[NLAT-1-2*(k+j)] = vlo_to_dbl(rer[j]-ror[j]) + I*vlo_to_dbl(rei[j]-roi[j]);
-V				((complex double *)BtF)[2*(k+j)] = vlo_to_dbl(ter[j]+tor[j]) + I*vlo_to_dbl(tei[j]+toi[j]);
-V				((complex double *)BtF)[2*(k+j)+1] = vhi_to_dbl(ter[j]+tor[j]) + I*vhi_to_dbl(tei[j]+toi[j]);
-V				((complex double *)BtF)[NLAT-2-2*(k+j)] = vhi_to_dbl(ter[j]-tor[j]) + I*vhi_to_dbl(tei[j]-toi[j]);
-V				((complex double *)BtF)[NLAT-1-2*(k+j)] = vlo_to_dbl(ter[j]-tor[j]) + I*vlo_to_dbl(tei[j]-toi[j]);
-V				((complex double *)BpF)[2*(k+j)] = vlo_to_dbl(per[j]+por[j]) + I*vlo_to_dbl(pei[j]+poi[j]);
-V				((complex double *)BpF)[2*(k+j)+1] = vhi_to_dbl(per[j]+por[j]) + I*vhi_to_dbl(pei[j]+poi[j]);
-V				((complex double *)BpF)[NLAT-2-2*(k+j)] = vhi_to_dbl(per[j]-por[j]) + I*vhi_to_dbl(pei[j]-poi[j]);
-V				((complex double *)BpF)[NLAT-1-2*(k+j)] = vlo_to_dbl(per[j]-por[j]) + I*vlo_to_dbl(pei[j]-poi[j]);
+Q				y0[j] = rer[j] + ror[j];	y1[j] = rei[j] + roi[j];	// north
+Q				((complex double *)BrF)[k+j] =                      vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]));
+Q				((complex double *)BrF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]));
+Q				y0[j] = rer[j] - ror[j];	y1[j] = rei[j] - roi[j];	// south
+Q				((complex double *)BrF)[NLAT_2-1 -k-j] =                vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]));
+Q				((complex double *)BrF)[(NPHI+1-2*im)*NLAT_2 -1- k-j] = vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]));
+V				y0[j] = ter[j] + tor[j];	y1[j] = tei[j] + toi[j];	// north
+V				((complex double *)BtF)[k+j] =                      vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]));
+V				((complex double *)BtF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]));
+V				y0[j] = ter[j] - tor[j];	y1[j] = tei[j] - toi[j];	// south
+V				((complex double *)BtF)[NLAT_2-1 -k-j] =                vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]));
+V				((complex double *)BtF)[(NPHI+1-2*im)*NLAT_2 -1- k-j] = vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]));
+V				y0[j] = per[j] + por[j];	y1[j] = pei[j] + poi[j];	// north
+V				((complex double *)BpF)[k+j] =                      vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]));
+V				((complex double *)BpF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]));
+V				y0[j] = per[j] - por[j];	y1[j] = pei[j] - poi[j];	// south
+V				((complex double *)BpF)[NLAT_2-1 -k-j] =                vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]));
+V				((complex double *)BpF)[(NPHI+1-2*im)*NLAT_2 -1- k-j] = vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]));
 			}
 		#else
 			for (int j=0; j<NWAY; j++) {
@@ -330,8 +330,13 @@ V				BpF[NLAT-1-k-j] = (per[j]-por[j]) + I*(pei[j]-poi[j]);
 		#endif
 			k+=NWAY;
 		} while (k < nk);
+	#if _GCC_VEC_
+Q		BrF += NLAT_2;
+V		BtF += NLAT_2;	BpF += NLAT_2;
+	#else
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
+	#endif
 	}
   } else {		// llim > SHT_L_RESCALE_FLY
 	for(im=1; im<=imlim; im++) {
@@ -352,7 +357,7 @@ V			BtF[NLAT+2*(k-l)] = vdup(0.0);		BtF[NLAT+2*(k-l)+1] = vdup(0.0);
 V			BpF[NLAT+2*(k-l)] = vdup(0.0);		BpF[NLAT+2*(k-l)+1] = vdup(0.0);
 			k++;
 		}
-	#ifndef _GCC_VEC_
+	#if _GCC_VEC_
 		k *= 2;
 	#endif
 		do {
@@ -498,18 +503,32 @@ Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
   }
+  #if _GCC_VEC_
+	for (k=0; k < NLAT_2*(NPHI-1-2*imlim); k++) {	// padding for high m's
+Q		BrF[k] = vdup(0.0);
+V		BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
+	}
+Q	BrF -= NLAT_2*(imlim+1);		// restore original pointer
+V	BtF -= NLAT_2*(imlim+1);	BpF -= NLAT_2*(imlim+1);
+  #else
 	for (k=0; k < NLAT*((NPHI>>1) -imlim); k++) {	// padding for high m's
 Q			BrF[k] = vdup(0.0);
 V			BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
 	}
 Q	BrF -= NLAT*(imlim+1);		// restore original pointer
 V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
-
+  #endif
     // NPHI > 1 as SHT_AXISYM is not defined.
 	if (shtns->ncplx_fft >= 0) {
+	#if _GCC_VEC_
+Q		fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
+V		fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
+V		fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
+	#else
 Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
+	#endif
 		if (shtns->ncplx_fft > 0) {		// free memory
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.

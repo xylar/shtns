@@ -596,12 +596,14 @@ void planFFT(shtns_cfg shtns, int layout)
 		cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
 		if (in_place) {		// in-place FFT (if allowed)
 			ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
+			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (double*) ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, FFTW_MEASURE);
 			if (ifft2 != NULL) {
 				fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 				if (fft2 != NULL) {
 					cost_fft_ip = fftw_cost(fft2);		cost_ifft_ip = fftw_cost(ifft2);
 					#if SHT_VERBOSE > 1
 						printf("          in-place cost : ifft=%g, fft=%g", cost_ifft_ip, cost_fft_ip);	fflush(stdout);
+						printf("          in-place cost complex : ifft=%g", fftw_cost(shtns->ifftc));	fflush(stdout);
 					#endif
 				}
 			}
@@ -1929,7 +1931,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	int vector = !(flags & SHT_SCALAR_ONLY);
 	int analys = 1;
 
-	#ifdef _GCC_VEC_
+	#if _GCC_VEC_
 		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
 	#endif
 	if (nl_order <= 0) nl_order = SHT_DEFAULT_NL_ORDER;

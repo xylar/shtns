@@ -72,6 +72,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *st_1;			///< 1/sin(theta);
 
 	fftw_plan ifft, fft;		// plans for FFTW.
+	fftw_plan ifftc;
 
 	/* Legendre function generation arrays */
 	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
