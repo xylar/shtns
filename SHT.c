@@ -596,19 +596,20 @@ void planFFT(shtns_cfg shtns, int layout)
 		cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
 		if (in_place) {		// in-place FFT (if allowed)
 			ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
-			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (double*) ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, FFTW_MEASURE);
+			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (double*) ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 			if (ifft2 != NULL) {
 				fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
+				shtns->fftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (double*) ShF, &nfft, NLAT/2, 1, FFTW_FORWARD, shtns->fftw_plan_mode);
 				if (fft2 != NULL) {
 					cost_fft_ip = fftw_cost(fft2);		cost_ifft_ip = fftw_cost(ifft2);
 					#if SHT_VERBOSE > 1
 						printf("          in-place cost : ifft=%g, fft=%g", cost_ifft_ip, cost_fft_ip);	fflush(stdout);
-						printf("          in-place cost complex : ifft=%g", fftw_cost(shtns->ifftc));	fflush(stdout);
+						printf("          in-place cost complex : ifft=%g, fft=%g\n", fftw_cost(shtns->ifftc), fftw_cost(shtns->ifftc));
 					#endif
 				}
 			}
 		}
-		if ( (in_place == 0) || (cost_fft_ip * cost_ifft_ip > 0.0) ) {		// out-of-place FFT
+	/*	if ( (in_place == 0) || (cost_fft_ip * cost_ifft_ip > 0.0) ) {		// out-of-place FFT
 			ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 			if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 			fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
@@ -622,7 +623,7 @@ void planFFT(shtns_cfg shtns, int layout)
 			if ( cost_fft_oop + SHT_NL_ORDER*cost_ifft_oop < cost_fft_ip + SHT_NL_ORDER*cost_ifft_ip )
 				in_place = 0;		// disable in-place, because out-of-place is faster.
 		}
-
+	*/
 		if (in_place) {
 			/* IN-PLACE FFT */
 			if (fft != NULL)  fftw_destroy_plan(fft);
@@ -630,6 +631,7 @@ void planFFT(shtns_cfg shtns, int layout)
 			fft = fft2;		ifft = ifft2;
 			shtns->ncplx_fft = 0;		// fft is done in-place, no allocation needed.
 		} else {
+			shtns_runerr("out-of-place not supported\n");
 			/* OUT-OF-PLACE FFT */
 			if (fft2 != NULL)  fftw_destroy_plan(fft2);		// use OUT-OF-PLACE FFT
 			if (ifft2 != NULL) fftw_destroy_plan(ifft2);

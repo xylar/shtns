@@ -72,7 +72,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *st_1;			///< 1/sin(theta);
 
 	fftw_plan ifft, fft;		// plans for FFTW.
-	fftw_plan ifftc;
+	fftw_plan ifftc, fftc;
 
 	/* Legendre function generation arrays */
 	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
@@ -145,8 +145,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 #endif
 
 #if _GCC_VEC_ && __SSE2__
-	typedef double s2d __attribute__ ((vector_size (16)));		// vector that should behave like a real scalar for complex number multiplication.
-	typedef double v2d __attribute__ ((vector_size (16)));		// vector that contains a complex number
+	#define VSIZE 2
+	typedef double s2d __attribute__ ((vector_size (VSIZE*8)));		// vector that should behave like a real scalar for complex number multiplication.
+	typedef double v2d __attribute__ ((vector_size (VSIZE*8)));		// vector that contains a complex number
 	#ifdef __SSE3__
 		#include <pmmintrin.h>
 		#warning "using GCC vector instructions (sse3)"
@@ -158,8 +159,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
 		#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
 	#endif
-	// vset(hi,lo) takes two doubles and pack them in a vector
-	#define vset(hi, lo) _mm_set_pd(hi, lo)
+	// vset(lo, hi) takes two doubles and pack them in a vector
+	#define vset(lo, hi) _mm_set_pd(hi, lo)
 	// vdup(x) takes a double and duplicate it to a vector of 2 doubles.
 	#define vdup(x) _mm_set1_pd(x)
 	// vxchg(a) exchange hi and lo component of vector a
@@ -170,14 +171,16 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vhi_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 1)
 #else
 	#undef _GCC_VEC_
+	#define VSIZE 1
 	typedef double s2d;
 	typedef complex double v2d;
-	// typedef union {v2d v; complex double c; double d[2]; double r; } vcplx;
 	#define vdup(x) (x)
+	#define vxchg(x) (x)
 	#define addi(a,b) ((a) + I*(b))
 	#define vlo_to_dbl(a) (a)
 	#define vhi_to_dbl(a) (a)
 #endif
+
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;
