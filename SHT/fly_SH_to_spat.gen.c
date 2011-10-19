@@ -303,12 +303,14 @@ Q				((complex double *)BrF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi
 Q				y0[j] = rer[j] - ror[j];	y1[j] = rei[j] - roi[j];	// south
 Q				((complex double *)BrF)[NLAT_2-1 -k-j] =                vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]));
 Q				((complex double *)BrF)[(NPHI+1-2*im)*NLAT_2 -1- k-j] = vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]));
+
 V				y0[j] = ter[j] + tor[j];	y1[j] = tei[j] + toi[j];	// north
 V				((complex double *)BtF)[k+j] =                      vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]));
 V				((complex double *)BtF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]));
 V				y0[j] = ter[j] - tor[j];	y1[j] = tei[j] - toi[j];	// south
 V				((complex double *)BtF)[NLAT_2-1 -k-j] =                vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]));
 V				((complex double *)BtF)[(NPHI+1-2*im)*NLAT_2 -1- k-j] = vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]));
+
 V				y0[j] = per[j] + por[j];	y1[j] = pei[j] + poi[j];	// north
 V				((complex double *)BpF)[k+j] =                      vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]));
 V				((complex double *)BpF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]));
@@ -480,12 +482,14 @@ Q				((complex double *)BrF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi
 Q				y0[j] = rer[j] - ror[j];	y1[j] = rei[j] - roi[j];	// south
 Q				((complex double *)BrF)[NLAT_2-1 -k-j] =                vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]));
 Q				((complex double *)BrF)[(NPHI+1-2*im)*NLAT_2 -1- k-j] = vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]));
+
 V				y0[j] = ter[j] + tor[j];	y1[j] = tei[j] + toi[j];	// north
 V				((complex double *)BtF)[k+j] =                      vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]));
 V				((complex double *)BtF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]));
 V				y0[j] = ter[j] - tor[j];	y1[j] = tei[j] - toi[j];	// south
 V				((complex double *)BtF)[NLAT_2-1 -k-j] =                vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]));
 V				((complex double *)BtF)[(NPHI+1-2*im)*NLAT_2 -1- k-j] = vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]) + I*(vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]));
+
 V				y0[j] = per[j] + por[j];	y1[j] = pei[j] + poi[j];	// north
 V				((complex double *)BpF)[k+j] =                      vlo_to_dbl(y0[j]) - vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) + vlo_to_dbl(y1[j]));
 V				((complex double *)BpF)[(NPHI-2*im)*NLAT_2 + k+j] = vlo_to_dbl(y0[j]) + vhi_to_dbl(y1[j]) + I*(vhi_to_dbl(y0[j]) - vlo_to_dbl(y1[j]));

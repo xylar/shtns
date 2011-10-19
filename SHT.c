@@ -596,30 +596,31 @@ void planFFT(shtns_cfg shtns, int layout)
 		cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
 		if (in_place) {		// in-place FFT (if allowed)
 			ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
-			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (double*) ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+			printf("          in-place cost : ifft=%lg  ",fftw_cost(ifft2));	fflush(stdout);
+			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+			printf("ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
 			if (ifft2 != NULL) {
 				fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
-				shtns->fftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (double*) ShF, &nfft, NLAT/2, 1, FFTW_FORWARD, shtns->fftw_plan_mode);
+				printf("fft=%lg\n",fftw_cost(fft2));	fflush(stdout);
+				shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
 				if (fft2 != NULL) {
 					cost_fft_ip = fftw_cost(fft2);		cost_ifft_ip = fftw_cost(ifft2);
-					#if SHT_VERBOSE > 1
-						printf("          in-place cost : ifft=%g, fft=%g", cost_ifft_ip, cost_fft_ip);	fflush(stdout);
-						printf("          in-place cost complex : ifft=%g, fft=%g\n", fftw_cost(shtns->ifftc), fftw_cost(shtns->ifftc));
-					#endif
 				}
 			}
 		}
-	/*	if ( (in_place == 0) || (cost_fft_ip * cost_ifft_ip > 0.0) ) {		// out-of-place FFT
+		//if ( (in_place == 0) || (cost_fft_ip * cost_ifft_ip > 0.0) )
+		{		// out-of-place FFT
 			ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
+			printf("          oop cost : ifft=%lg  ",fftw_cost(ifft));	fflush(stdout);
+			fftw_plan tmp = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (complex double*) Sh, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+			printf("ifftc=%lg  ",fftw_cost(tmp));	fflush(stdout);
 			if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 			fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
+			printf("fft=%lg\n",fftw_cost(fft));	fflush(stdout);
 			if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
 			cost_fft_oop = fftw_cost(fft);		cost_ifft_oop = fftw_cost(ifft);
-			#if SHT_VERBOSE > 1
-				printf("    out-of-place cost : ifft=%g, fft=%g\n", cost_ifft_oop, cost_fft_oop);
-			#endif
 		}
-		if ( (cost_fft_ip * cost_ifft_ip > 0.0) && (cost_fft_oop * cost_ifft_oop > 0.0) ) {		// both have been succesfully timed.
+	/*	if ( (cost_fft_ip * cost_ifft_ip > 0.0) && (cost_fft_oop * cost_ifft_oop > 0.0) ) {		// both have been succesfully timed.
 			if ( cost_fft_oop + SHT_NL_ORDER*cost_ifft_oop < cost_fft_ip + SHT_NL_ORDER*cost_ifft_ip )
 				in_place = 0;		// disable in-place, because out-of-place is faster.
 		}

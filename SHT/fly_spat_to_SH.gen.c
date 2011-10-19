@@ -227,21 +227,21 @@ V		BtF += vnlat;	BpF += vnlat;
  		do {	// compute symmetric and antisymmetric parts, and reorganize data.
 			s2d nr, ni, sr, si, tn, ts;
 3			s2d sin = st[k];	s2d sin_sgn = sgn*sin;
-Q			nr = BrF[k];				ni = BrF[(NPHI-2*im)*vnlat + k];
-Q			sr = BrF[vnlat-1 - k];		si = BrF[(NPHI-2*im)*vnlat +vnlat-1-k];
+Q			ni = BrF[k];				nr = BrF[(NPHI-2*im)*vnlat + k];
+Q			si = BrF[vnlat-1 - k];		sr = BrF[(NPHI-2*im)*vnlat +vnlat-1-k];
 Q			tn = nr;		nr += ni;				ni = vxchg(tn-ni);		// nr = 2anr | 2bnr		ni = 2ani | 2bni
 Q			ts = sr;		sr = vxchg(sr+si);		si -= ts;				// sr = 2asr | 2bsr		si = 2asi | 2bsi
 QX			rer[k] = nr+sr;		ror[k] = nr-sr;		rei[k] = (ni+si)*sgn;		roi[k] = (ni-si)*sgn;
 3			rer[k] = (nr+sr)*sin;		ror[k] = (nr-sr)*sin;		rei[k] = (ni+si)*sin_sgn;		roi[k] = (ni-si)*sin_sgn;
 
-V			nr = BtF[k];				ni = BtF[(NPHI-2*im)*vnlat + k];
-V			sr = BtF[vnlat-1 - k];		si = BtF[(NPHI-2*im)*vnlat +vnlat-1-k];
+V			ni = BtF[k];				nr = BtF[(NPHI-2*im)*vnlat + k];
+V			si = BtF[vnlat-1 - k];		sr = BtF[(NPHI-2*im)*vnlat +vnlat-1-k];
 V			tn = nr;		nr += ni;				ni = vxchg(tn-ni) *sgn;
 V			ts = sr;		sr = vxchg(sr+si);		si = (si-ts) *sgn;
 V			ter[k] = nr+sr;		tor[k] = nr-sr;		tei[k] = ni+si;		toi[k] = ni-si;
 
-V			nr = BpF[k];				ni = BpF[(NPHI-2*im)*vnlat + k];
-V			sr = BpF[vnlat-1 - k];		si = BpF[(NPHI-2*im)*vnlat +vnlat-1-k];
+V			ni = BpF[k];				nr = BpF[(NPHI-2*im)*vnlat + k];
+V			si = BpF[vnlat-1 - k];		sr = BpF[(NPHI-2*im)*vnlat +vnlat-1-k];
 V			tn = nr;		nr += ni;				ni = vxchg(tn-ni) *sgn;
 V			ts = sr;		sr = vxchg(sr+si);		si = (si-ts) *sgn;
 V			per[k] = nr+sr;		por[k] = nr-sr;		pei[k] = ni+si;		poi[k] = ni-si;
@@ -251,31 +251,31 @@ V			per[k] = nr+sr;		por[k] = nr-sr;		pei[k] = ni+si;		poi[k] = ni-si;
  		do {	// compute symmetric and antisymmetric parts, and reorganize data.
 			double an, bn, ani, bni, bs, as, bsi, asi, t;
 3			double sina = st[k];	double sinb = st[k+1];
-Q			an = BrF[k];		bn = BrF[k+1];		// north
-Q			ani = BrF[(NPHI-2*im)*vnlat + k];	bni = BrF[(NPHI-2*im)*vnlat + k+1];
+Q			ani = BrF[k];		bni = BrF[k+1];		// north
+Q			an = BrF[(NPHI-2*im)*vnlat + k];	bn = BrF[(NPHI-2*im)*vnlat + k+1];
 Q			t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
 3			an *= sina;		ani*= sina;		bn *= sinb;		bni *= sinb;
-Q			bs = BrF[vnlat-2 -k];	as = BrF[vnlat-1 -k];	// south
-Q			bsi = BrF[(NPHI-2*im)*vnlat +vnlat-2-k];		asi = BrF[(NPHI-2*im)*vnlat +vnlat-1-k];
+Q			bsi = BrF[vnlat-2 -k];	asi = BrF[vnlat-1 -k];	// south
+Q			bs = BrF[(NPHI-2*im)*vnlat +vnlat-2-k];		as = BrF[(NPHI-2*im)*vnlat +vnlat-1-k];
 Q			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
 3			as *= sina;		asi*= sina;		bs *= sinb;		bsi *= sinb;
 Q			rer[k] = an+as;		rei[k] = ani+asi;		rer[k+1] = bn+bs;		rei[k+1] = bni+bsi;
 Q			ror[k] = an-as;		roi[k] = ani-asi;		ror[k+1] = bn-bs;		roi[k+1] = bni-bsi;
 
-V			an = BtF[k];		bn = BtF[k+1];		// north
-V			ani = BtF[(NPHI-2*im)*vnlat + k];	bni = BtF[(NPHI-2*im)*vnlat + k+1];
+V			ani = BtF[k];		bni = BtF[k+1];		// north
+V			an = BtF[(NPHI-2*im)*vnlat + k];	bn = BtF[(NPHI-2*im)*vnlat + k+1];
 V			t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
-V			bs = BtF[vnlat-2 -k];	as = BtF[vnlat-1 -k];	// south
-V			bsi = BtF[(NPHI-2*im)*vnlat +vnlat-2-k];		asi = BtF[(NPHI-2*im)*vnlat +vnlat-1-k];
+V			bsi = BtF[vnlat-2 -k];	asi = BtF[vnlat-1 -k];	// south
+V			bs = BtF[(NPHI-2*im)*vnlat +vnlat-2-k];		as = BtF[(NPHI-2*im)*vnlat +vnlat-1-k];
 V			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
 V			ter[k] = an+as;		tei[k] = ani+asi;		ter[k+1] = bn+bs;		tei[k+1] = bni+bsi;
 V			tor[k] = an-as;		toi[k] = ani-asi;		tor[k+1] = bn-bs;		toi[k+1] = bni-bsi;
 
-V			an = BpF[k];		bn = BpF[k+1];		// north
-V			ani = BpF[(NPHI-2*im)*vnlat + k];	bni = BpF[(NPHI-2*im)*vnlat + k+1];
+V			ani = BpF[k];		bni = BpF[k+1];		// north
+V			an = BpF[(NPHI-2*im)*vnlat + k];	bn = BpF[(NPHI-2*im)*vnlat + k+1];
 V			t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
-V			bs = BpF[vnlat-2 -k];	as = BpF[vnlat-1 -k];	// south
-V			bsi = BpF[(NPHI-2*im)*vnlat +vnlat-2-k];		asi = BpF[(NPHI-2*im)*vnlat +vnlat-1-k];
+V			bsi = BpF[vnlat-2 -k];	asi = BpF[vnlat-1 -k];	// south
+V			bs = BpF[(NPHI-2*im)*vnlat +vnlat-2-k];		as = BpF[(NPHI-2*im)*vnlat +vnlat-1-k];
 V			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
 V			per[k] = an+as;		pei[k] = ani+asi;		per[k+1] = bn+bs;		pei[k+1] = bni+bsi;
 V			por[k] = an-as;		poi[k] = ani-asi;		por[k+1] = bn-bs;		poi[k+1] = bni-bsi;
