@@ -67,6 +67,16 @@ T	double Tl0[llim];
   #ifndef SHT_AXISYM
 Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
+	#ifdef _GCC_VEC_
+	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
+		unsigned long nv = shtns->nspat;
+QX		BrF = (v2d*) VMALLOC( nv * sizeof(double) );
+VX		BtF = (v2d*) VMALLOC( 2*nv * sizeof(double) );
+VX		BpF = BtF + nv/2;
+3		BrF = (v2d*) VMALLOC( 3*nv * sizeof(double) );
+3		BtF = BrF + nv/2;		BpF = BrF + nv;
+	}
+	#else
 	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
 QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
 VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(complex double) );
@@ -74,6 +84,7 @@ VX		BpF = BtF + shtns->ncplx_fft;
 3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
+	#endif
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
 		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
@@ -564,21 +575,29 @@ Q	BrF -= NLAT*(imlim+1);		// restore original pointer
 V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
   #endif
     // NPHI > 1 as SHT_AXISYM is not defined.
-	if (shtns->ncplx_fft >= 0) {
 	#if _GCC_VEC_
+  	if (shtns->fftc_mode == 0) {
 Q		fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
 V		fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
 V		fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
+	} else if (shtns->fftc_mode > 0) {		// free memory
+Q		fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
+V		fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
+V		fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
+Q		VFREE(BrF);
+VX		VFREE(BtF);		// this frees also BpF.
+	}
 	#else
+	if (shtns->ncplx_fft >= 0) {
 Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
-	#endif
 		if (shtns->ncplx_fft > 0) {		// free memory
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.
 		}
 	}
+	#endif
   #endif
 
 Q	#undef BR0

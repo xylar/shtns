@@ -91,7 +91,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	short mtr_dct;			///< m truncation for dct. -1 means no dct at all.
 	short nlorder;			///< order of non-linear terms to be resolved by SH transform.
 	unsigned short klim;	///< Limit to k for non-linear terms (dct)
-	short dummy;			// alignement.
+	short fftc_mode;		///< how to perform the complex fft : -1 = no fft; 0 = interleaved/native; 1 = split/transpose.
 	fftw_plan idct, dct_m0;			// (I)DCT
 	double **ykm_dct;	// matrix for inverse transform (synthesis) using dct.
 	struct DtDp** dykm_dct;	// theta and phi derivative of Ykm matrix.

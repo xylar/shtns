@@ -77,21 +77,25 @@ V	s2d pei[NLAT_2/VSIZE+NWAY];
 V	s2d poi[NLAT_2/VSIZE+NWAY];
   #endif
 
-  #ifndef SHT_AXISYM
 Q	BrF = (s2d *) Vr;
 V	BtF = (s2d *) Vt;	BpF = (s2d *) Vp;
-	if (shtns->ncplx_fft >= 0) {
-	    if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
-			long int nv = shtns->nspat /VSIZE;
+  #ifndef SHT_AXISYM
+	if (shtns->fftc_mode >= 0) {
+	    if (shtns->fftc_mode == 0) {	// in-place
+Q			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
+V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
+V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
+		} else {	// alloc memory for the transpose FFT
+			unsigned long nv = shtns->nspat /VSIZE;
 QX			BrF = (s2d*) VMALLOC( nv * sizeof(s2d) );
 VX			BtF = (s2d*) VMALLOC( 2*nv * sizeof(s2d) );
 VX			BpF = BtF + nv;
 3			BrF = (s2d*) VMALLOC( 3*nv * sizeof(s2d) );
 3			BtF = BrF + nv;		BpF = BtF + nv;
+Q			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, ((double*)BrF)+1, ((double*)BrF));
+V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, ((double*)BtF)+1, ((double*)BtF));
+V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*)BpF));
 	    }
-Q		fftw_execute_dft(shtns->fftc,(complex double*)Vr, (complex double*)BrF);
-V		fftw_execute_dft(shtns->fftc,(complex double*)Vt, (complex double*)BtF);
-V		fftw_execute_dft(shtns->fftc,(complex double*)Vp, (complex double*)BpF);
 	}
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
@@ -110,21 +114,15 @@ V	l_2 = shtns->l_2;
 		k=0;
 		alm = shtns->blm[0];
 Q		s2d r0 = vdup(0.0);
-Q		#define BR0(k) ((s2d*)Vr)[k]
-S		#define BT0(k) ((s2d*)Vt)[k]
-T		#define BP0(k) ((s2d*)Vp)[k]
  		do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-Q			s2d a = BR0(k);		s2d b = vxchg(BR0(vnlat-1-k));
-Q			ror[k] = a-b;		rer[k] = a+b;
+Q			s2d a = BrF[k];		s2d b = vxchg(BrF[vnlat-1-k]);
+Q			rer[k] = a+b;		ror[k] = a-b;
 Q			r0 += (a+b)*wg[k];
-V			s2d c = BT0(k);		s2d d = vxchg(BT0(vnlat-1-k));
+V			s2d c = BtF[k];		s2d d = vxchg(BtF[vnlat-1-k]);
 V			ter[k] = c+d;		tor[k] = c-d;
-V			s2d e = BP0(k);		s2d f = vxchg(BP0(vnlat-1-k));
+V			s2d e = BpF[k];		s2d f = vxchg(BpF[vnlat-1-k]);
 V			per[k] = e+f;		por[k] = e-f;
 		} while(++k < nk);
-Q		#undef BR0
-S		#undef BT0
-T		#undef BP0
 		for (k=nk; k<nk+NWAY-1; k++) {
 Q			rer[k] = vdup(0.0);		ror[k] = vdup(0.0);
 V			ter[k] = vdup(0.0);		tor[k] = vdup(0.0);
@@ -537,7 +535,7 @@ V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	}
 	#endif
 
-  	if (shtns->ncplx_fft > 0) {		// free memory
+  	if (shtns->fftc_mode > 0) {		// free memory
 Q	    VFREE(BrF - vnlat*imlim);
 VX	    VFREE(BtF - vnlat*imlim);	// this frees also BpF.
 	}
