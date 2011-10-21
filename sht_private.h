@@ -150,12 +150,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 	typedef double v2d __attribute__ ((vector_size (VSIZE*8)));		// vector that contains a complex number
 	#ifdef __SSE3__
 		#include <pmmintrin.h>
-		#warning "using GCC vector instructions (sse3)"
+		#warning "using GCC vector extensions (sse3)"
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd(b,b,1))		// a + I*b
 		#define subadd(a,b) _mm_addsub_pd(a, b)		// [al-bl, ah+bh]
 	#else
 		#include <emmintrin.h>
-		#warning "using GCC vector instructions (sse2)"
+		#warning "using GCC vector extensions (sse2)"
 		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
 		#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
 	#endif
@@ -167,8 +167,15 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vxchg(a) _mm_shuffle_pd(a,a,1)
 	#define vlo_to_cplx(a) _mm_unpacklo_pd(a, vdup(0.0))
 	#define vhi_to_cplx(a) _mm_unpackhi_pd(a, vdup(0.0))
-	#define vlo_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 0)
-	#define vhi_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 1)
+	#ifdef __clang__
+		// allow to compile with clang (llvm)
+		#define vlo_to_dbl(a) (a)[0]
+		#define vhi_to_dbl(a) (a)[1]
+	#else
+		// gcc extensions
+		#define vlo_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 0)
+		#define vhi_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 1)
+	#endif
 #else
 	#undef _GCC_VEC_
 	#define VSIZE 1

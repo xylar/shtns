@@ -359,12 +359,11 @@ V				for (int j=0; j<NWAY; j++)	t[2] -= DY1 * perk[j]  - Y1 * toik[j];
 V				for (int j=0; j<NWAY; j++)	t[3] -= DY1 * peik[j]  + Y1 * tork[j];
 Q				q+=4;
 V				s+=4;	t+=4;
-				l+=2;
 				for (int j=0; j<NWAY; j++) {
 					y1[j] = vdup(al[3])*cost[j]*y0[j] + vdup(al[2])*y1[j];
 V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vdup(al[2])*dy1[j];
 				}
-				al+=4;
+				l+=2;	al+=4;
 			}
 			if (l==llim) {
 Q				for (int j=0; j<NWAY; j++)	q[0] += Y0 * rerk[j];		// real even
@@ -469,12 +468,11 @@ V					t[3] -= DY1 * peik[j]  + Y1 * tork[j];
 				}
 Q				q+=4;
 V				s+=4;	t+=4;
-				l+=2;
 				for (int j=0; j<NWAY; j++) {
 					y1[j] = vdup(al[3])*cost[j]*y0[j] + vdup(al[2])*y1[j];
 V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vdup(al[2])*dy1[j];
 				}
-				al+=4;
+				l+=2;	al+=4;
 			}
 			if (l==llim) {
 				for (int j=0; j<NWAY; j++) {

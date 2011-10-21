@@ -42,12 +42,12 @@ V	v2d *BtF, *BpF;
 Q	#define BR0(i) ((double *)BrF)[2*(i)]
 V	#define BT0(i) ((double *)BtF)[2*(i)]
 V	#define BP0(i) ((double *)BpF)[2*(i)]
-Q	#define qr vdup(creal(Ql[l]));
-Q	#define qi vdup(cimag(Ql[l]));
-S	#define sr vdup(creal(Sl[l]));
-S	#define si vdup(cimag(Sl[l]));
-T	#define tr vdup(creal(Tl[l]));
-T	#define ti vdup(cimag(Tl[l]));
+Q	#define qr(l) vdup(creal(Ql[l]))
+Q	#define qi(l) vdup(cimag(Ql[l]))
+S	#define sr(l) vdup(creal(Sl[l]))
+S	#define si(l) vdup(cimag(Sl[l]))
+T	#define tr(l) vdup(creal(Tl[l]))
+T	#define ti(l) vdup(cimag(Tl[l]))
 V	double m_1;
   #else
 S	v2d *BtF;
@@ -262,34 +262,51 @@ T				toi[j] = vdup(0.0);		per[j] = vdup(0.0);
 V			#define DY0 dy0[j]
 V			#define DY1 dy1[j]
 			while (l<llim) {	// compute even and odd parts
-Q				for (int j=0; j<NWAY; j++) {	rer[j] += Y0 * qr;		rei[j] += Y0 * qi;	}
-S				for (int j=0; j<NWAY; j++) {	tor[j] += DY0 * sr;		pei[j] += Y0 * sr;	}
-S				for (int j=0; j<NWAY; j++) {	toi[j] += DY0 * si;		per[j] -= Y0 * si;	}
-T				for (int j=0; j<NWAY; j++) {	por[j] -= DY0 * tr;		tei[j] += Y0 * tr;	}
-T				for (int j=0; j<NWAY; j++) {	poi[j] -= DY0 * ti;		ter[j] -= Y0 * ti;	}
-				l++;
+Q				for (int j=0; j<NWAY; j++) {	rer[j] += Y0  * qr(l);		rei[j] += Y0 * qi(l);	}
+Q				for (int j=0; j<NWAY; j++) {	ror[j] += Y1  * qr(l+1);	roi[j] += Y1 * qi(l+1);	}
+			#ifdef SHT_GRAD
+S				for (int j=0; j<NWAY; j++) {	tor[j] += DY0 * sr(l);		pei[j] += Y0 * sr(l);	}
+S				for (int j=0; j<NWAY; j++) {	toi[j] += DY0 * si(l);		per[j] -= Y0 * si(l);	}
+T				for (int j=0; j<NWAY; j++) {	por[j] -= DY0 * tr(l);		tei[j] += Y0 * tr(l);	}
+T				for (int j=0; j<NWAY; j++) {	poi[j] -= DY0 * ti(l);		ter[j] -= Y0 * ti(l);	}
+S				for (int j=0; j<NWAY; j++) {	ter[j] += DY1 * sr(l+1);	poi[j] += Y1 * sr(l+1);	}
+S				for (int j=0; j<NWAY; j++) {	tei[j] += DY1 * si(l+1);	por[j] -= Y1 * si(l+1);	}
+T				for (int j=0; j<NWAY; j++) {	per[j] -= DY1 * tr(l+1);	toi[j] += Y1 * tr(l+1);	}
+T				for (int j=0; j<NWAY; j++) {	pei[j] -= DY1 * ti(l+1);	tor[j] -= Y1 * ti(l+1);	}
+			#else
+V				for (int j=0; j<NWAY; j++) {
+V					tor[j] += DY0 * sr(l) - Y1  * ti(l+1);
+V					pei[j] += Y0  * sr(l) - DY1 * ti(l+1);
+V				}
+V				for (int j=0; j<NWAY; j++) {
+V					poi[j] -= DY0 * ti(l) - Y1  * sr(l+1);
+V					ter[j] -= Y0  * ti(l) - DY1 * sr(l+1);
+V				}
+V				for (int j=0; j<NWAY; j++) {
+V					toi[j] += DY0 * si(l) + Y1  * tr(l+1);
+V					per[j] -= Y0  * si(l) + DY1 * tr(l+1);
+V				}
+V				for (int j=0; j<NWAY; j++) {
+V					por[j] -= DY0 * tr(l) + Y1  * si(l+1);
+V					tei[j] += Y0  * tr(l) + DY1 * si(l+1);
+V				}
+			#endif
 				for (int j=0; j<NWAY; j++) {
 					y0[j] = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
 V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vdup(al[0])*dy0[j];
 				}
-Q				for (int j=0; j<NWAY; j++) {	ror[j] += Y1 * qr;		roi[j] += Y1 * qi;	}
-S				for (int j=0; j<NWAY; j++) {	ter[j] += DY1 * sr;		poi[j] += Y1 * sr;	}
-S				for (int j=0; j<NWAY; j++) {	tei[j] += DY1 * si;		por[j] -= Y1 * si;	}
-T				for (int j=0; j<NWAY; j++) {	per[j] -= DY1 * tr;		toi[j] += Y1 * tr;	}
-T				for (int j=0; j<NWAY; j++) {	pei[j] -= DY1 * ti;		tor[j] -= Y1 * ti;	}
-				l++;
 				for (int j=0; j<NWAY; j++) {
 					y1[j] = vdup(al[3])*cost[j]*y0[j] + vdup(al[2])*y1[j];
 V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vdup(al[2])*dy1[j];
 				}
-				al+=4;
+				l+=2;	al+=4;
 			}
 			if (l==llim) {
-Q				for (int j=0; j<NWAY; j++) {	rer[j] += Y0 * qr;		rei[j] += Y0 * qi;	}
-S				for (int j=0; j<NWAY; j++) {	tor[j] += DY0 * sr;		pei[j] += Y0 * sr;	}
-S				for (int j=0; j<NWAY; j++) {	toi[j] += DY0 * si;		per[j] -= Y0 * si;	}
-T				for (int j=0; j<NWAY; j++) {	por[j] -= DY0 * tr;		tei[j] += Y0 * tr;	}
-T				for (int j=0; j<NWAY; j++) {	poi[j] -= DY0 * ti;		ter[j] -= Y0 * ti;	}
+Q				for (int j=0; j<NWAY; j++) {	rer[j] += Y0 * qr(l);		rei[j] += Y0 * qi(l);	}
+S				for (int j=0; j<NWAY; j++) {	tor[j] += DY0 * sr(l);		pei[j] += Y0 * sr(l);	}
+S				for (int j=0; j<NWAY; j++) {	toi[j] += DY0 * si(l);		per[j] -= Y0 * si(l);	}
+T				for (int j=0; j<NWAY; j++) {	por[j] -= DY0 * tr(l);		tei[j] += Y0 * tr(l);	}
+T				for (int j=0; j<NWAY; j++) {	poi[j] -= DY0 * ti(l);		ter[j] -= Y0 * ti(l);	}
 			}
 			#undef Y0
 			#undef Y1
@@ -437,44 +454,42 @@ V			#define DY0 (dy0[j]*scale[j])
 V			#define DY1 (dy1[j]*scale[j])
 			while (l<llim) {	// compute even and odd parts
 				for (int j=0; j<NWAY; j++) {
-Q					rer[j] += Y0 * qr;		rei[j] += Y0 * qi;
-S					pei[j] += Y0 * sr;		per[j] -= Y0 * si;
-T					tei[j] += Y0 * tr;		ter[j] -= Y0 * ti;
+Q					rer[j] += Y0 * qr(l);		rei[j] += Y0 * qi(l);
+S					pei[j] += Y0 * sr(l);		per[j] -= Y0 * si(l);
+T					tei[j] += Y0 * tr(l);		ter[j] -= Y0 * ti(l);
 				}
 V				for (int j=0; j<NWAY; j++) {
-S					tor[j] += DY0 * sr;		toi[j] += DY0 * si;
-T					por[j] -= DY0 * tr;		poi[j] -= DY0 * ti;
+S					tor[j] += DY0 * sr(l);		toi[j] += DY0 * si(l);
+T					por[j] -= DY0 * tr(l);		poi[j] -= DY0 * ti(l);
 V				}
-				l++;
 				for (int j=0; j<NWAY; j++) {
 					y0[j] = vdup(al[1])*cost[j]*y1[j] + vdup(al[0])*y0[j];
 V					dy0[j] = vdup(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vdup(al[0])*dy0[j];
 				}
 				for (int j=0; j<NWAY; j++) {
-Q					ror[j] += Y1 * qr;		roi[j] += Y1 * qi;
-S					poi[j] += Y1 * sr;		por[j] -= Y1 * si;
-T					toi[j] += Y1 * tr;		tor[j] -= Y1 * ti;
+Q					ror[j] += Y1 * qr(l+1);		roi[j] += Y1 * qi(l+1);
+S					poi[j] += Y1 * sr(l+1);		por[j] -= Y1 * si(l+1);
+T					toi[j] += Y1 * tr(l+1);		tor[j] -= Y1 * ti(l+1);
 				}
 V				for (int j=0; j<NWAY; j++) {
-S					ter[j] += DY1 * sr;		tei[j] += DY1 * si;
-T					per[j] -= DY1 * tr;		pei[j] -= DY1 * ti;
+S					ter[j] += DY1 * sr(l+1);	tei[j] += DY1 * si(l+1);
+T					per[j] -= DY1 * tr(l+1);	pei[j] -= DY1 * ti(l+1);
 V				}
-				l++;
 				for (int j=0; j<NWAY; j++) {
 					y1[j] = vdup(al[3])*cost[j]*y0[j] + vdup(al[2])*y1[j];
 V					dy1[j] = vdup(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vdup(al[2])*dy1[j];
 				}
-				al+=4;
+				l+=2;		al+=4;
 			}
 			if (l==llim) {
 				for (int j=0; j<NWAY; j++) {
-Q					rer[j] += Y0 * qr;		rei[j] += Y0 * qi;
-S					pei[j] += Y0 * sr;		per[j] -= Y0 * si;
-T					tei[j] += Y0 * tr;		ter[j] -= Y0 * ti;
+Q					rer[j] += Y0 * qr(l);		rei[j] += Y0 * qi(l);
+S					pei[j] += Y0 * sr(l);		per[j] -= Y0 * si(l);
+T					tei[j] += Y0 * tr(l);		ter[j] -= Y0 * ti(l);
 				}
 V				for (int j=0; j<NWAY; j++) {
-S					tor[j] += DY0 * sr;		toi[j] += DY0 * si;
-T					por[j] -= DY0 * tr;		poi[j] -= DY0 * ti;
+S					tor[j] += DY0 * sr(l);		toi[j] += DY0 * si(l);
+T					por[j] -= DY0 * tr(l);		poi[j] -= DY0 * ti(l);
 V				}
 			}
 			#undef Y0
