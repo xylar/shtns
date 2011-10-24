@@ -73,9 +73,11 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
  * The following macros give access to single spherical harmonic coefficient or perform loops spanning all of them.
 **///@{
 ///LiM(l,im) : macro returning array index for given l and im.
-#define LiM(shtns, l,im) ( shtns->lmidx[im] + l )
+#define LiM(shtns, l,im) ( shtns->lmidx[im] + (l) )
+//#define LiM(shtns, l,im) ( ((im)*(2*shtns->lmax + 2 - ((im)+1)*shtns->mres))>>1 + (l) )
 /// LM(l,m) : macro returning array index for given l and m.
-#define LM(shtns, l,m) ( shtns->lmidx[(m)/shtns->mres] + l )
+#define LM(shtns, l,m) ( shtns->lmidx[((unsigned)(m))/shtns->mres] + (l) )
+//#define LM(shtns, l,m) ( ((((unsigned)(m))/shtns->mres)*(2*shtns->lmax + 2 - ((m)+shtns->mres)))>>1 + (l) )
 /// LM_LOOP( action ) : macro that performs "action" for every (l,m), with lm set, but neither l, m nor im.
 /// \c lm must be a declared int and is the loop counter and the SH array index. more info : \ref spec_data
 #define LM_LOOP( shtns, action ) { int lm=0; do { action } while(++lm < shtns->nlm); }

@@ -118,6 +118,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 #define MTR_DCT shtns->mtr_dct
 #define SHT_NL_ORDER shtns->nlorder
 
+// define index in alm/blm matrices
+#define ALM_IDX(shtns, im) ( (im)*(2*shtns->lmax - ((im)-1)*shtns->mres) )
+
 // SHT_NORM without CS_PHASE
 #define SHT_NORM (shtns->norm & 0x0FF)
 

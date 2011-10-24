@@ -49,6 +49,7 @@ S	#define si(l) vdup(cimag(Sl[l]))
 T	#define tr(l) vdup(creal(Tl[l]))
 T	#define ti(l) vdup(cimag(Tl[l]))
 V	double m_1;
+	unsigned im, imlim;
   #else
 S	v2d *BtF;
 T	v2d *BpF;
@@ -56,12 +57,11 @@ Q	#define BR0(i) ((double *)BrF)[i]
 S	#define BT0(i) ((double *)BtF)[i]
 T	#define BP0(i) ((double *)BpF)[i]
   #endif
-	long int nk, k,m,l;
-	long int im, imlim;
+	long int nk, k,l,m;
 	double *alm, *al;
 	s2d *ct, *st;
 Q	double Ql0[llim+1];
-S	double Sl0[llim+1];
+S	double Sl0[llim];
 T	double Tl0[llim];
 
   #ifndef SHT_AXISYM
@@ -87,7 +87,7 @@ VX		BpF = BtF + shtns->ncplx_fft;
 	#endif
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
-		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
   #else
 	#ifdef SHT_GRAD
@@ -100,7 +100,7 @@ T	BpF = (v2d*) Vp;
   #endif
 
 	ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
-	im=0;
+	//	im=0;
  		l=1;
 		alm = shtns->alm[0];
 Q		Ql0[0] = (double) Qlm[0];		// l=0
@@ -195,9 +195,6 @@ T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
 		} while (k < nk);
 
   #ifndef SHT_AXISYM
-//	#undef NWAY
-//V	#define NWAY 1
-//QX	#define NWAY 2
 	#if _GCC_VEC_
 Q		BrF += NLAT_2;
 V		BtF += NLAT_2;	BpF += NLAT_2;
@@ -576,16 +573,18 @@ V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
   #endif
     // NPHI > 1 as SHT_AXISYM is not defined.
 	#if _GCC_VEC_
-  	if (shtns->fftc_mode == 0) {
-Q		fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
-V		fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
-V		fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
-	} else if (shtns->fftc_mode > 0) {		// free memory
-Q		fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
-V		fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
-V		fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-Q		VFREE(BrF);
-VX		VFREE(BtF);		// this frees also BpF.
+  	if (shtns->fftc_mode >= 0) {
+		if (shtns->fftc_mode == 0) {
+Q			fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
+V			fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
+V			fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
+		} else {		// split dft
+Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
+V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
+V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
+Q			VFREE(BrF);
+VX			VFREE(BtF);		// this frees also BpF.
+		}
 	}
 	#else
 	if (shtns->ncplx_fft >= 0) {

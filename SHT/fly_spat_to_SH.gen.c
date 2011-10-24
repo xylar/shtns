@@ -48,9 +48,8 @@ V	s2d *BtF, *BpF;	// contains the Fourier transformed data
 	double *alm, *al;
 	s2d *wg, *ct, *st;
 V	double *l_2;
-	long int nk, k, vnlat;
-	long int m,l;
-	long int imlim, im;
+	long int nk, k, vnlat, l,m;
+	unsigned imlim, im;
 V	double m_1;
   #if _GCC_VEC_
 Q	s2d qq[2*llim];
@@ -99,18 +98,18 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
 	}
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
-		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
   #endif
 
-	vnlat = ((int) NLAT)/VSIZE;		// vector size.
+	vnlat = ((unsigned) NLAT)/VSIZE;		// vector size.
 	nk = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 	wg = (s2d*) shtns->wg;		ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
 	#if _GCC_VEC_
 	  nk = (nk+1)>>1;
 	#endif
 V	l_2 = shtns->l_2;
-	im = 0;		// dzl.p = 0.0 : and evrything is REAL
+	//	im = 0;		// dzl.p = 0.0 : and evrything is REAL
 		k=0;
 		alm = shtns->blm[0];
 Q		s2d r0 = vdup(0.0);

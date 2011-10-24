@@ -52,11 +52,8 @@ Q	double *zl;
 V	double *dzl0;
 V	struct DtDp *dzl;
 	long int i,i0, ni,l;
-	long int im, imlim;
-Q	complex double q0,q1;
-S	complex double s0,s1;
-T	complex double t0,t1;
   #ifndef SHT_AXISYM
+	unsigned im, imlim;
 Q	complex double *BrF;		// contains the Fourier transformed data
 V	complex double *BtF, *BpF;	// contains the Fourier transformed data
 Q	v2d reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
@@ -112,12 +109,12 @@ V	    fftw_execute_dft_r2c(shtns->fft,Vp, BpF);
 	}
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
-		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
   #endif
 
 	ni = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
-	im = 0;		// dzl.p = 0.0 : and evrything is REAL
+	//	im = 0;		// dzl.p = 0.0 : and evrything is REAL
   #ifndef SHT_NO_DCT
 V	double* st_1 = shtns->st_1;
 	#ifndef SHT_AXISYM
@@ -180,9 +177,9 @@ QX		BR0[klim] = 0;		BR0[klim+1] = 0;		// allow some overflow.
 	  #ifndef _GCC_VEC_
 S			Sl[l] = s1;
 T			Tl[l] = t1;
-Q			q0 = 0.0;	q1 = 0.0;
-S			s0 = 0.0;	s1 = 0.0;
-T			t0 = 0.0;	t1 = 0.0;
+Q			complex double q0 = 0.0;	complex double q1 = 0.0;
+S			complex double s0 = 0.0;	complex double s1 = 0.0;
+T			complex double t0 = 0.0;	complex double t1 = 0.0;
 			do {
 Q				q0 += BR0[i]   * zl[i];
 Q				q1 += BR0[i+1] * zl[i+1];
@@ -232,7 +229,7 @@ V	#else
 S			((v2d*) Sl)[l] = vhi_to_cplx(s);
 T			((v2d*) Tl)[l] = vhi_to_cplx(t);
 V	#endif
-Q			q0 = 0.0;
+Q			complex double q0 = 0.0;
 Q			i=l;	// l < klim
 Q			do {
 Q				q0 += BR0[i] * zl[i];

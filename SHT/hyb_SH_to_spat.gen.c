@@ -78,6 +78,8 @@ V	complex double dte,dto, dpe,dpo;
 Q	#define BR0(i) ((double *)BrF)[2*(i)]
 V	#define BT0(i) ((double *)BtF)[2*(i)]
 V	#define BP0(i) ((double *)BpF)[2*(i)]
+	unsigned im, imlim;
+	int imlim_dct;
   #else
 S	v2d *BtF;
 T	v2d *BpF;
@@ -89,7 +91,6 @@ S	#define BT0(i) ((double *)BtF)[i]
 T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	long int k,m,l;
-	long int im, imlim, imlim_dct;
   #ifdef _GCC_VEC_
 QX	s2d Ql0[(llim+4)>>1];		// we need some zero-padding.
 3	s2d Ql0[(llim+3)>>1];		// we need some zero-padding.
@@ -109,7 +110,13 @@ VX		BpF = BtF + shtns->ncplx_fft;
 	}
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
-		if (MTR*MRES > (int) llim) imlim = ((int) llim)/MRES;		// 32bit mul and div should be faster
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
+	#ifndef SHT_NO_DCT
+		imlim_dct = MTR_DCT;
+		#ifdef SHT_VAR_LTR
+			if (imlim_dct > imlim) imlim_dct = imlim;
+		#endif
 	#endif
   #else
 	#ifdef SHT_GRAD
@@ -121,9 +128,9 @@ S	BtF = (v2d*) Vt;
 T	BpF = (v2d*) Vp;
   #endif
 
-	im=0;
+	//	im=0;
   #ifdef _GCC_VEC_
-  	{	// store the m=0 coefficients in an efficient & vectorizable way.
+	{	// store the m=0 coefficients in an efficient & vectorizable way.
 Q		double* Ql = (double*) &Ql0;
 S		double* Sl = (double*) &Sl0;
 T		double* Tl = (double*) &Tl0;
@@ -141,19 +148,13 @@ QX		Ql[l] = 0.0;	Ql[l+1] = 0.0;		Ql[l+2] = 0.0;
 	}
   #endif
   #ifndef SHT_NO_DCT
-	{
-		imlim_dct = MTR_DCT;
-	#ifdef SHT_VAR_LTR
-		if (MTR_DCT*MRES > (int) llim) imlim_dct = ((int) llim)/MRES;		// 32bit mul and div should be faster
-	#endif
+	{	// m=0 dct
+Q		s2d* yl = (s2d*) shtns->ykm_dct[0];
+V		s2d* dyl0 = (s2d*) shtns->dykm_dct[0];		// only theta derivative (d/dphi = 0 for m=0)
 	#ifndef _GCC_VEC_
 Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
-	#endif
-Q		s2d* yl = (s2d*) shtns->ykm_dct[im];
-V		s2d* dyl0 = (s2d*) shtns->dykm_dct[im];		// only theta derivative (d/dphi = 0 for m=0)
-	#ifndef _GCC_VEC_
 Q		re = 0.0;	ro = 0.0;
 QE		re = yl[0]  * Ql[0];
 QO		ro = yl[1]  * Ql[2];
@@ -266,15 +267,15 @@ V		} while (k<NLAT_2);
     #endif
 	}
   #else		// ifndef SHT_NO_DCT
-	{
+	{	// m=0 no dct
 	#ifndef _GCC_VEC_
 Q		double* Ql = (double*) Qlm;
 S		double* Sl = (double*) Slm;
 T		double* Tl = (double*) Tlm;
 	#endif
 		k=0;
-Q		s2d* yl  = (s2d*) shtns->ylm[im];
-V		s2d* dyl0 = (s2d*) shtns->dylm[im];	// only theta derivative (d/dphi = 0 for m=0)
+Q		s2d* yl  = (s2d*) shtns->ylm[0];
+V		s2d* dyl0 = (s2d*) shtns->dylm[0];	// only theta derivative (d/dphi = 0 for m=0)
 		do {	// ops : NLAT_2 * [ (lmax-m+1) + 4]	: almost twice as fast.
 	#ifndef _GCC_VEC_
 			l=1;

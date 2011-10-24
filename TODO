@@ -1,8 +1,3 @@
-use guru fftw for complex out-of-place.
-+			dim.n = NPHI;    	dim.os = 1;			dim.is = NLAT;		// complex transpose
-+			many.n = NLAT/2;	many.os = 2*NPHI;	many.is = 2;
-+			shtns->ifftc = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode
-
 *** KNOWN BUGS ***
 - We rely on fftw to allocate aligned memory. This only works if fftw has been compiled with sse2 support !!
   => we should therefore use our own aligned memory allocation ... (or use autoconf ?)
