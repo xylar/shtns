@@ -326,10 +326,10 @@ show that <b>SHTns performs much faster than any other</b> (non-parallel). Furth
   <td><a href="http://www.cs.dartmouth.edu/~geelong/sphere/">SpharmonicKit2</a> 2.7 (fast)</td>
   <td><b>SHTns</b> (Gauss)</td> <td>SHTns/SpharmonicKit2</td> </tr><tr>
 <td>127 </td> <td>8.9 ms</td> <td> 5.3 ms</td> <td> 10-80 ms </td> <td>5.5 ms</td>  <td><b>0.67 ms</b></td>  <td>8.2</td> </tr><tr>
-<td>255 </td> <td>73 ms</td> <td> 29 ms</td> <td> 20-90ms </td> <td>27 ms</td>  <td><b>6.1 ms</b></td>  <td>4.4</td> </tr><tr>
-<td>511 </td> <td>757 ms</td> <td>170 ms </td> <td>40-116 ms</td> <td>143 ms</td>  <td><b>40 ms</b></td>  <td>3.6</td> </tr><tr>
-<td>1023 </td> <td>10.3 s</td> <td>1.1 s </td> <td> 130-300 ms</td> <td>860 ms</td>  <td><b>312 ms</b></td>  <td>2.8</td> </tr><tr>
-<td>2047 </td> <td>NA (too slow)</td> <td>5.9 s</td> <td>0.8-0.9 s</td> <td>NA (out of memory)</td>  <td><b>3.2 s</b></td>  <td>NA</td> </tr></table>
+<td>255 </td> <td>73 ms</td> <td> 29 ms</td> <td> 20-90ms </td> <td>27 ms</td>  <td><b>5.4 ms</b></td>  <td>5.0</td> </tr><tr>
+<td>511 </td> <td>757 ms</td> <td>170 ms </td> <td>40-116 ms</td> <td>143 ms</td>  <td><b>37 ms</b></td>  <td>3.9</td> </tr><tr>
+<td>1023 </td> <td>10.3 s</td> <td>1.1 s </td> <td> 130-300 ms</td> <td>860 ms</td>  <td><b>270 ms</b></td>  <td>3.2</td> </tr><tr>
+<td>2047 </td> <td>NA (too slow)</td> <td>5.9 s</td> <td>0.8-0.9 s</td> <td>NA (out of memory)</td>  <td><b>2.6 s</b></td>  <td>NA</td> </tr></table>
 
 <i>Average times for forward or backward scalar transform on an Intel Xeon E5520 (2.27GHz), with gcc 4.1.2 and "-O3 -march=core2" compilation options.</i>
 </div>
