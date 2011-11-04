@@ -82,6 +82,35 @@ long nlm_calc(long lmax, long mmax, long mres)
 	SHT FUNCTIONS
 */
 
+/// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
+/// which is the same as rotating the reference frame by angle -alpha.
+/// Result is stored in Rlm (which can be the same array as Qlm).
+void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
+{
+	int im, l, lmax, mmax, mres;
+
+	lmax = shtns->lmax;		mmax = shtns->mmax;		mres = shtns->mres;
+	if (Rlm != Qlm) {		// copy m=0 which does not change.
+		l=0;	do { Rlm[l] = Qlm[l] } while(++l <= lmax);
+	}
+	if (mmax > 0) {
+		complex double eia = cos(mres*alpha) - I*sin(mres*alpha);		// rotate reference frame by angle -alpha
+		complex double eima = 1.0;
+		Qlm += (lmax+1);	Rlm += (lmax+1);
+		for (im=1; im <= mmax; im++) {
+			eima *= eia;
+			for (l=m; l<=lmax; l++)	*Rlm++ = (*Qlm++) * eima;
+		}
+	}
+}
+
+void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
+{
+	if ((shtns->mres != 1) || (shtns->mmax != shtns->lmax)) shtns_runerr("attempt to rotate a non-square truncation.");		// cannot rotate a non-squared truncation.
+
+
+}
+
 // truncation at LMAX and MMAX
 #define LTR LMAX
 #define MTR MMAX

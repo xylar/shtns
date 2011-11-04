@@ -133,6 +133,14 @@ double sh11_st(shtns_cfg);	///< returns the spherical harmonic representation of
 double shlm_e1(shtns_cfg, int l, int m);		///< returns the l,m SH coefficient corresponding to unit energy.
 //@}
 
+/// \name utils functions
+//@{
+/// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
+/// which is the same as rotating the reference frame by angle -alpha.
+/// Result is stored in Rlm (which can be the same array as Qlm).
+void SH_Zrotate(shtns_cfg, complex double *Qlm, double alpha, complex double *Rlm);
+//@}
+
 /// \name Scalar transforms
 //@{
 void spat_to_SH(shtns_cfg, double *Vr, complex double *Qlm);
