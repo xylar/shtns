@@ -7,7 +7,7 @@ march = -march=native
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(march) -fomit-frame-pointer -std=gnu99 -ffast-math -D_GNU_SOURCE
+go= $(march) -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
@@ -15,7 +15,7 @@ go= $(march) -fomit-frame-pointer -std=gnu99 -ffast-math -D_GNU_SOURCE
 # gcc compiler command with options for the sht codelets
 shtcc = gcc $(go) -O3 -ffast-math
 # gcc compiler command with options for other source (initialization, ...)
-cc = gcc $(go) -O2 
+cc = gcc $(go) -O2 -ffast-math
 
 ## "version" identification string
 HGID=`hg id -ti`
@@ -71,6 +71,8 @@ sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile
 	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -o time_SHT
+test_rot : shtns.h test_rot.c libshtns.a Makefile
+	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -o test_rot
 
 SHT_example : SHT_example.c libshtns.a Makefile shtns.h
 	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c -lshtns -lfftw3 -lm -o SHT_example

@@ -85,11 +85,14 @@ long nlm_calc(long lmax, long mmax, long mres)
 /// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
 /// which is the same as rotating the reference frame by angle -alpha.
 /// Result is stored in Rlm (which can be the same array as Qlm).
-void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
+void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm, int lmax)
 {
-	int im, l, lmax, mmax, mres;
+	int im, l, mmax, mres;
 
-	lmax = shtns->lmax;		mmax = shtns->mmax;		mres = shtns->mres;
+	l = shtns->lmax;	if (lmax > l) lmax = l;
+	mmax = shtns->mmax;		mres = shtns->mres;
+	if (mmax*mres > lmax) mmax=lmax/mres;
+
 	if (Rlm != Qlm) {		// copy m=0 which does not change.
 		l=0;	do { Rlm[l] = Qlm[l]; } while(++l <= lmax);
 	}
@@ -104,75 +107,140 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 	}
 }
 
-/// rotate by 90 degrees around Y axis.
-/// Algorithm based on the pseudospectral rotation, with fixed 90 degrees angle :
-/// Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" Journal of Computational Physics.
-void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
+/** rotation kernel used by SH_Yrotate90(), SH_Xrotate90() and SH_rotate().
+ Algorithm based on the pseudospectral rotation[1] :
+ - rotate around Z by angle dphi0.
+ - synthetize for each l the spatial description for phi=0 and phi=pi on an equispaced latitudinal grid.
+ - Fourier ananlyze as data on the equator to recover the m in the 90 degrees rotated frame.
+ - rotate around new Z by angle dphi1.
+ [1] Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" Journal of Computational Physics. **/
+void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double dphi0, double dphi1, int lmax)
 {
-	if ((shtns->mres != 1) || (shtns->mmax != shtns->lmax)) shtns_runerr("attempt to rotate a non-square truncation.");		// cannot rotate a non-squared truncation.
-
 	fftw_plan fft;
-	complex double *q, *dq;
-	double *q0, *dq0;
+	complex double *q;
+	double *q0;
 	double *yl, *dyl;
 	int k, m, l, ntheta, nrembed, ncembed;
-	
-/*	{	l=0;		// l=0 is invariant.
-		Rlm[0] = Qlm[0];
-	}
-	{	l=1;		// simple matrix.
-		double q0 = creal(Qlm[LiM(shtns, l, 0)]);
-		Rlm[LiM(shtns, l, 0)] = -sqrt(2.0) * creal(Qlm[LiM(shtns, l, 1)]);
-		Rlm[LiM(shtns, l ,1)] = +sqrt(0.5) * q0  + I*cimag(Qlm[LiM(shtns, l, 1)]);
-	}
-*/
 
-	ntheta = ((LMAX+2)>>1)*2;
-	q0 = malloc(2* sizeof(double)*(2*ntheta+2)*(LMAX+1));
-	memset(q0, 0, 2* sizeof(double)*(2*ntheta+2)*(LMAX+1));		// zero out.
-	dq0 = q0 + (2*ntheta+2)*(LMAX+1);
-	yl = malloc(2* sizeof(double)*(LMAX+1));
-	dyl = yl + (LMAX+1);
+	ntheta = ((lmax+2)>>1)*2;
+	q0 = malloc(2* sizeof(double)*(2*ntheta+2)*lmax);
+	memset(q0, 0, 2* sizeof(double)*(2*ntheta+2)*lmax);		// zero out.
+	yl = malloc(2* sizeof(double)*(lmax+1));
+	dyl = yl + (lmax+1);
 
+	// rotate around Z by dphi0
+	if (dphi0 != 0.0) {
+		SH_Zrotate(shtns, Qlm, dphi0, Rlm, lmax);
+		Qlm = Rlm;
+	} else {
+		Rlm[0] = Qlm[0];		// l=0 is rotation invariant.
+	}
+
+	// compute q(l) on the meridian phi=0 and phi=pi. (rotate around X)
 	for (k=0; k<ntheta/2; k++) {
 		double cost= cos(M_PI*(k+0.5)/ntheta);
 		double sint_1 = 1.0/sqrt((1.0-cost)*(1.0+cost));
-		double sgnm = -1.0;
-		for (m=0; m<=MMAX; m++) {
-			legendre_sphPlm_array(shtns, LMAX, m, cost, yl+m);
+		m=0;
+			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
 			double sgnt = -1.0;
+			for (l=1; l<=lmax; l++) {
+				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
+				q0[k*2*lmax +2*(l-1)] = qr;
+				q0[(ntheta-1-k)*2*lmax +2*(l-1)] = sgnt*qr;
+				q0[(ntheta+k)*2*lmax +2*(l-1)] = sgnt*qr;
+				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)] = qr;
+				sgnt *= -1.0;
+			}
+		double sgnm = 1.0;
+		for (m=1; m<=lmax; m++) {
+			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
+			double sgnt = 1.0;
 			sgnm *= -1.0;
-			for (l=m; l<=LMAX; l++) {
+			for (l=m; l<=lmax; l++) {
 				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
 				double qi = cimag(Qlm[LiM(shtns, l, m)]) * m*yl[l]*sint_1;
-				if (m>0) {	qr *= 2.0;	qi *= 2.0;	}
+				qr += qr;	qi += qi;		// x2 for m>0
+				q0[k*2*lmax +2*(l-1)] += qr;						// q0
+				q0[k*2*lmax +2*(l-1)+1] -= qi;						// dq0
+				q0[(ntheta-1-k)*2*lmax +2*(l-1)] += sgnt*qr;
+				q0[(ntheta-1-k)*2*lmax +2*(l-1)+1] -= sgnt*qi;
+				q0[(ntheta+k)*2*lmax +2*(l-1)] += (sgnm*sgnt)*qr;
+				q0[(ntheta+k)*2*lmax +2*(l-1)+1] += (sgnm*sgnt)*qi;
+				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)] += sgnm*qr;
+				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)+1] += sgnm*qi;
 				sgnt *= -1.0;
-				q0[k*(LMAX+1) +l] += qr;
-				q0[(ntheta-1-k)*(LMAX+1) +l] += sgnt*qr;
-				q0[(2*ntheta-1-k)*(LMAX+1) +l] += sgnm*qr;
-				q0[(ntheta+k)*(LMAX+1) +l] += (sgnm*sgnt)*qr;
-				dq0[k*(LMAX+1) +l] -= qi;
-				dq0[(ntheta-1-k)*(LMAX+1) +l] -= sgnt*qi;
-				dq0[(2*ntheta-1-k)*(LMAX+1) +l] += sgnm*qi;
-				dq0[(ntheta+k)*(LMAX+1) +l] += (sgnm*sgnt)*qi;
 			}
 		}
 	}
 
-	q = (complex double*) q0;		dq = (complex double*) dq0;
+	q = (complex double*) q0;
 	ntheta*=2;		nrembed = ntheta+2;		ncembed = nrembed/2;
-	fft = fftw_plan_many_dft_r2c(1, &ntheta, LMAX+1, q0, &nrembed, LMAX+1, 1, q, &ncembed, LMAX+1, 1, FFTW_ESTIMATE);
-	fftw_execute_dft_r2c(fft, q0, q);		fftw_execute_dft_r2c(fft, dq0, dq);
+	fft = fftw_plan_many_dft_r2c(1, &ntheta, 2*lmax, q0, &nrembed, 2*lmax, 1, q, &ncembed, 2*lmax, 1, FFTW_ESTIMATE);
+	fftw_execute_dft_r2c(fft, q0, q);
 	fftw_destroy_plan(fft);
 
-	for (m=0; m<=MMAX; m++) {
-		legendre_sphPlm_deriv_array(shtns, LMAX, m, 0.0, 1.0, yl+m, dyl+m);
-		complex double eimdp = (cos(m*M_PI/(ntheta)) - I*sin(m*M_PI/(ntheta)))/(ntheta);		// +/- 
-		for (l=m; l<=LMAX; l++) {
-			Rlm[LiM(shtns, l,m)] =  eimdp*(yl[l]*q[m*(LMAX+1) +l] - dyl[l]*dq[m*(LMAX+1) +l])/(yl[l]*yl[l] + dyl[l]*dyl[l]);
+	m=0;
+		legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
+		for (l=1; l<lmax; l+=2) {
+			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*ntheta);
+			Rlm[LiM(shtns, l+1,m)] =  creal(q[m*2*lmax +2*l])/(yl[l+1]*ntheta);
+		}
+		if (l==lmax) {
+			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*ntheta);
+		}
+	dphi1 += M_PI/ntheta - M_PI/2;	// shift rotation angle by angle of first synthesis latitude.
+	for (m=1; m<=lmax; m++) {
+		legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
+		complex double eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);		// +/-
+		for (l=m; l<lmax; l+=2) {
+			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]/yl[l];
+			Rlm[LiM(shtns, l+1,m)] =  -eimdp*q[m*2*lmax +2*l+1]/dyl[l+1];
+		}
+		if (l==lmax) {
+			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]/yl[l];
 		}
 	}
-	free(yl);	free(q0);
+	free(yl);	free(q0);	
+}
+
+/// rotate by 90 degrees around X axis (up to degree ltr)
+/// shtns->mres MUST be 1 !
+void SH_Xrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, int lmax)
+{
+	if (lmax < shtns->lmax) lmax= shtns->lmax;
+	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature make rotation not closed.");
+
+/*	if (lmax == 1) {
+		Rlm[0] = Qlm[0];	// l=0 is invariant.
+		l=1;		// simple matrix.
+			double q0 = creal(Qlm[LiM(shtns, l, 0)]);
+			Rlm[LiM(shtns, l, 0)] = sqrt(2.0) * cimag(Qlm[LiM(shtns, l, 1)]);
+			Rlm[LiM(shtns, l ,1)] = creal(Qlm[LiM(shtns, l, 1)]) - I*(sqrt(0.5)*q0);
+		return;
+	}
+*/
+
+	SH_rotK90(shtns, Qlm, Rlm, 0.0, 0.0, lmax);
+}
+
+/// rotate by 90 degrees around Y axis (up to degree ltr)
+/// shtns->mres MUST be 1 !
+void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, int lmax)
+{
+	if (lmax < shtns->lmax) lmax= shtns->lmax;
+	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature make rotation not closed.");
+
+/*	if (lmax == 1) {		// simple matrix
+		Rlm[0] = Qlm[0];	// l=0 is invariant.
+		int l=1;
+			double q0 = creal(Qlm[LiM(shtns, l, 0)]);
+			Rlm[LiM(shtns, l, 0)] = sqrt(2.0) * creal(Qlm[LiM(shtns, l, 1)]);
+			Rlm[LiM(shtns, l ,1)] = I*cimag(Qlm[LiM(shtns, l, 1)]) - sqrt(0.5) * q0;
+		return;
+	}
+*/
+
+	SH_rotK90(shtns, Qlm, Rlm, M_PI/2, M_PI/2, lmax);
 }
 
 // truncation at LMAX and MMAX
