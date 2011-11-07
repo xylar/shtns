@@ -91,7 +91,7 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 
 	lmax = shtns->lmax;		mmax = shtns->mmax;		mres = shtns->mres;
 	if (Rlm != Qlm) {		// copy m=0 which does not change.
-		l=0;	do { Rlm[l] = Qlm[l] } while(++l <= lmax);
+		l=0;	do { Rlm[l] = Qlm[l]; } while(++l <= lmax);
 	}
 	if (mmax > 0) {
 		complex double eia = cos(mres*alpha) - I*sin(mres*alpha);		// rotate reference frame by angle -alpha
@@ -99,16 +99,80 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 		Qlm += (lmax+1);	Rlm += (lmax+1);
 		for (im=1; im <= mmax; im++) {
 			eima *= eia;
-			for (l=m; l<=lmax; l++)	*Rlm++ = (*Qlm++) * eima;
+			for (l=im*mres; l<=lmax; l++)	*Rlm++ = (*Qlm++) * eima;
 		}
 	}
 }
 
-void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
+/// rotate by 90 degrees around Y axis.
+/// Algorithm based on the pseudospectral rotation, with fixed 90 degrees angle :
+/// Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" Journal of Computational Physics.
+void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 {
 	if ((shtns->mres != 1) || (shtns->mmax != shtns->lmax)) shtns_runerr("attempt to rotate a non-square truncation.");		// cannot rotate a non-squared truncation.
 
+	fftw_plan fft;
+	complex double *q, *dq;
+	double *q0, *dq0;
+	double *yl, *dyl;
+	int k, m, l, ntheta, nrembed, ncembed;
+	
+/*	{	l=0;		// l=0 is invariant.
+		Rlm[0] = Qlm[0];
+	}
+	{	l=1;		// simple matrix.
+		double q0 = creal(Qlm[LiM(shtns, l, 0)]);
+		Rlm[LiM(shtns, l, 0)] = -sqrt(2.0) * creal(Qlm[LiM(shtns, l, 1)]);
+		Rlm[LiM(shtns, l ,1)] = +sqrt(0.5) * q0  + I*cimag(Qlm[LiM(shtns, l, 1)]);
+	}
+*/
 
+	ntheta = ((LMAX+2)>>1)*2;
+	q0 = malloc(2* sizeof(double)*(2*ntheta+2)*(LMAX+1));
+	memset(q0, 0, 2* sizeof(double)*(2*ntheta+2)*(LMAX+1));		// zero out.
+	dq0 = q0 + (2*ntheta+2)*(LMAX+1);
+	yl = malloc(2* sizeof(double)*(LMAX+1));
+	dyl = yl + (LMAX+1);
+
+	for (k=0; k<ntheta/2; k++) {
+		double cost= cos(M_PI*(k+0.5)/ntheta);
+		double sint_1 = 1.0/sqrt((1.0-cost)*(1.0+cost));
+		double sgnm = -1.0;
+		for (m=0; m<=MMAX; m++) {
+			legendre_sphPlm_array(shtns, LMAX, m, cost, yl+m);
+			double sgnt = -1.0;
+			sgnm *= -1.0;
+			for (l=m; l<=LMAX; l++) {
+				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
+				double qi = cimag(Qlm[LiM(shtns, l, m)]) * m*yl[l]*sint_1;
+				if (m>0) {	qr *= 2.0;	qi *= 2.0;	}
+				sgnt *= -1.0;
+				q0[k*(LMAX+1) +l] += qr;
+				q0[(ntheta-1-k)*(LMAX+1) +l] += sgnt*qr;
+				q0[(2*ntheta-1-k)*(LMAX+1) +l] += sgnm*qr;
+				q0[(ntheta+k)*(LMAX+1) +l] += (sgnm*sgnt)*qr;
+				dq0[k*(LMAX+1) +l] -= qi;
+				dq0[(ntheta-1-k)*(LMAX+1) +l] -= sgnt*qi;
+				dq0[(2*ntheta-1-k)*(LMAX+1) +l] += sgnm*qi;
+				dq0[(ntheta+k)*(LMAX+1) +l] += (sgnm*sgnt)*qi;
+			}
+		}
+	}
+
+	q = (complex double*) q0;		dq = (complex double*) dq0;
+	ntheta*=2;		nrembed = ntheta+2;		ncembed = nrembed/2;
+	fft = fftw_plan_many_dft_r2c(1, &ntheta, LMAX+1, q0, &nrembed, LMAX+1, 1, q, &ncembed, LMAX+1, 1, FFTW_ESTIMATE);
+	fftw_execute_dft_r2c(fft, q0, q);		fftw_execute_dft_r2c(fft, dq0, dq);
+	fftw_destroy_plan(fft);
+
+	for (m=0; m<=MMAX; m++) {
+		legendre_sphPlm_deriv_array(shtns, LMAX, m, 0.0, 1.0, yl+m, dyl+m);
+		complex double eimdp = (cos(m*M_PI/(ntheta)) - I*sin(m*M_PI/(ntheta)))/(ntheta);		// +/- 
+		for (l=m; l<=LMAX; l++) {
+			Rlm[LiM(shtns, l,m)] =  eimdp*(yl[l]*q[m*(LMAX+1) +l] - dyl[l]*dq[m*(LMAX+1) +l])/(yl[l]*yl[l] + dyl[l]*dyl[l]);
+		}
+	}
+	free(yl);	free(q0);
 }
 
 // truncation at LMAX and MMAX

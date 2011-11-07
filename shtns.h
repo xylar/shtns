@@ -139,6 +139,7 @@ double shlm_e1(shtns_cfg, int l, int m);		///< returns the l,m SH coefficient co
 /// which is the same as rotating the reference frame by angle -alpha.
 /// Result is stored in Rlm (which can be the same array as Qlm).
 void SH_Zrotate(shtns_cfg, complex double *Qlm, double alpha, complex double *Rlm);
+void SH_Yrotate90(shtns_cfg, complex double *Qlm, complex double *Rlm);
 //@}
 
 /// \name Scalar transforms
