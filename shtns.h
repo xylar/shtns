@@ -139,6 +139,8 @@ double shlm_e1(shtns_cfg, int l, int m);		///< returns the l,m SH coefficient co
 /// which is the same as rotating the reference frame by angle -alpha.
 /// Result is stored in Rlm (which can be the same array as Qlm).
 void SH_Zrotate(shtns_cfg, complex double *Qlm, double alpha, complex double *Rlm);
+/// Rotate SH representation around Y axis by alpha (in radians).
+void SH_Yrotate(shtns_cfg, complex double *Qlm, double alpha, complex double *Rlm);
 /// Rotate SH representation around Y axis by 90 degrees.
 void SH_Yrotate90(shtns_cfg, complex double *Qlm, complex double *Rlm);
 /// Rotate SH representation around X axis by 90 degrees.

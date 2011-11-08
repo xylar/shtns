@@ -97,10 +97,10 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 	if (mmax > 0) {
 		complex double eia = cos(mres*alpha) - I*sin(mres*alpha);		// rotate reference frame by angle -alpha
 		complex double eima = 1.0;
-		for (im=1; im <= mmax; im++) {
+		im=1; do {
 			eima *= eia;
 			for (l=im*mres; l<=lmax; l++)	Rlm[LiM(shtns, l, im)] = Qlm[LiM(shtns, l, im)] * eima;
-		}
+		} while(++im <= mmax);
 	}
 }
 
@@ -242,11 +242,10 @@ void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 /// rotate around Y axis by arbitrary angle, using composition of rotations.
 void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
 {
-	int lmax= shtns->lmax;
-	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature makes rotation not closed.");
+	if ((shtns->mres != 1) || (shtns->mmax < shtns->lmax)) shtns_runerr("truncature makes rotation not closed.");
 
-	SH_rotK90(shtns, Qlm, Rlm, 0.0, -M_PI + alpha);		// Zrotate(pi/4) + Yrotate90 + Zrotate(pi+alpha)
-	SH_rotK90(shtns, Rlm, Rlm, -M_PI/2, M_PI/2);			// Yrotate90 + Zrotate(pi/4)
+	SH_rotK90(shtns, Qlm, Rlm, 0.0, M_PI/2 + alpha);	// Zrotate(pi/2) + Yrotate90 + Zrotate(pi+alpha)
+	SH_rotK90(shtns, Rlm, Rlm, 0.0, M_PI/2);			// Yrotate90 + Zrotate(pi/2)
 }
 
 // truncation at LMAX and MMAX

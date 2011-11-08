@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
 	SH_Yrotate90(shtns, Qlm, Slm);
 	SH_to_spat(shtns, Slm, Sh);
 	write_shell("qry",Sh);
-	
+
 	SH_Xrotate90(shtns, Qlm, Slm);
 	SH_to_spat(shtns, Slm, Sh);
 	write_shell("qrx",Sh);
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
 		}
 		printf("norm0 = %f, norm1 = %f\n", sqrt(norm0), sqrt(normR));
 	}
-		
+
 
 //	SH_Yrotate90(shtns, Slm, Tlm0);
 //	SH_Yrotate90(shtns, Tlm0, Slm);
