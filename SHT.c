@@ -85,13 +85,11 @@ long nlm_calc(long lmax, long mmax, long mres)
 /// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
 /// which is the same as rotating the reference frame by angle -alpha.
 /// Result is stored in Rlm (which can be the same array as Qlm).
-void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm, int lmax)
+void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
 {
-	int im, l, mmax, mres;
+	int im, l, lmax, mmax, mres;
 
-	l = shtns->lmax;	if (lmax > l) lmax = l;
-	mmax = shtns->mmax;		mres = shtns->mres;
-	if (mmax*mres > lmax) mmax=lmax/mres;
+	lmax = shtns->lmax;		mmax = shtns->mmax;		mres = shtns->mres;
 
 	if (Rlm != Qlm) {		// copy m=0 which does not change.
 		l=0;	do { Rlm[l] = Qlm[l]; } while(++l <= lmax);
@@ -99,10 +97,9 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 	if (mmax > 0) {
 		complex double eia = cos(mres*alpha) - I*sin(mres*alpha);		// rotate reference frame by angle -alpha
 		complex double eima = 1.0;
-		Qlm += (lmax+1);	Rlm += (lmax+1);
 		for (im=1; im <= mmax; im++) {
 			eima *= eia;
-			for (l=im*mres; l<=lmax; l++)	*Rlm++ = (*Qlm++) * eima;
+			for (l=im*mres; l<=lmax; l++)	Rlm[LiM(shtns, l, im)] = Qlm[LiM(shtns, l, im)] * eima;
 		}
 	}
 }
@@ -114,14 +111,15 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
  - Fourier ananlyze as data on the equator to recover the m in the 90 degrees rotated frame.
  - rotate around new Z by angle dphi1.
  [1] Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" Journal of Computational Physics. **/
-void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double dphi0, double dphi1, int lmax)
+void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double dphi0, double dphi1)
 {
 	fftw_plan fft;
 	complex double *q;
 	double *q0;
 	double *yl, *dyl;
-	int k, m, l, ntheta, nrembed, ncembed;
+	int k, m, l, lmax, ntheta, nrembed, ncembed;
 
+	lmax = shtns->lmax;
 	ntheta = ((lmax+2)>>1)*2;
 	q0 = malloc(2* sizeof(double)*(2*ntheta+2)*lmax);
 	memset(q0, 0, 2* sizeof(double)*(2*ntheta+2)*lmax);		// zero out.
@@ -130,7 +128,7 @@ void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double
 
 	// rotate around Z by dphi0
 	if (dphi0 != 0.0) {
-		SH_Zrotate(shtns, Qlm, dphi0, Rlm, lmax);
+		SH_Zrotate(shtns, Qlm, dphi0, Rlm);
 		Qlm = Rlm;
 	} else {
 		Rlm[0] = Qlm[0];		// l=0 is rotation invariant.
@@ -188,10 +186,10 @@ void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double
 		if (l==lmax) {
 			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*ntheta);
 		}
-	dphi1 += M_PI/ntheta - M_PI/2;	// shift rotation angle by angle of first synthesis latitude.
+	dphi1 += M_PI/ntheta;	// shift rotation angle by angle of first synthesis latitude.
 	for (m=1; m<=lmax; m++) {
 		legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
-		complex double eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);		// +/-
+		complex double eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);
 		for (l=m; l<lmax; l+=2) {
 			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]/yl[l];
 			Rlm[LiM(shtns, l+1,m)] =  -eimdp*q[m*2*lmax +2*l+1]/dyl[l+1];
@@ -203,44 +201,52 @@ void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double
 	free(yl);	free(q0);	
 }
 
-/// rotate by 90 degrees around X axis (up to degree ltr)
-/// shtns->mres MUST be 1 !
-void SH_Xrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, int lmax)
+/// rotate by 90 degrees around X axis
+/// shtns->mres MUST be 1, and lmax=mmax.
+void SH_Xrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 {
-	if (lmax < shtns->lmax) lmax= shtns->lmax;
-	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature make rotation not closed.");
+	int lmax= shtns->lmax;
+	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature makes rotation not closed.");
 
-/*	if (lmax == 1) {
+	if (lmax == 1) {
 		Rlm[0] = Qlm[0];	// l=0 is invariant.
-		l=1;		// simple matrix.
+		int l=1;													// rotation matrix for rotX(90), l=1 : m=[0, 1r, 1i]
 			double q0 = creal(Qlm[LiM(shtns, l, 0)]);
-			Rlm[LiM(shtns, l, 0)] = sqrt(2.0) * cimag(Qlm[LiM(shtns, l, 1)]);
-			Rlm[LiM(shtns, l ,1)] = creal(Qlm[LiM(shtns, l, 1)]) - I*(sqrt(0.5)*q0);
-		return;
+			Rlm[LiM(shtns, l, 0)] = sqrt(2.0) * cimag(Qlm[LiM(shtns, l, 1)]);			//[m=0]     0        0    sqrt(2)
+			Rlm[LiM(shtns, l ,1)] = creal(Qlm[LiM(shtns, l, 1)]) - I*(sqrt(0.5)*q0);	//[m=1r]    0        1      0
+		return;																			//[m=1i] -sqrt(2)/2  0      0
 	}
-*/
 
-	SH_rotK90(shtns, Qlm, Rlm, 0.0, 0.0, lmax);
+	SH_rotK90(shtns, Qlm, Rlm, 0.0,  -M_PI/2);
 }
 
-/// rotate by 90 degrees around Y axis (up to degree ltr)
-/// shtns->mres MUST be 1 !
-void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, int lmax)
+/// rotate by 90 degrees around Y axis
+/// shtns->mres MUST be 1, and lmax=mmax.
+void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 {
-	if (lmax < shtns->lmax) lmax= shtns->lmax;
-	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature make rotation not closed.");
+	int lmax= shtns->lmax;
+	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature makes rotation not closed.");
 
-/*	if (lmax == 1) {		// simple matrix
+	if (lmax == 1) {
 		Rlm[0] = Qlm[0];	// l=0 is invariant.
-		int l=1;
-			double q0 = creal(Qlm[LiM(shtns, l, 0)]);
-			Rlm[LiM(shtns, l, 0)] = sqrt(2.0) * creal(Qlm[LiM(shtns, l, 1)]);
-			Rlm[LiM(shtns, l ,1)] = I*cimag(Qlm[LiM(shtns, l, 1)]) - sqrt(0.5) * q0;
+		int l=1;											// rotation matrix for rotY(90), l=1 : m=[0, 1r, 1i]
+			double q0 = creal(Qlm[LiM(shtns, l, 0)]);									//[m=0]       0       0    sqrt(2)
+			Rlm[LiM(shtns, l, 0)] = sqrt(2.0) * creal(Qlm[LiM(shtns, l, 1)]);			//[m=1r] -sqrt(2)/2   0      0
+			Rlm[LiM(shtns, l ,1)] = I*cimag(Qlm[LiM(shtns, l, 1)]) - sqrt(0.5) * q0;	//[m=1i]      0       0      1
 		return;
 	}
-*/
 
-	SH_rotK90(shtns, Qlm, Rlm, M_PI/2, M_PI/2, lmax);
+	SH_rotK90(shtns, Qlm, Rlm, -M_PI/2, 0.0);
+}
+
+/// rotate around Y axis by arbitrary angle, using composition of rotations.
+void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
+{
+	int lmax= shtns->lmax;
+	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature makes rotation not closed.");
+
+	SH_rotK90(shtns, Qlm, Rlm, 0.0, -M_PI + alpha);		// Zrotate(pi/4) + Yrotate90 + Zrotate(pi+alpha)
+	SH_rotK90(shtns, Rlm, Rlm, -M_PI/2, M_PI/2);			// Yrotate90 + Zrotate(pi/4)
 }
 
 // truncation at LMAX and MMAX

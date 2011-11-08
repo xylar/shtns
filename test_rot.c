@@ -38,6 +38,26 @@ int LMAX,MMAX,MRES,NLM;
 int NLAT = 0;
 int NPHI = 0;
 
+void write_shell(char *fn, double *V)
+{
+	FILE *fp;
+	int i,j,k;	//phi, theta
+	
+	fp = fopen(fn,"w");
+	fprintf(fp,"0 ");
+		for(j=0;j<NLAT;j++) {
+			fprintf(fp,"%.6g 0 0 ",acos(shtns->ct[j]));	// first line = theta (radians)
+		}
+	for (i=0; i<NPHI; i++) {
+		fprintf(fp,"\n%.6g ",PHI_RAD(shtns, i));		// first row = phi (radians)
+		for(j=0; j<NLAT; j++) {
+			k = i*NLAT+j;
+			fprintf(fp,"%.6g %.6g %.6g  ",V[k],0.,0.);		// data
+		}
+	}
+	fprintf(fp,"\n");	fclose(fp);
+}
+
 int main(int argc, char *argv[])
 {
 	complex double t1, t2;
@@ -56,11 +76,12 @@ int main(int argc, char *argv[])
 	
 	MMAX=LMAX=2;
 	MRES=1;
-	NLAT=32;
+	NLAT=64;
+	NPHI=128;
 
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
 	NLM = shtns->nlm;
-	shtns_set_grid_auto(shtns, sht_gauss_fly, 0.0, 1e-10, &NLAT, &NPHI);
+	shtns_set_grid_auto(shtns, sht_quick_init, 0.0, 1e-10, &NLAT, &NPHI);
 	shtns_print_cfg(shtns);
 
 	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
@@ -77,15 +98,59 @@ int main(int argc, char *argv[])
 	Qlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 
 
-	for (l=0; l<NLM; l++) {
-		Qlm[l] = 0.0;
-	}
-	Qlm[0] = 1.0e3;
-//	Qlm[LiM(shtns, 1, 0)] = 10.0;
-	Qlm[LiM(shtns, 1, 1)] = 1.0;	//0.1 + I*0.05;
+	double mx[3][3];
+
+	for (l=0; l<NLM; l++) 	Qlm[l] = 0.0;
+	Qlm[LiM(shtns, 1, 0)] = 1.0;
+	SH_Xrotate90(shtns, Qlm, Slm);
+	mx[0][0] = Slm[LiM(shtns, 1, 0)];
+	mx[1][0] = creal(Slm[LiM(shtns, 1, 1)]);
+	mx[2][0] = cimag(Slm[LiM(shtns, 1, 1)]);
+
+	for (l=0; l<NLM; l++) 	Qlm[l] = 0.0;
+	Qlm[LiM(shtns, 1, 1)] = 1.0;
+	SH_Xrotate90(shtns, Qlm, Slm);
+	mx[0][1] = Slm[LiM(shtns, 1, 0)];
+	mx[1][1] = creal(Slm[LiM(shtns, 1, 1)]);
+	mx[2][1] = cimag(Slm[LiM(shtns, 1, 1)]);
+
+	for (l=0; l<NLM; l++) 	Qlm[l] = 0.0;
+	Qlm[LiM(shtns, 1, 1)] = I;
+	SH_Xrotate90(shtns, Qlm, Slm);
+	mx[0][2] = Slm[LiM(shtns, 1, 0)];
+	mx[1][2] = creal(Slm[LiM(shtns, 1, 1)]);
+	mx[2][2] = cimag(Slm[LiM(shtns, 1, 1)]);
+
+	printf("rotation matrix :\n");
+	printf(" %10f %10f %10f\n", mx[0][0], mx[0][1], mx[0][2]);
+	printf(" %10f %10f %10f\n", mx[1][0], mx[1][1], mx[1][2]);
+	printf(" %10f %10f %10f\n", mx[2][0], mx[2][1], mx[2][2]);
+	printf("\n");
 	
-	LMAX=1;
-	SH_Yrotate90(shtns, Qlm, Slm, LMAX);
+	for (l=0; l<NLM; l++) 	{Qlm[l] = 0.0;	Slm[l] = 0.0;}
+//	Qlm[0] = 1000.;
+//	Qlm[LiM(shtns, 2, 0)] = 1.0;
+	Qlm[LiM(shtns, 1, 0)] = 1.0;	//0.1 + I*0.05;
+	
+	SH_to_spat(shtns, Qlm, Sh);
+	write_shell("q0",Sh);
+
+	SH_Yrotate(shtns, Qlm, 30*M_PI/180., Slm);
+	SH_to_spat(shtns, Slm, Sh);
+	write_shell("qry30",Sh);
+
+	SH_Yrotate90(shtns, Qlm, Slm);
+	SH_to_spat(shtns, Slm, Sh);
+	write_shell("qry",Sh);
+	
+	SH_Xrotate90(shtns, Qlm, Slm);
+	SH_to_spat(shtns, Slm, Sh);
+	write_shell("qrx",Sh);
+
+	SH_Zrotate(shtns, Qlm, 30*M_PI/180, Slm);
+	SH_to_spat(shtns, Slm, Sh);
+	write_shell("q0z",Sh);
+
 
 	for (l=0; l<=LMAX; l++) {
 		double norm0=0;		double normR=0;
@@ -104,9 +169,9 @@ int main(int argc, char *argv[])
 	}
 		
 
-	SH_Yrotate90(shtns, Slm, Tlm0, LMAX);
-	SH_Yrotate90(shtns, Tlm0, Slm, LMAX);
-	SH_Yrotate90(shtns, Slm, Tlm, LMAX);
+//	SH_Yrotate90(shtns, Slm, Tlm0);
+//	SH_Yrotate90(shtns, Tlm0, Slm);
+	SH_Yrotate90(shtns, Slm, Tlm);
 
 	for (l=0; l<=LMAX; l++) {
 		double norm0=0;		double normR=0;
