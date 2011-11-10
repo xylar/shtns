@@ -28,7 +28,7 @@
 #include <math.h>
 #include <fftw3.h>
 
-#include <shtns.h>
+#include "shtns.h"
 
 /// a simple function that writes a vector to a file
 void write_vect(char *fn, double *vec, int N);
@@ -73,7 +73,7 @@ int main()
 	Slm[LM(shtns, 2,0)] = 1.0;
 // 	Slm[LiM(shtns, 1,0)] = sh10_ct(shtns);
 //	Slm[LiM(shtns, 0,0)] = 0.5*sh00_1(shtns);
-//	SH_to_spat(shtns, Slm,Sh);
+	SH_to_spat(shtns, Slm,Sh);
 	SHtor_to_spat(shtns, Slm,Th,Sh);
 	write_vect("ylm",(double *) Slm,NLM*2);
 	write_mx("spat",Sh,nphi,nlat);

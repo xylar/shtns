@@ -75,7 +75,7 @@ test_rot : shtns.h test_rot.c libshtns.a Makefile
 	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -o test_rot
 
 SHT_example : SHT_example.c libshtns.a Makefile shtns.h
-	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c -lshtns -lfftw3 -lm -o SHT_example
+	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c ./libshtns.a -lfftw3 -lm -o SHT_example
 
 SHT_fort_ex : SHT_example.f libshtns.a Makefile shtns.f
 	gfortran -fdefault-real-8 -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.f -lshtns -lfftw3 -lm -lc -o SHT_fort_ex
