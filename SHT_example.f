@@ -22,10 +22,12 @@ c
 c import useful parameters for shtns initialization
       include 'shtns.f'
 
-      Integer*4 lmax, mmax, mres
+      integer*4 lmax, mmax, mres
       integer*4 nlat, nphi
       integer*4 nlm
-      Integer*4 layout
+      integer*4 layout
+      integer*4 norm
+      real*8 eps_polar
       complex*16, allocatable :: Slm(:), Tlm(:)
       real*8, allocatable :: Sh(:,:), Th(:,:)
 
@@ -45,6 +47,14 @@ c compute sizes required for arrays.
 c init SHT. SHT_PHI_CONTIGUOUS is defined in 'shtns.f'
       layout = SHT_PHI_CONTIGUOUS
       call shtns_init_sh_gauss(layout, lmax, mmax, mres, nlat, nphi)
+
+c alternatively, you can use the two following calls, giving more control on the initialization process,
+c namely you can choose a normalization with 'norm' and control the polar optimization
+c with 'eps_polar' : from 0 (no optimization) to 1e-6 (agressive optimization).
+!      norm = SHT_ORTHONORMAL + SHT_REAL_NORM
+!      call shtns_set_size_(lmax, mmax, mres, norm)
+!      eps_polar = 1.e-10
+!      call shtns_precompute_(SHT_GAUSS, layout, eps_polar, nlat, nphi)
 
 c allocate memory for spectral and spatial representation
       allocate ( Slm(1:nlm), Tlm(1:nlm) )

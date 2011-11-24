@@ -2258,7 +2258,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		EqualPolarGrid(shtns);
 		if (on_the_fly == 0) {
 			init_SH_synth(shtns);
-			OptimizeMatrices(shtns, eps);
+			//OptimizeMatrices(shtns, eps);		// does not work for sht_reg_poles.
 		}
 	}
 
@@ -2336,12 +2336,12 @@ shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nl
 */
 //@{
 	
-/// Initializes spherical harmonic transforms of given size using Gauss algorithm and no approximation
+/// Initializes spherical harmonic transforms of given size using Gauss algorithm with default polar optimization.
 void shtns_init_sh_gauss_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
 	shtns_reset();
 	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
-	shtns_set_grid(shtns, sht_gauss | *layout, 0, *nlat, *nphi);
+	shtns_set_grid(shtns, sht_gauss | *layout, SHT_DEFAULT_POLAR_OPT, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transforms of given size using Fastest available algorithm and polar optimization.
@@ -2349,7 +2349,7 @@ void shtns_init_sh_auto_(int *layout, int *lmax, int *mmax, int *mres, int *nlat
 {
 	shtns_reset();
 	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
-	shtns_set_grid(shtns, sht_auto | *layout, 1.e-10, *nlat, *nphi);
+	shtns_set_grid(shtns, sht_auto | *layout, SHT_DEFAULT_POLAR_OPT, *nlat, *nphi);
 }
 
 /// Initializes spherical harmonic transforms of given size using a regular grid and agressive optimizations.
