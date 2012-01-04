@@ -148,17 +148,52 @@ struct shtns_info {		// MUST start with "int nlm;"
 #endif
 
 #if _GCC_VEC_ && __SSE2__
-	#define VSIZE 2
-	typedef double s2d __attribute__ ((vector_size (VSIZE*8)));		// vector that should behave like a real scalar for complex number multiplication.
-	typedef double v2d __attribute__ ((vector_size (VSIZE*8)));		// vector that contains a complex number
+	typedef double s2d __attribute__ ((vector_size (16)));		// vector that should behave like a real scalar for complex number multiplication.
+	typedef double v2d __attribute__ ((vector_size (16)));		// vector that contains a complex number
+	#ifdef __AVX__
+		#define VSIZE 4
+		#include <immintrin.h>
+		#warning "using GCC vector extensions (avx)"
+		typedef double rnd __attribute__ ((vector_size (VSIZE*8)));		// vector of 4 doubles.
+		#define vall(x) _mm256_set1_pd(x)
+		#define S2D_STORE(mem, idx, ev, od)		((rnd*)mem)[idx] = ev+od; \
+			((s2d*)mem)[NLAT_2-1 - (idx)*2] = _mm256_extractf128_pd(_mm256_permute_pd(ev-od,5), 0); \
+			((s2d*)mem)[NLAT_2-2 - (idx)*2] = _mm256_extractf128_pd(_mm256_permute_pd(ev-od,5), 1);
+
+		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
+			rnd aa = _mm256_permute_pd(ei+oi,5) + (er + or);		rnd bb = (er + or) - _mm256_permute_pd(ei+oi,5);	\
+			((rnd*)mem)[idx] = _mm256_shuffle_pd(bb, aa, 10 );	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ),0);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2+1] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ),1);	\
+			aa = _mm256_permute_pd(er-or,5) + (ei - oi);		bb = _mm256_permute_pd(er-or,5) - (ei - oi);	\
+			((s2d*)mem)[NLAT_2-1 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(bb, aa, 10 ), 0);	\
+			((s2d*)mem)[NLAT_2-2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(bb, aa, 10 ), 1);	\
+			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ), 0);	\
+			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ), 1);	}
+	#else
+		#define VSIZE 2
+		#ifdef __SSE3__
+			#include <pmmintrin.h>
+			#warning "using GCC vector extensions (sse3)"
+		#else
+			#include <emmintrin.h>
+			#warning "using GCC vector extensions (sse2)"
+		#endif
+		typedef double rnd __attribute__ ((vector_size (VSIZE*8)));		// vector of 2 doubles.
+		#define vall(x) _mm_set1_pd(x)
+		#define S2D_STORE(mem, idx, ev, od)		((s2d*)mem)[idx] = ev+od;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(ev-od);
+		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
+			rnd aa = vxchg(ei + oi) + (er + or);		rnd bb = (er + or) - vxchg(ei + oi);	\
+			((s2d*)mem)[idx] = _mm_shuffle_pd(bb, aa, 2 );	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = _mm_shuffle_pd(aa, bb, 2 );	\
+			aa = vxchg(er - or) + (ei - oi);		bb = vxchg(er - or) - (ei - oi);	\
+			((s2d*)mem)[NLAT_2-1 -(idx)] = _mm_shuffle_pd(bb, aa, 2 );	\
+			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = _mm_shuffle_pd(aa, bb, 2 );	}
+	#endif
 	#ifdef __SSE3__
-		#include <pmmintrin.h>
-		#warning "using GCC vector extensions (sse3)"
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd(b,b,1))		// a + I*b
 		#define subadd(a,b) _mm_addsub_pd(a, b)		// [al-bl, ah+bh]
 	#else
-		#include <emmintrin.h>
-		#warning "using GCC vector extensions (sse2)"
 		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
 		#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
 	#endif
@@ -184,6 +219,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define VSIZE 1
 	typedef double s2d;
 	typedef complex double v2d;
+	typedef double rnd;
+	#define vall(x) (x)
 	#define vdup(x) (x)
 	#define vxchg(x) (x)
 	#define addi(a,b) ((a) + I*(b))
