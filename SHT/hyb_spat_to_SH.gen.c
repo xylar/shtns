@@ -161,8 +161,8 @@ T		v2d* Tl = (v2d*) Tlm;
 Q		zl = shtns->zlm_dct0;
 V		dzl0 = shtns->dzlm_dct0;
 V	#ifndef _GCC_VEC_
-S		s1 = 0.0;		// l=0 : Sl = 0
-T		t1 = 0.0;		// l=0 : Tl = 0
+S		complex double s1 = 0.0;		// l=0 : Sl = 0
+T		complex double t1 = 0.0;		// l=0 : Tl = 0
 V	#else
 S		v2d s = vdup(0.0);		// l=0 : Sl = 0
 T		v2d t = vdup(0.0);		// l=0 : Tl = 0
@@ -178,8 +178,8 @@ QX		BR0[klim] = 0;		BR0[klim+1] = 0;		// allow some overflow.
 S			Sl[l] = s1;
 T			Tl[l] = t1;
 Q			complex double q0 = 0.0;	complex double q1 = 0.0;
-S			complex double s0 = 0.0;	complex double s1 = 0.0;
-T			complex double t0 = 0.0;	complex double t1 = 0.0;
+S			complex double s0 = 0.0;	s1 = 0.0;
+T			complex double t0 = 0.0;	t1 = 0.0;
 			do {
 Q				q0 += BR0[i]   * zl[i];
 Q				q1 += BR0[i+1] * zl[i+1];
