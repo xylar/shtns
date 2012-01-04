@@ -148,15 +148,16 @@ struct shtns_info {		// MUST start with "int nlm;"
 #endif
 
 #if _GCC_VEC_ && __SSE2__
-	typedef double s2d __attribute__ ((vector_size (16)));		// vector that should behave like a real scalar for complex number multiplication.
-	typedef double v2d __attribute__ ((vector_size (16)));		// vector that contains a complex number
+	#define VSIZE 2
+	typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
+	typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
 	#ifdef __AVX__
-		#define VSIZE 4
+		#define VSIZE2 4
 		#include <immintrin.h>
 		#warning "using GCC vector extensions (avx)"
-		typedef double rnd __attribute__ ((vector_size (VSIZE*8))) __attribute__((aligned (16)));		// vector of 4 doubles.
+		typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 4 doubles.
 		#define vall(x) _mm256_set1_pd(x)
-		#define vread(mem, idx) _mm256_loadu_pd( ((double*)mem) + VSIZE*(idx) )
+		#define vread(mem, idx) _mm256_loadu_pd( ((double*)mem) + VSIZE2*(idx) )
 		#define vlo(a) __builtin_ia32_vec_ext_v2df (_mm256_extractf128_pd(a,0), 0)
 		#define S2D_STORE(mem, idx, ev, od) \
 			((s2d*)mem)[(idx)*2] = _mm256_extractf128_pd(ev+od,0); \
@@ -176,7 +177,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ), 0);	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ), 1);	}
 	#else
-		#define VSIZE 2
+		#define VSIZE2 2
 		#ifdef __SSE3__
 			#include <pmmintrin.h>
 			#warning "using GCC vector extensions (sse3)"
@@ -184,7 +185,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 			#include <emmintrin.h>
 			#warning "using GCC vector extensions (sse2)"
 		#endif
-		typedef double rnd __attribute__ ((vector_size (VSIZE*8)));		// vector of 2 doubles.
+		typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 2 doubles.
 		#define vall(x) _mm_set1_pd(x)
 		#define vread(mem, idx) ((s2d*)mem)[idx]
 		#define vlo(a) __builtin_ia32_vec_ext_v2df (a, 0)
@@ -224,6 +225,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 #else
 	#undef _GCC_VEC_
 	#define VSIZE 1
+	#define VSIZE2 1
 	typedef double s2d;
 	typedef complex double v2d;
 	typedef double rnd;

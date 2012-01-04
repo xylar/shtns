@@ -112,7 +112,7 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 		} while(l<=llim);
 		k=0;	nk = NLAT_2;
 	#if _GCC_VEC_
-		nk = ((unsigned long)(nk+VSIZE-1)) / VSIZE;
+		nk = ((unsigned long)(nk+VSIZE2-1)) / VSIZE2;
 	#endif
 		do {
 			l=0;	al = alm;
@@ -220,6 +220,7 @@ V			BpF[k] = vdup(0.0);				BpF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
 V			BpF[NLAT_2-l+k] = vdup(0.0);	BpF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
 			k++;
 		}
+		k = ((unsigned) k) / (VSIZE2/2);
 	#else
 		while (k<l) {	// polar optimization
 Q			BrF[k] = 0.0;		BrF[NLAT-l+k] = 0.0;
@@ -366,6 +367,7 @@ V			BpF[k] = vdup(0.0);				BpF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
 V			BpF[NLAT_2-l+k] = vdup(0.0);	BpF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
 			k++;
 		}
+		k = ((unsigned) k) / (VSIZE2/2);
 	#else
 		while (k<l) {	// polar optimization
 Q			BrF[k] = 0.0;		BrF[NLAT-l+k] = 0.0;

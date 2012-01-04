@@ -775,7 +775,7 @@ void planFFT(shtns_cfg shtns, int layout)
 		} else {		// use only in-place here, supposed to be faster.
 			shtns->fftc_mode = 0;
 			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
-			shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.			
+			shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
 			#if SHT_VERBOSE > 1
 				printf("          fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
 			#endif
