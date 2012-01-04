@@ -10,8 +10,8 @@ cmt=' * '
 cmtend=' */'
 
 if [ "$1" == "-fortran" ]; then
-  cmtstart='c'
-  cmt='c  '
+  cmtstart='!'
+  cmt='!  '
   cmtend=''
   shift
 fi
