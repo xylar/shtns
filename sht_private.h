@@ -154,15 +154,20 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define VSIZE 4
 		#include <immintrin.h>
 		#warning "using GCC vector extensions (avx)"
-		typedef double rnd __attribute__ ((vector_size (VSIZE*8)));		// vector of 4 doubles.
+		typedef double rnd __attribute__ ((vector_size (VSIZE*8))) __attribute__((aligned (16)));		// vector of 4 doubles.
 		#define vall(x) _mm256_set1_pd(x)
-		#define S2D_STORE(mem, idx, ev, od)		((rnd*)mem)[idx] = ev+od; \
+		#define vread(mem, idx) _mm256_loadu_pd( ((double*)mem) + VSIZE*(idx) )
+		#define vlo(a) __builtin_ia32_vec_ext_v2df (_mm256_extractf128_pd(a,0), 0)
+		#define S2D_STORE(mem, idx, ev, od) \
+			((s2d*)mem)[(idx)*2] = _mm256_extractf128_pd(ev+od,0); \
+			((s2d*)mem)[(idx)*2+1] = _mm256_extractf128_pd(ev+od,1); \
 			((s2d*)mem)[NLAT_2-1 - (idx)*2] = _mm256_extractf128_pd(_mm256_permute_pd(ev-od,5), 0); \
 			((s2d*)mem)[NLAT_2-2 - (idx)*2] = _mm256_extractf128_pd(_mm256_permute_pd(ev-od,5), 1);
 
 		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
 			rnd aa = _mm256_permute_pd(ei+oi,5) + (er + or);		rnd bb = (er + or) - _mm256_permute_pd(ei+oi,5);	\
-			((rnd*)mem)[idx] = _mm256_shuffle_pd(bb, aa, 10 );	\
+			((s2d*)mem)[(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(bb, aa, 10 ),0);	\
+			((s2d*)mem)[(idx)*2+1] = _mm256_extractf128_pd(_mm256_shuffle_pd(bb, aa, 10 ),1);	\
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ),0);	\
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2+1] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ),1);	\
 			aa = _mm256_permute_pd(er-or,5) + (ei - oi);		bb = _mm256_permute_pd(er-or,5) - (ei - oi);	\
@@ -181,6 +186,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#endif
 		typedef double rnd __attribute__ ((vector_size (VSIZE*8)));		// vector of 2 doubles.
 		#define vall(x) _mm_set1_pd(x)
+		#define vread(mem, idx) ((s2d*)mem)[idx]
+		#define vlo(a) __builtin_ia32_vec_ext_v2df (a, 0)
 		#define S2D_STORE(mem, idx, ev, od)		((s2d*)mem)[idx] = ev+od;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(ev-od);
 		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
 			rnd aa = vxchg(ei + oi) + (er + or);		rnd bb = (er + or) - vxchg(ei + oi);	\

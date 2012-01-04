@@ -59,7 +59,7 @@ T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	long int nk, k,l,m;
 	double *alm, *al;
-	rnd *ct, *st;
+	s2d *ct, *st;
 Q	double Ql0[llim+1];
 S	double Sl0[llim];
 T	double Tl0[llim];
@@ -99,7 +99,7 @@ S	BtF = (v2d*) Vt;
 T	BpF = (v2d*) Vp;
   #endif
 
-	ct = (rnd*) shtns->ct;		st = (rnd*) shtns->st;
+	ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
 	//	im=0;
  		l=1;
 		alm = shtns->alm[0];
@@ -122,8 +122,8 @@ Q			rnd re[NWAY], ro[NWAY];
 S			rnd te[NWAY], to[NWAY];
 T			rnd pe[NWAY], po[NWAY];
 			for (int j=0; j<NWAY; j++) {
-				cost[j] = ct[j+k];
-V				sint[j] = -st[j+k];
+				cost[j] = vread(ct, j+k);
+V				sint[j] = -vread(st, j+k);
 				y0[j] = vall(al[0]);
 V				dy0[j] = vall(0.0);
 Q				re[j] = y0[j] * vall(Ql0[0]);
@@ -236,7 +236,7 @@ Q			rnd rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];
 V			rnd ter[NWAY], tei[NWAY], tor[NWAY], toi[NWAY];
 V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 			for (int j=0; j<NWAY; j++) {
-				cost[j] = st[k+j];
+				cost[j] = vread(st, k+j);
 				y0[j] = vall(al[0]);
 V				st2[j] = cost[j]*cost[j]*vall(m_1);
 V				y0[j] *= vall(m);		// for the vector transform, compute ylm*m/sint
@@ -248,7 +248,7 @@ V			l=m-1;
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
 			} while(l >>= 1);
 			for (int j=0; j<NWAY; j++) {
-				cost[j] = ct[k+j];
+				cost[j] = vread(ct, j+k);
 V				dy0[j] = cost[j]*y0[j];
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
@@ -317,7 +317,7 @@ T				for (int j=0; j<NWAY; j++) {	poi[j] -= DY0 * ti(l);		ter[j] -= Y0 * ti(l);	
 			#undef Y1
 V			#undef DY0
 V			#undef DY1
-3			for (int j=0; j<NWAY; j++) cost[j]  = st[k+j] * vall(-m_1);
+3			for (int j=0; j<NWAY; j++) cost[j]  = vread(st, k+j) * vall(-m_1);
 3			for (int j=0; j<NWAY; j++) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
 		#if _GCC_VEC_
 			for (int j=0; j<NWAY; j++) {
@@ -382,7 +382,7 @@ Q			rnd rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];
 V			rnd ter[NWAY], tei[NWAY], tor[NWAY], toi[NWAY];
 V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 			for (int j=0; j<NWAY; j++) {
-				cost[j] = st[k+j];
+				cost[j] = vread(st, k+j);
 				y0[j] = vall(al[0]);
 V				st2[j] = cost[j]*cost[j]*vall(m_1);
 V				y0[j] *= vall(m);		// for the vector transform, compute ylm*m/sint
@@ -403,7 +403,7 @@ V			l=m-1;
 				for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
 			}
 			for (int j=0; j<NWAY; j++) {
-				cost[j] = ct[k+j];
+				cost[j] = vread(ct, j+k);
 V				dy0[j] = cost[j]*y0[j];
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
@@ -418,7 +418,7 @@ T				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			if (SHT_ACCURACY > 0) {		// this saves a lot of work, as rescale is not needed here.
-				while ((vlo_to_dbl(y1[NWAY-1]) < SHT_ACCURACY*SHT_LEG_SCALEF)&&(vlo_to_dbl(y1[NWAY-1]) > -SHT_ACCURACY*SHT_LEG_SCALEF)&&(l<llim)) {
+				while ((vlo(y1[NWAY-1]) < SHT_ACCURACY*SHT_LEG_SCALEF)&&(vlo(y1[NWAY-1]) > -SHT_ACCURACY*SHT_LEG_SCALEF)&&(l<llim)) {
 					for (int j=0; j<NWAY; j++) {
 						y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
 V						dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
@@ -478,7 +478,7 @@ V				}
 			#undef Y1
 V			#undef DY0
 V			#undef DY1
-3			for (int j=0; j<NWAY; j++)	cost[j]  = st[k+j] * vall(-m_1);
+3			for (int j=0; j<NWAY; j++)	cost[j]  = vread(st, k+j) * vall(-m_1);
 3			for (int j=0; j<NWAY; j++) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
 		#if _GCC_VEC_
 			for (int j=0; j<NWAY; j++) {
