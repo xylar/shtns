@@ -155,20 +155,19 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define VSIZE2 4
 		#include <immintrin.h>
 		#warning "using GCC vector extensions (avx)"
-		#define vxchg(a) _mm_permute_pd(a,5)
 		#define vall(x) _mm256_set1_pd(x)
 		#define vread(mem, idx) _mm256_loadu_pd( ((double*)mem) + (idx)*4 )
 		#define vlo(a) __builtin_ia32_vec_ext_v2df (_mm256_castpd256_pd128(a), 0)
 		#define S2D_STORE(mem, idx, ev, od) \
 			_mm256_storeu_pd(((double*)mem) + (idx)*4,   ev+od); \
-			((s2d*)mem)[NLAT_2-1 - (idx)*2] = _mm256_castpd256_pd128(_mm256_permute_pd(ev-od,5)); \
-			((s2d*)mem)[NLAT_2-2 - (idx)*2] = _mm256_extractf128_pd(_mm256_permute_pd(ev-od,5), 1);
+			((s2d*)mem)[NLAT_2-1 - (idx)*2] = _mm256_castpd256_pd128(_mm256_shuffle_pd(ev-od, ev-od, 5)); \
+			((s2d*)mem)[NLAT_2-2 - (idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(ev-od, ev-od, 5), 1);
 
 		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
-			rnd aa = _mm256_permute_pd(ei+oi,5) + (er + or);		rnd bb = (er + or) - _mm256_permute_pd(ei+oi,5);	\
+			rnd aa = _mm256_shuffle_pd(ei+oi,ei+oi,5) + (er + or);		rnd bb = (er + or) - _mm256_shuffle_pd(ei+oi,ei+oi,5);	\
 			_mm256_storeu_pd(((double*)mem) + (idx)*4, _mm256_shuffle_pd(bb, aa, 10 )); \
 			_mm256_storeu_pd(((double*)mem) + (NPHI-2*im)*NLAT + (idx)*4, _mm256_shuffle_pd(aa, bb, 10 )); \
-			aa = _mm256_permute_pd(er-or,5) + (ei - oi);		bb = _mm256_permute_pd(er-or,5) - (ei - oi);	\
+			aa = _mm256_shuffle_pd(er-or,er-or,5) + (ei - oi);		bb = _mm256_shuffle_pd(er-or,er-or,5) - (ei - oi);	\
 			((s2d*)mem)[NLAT_2-1 -(idx)*2] = _mm256_castpd256_pd128(_mm256_shuffle_pd(bb, aa, 10 ));	\
 			((s2d*)mem)[NLAT_2-2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(bb, aa, 10 ), 1);	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)*2] = _mm256_castpd256_pd128(_mm256_shuffle_pd(aa, bb, 10 ));	\
@@ -182,7 +181,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 			#include <emmintrin.h>
 			#warning "using GCC vector extensions (sse2)"
 		#endif
-		#define vxchg(a) _mm_shuffle_pd(a,a,1)
 		#define vall(x) _mm_set1_pd(x)
 		#define vread(mem, idx) ((s2d*)mem)[idx]
 		#define vlo(a) __builtin_ia32_vec_ext_v2df (a, 0)
@@ -213,6 +211,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	// vdup(x) takes a double and duplicate it to a vector of 2 doubles.
 	#define vdup(x) _mm_set1_pd(x)
 	// vxchg(a) exchange hi and lo component of vector a
+	#define vxchg(a) _mm_shuffle_pd(a,a,1)
 	#define vlo_to_cplx(a) _mm_unpacklo_pd(a, vdup(0.0))
 	#define vhi_to_cplx(a) _mm_unpackhi_pd(a, vdup(0.0))
 	#ifdef __clang__
