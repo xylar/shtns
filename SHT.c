@@ -460,9 +460,23 @@ void set_sht_mem(shtns_cfg shtns) {
 void init_sht_array_func(shtns_cfg shtns)
 {
 	int it, j;
+	int alg_lim = SHT_NALG-1;
+
+	if (shtns->nlat_2 < 8*VSIZE) {		// limit available on-the-fly algorithm to avoid overflow (and segfaults).
+		it = shtns->nlat_2 / VSIZE;
+		switch(it) {
+			case 0 : alg_lim = SHT_FLY1-1; break;
+			case 1 : alg_lim = SHT_FLY1; break;
+			case 2 : alg_lim = SHT_FLY2; break;
+			case 3 : alg_lim = SHT_FLY3; break;
+			case 4 : ;
+			case 5 : alg_lim = SHT_FLY4; break;
+			default : alg_lim = SHT_FLY6;
+		}
+	}
 
 	for (it=0; it<SHT_NTYP; it++) {
-		for (j=0; j<SHT_NALG; j++) {
+		for (j=0; j<=alg_lim; j++) {
 			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
 			if (j >= SHT_FLY1) {
 				sht_func[SHT_STD][it][j] = sht_array_l[j][it];		// on-the-fly only exist in LTR version
@@ -474,6 +488,10 @@ void init_sht_array_func(shtns_cfg shtns)
 					sht_func[SHT_STD][it][j] = sht_array_m0l[j][it];		// on-the-fly only exist in LTR version
 				} else  sht_func[SHT_STD][it][j] = sht_array_m0[j][it];
 			}
+		}
+		for (j=alg_lim+1; j<SHT_NALG; j++) {
+			sht_func[SHT_LTR][it][j] = NULL;
+			sht_func[SHT_STD][it][j] = NULL;
 		}
 	}
 	set_sht_mem(shtns);		// default transform is MEM
@@ -1100,9 +1118,10 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 	long double iylm_fft_norm;
 	long double xg[NLAT], wgl[NLAT];	// gauss points and weights.
 	int vector = (shtns->dylm != NULL);
+	const int overflow = 8*VSIZE2-1;
 
 	shtns->grid = GRID_GAUSS;
-	shtns->wg = malloc((NLAT_2 +15) * sizeof(double));	// gauss weights, double precision.
+	shtns->wg = malloc((NLAT_2 +overflow) * sizeof(double));	// gauss weights, double precision.
 
  	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
  		iylm_fft_norm = 0.5/NPHI;		// FFT/SHT normalization for zlm (4pi normalized)
@@ -1124,7 +1143,7 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point.
 		shtns->wg[NLAT_2-1] *= 0.5;
 	}
-	for (it=NLAT_2; it < NLAT_2 +15; it++) shtns->wg[it] = 0.0;		// padding for multi-way algorithm.
+	for (it=NLAT_2; it < NLAT_2 +overflow; it++) shtns->wg[it] = 0.0;		// padding for multi-way algorithm.
 
 #if SHT_VERBOSE > 1
 	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
@@ -1724,7 +1743,7 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 	int on_the_fly_only = (shtns->ylm == NULL);		// only on-the-fly.
 	int otf_analys = (shtns->wg != NULL);			// on-the-fly analysis supported.
 
-	if (NLAT < 32) return(0.0);			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow) and DCT not efficient for low NLAT.
+	if (NLAT < VSIZE2*4) return(0.0);			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow) and DCT not efficient for low NLAT.
 	if ((dct_mtr != 0) && (shtns->ykm_dct == NULL)) return(0.0);		// no dct available : do nothing.
 
 	m = 2*(NPHI/2+1) * NLAT * sizeof(double);
@@ -2266,7 +2285,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
   #if SHT_VERBOSE > 0
 		printf("        + using on-the-fly transforms.\n");
   #endif
-		if (NLAT < 32) shtns_runerr("on-the-fly only available for nlat>=32");		// avoid overflow with NLAT_2 < 2*NWAY
+		if (NLAT < VSIZE2*4) shtns_runerr("on-the-fly only available for nlat>=32");		// avoid overflow with NLAT_2 < VSIZE2*2
 		PolarOptimize(shtns, eps);
 		set_sht_fly(shtns, 0);		// switch function pointers to "on-the-fly" functions.
 	}

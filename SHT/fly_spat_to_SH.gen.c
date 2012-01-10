@@ -51,6 +51,9 @@ V	double *l_2;
 	long int nk, k, vnlat, l,m;
 	unsigned imlim, im;
 V	double m_1;
+  #ifndef SHT_AXISYM
+    s2d sgn_mask;
+  #endif
   #if _GCC_VEC_
 Q	rnd qq[2*llim];
 V	rnd ss[2*llim];
@@ -61,19 +64,19 @@ V	double ss[llim];
 V	double tt[llim];
   #endif
 
-Q	s2d rer[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-Q	s2d ror[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-V	s2d ter[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-V	s2d tor[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-V	s2d per[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-V	s2d por[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
+Q	s2d rer[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+Q	s2d ror[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+V	s2d ter[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+V	s2d tor[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+V	s2d per[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+V	s2d por[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
   #ifndef SHT_AXISYM
-Q	s2d rei[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-Q	s2d roi[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-V	s2d tei[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-V	s2d toi[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-V	s2d pei[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
-V	s2d poi[NLAT_2/2+(VSIZE2/VSIZE)*NWAY];
+Q	s2d rei[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+Q	s2d roi[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+V	s2d tei[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+V	s2d toi[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+V	s2d pei[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+V	s2d poi[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
   #endif
 
 Q	BrF = (s2d *) Vr;
@@ -113,7 +116,7 @@ V	l_2 = shtns->l_2;
 		k=0;
 		alm = shtns->blm[0];
 Q		s2d r0 = vdup(0.0);
- 		do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
+		do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 Q			s2d a = BrF[k];		s2d b = vxchg(BrF[vnlat-1-k]);
 Q			rer[k] = a+b;		ror[k] = a-b;
 Q			r0 += (a+b)*wg[k];
@@ -189,10 +192,10 @@ V					tt[l-1] -= dy1[j] * perk[j];
 		for (l=1; l<=llim; l++) {
 			#if _GCC_VEC_
 			  #ifdef __AVX__
-Q			    s2d qa = _mm256_extractf128_pd(qq[l-1],0) + _mm256_extractf128_pd(qq[l-1],1);
+Q			    s2d qa = _mm256_castpd256_pd128(qq[l-1]) + _mm256_extractf128_pd(qq[l-1],1);
 Q				Qlm[l] = vlo_to_dbl(qa) + vhi_to_dbl(qa);
 V				rnd a = _mm256_hadd_pd(ss[l-1], tt[l-1]);
-V				s2d b = (_mm256_extractf128_pd(a,0) + _mm256_extractf128_pd(a,1)) * vdup(l_2[l]);
+V				s2d b = (_mm256_castpd256_pd128(a) + _mm256_extractf128_pd(a,1)) * vdup(l_2[l]);
 V				Slm[l] = vlo_to_dbl(b);		Tlm[l] = vhi_to_dbl(b);
 			  #elif defined __SSE3__
 Q				Qlm[l] = vlo_to_dbl(qq[l-1]) + vhi_to_dbl(qq[l-1]);
@@ -216,6 +219,17 @@ V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 		#endif
 
   #ifndef SHT_AXISYM
+	#if _GCC_VEC_
+		sgn_mask = vdup(0.0);		// build mask to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
+		sgn_mask = (s2d) _mm_cmpeq_epi16((__m128i) sgn_mask, (__m128i) sgn_mask);
+		sgn_mask = (s2d) _mm_slli_epi64((__m128i) sgn_mask, 63);		// (-0,-0)
+		sgn_mask = _mm_unpackhi_pd(vdup(0.0), sgn_mask);	// (0, -0)
+	#endif
+	for (k=nk*(VSIZE2/VSIZE); k<(nk+NWAY)*(VSIZE2/VSIZE)-1; k++) {		// never written, so this is now done for all m's (real parts already zero)
+Q		rei[k] = vdup(0.0);		roi[k] = vdup(0.0);
+V		tei[k] = vdup(0.0);		toi[k] = vdup(0.0);
+V		pei[k] = vdup(0.0);		poi[k] = vdup(0.0);
+	}
 	for (im=1;im<=imlim;im++) {
 Q		BrF += vnlat;
 V		BtF += vnlat;	BpF += vnlat;
@@ -224,32 +238,28 @@ V		BtF += vnlat;	BpF += vnlat;
 		m = im*MRES;
  	#if _GCC_VEC_
  		k=(VSIZE2/VSIZE)*l;
- 		s2d sgn = vset(1., -1.);
- 		do {	// compute symmetric and antisymmetric parts, and reorganize data.
+		do {	// compute symmetric and antisymmetric parts, and reorganize data.
 			s2d nr, ni, sr, si, tn, ts;
-3			s2d sin = st[k];	s2d sin_sgn = sgn*sin;
+3			s2d sin = st[k];
 Q			ni = BrF[k];				nr = BrF[(NPHI-2*im)*vnlat + k];
 Q			si = BrF[vnlat-1 - k];		sr = BrF[(NPHI-2*im)*vnlat +vnlat-1-k];
-Q			tn = nr;		nr += ni;				ni = vxchg(tn-ni);		// nr = 2anr | 2bnr		ni = 2ani | 2bni
-Q			ts = sr;		sr = vxchg(sr+si);		si -= ts;				// sr = 2asr | 2bsr		si = 2asi | 2bsi
-QX			rer[k] = nr+sr;		ror[k] = nr-sr;		rei[k] = (ni+si)*sgn;		roi[k] = (ni-si)*sgn;
-3			rer[k] = (nr+sr)*sin;		ror[k] = (nr-sr)*sin;		rei[k] = (ni+si)*sin_sgn;		roi[k] = (ni-si)*sin_sgn;
+Q			CFFT_TO_2REAL(nr, ni, sr, si, sgn_mask)
+QX			rer[k] = nr+sr;		ror[k] = nr-sr;		rei[k] = ni+si;		roi[k] = ni-si;
+3			rer[k] = (nr+sr)*sin;		ror[k] = (nr-sr)*sin;		rei[k] = (ni+si)*sin;		roi[k] = (ni-si)*sin;
 
 V			ni = BtF[k];				nr = BtF[(NPHI-2*im)*vnlat + k];
 V			si = BtF[vnlat-1 - k];		sr = BtF[(NPHI-2*im)*vnlat +vnlat-1-k];
-V			tn = nr;		nr += ni;				ni = vxchg(tn-ni) *sgn;
-V			ts = sr;		sr = vxchg(sr+si);		si = (si-ts) *sgn;
+V			CFFT_TO_2REAL(nr, ni, sr, si, sgn_mask)
 V			ter[k] = nr+sr;		tor[k] = nr-sr;		tei[k] = ni+si;		toi[k] = ni-si;
 
 V			ni = BpF[k];				nr = BpF[(NPHI-2*im)*vnlat + k];
 V			si = BpF[vnlat-1 - k];		sr = BpF[(NPHI-2*im)*vnlat +vnlat-1-k];
-V			tn = nr;		nr += ni;				ni = vxchg(tn-ni) *sgn;
-V			ts = sr;		sr = vxchg(sr+si);		si = (si-ts) *sgn;
+V			CFFT_TO_2REAL(nr, ni, sr, si, sgn_mask)
 V			per[k] = nr+sr;		por[k] = nr-sr;		pei[k] = ni+si;		poi[k] = ni-si;
 		} while(++k < nk*(VSIZE2/VSIZE));
- 	#else
- 		k = (l>>1)*2;		// k must be even here.
- 		do {	// compute symmetric and antisymmetric parts, and reorganize data.
+	#else
+		k = (l>>1)*2;		// k must be even here.
+		do {	// compute symmetric and antisymmetric parts, and reorganize data.
 			double an, bn, ani, bni, bs, as, bsi, asi, t;
 3			double sina = st[k];	double sinb = st[k+1];
 Q			ani = BrF[k];		bni = BrF[k+1];		// north
@@ -284,11 +294,6 @@ V			por[k] = an-as;		poi[k] = ani-asi;		por[k+1] = bn-bs;		poi[k+1] = bni-bsi;
  		} while (k<nk);
 	#endif
 V		m_1 = -1.0/m;
-		for (k=nk*(VSIZE2/VSIZE); k<(nk+NWAY)*(VSIZE2/VSIZE)-1; k++) {
-Q			rer[k] = vdup(0.0);		rei[k] = vdup(0.0);		ror[k] = vdup(0.0);		roi[k] = vdup(0.0);
-V			ter[k] = vdup(0.0);		tei[k] = vdup(0.0);		tor[k] = vdup(0.0);		toi[k] = vdup(0.0);
-V			per[k] = vdup(0.0);		pei[k] = vdup(0.0);		por[k] = vdup(0.0);		poi[k] = vdup(0.0);
-		}
 		k=l;
 		#if _GCC_VEC_
 Q			rnd* q = qq;
@@ -508,11 +513,11 @@ V		v2d *Tl = (v2d*) &Tlm[l];
 			for (l=0; l<=llim-m; l++) {
 			#ifdef __AVX__
 Q				rnd qa = _mm256_hadd_pd(qq[2*l], qq[2*l+1]);
-QX				Ql[l] = _mm256_extractf128_pd(qa,0) + _mm256_extractf128_pd(qa,1);
-3				Ql[l] = (_mm256_extractf128_pd(qa,0) + _mm256_extractf128_pd(qa,1)) * vdup(-m_1);
+QX				Ql[l] = _mm256_castpd256_pd128(qa) + _mm256_extractf128_pd(qa,1);
+3				Ql[l] = (_mm256_castpd256_pd128(qa) + _mm256_extractf128_pd(qa,1)) * vdup(-m_1);
 V				rnd sa = _mm256_hadd_pd(ss[2*l], ss[2*l+1]);		rnd ta = _mm256_hadd_pd(tt[2*l], tt[2*l+1]);
 V				sa = (_mm256_permute2f128_pd(sa, ta, 0x02) + _mm256_permute2f128_pd(sa, ta, 0x13)) * vall(l_2[l+m]);
-V				Sl[l] = _mm256_extractf128_pd(sa,1);	Tl[l] = _mm256_extractf128_pd(sa,0);
+V				Sl[l] = _mm256_extractf128_pd(sa,1);	Tl[l] = _mm256_castpd256_pd128(sa);
 			#elif defined __SSE3__
 QX				Ql[l] = _mm_hadd_pd(qq[2*l], qq[2*l+1]);
 3				Ql[l] = _mm_hadd_pd(qq[2*l], qq[2*l+1]) * vdup(-m_1);
