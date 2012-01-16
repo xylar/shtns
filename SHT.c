@@ -2277,6 +2277,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		EqualPolarGrid(shtns);
 		if (on_the_fly == 0) {
 			init_SH_synth(shtns);
+			for (im=0; im<=MMAX; im++) shtns->tm[im] = 0;	// avoid problems with tm[im] modified ????
 			//OptimizeMatrices(shtns, eps);		// does not work for sht_reg_poles.
 		}
 	}
