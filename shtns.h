@@ -101,6 +101,8 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 
 // FUNCTIONS //
 
+#ifndef SWIG
+
 /// \name initialization
 //@{
 /// Simple initialization of the spherical harmonic transforms of given size. Calls \ref shtns_set_size and \ref shtns_precompute.
@@ -195,3 +197,5 @@ void SHqst_to_spat_l(shtns_cfg, complex double *Qlm, complex double *Slm, comple
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_l(shtns, S,Gt,Gp,ltr) SHsph_to_spat_l(shtns, S, Gt, Gp, ltr)
+
+#endif

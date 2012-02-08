@@ -7,7 +7,7 @@ march = -march=native
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(march) -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE
+go= $(march) -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE -fPIC
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
@@ -93,8 +93,8 @@ clean :
 # use it with "from shtns import *" in a python program/shell
 python : shtns.h shtns.i
 	swig -python shtns.i
-	gcc -fpic -I/usr/include/python2.6 -c shtns_wrap.c 
-	gcc -shared /usr/lib/libfftw3.so SHT.o sht_*.o shtns_wrap.o -o _shtns.so
+	gcc $(march) -O2 -fPIC -I/usr/include/python2.7 -c shtns_wrap.c 
+	gcc $(march) -O2 -fPIC -shared /usr/lib/libfftw3.so SHT.o sht_*.o shtns_wrap.o -o _shtns.so
 
 # update the copyright notice
 updatecpy : COPYRIGHT

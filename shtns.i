@@ -15,9 +15,9 @@
  * 
  */
 
-/* shtns.i : SWIG interface to Python*/
+/* shtns.i : SWIG interface to Python */
 
-%module (docstring="Python interface to the SHTns spherical harmonic library") shtns
+%module (docstring="Python interface to the SHTns spherical harmonic transform library") shtns
 
 %{
 
@@ -25,73 +25,98 @@
 
 %}
 
+%include "shtns.h"
 
-/* Py_complex is the equivalent of "complex double" */
-%typemap(in) Py_complex {
-        $1 = PyComplex_AsCComplex($input);
-}
-%typemap(out) Py_complex {
-        $result = PyComplex_FromCComplex($1);
-}
+%feature("autodoc");
+
+long nlm_calc(long lmax, long mmax, long mres);
+
+
+%extend shtns_info {
+	shtns_info(int lmax, int mmax, int mres=1, int norm=sht_orthonormal) {	// default arguments : mres and norm
+		return shtns_create(lmax, mmax, mres, norm);
+	}
+	~shtns_info() {
+		shtns_destroy($self);		// free memory.
+	}
+	int set_grid(int nlat, int nphi, enum shtns_type flags=sht_quick_init, double eps=1.0e-8) {	// default arguments
+		return shtns_set_grid($self, flags, eps, nlat, nphi);
+	}
+	int set_grid_auto(int nlat=0, int nphi=0, int nl_order=1, enum shtns_type flags=sht_quick_init, double eps=1.0e-8) {
+		return shtns_set_grid_auto($self, flags, eps, nl_order, &nlat, &nphi);
+	}
+
+	void print() {
+		shtns_print_cfg($self);
+	}
+	double sh00_1() {
+		return sh00_1($self);
+	}
+	double sh10_ct() {
+		return sh10_ct($self);
+	}
+	double sh11_st() {
+		return sh11_st($self);
+	}
+	double shlm_e1(int l, int m) {
+		return shlm_e1($self, l, m);
+	}
 
 /* Helper functions to allocate and access sh coefficients arrays */
-%inline %{
-  Py_complex ylm_get(Py_complex *y, int l, int m) {
-    return( y[LM(l,m)] );
-  }
-  void ylm_set(Py_complex *y, int l, int m, Py_complex val) {
-    y[LM(l,m)] = val;
-  }
-  Py_complex *ylm_alloc() {
-     int i;
-     complex double *y = (complex double *) malloc(sizeof(complex double) * shtns.nlm);
-     for (i=0;i<shtns.nlm;i++) y[i] = 0.0;
-     return (Py_complex *) y;
-  }
-%}
+	PyObject* ylm_get(Py_complex *y, int l, int m) {
+		return PyComplex_FromCComplex(y[LM($self, l,m)]);
+	}
+	void ylm_set(Py_complex *y, int l, int m, PyObject *val) {
+		y[LM($self, l,m)] = PyComplex_AsCComplex(val);
+	}
+	Py_complex *ylm_alloc() {
+		int i;
+		complex double *y = (complex double *) malloc(sizeof(complex double) * $self->nlm);
+		for (i=0; i<$self->nlm; i++) y[i] = 0.0;
+		return (Py_complex *) y;
+	}
 
-int shtns_set_size(int lmax, int mmax, int mres, int norm);
-int shtns_precompute(int flags, double eps, int nlat, int nphi);
-int shtns_init(int flags, int lmax, int mmax, int mres, int nlat, int nphi);
-long int nlm_calc(long int lmax, long int mmax, long int mres);
-void Set_MTR_DCT(int m);
-int Get_MTR_DCT();
+	/* scalar transforms */
+	void spat_to_SH(double *Vr, complex double *Qlm) {
+		spat_to_SH($self, Vr, Qlm);	}
 
-double sh00_1();	///< returns the spherical harmonic representation of 1 (l=0,m=0)
-double sh10_ct();	///< returns the spherical harmonic representation of cos(theta) (l=1,m=0)
-double sh11_st();	///< returns the spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
+	void SH_to_spat(complex double *Qlm, double *Vr) {
+		SH_to_spat($self, Qlm, Vr);	}
 
-void spat_to_SH(double *Vr, complex double *Qlm);
-void SH_to_spat(complex double *Qlm, double *Vr);
+	/* 2D vectors */
+	void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm) {
+		spat_to_SHsphtor($self, Vt, Vp, Slm, Tlm);	}
+	void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp) {
+		SHsphtor_to_spat($self, Slm, Tlm, Vt, Vp);	}
+	void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp) {
+		SHsph_to_spat($self, Slm, Vt, Vp);	}
+	void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp) {
+		SHtor_to_spat($self, Tlm, Vt, Vp);	}
 
-void spat_to_SHsphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
-void SHsphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
-void SHsph_to_spat(complex double *Slm, double *Vt, double *Vp);
-void SHtor_to_spat(complex double *Tlm, double *Vt, double *Vp);
+	/* 3D vectors */
+	void spat_to_SHqst(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm) {
+		spat_to_SHqst($self, Vr, Vt, Vp, Qlm, Slm, Tlm);	}
+	void SHqst_to_spat(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp) {
+		SHqst_to_spat($self, Qlm, Slm, Tlm, Vr, Vt, Vp);	}
 
-double SH_to_point(complex double *Qlm, double cost, double phi);
-void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm,
-					double cost, double phi, double *vr, double *vt, double *vp);
-void SHqst_to_lat(complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
-					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
+	/* local evaluations */
+	double SH_to_point(complex double *Qlm, double cost, double phi) {
+		SH_to_point($self, Qlm, cost, phi);	}
+	void SHqst_to_point(complex double *Qlm, complex double *Slm, complex double *Tlm,
+					double cost, double phi, double *vr, double *vt, double *vp) {
+		SHqst_to_point($self, Qlm, Slm, Tlm, cost, phi, vr, vt, vp);	}
 
-void spat_to_SH_l(double *Vr, complex double *Qlm, int LTR);
-void SH_to_spat_l(complex double *Qlm, double *Vr, int LTR);
+	/* rotation of SH representations (experimental) */
+	void SH_Zrotate(complex double *Qlm, double alpha, complex double *Rlm) {
+		SH_Zrotate($self, Qlm, alpha, Rlm);	}
+	void SH_Yrotate(complex double *Qlm, double alpha, complex double *Rlm) {
+		SH_Yrotate($self, Qlm, alpha, Rlm);	}
+	void SH_Yrotate90(complex double *Qlm, complex double *Rlm) {
+		SH_Yrotate90($self, Qlm, Rlm);	}
+	void SH_Xrotate90(complex double *Qlm, complex double *Rlm) {
+		SH_Xrotate90($self, Qlm, Rlm);
+	}
 
-void SHsphtor_to_spat_l(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int LTR);
-void SHsph_to_spat_l(complex double *Slm, double *Vt, double *Vp, int LTR);
-void SHtor_to_spat_l(complex double *Tlm, double *Vt, double *Vp, int LTR);
-void spat_to_SHsphtor_l(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int LTR);
+};
 
-void spat_to_SH_m0(double *Vr, complex double *Qlm);
-void SH_to_spat_m0(complex double *Qlm, double *Vr);
-void SHsphtor_to_spat_m0(complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
-void SHsph_to_spat_m0(complex double *Slm, double *Vt);
-void SHtor_to_spat_m0(complex double *Tlm, double *Vp);
-void spat_to_SHsphtor_m0(double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
-
-void SHeo_to_spat(complex double *Qlm, double *Vr, int parity);
-void spat_to_SHeo(double *Vr, complex double *Qlm, int parity);
-void SHeo_sphtor_to_spat(complex double *Slm, complex double *Tlm, double *Vt, double *Vp, int parity);
-void spat_to_SHeo_sphtor(double *Vt, double *Vp, complex double *Slm, complex double *Tlm, int parity);
 
