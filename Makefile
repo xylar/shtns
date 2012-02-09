@@ -7,7 +7,7 @@ march = -march=native
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(march) -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE -fPIC
+go= $(march) -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE -fpic
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
@@ -91,10 +91,10 @@ clean :
 
 # build a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
-python : shtns.h shtns.i
-	swig -python shtns.i
-	gcc $(march) -O2 -fPIC -I/usr/include/python2.7 -c shtns_wrap.c 
-	gcc $(march) -O2 -fPIC -shared /usr/lib/libfftw3.so SHT.o sht_*.o shtns_wrap.o -o _shtns.so
+python : shtns.h shtns_numpy.i
+	swig -python shtns_numpy.i
+	gcc $(march) -O2 -fpic -I/usr/include/python2.7 -c shtns_numpy_wrap.c 
+	gcc $(march) -O2 -fpic -shared /usr/lib/libfftw3.so SHT.o sht_*.o shtns_numpy_wrap.o -o _shtns.so
 
 # update the copyright notice
 updatecpy : COPYRIGHT
@@ -115,7 +115,7 @@ updatecpy : COPYRIGHT
 	./update-copyright.sh SHT_example.c
 	./update-copyright.sh -fortran SHT_example.f
 	./update-copyright.sh -fortran shtns.f
-	./update-copyright.sh shtns.i
+	./update-copyright.sh shtns_numpy.i
 
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000
