@@ -15,7 +15,7 @@ Then browse the html documentation starting with doc/html/index.html
  * - flexible truncation
  * - spatial data can be stored in latitude-major or longitude-major order arrays.
  * - various conventions (normalization and Condon-Shortley phase)
- * - can be used from <b>fortran or c/c++</b> programs
+ * - can be used from <b>fortran, c/c++, and Python</b> programs
  * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature)
  * - an even faster algorithm using DCT for <b>regular nodes</b> (based on a generalized Fejer quadrature)
  * - support for SSE2, SSE3 and <b>AVX</b> vectorization with gcc.
@@ -29,7 +29,7 @@ Then browse the html documentation starting with doc/html/index.html
  * It uses the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms, and is distributed under the open source CeCILL License.
  *
  * \see shtns.h for the definitions of variables, macros and functions.
- * \see The example programs (in \link SHT_example.f Fortran \endlink and \link SHT_example.c C \endlink) to get started.
+ * \see The example programs (in \link SHT_example.f Fortran \endlink, \link SHT_example.c C \endlink and \link SHT_example.py Python \endlink) to get started.
  * \see The organisation of data used by SHTns is described in \ref spat.
  * \see The description of \ref opt.
  *
@@ -413,16 +413,22 @@ When your program is ready, compile it adding these options to the compiler (gfo
 
 /** \page python Using SHTns with Python
 
-<b>This is a preliminary Python interface, do not expect too much !</b>
-SHTns provides a Python interface, for interactive use of the spherical harmonic transform.
-It uses swig to generate the Python interface.
-
+<b>This is a preliminary, alpha quality, Python interface; do not expect too much !</b>
+SHTns provides a Python interface that uses <a href="http://numpy.scipy.org/">NumPy</a> arrays to perform Spherical Harmonic Transforms.
+It uses <a href="http://www.swig.org/">SWIG</a> to generate the Python interface, so you have to install it in order to build the Python interface.
 
 \li Compile using \code make python \endcode
 
-\li Use within a python script or shell in the same directory \code from shtns import * \endcode
+\li Use within a python script or shell in the same directory \code import shtns \endcode
 
-The functions available are the same as the \link usage C interface \endlink, plus some memory allocation functions...
+To start using SHTns you must then create an sht object, from which you can call the transform functions and more.
+The arrays should be created using <a href="http://numpy.scipy.org/">NumPy</a>.
+\see See the \link SHT_example.py Python example \endlink to get started.
+
+<i>In case of segfaults, you may have alignment problems. Please make a bugreport or contact the author.</i>
+
+\example SHT_example.py
+  \brief A Python example using NumPy and SHTns that performs backward and forward Spherical Harmonic Transforms.
 
 */
 

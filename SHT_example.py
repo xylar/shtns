@@ -24,6 +24,7 @@ l2 = el*(el+1)					# array l(l+1) that is useful for computing laplacian
 # nlat = lmax*2
 # nphi = mmax*3
 # sh.set_grid(nlat, nphi, sht_gauss_fly|SHT_PHI_CONTIGUOUS, 1.0e-10)		# use advanced options to create a gauss grid with optimized on-the-fly transforms.
+								# warning : the use of SHT_NATIVE_LAYOUT is tricky with NumPy arrays.
 
 ylm = numpy.zeros(sh.nlm, dtype=complex)		# a spherical harmonic spectral array
 
