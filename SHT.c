@@ -1968,7 +1968,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->lmidx = (int*) (shtns + 1);		// lmidx is stored at the end of the struct...
 		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
 		shtns->ct = NULL;	shtns->st = NULL;
-		shtns->nphi = 0;	shtns->nlat = 0;	shtns->nlat_2 = 0;		// public data
+		shtns->nphi = 0;	shtns->nlat = 0;	shtns->nlat_2 = 0;		shtns->nspat = 0;	// public data
 	}
 
 	// copy sizes.

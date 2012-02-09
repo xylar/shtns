@@ -17,6 +17,11 @@
 
 /* shtns.i : SWIG interface to Python using NumPy */
 
+/* TODO and known problems :
+ * - exception handling does not work well : some functions will still return incorect values when parameters are wrong
+ * - alignement on 16 bytes of NumPy arrays is not guaranteed. It should however work on 64bit systems or on modern 32bit systems.
+ */
+
 %module (docstring="Python/NumPy interface to the SHTns spherical harmonic transform library") shtns
 
 %{
@@ -25,6 +30,10 @@
 #include "/usr/lib/python2.7/site-packages/numpy/core/include/numpy/arrayobject.h"
 
 int check_spatial(PyObject *a, int size) {
+	if (size == 0) {
+		PyErr_SetString(PyExc_RuntimeError,"grid not set");
+		return 0;
+	}
 	if (!PyArray_Check(a)) {
 		PyErr_SetString(PyExc_RuntimeError,"NumPy array expected");
 		return 0;
@@ -66,7 +75,7 @@ int check_spectral(PyObject *a, int size) {
 
 %}
 
-// object name is renamed to sht.
+// main object is renamed to sht.
 %rename("sht") shtns_info;
 
 %include "shtns.h"
@@ -112,18 +121,22 @@ long nlm_calc(long lmax, long mmax, long mres);
 		int i;
 		npy_intp dims = $self->nlm;
 		npy_intp strides = sizeof(double);
-		PyArrayObject *obj = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
-		double *el = (double*) obj->data;
-		for (i=0; i<$self->nlm; i++)		el[i] = $self->li[i];
+		PyObject *obj = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		double *el = (double*) PyArray_DATA(obj);
+		for (i=0; i<$self->nlm; i++)		el[i] = $self->li[i];		// convert and copy
 		return obj;
 	}
 	PyObject* cos_theta() {		// grid must have been initialized.
 		int i;
 		npy_intp dims = $self->nlat;
 		npy_intp strides = sizeof(double);
-		PyArrayObject *obj = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
-		double *ct = (double*) obj->data;
-		for (i=0; i<$self->nlat; i++)		ct[i] = $self->ct[i];
+		if (dims == 0) {	// no grid
+			PyErr_SetString(PyExc_RuntimeError,"grid not set");
+			return NULL;
+		}
+		PyObject *obj = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		double *ct = (double*) PyArray_DATA(obj);
+		for (i=0; i<$self->nlat; i++)		ct[i] = $self->ct[i];		// copy
 		return obj;
 	}
 
