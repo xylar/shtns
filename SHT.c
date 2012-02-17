@@ -2200,7 +2200,10 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	// fftw_set_timelimit(60.0);		// do not search plans for more than 1 minute (does it work well ???)
 		if (*nphi > 512) shtns->fftw_plan_mode = FFTW_PATIENT;
 		if (*nphi > 1024) shtns->fftw_plan_mode = FFTW_MEASURE;
-	} else shtns->fftw_plan_mode = FFTW_ESTIMATE;
+	} else {
+		shtns->fftw_plan_mode = FFTW_ESTIMATE;
+		if ((VSIZE2 >= 4) && (NLAT > VSIZE2*4)) on_the_fly = 1;		// with AVX, on-the-fly should be the default (faster).
+	}
 
 	if (flags == sht_auto) {
 		if ( ((nl_order>=2)&&(MMAX*MRES > LMAX/2)) || (*nlat < SHT_MIN_NLAT_DCT) || (*nlat & 1) || (*nlat <= LMAX+1) ) {
