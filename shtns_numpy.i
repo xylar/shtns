@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2011 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2012 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@ujf-grenoble.fr
@@ -20,6 +20,7 @@
 /* TODO and known problems :
  * - exception handling does not work well : some functions will still return incorect values when parameters are wrong
  * - alignement on 16 bytes of NumPy arrays is not guaranteed. It should however work on 64bit systems or on modern 32bit systems.
+ * - you may have to adjust the path below to include the header file "arrayobject.h" from the NumPy package.
  */
 
 %module (docstring="Python/NumPy interface to the SHTns spherical harmonic transform library") shtns

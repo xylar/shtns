@@ -16,6 +16,12 @@ if [ "$1" == "-fortran" ]; then
   shift
 fi
 
+if [ "$1" == "-python" ]; then
+  cmtstart='#'
+  cmt='#  '
+  cmtend=''
+  shift
+fi
 
 if [ -f "$1" ]; then
 

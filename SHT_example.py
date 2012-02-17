@@ -1,10 +1,28 @@
+#
+#  Copyright (c) 2010-2012 Centre National de la Recherche Scientifique.
+#  written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
+#  
+#  nathanael.schaeffer@ujf-grenoble.fr
+#  
+#  This software is governed by the CeCILL license under French law and
+#  abiding by the rules of distribution of free software. You can use,
+#  modify and/or redistribute the software under the terms of the CeCILL
+#  license as circulated by CEA, CNRS and INRIA at the following URL
+#  "http://www.cecill.info".
+#  
+#  The fact that you are presently reading this means that you have had
+#  knowledge of the CeCILL license and that you accept its terms.
+#  
+
 #!/usr/bin/python2
 #
-# SHTns Python interface example
+# SHTns Python interface example (tested with Python 2.7)
 #
 
 import numpy		# numpy for arrays
-import shtns		# shtns interface (must be build with "make python" and copied in the current directory)
+import shtns		# shtns interface: must be build with "make python" which produces
+					#   files "shtns.py" and "_shtns.so" that must be either in the current directory
+					#   or copied to the python search path (typically "/usr/lib/python2.7/site-packages/")
 
 lmax = 15			# maximum degree of spherical harmonic representation.
 mmax = 3			# maximum order of spherical harmonic representation.

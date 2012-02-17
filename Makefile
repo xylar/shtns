@@ -116,6 +116,7 @@ updatecpy : COPYRIGHT
 	./update-copyright.sh -fortran SHT_example.f
 	./update-copyright.sh -fortran shtns.f
 	./update-copyright.sh shtns_numpy.i
+	./update-copyright.sh -python SHT_example.py
 
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000

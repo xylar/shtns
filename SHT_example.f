@@ -1,5 +1,5 @@
 !
-!  Copyright (c) 2010-2011 Centre National de la Recherche Scientifique.
+!  Copyright (c) 2010-2012 Centre National de la Recherche Scientifique.
 !  written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
 !  
 !  nathanael.schaeffer@ujf-grenoble.fr
