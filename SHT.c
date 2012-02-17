@@ -730,6 +730,10 @@ void free_SHTarrays(shtns_cfg shtns)
 	shtns->fft = NULL;		shtns->ifft = NULL;		shtns->ncplx_fft = -1;	// no fft
 }
 
+#if USE_LEGACY_FFTW3
+	// substitute undefined symbol in fftw older than 3.3
+	#define fftw_cost(a) 0.0
+#endif
 
 /// \internal initialize FFTs using FFTW.
 /// \param[in] layout defines the spatial layout (see \ref spat).
