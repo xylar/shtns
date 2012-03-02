@@ -3,13 +3,10 @@ Then browse the html documentation starting with doc/html/index.html
 
 /** \mainpage SHTns : Spherical Harmonic Transform for numerical simulations.
  *
- * SHTns is a library for Spherical Harmonic Transform written in C, aimed at
- * numerical simulation (fluid flows, mhd, ...) in spherical geometries.
- *
- * Available soon under <a href="http://www.cecill.info/index.en.html">CeCILL Licence</a> (GPL compatible french Licence).
- * Send an email to nathanael.schaeffer@ujf-grenoble.fr to be informed on release or request a pre-version.
+ * SHTns is a library for Spherical Harmonic Transform written in C, aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.\n
  *
  * Main features :
+ * - distributed under the open source <a href="://www.cecill.info/licences/Licence_CeCILL_V2-en.html">CeCILL License</a> (GPL compatible)
  * - both <b>scalar and vector transforms</b>
  * - backward and forward (synthesis and analysis) functions
  * - flexible truncation
@@ -26,14 +23,18 @@ Then browse the html documentation starting with doc/html/index.html
  *
  * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *
- * It uses the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms, and is distributed under the open source CeCILL License.
+ * It requires the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms.
+ *
+ * If you use SHTns for research work, please <b>cite the paper</b>: <a href="http://arxiv.org/abs/1202.6522">Efficient Spherical Harmonic Transforms aimed at pseudo-spectral numerical simulations</a>.
+ *
+ * If you accept the open source <a href="http://www.cecill.info/licences/Licence_CeCILL_V2-en.html">CeCILL License</a> (GPL compatible french License), you can <a href="https://bitbucket.org/nschaeff/shtns/downloads">download SHTns</a>.
  *
  * \see shtns.h for the definitions of variables, macros and functions.
  * \see The example programs (in \link SHT_example.f Fortran \endlink, \link SHT_example.c C \endlink and \link SHT_example.py Python \endlink) to get started.
  * \see The organisation of data used by SHTns is described in \ref spat.
  * \see The description of \ref opt.
  *
- * \author SHTns is written by Nathanael Schaeffer (CNRS)
+ * \author SHTns is written by Nathanael Schaeffer (CNRS). Email: nathanael.schaeffer@ujf-grenoble.fr
  *
  * \image html logo_cnrs_small.png
  *
