@@ -6,7 +6,7 @@ Then browse the html documentation starting with doc/html/index.html
  * SHTns is a library for Spherical Harmonic Transform written in C, aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.\n
  *
  * Main features :
- * - distributed under the open source <a href="://www.cecill.info/licences/Licence_CeCILL_V2-en.html">CeCILL License</a> (GPL compatible)
+ * - distributed under the open source \link license CeCILL License\endlink (GPL compatible)
  * - both <b>scalar and vector transforms</b>
  * - backward and forward (synthesis and analysis) functions
  * - flexible truncation
@@ -27,7 +27,7 @@ Then browse the html documentation starting with doc/html/index.html
  *
  * If you use SHTns for research work, please <b>cite the paper</b>: <a href="http://arxiv.org/abs/1202.6522">Efficient Spherical Harmonic Transforms aimed at pseudo-spectral numerical simulations</a>.
  *
- * If you accept the open source <a href="http://www.cecill.info/licences/Licence_CeCILL_V2-en.html">CeCILL License</a> (GPL compatible french License), you can <a href="https://bitbucket.org/nschaeff/shtns/downloads">download SHTns</a>.
+ * If you accept the open source \link license CeCILL License\endlink (GPL compatible french License), you can <a href="https://bitbucket.org/nschaeff/shtns/downloads">download SHTns</a>.
  *
  * \see shtns.h for the definitions of variables, macros and functions.
  * \see The example programs (in \link SHT_example.f Fortran \endlink, \link SHT_example.c C \endlink and \link SHT_example.py Python \endlink) to get started.
