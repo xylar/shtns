@@ -420,12 +420,12 @@ T				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			if (SHT_ACCURACY > 0) {		// this saves a lot of work, as rescale is not needed here.
-				while ((vlo(y1[NWAY-1]) < SHT_ACCURACY*SHT_LEG_SCALEF)&&(vlo(y1[NWAY-1]) > -SHT_ACCURACY*SHT_LEG_SCALEF)&&(l<llim)) {
+				while ((fabs(vlo(y0[NWAY-1]*scale[NWAY-1])) < SHT_ACCURACY)&&(l<llim)) {
 					for (int j=0; j<NWAY; j++) {
 						y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
 V						dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
 					}
-					for (int j=0; j<NWAY; j++) {					
+					for (int j=0; j<NWAY; j++) {
 						y1[j] = vall(al[3])*cost[j]*y0[j] + vall(al[2])*y1[j];
 V						dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];				
 					}

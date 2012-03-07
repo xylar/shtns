@@ -419,7 +419,7 @@ V			rnd perk[NWAY], peik[NWAY], pork[NWAY], poik[NWAY];
 				y0[j] = vall(al[0]* 0.5*SHT_LEG_SCALEF);
 V				st2[j] = cost[j]*cost[j]*vall(m_1);
 V				y0[j] *= vall(m);		// for the vector transform, compute ylm*m/sint
-				scale[j] = vall(1.0/SHT_LEG_SCALEF) * vread(wg, k+j);	// weight appears here.
+				scale[j] = vall(1.0/SHT_LEG_SCALEF);
 			}
 Q			l=m;
 V			l=m-1;
@@ -440,7 +440,7 @@ V				dy1[j] = (vall(al[1])*y0[j]) *(cost[j]*cost[j] + st2[j]);
 			}
 			l=m;	al+=2;
 			if (SHT_ACCURACY > 0) {		// this saves a lot of work, as rescale is not needed here.
-				while ((vlo(y1[NWAY-1]) < SHT_ACCURACY*SHT_LEG_SCALEF)&&(vlo(y1[NWAY-1]) > -SHT_ACCURACY*SHT_LEG_SCALEF)&&(l<llim)) {
+				while ((fabs(vlo(y0[NWAY-1]*scale[NWAY-1])) < SHT_ACCURACY)&&(l<llim)) {
 					for (int j=0; j<NWAY; j++) {
 						y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
 V						dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
@@ -455,6 +455,7 @@ Q				q+=2*(l-m);
 V				s+=2*(l-m);		t+=2*(l-m);
 			}
 			for (int j=0; j<NWAY; j++) {	// prefetch
+				scale[j] *= vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
 Q				rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( ror, k+j);		roik[j] = vread( roi, k+j);
 V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( tor, k+j);		toik[j] = vread( toi, k+j);
 V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
