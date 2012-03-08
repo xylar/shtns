@@ -19,7 +19,7 @@ Then browse the html documentation starting with doc/html/index.html
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
  * - ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
  * - <b>on-the-fly transforms</b> : saving memory and bandwidth, and can even be faster depending on architecture.
- * - accurate up to spherical harmonic degree l=2700 (at least).
+ * - accurate up to spherical harmonic degree l=8000 (at least).
  *
  * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *
@@ -339,20 +339,18 @@ show that <b>SHTns performs much faster than any other</b> (non-parallel). Furth
 \section Accuracy
 
 We claim that the accuracy of SHTns is as good as it can be with double precision floating point math.
-For example, at LMAX=600, MMAX=600, MRES=1, a back and forth transform on random spherical harmonic coefficients, gives the following results.
+Rescaling is performed for large transform where the recurrence relation would otherwise underflow the double precision numbers.
+SHTns has been tested on x86 architecture with SSE2 double precision floating point math (64 bit) to be <b>accurate up to l=8191</b>.
+The measured error for a back and forth scalar transform using a Gauss-Legendre algorithm for various truncation levels lmax is plotted below.
 
-\li scalar transform, polar_opt=0 : maximum error < 1.0e-12,  rms error < 1.0e-13
-\li vector transform, polar_opt=0 : maximum error < 1.0e-11,  rms error < 1.0e-13
-\li vector transform, polar_opt=1.0e-8 : maximum error < 2.0e-11,  rms error < 1.0e-13, but about <b>10% faster</b>.
-\li vector transform, polar_opt=1.0e-8, DCT : maximum error < 1.0e-10,  rms error < 1.0e-12, but about <b>20% faster</b>.
+\image html accuracy.png
+\image latex accuracy.png "Accuracy of our scalar Gauss-Legendre transform" width=10cm
 
-Don't trust our word, these results are obtained by running the time_SHT program, shipped with SHTns :
+Don't trust our word, these results are obtained by running the time_SHT program, shipped with SHTns. For example :
 \code
 make time_SHT
-./time_SHT 600 -iter=1 -nlorder=1 -polaropt=0 -quickinit
+./time_SHT 511 -iter=1 -quickinit
 \endcode
-
-SHTns has been tested on x86 architecture with SSE2 double precision floating point math (64 bit) to be <b>accurate up to l=2700</b>.
 
 */
 

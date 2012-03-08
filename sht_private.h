@@ -132,14 +132,14 @@ struct shtns_info {		// MUST start with "int nlm;"
 #endif
 
 // scale factor applied for LMAX larger than SHT_L_RESCALE. Allows accurate transforms up to l=2700 with 64 bit double precision.
-#define SHT_LEG_SCALEF 1.10180320792531e-280
+#define SHT_LEG_SCALEF 1.1018032079253110206e-280
 #define SHT_L_RESCALE 1536
-// value for on-the-fly transforms is near the limit of double precsision, as there is an associated performance drop.
-#define SHT_L_RESCALE_FLY 1792
+// value for on-the-fly transforms is lower because it allows to optimize some more (don't compute l which are not significant).
+#define SHT_L_RESCALE_FLY 1000
 // set to a value close to the machine accuracy, it allows to speed-up on-the-fly SHTs with very large l (lmax > SHT_L_RESCALE_FLY).
 #define SHT_ACCURACY 1.0e-15
-
-#define SHT_SCALE_FACTOR 2.90735489718243e+135
+// scale factor for extended range numbers (used in on-the-fly transforms to compute recurrence)
+#define SHT_SCALE_FACTOR 2.9073548971824275622e+135
 
 /* for vectorization (SSE2) */
 
@@ -218,6 +218,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vhi_to_cplx(a) _mm_unpackhi_pd(a, vdup(0.0))
 	#ifdef __clang__
 		// allow to compile with clang (llvm)
+		#define vlo(a) (a)[0]
 		#define vlo_to_dbl(a) (a)[0]
 		#define vhi_to_dbl(a) (a)[1]
 	#else
