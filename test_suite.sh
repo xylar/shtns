@@ -14,6 +14,15 @@ $c > tmp.out
 cat tmp.out | grep ERROR
 cat tmp.out >> $log
 
+# even bigger :
+c="./time_SHT 7975 -mres=145 -quickinit -iter=1"
+echo $c
+echo "---" >> $log
+echo "*** $c *** " >> $log
+$c > tmp.out
+cat tmp.out | grep ERROR
+cat tmp.out >> $log
+
 
 for switch in "" "-oop" "-transpose" "-schmidt" "-4pi"
 do
