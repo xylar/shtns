@@ -139,6 +139,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 // set to a value close to the machine accuracy, it allows to speed-up on-the-fly SHTs with very large l (lmax > SHT_L_RESCALE_FLY).
 #define SHT_ACCURACY 1.0e-15
 
+#define SHT_SCALE_FACTOR 2.90735489718243e+135
+
 /* for vectorization (SSE2) */
 
 #define SSE __attribute__((aligned (16)))

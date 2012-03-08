@@ -394,10 +394,10 @@ V				for (int j=0; j<NWAY; j++)	t[1] -= DY0 * poik[j]  + Y0 * terk[j];
 V		#undef DY0
 V		#undef DY1
 	  } else {		// llim > SHT_L_RESCALE_FLY
-		#define Y0 (y0[j]*scale[j])
-		#define Y1 (y1[j]*scale[j])
-V		#define DY0 (dy0[j]*scale[j])
-V		#define DY1 (dy1[j]*scale[j])
+		#define Y0 y0[j]
+		#define Y1 y1[j]
+V		#define DY0 dy0[j]
+V		#define DY1 dy1[j]
 		do {
 		#if _GCC_VEC_
 Q			rnd* q = qq;
@@ -409,29 +409,38 @@ V			double* s = (double *) &Slm[l];
 V			double* t = (double *) &Tlm[l];
 		#endif
 			al = alm;
-			rnd cost[NWAY], y0[NWAY], y1[NWAY], scale[NWAY];
+			rnd cost[NWAY], y0[NWAY], y1[NWAY];
 V			rnd st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			rnd rerk[NWAY], reik[NWAY], rork[NWAY], roik[NWAY];		// help the compiler to cache into registers.
 V			rnd terk[NWAY], teik[NWAY], tork[NWAY], toik[NWAY];
 V			rnd perk[NWAY], peik[NWAY], pork[NWAY], poik[NWAY];
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = vread(st, k+j);
-				y0[j] = vall(al[0]* 0.5*SHT_LEG_SCALEF);
+				y0[j] = vall(al[0]);
 V				st2[j] = cost[j]*cost[j]*vall(m_1);
 V				y0[j] *= vall(m);		// for the vector transform, compute ylm*m/sint
-				scale[j] = vall(1.0/SHT_LEG_SCALEF);
 			}
 Q			l=m;
 V			l=m-1;
-			long int ll = l >> 8;
-			do {		// sin(theta)^m
-				if (l&1) for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
+			long int nsint = 0;
+			long int ny = 0;
+			do {		// sin(theta)^m		(use rescaling to avoid underflow)
+				if (l&1) {
+					for (int j=0; j<NWAY; j++) y0[j] *= cost[j];
+					ny += nsint;
+					if (fabs(vlo(y0[0])) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
+						ny--;
+						for (int j=0; j<NWAY; j++) y0[j] *= vall(SHT_SCALE_FACTOR);
+					}
+				}
 				l >>= 1;
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
-			} while(l > ll);
-			while(--l >= 0) {
-				for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
-			}
+				nsint += nsint;
+				if (vlo(cost[0]) < 1.0/SHT_SCALE_FACTOR) {
+					nsint--;
+					for (int j=0; j<NWAY; j++) cost[j] *= vall(SHT_SCALE_FACTOR);
+				}
+			} while(l > 0);
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = vread(ct, k+j);
 V				dy0[j] = cost[j]*y0[j];
@@ -439,23 +448,30 @@ V				dy0[j] = cost[j]*y0[j];
 V				dy1[j] = (vall(al[1])*y0[j]) *(cost[j]*cost[j] + st2[j]);
 			}
 			l=m;	al+=2;
-			if (SHT_ACCURACY > 0) {		// this saves a lot of work, as rescale is not needed here.
-				while ((fabs(vlo(y0[NWAY-1]*scale[NWAY-1])) < SHT_ACCURACY)&&(l<llim)) {
-					for (int j=0; j<NWAY; j++) {
-						y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
-V						dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
-					}
-					for (int j=0; j<NWAY; j++) {
-						y1[j] = vall(al[3])*cost[j]*y0[j] + vall(al[2])*y1[j];
-V						dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];				
-					}
-					l+=2;	al+=4;
+			while ((ny < 0) && (l < llim)) {		// ylm treated as zero and ignored if ny < 0
+				for (int j=0; j<NWAY; j++) {
+					y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
+V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
 				}
-Q				q+=2*(l-m);
-V				s+=2*(l-m);		t+=2*(l-m);
+				for (int j=0; j<NWAY; j++) {
+					y1[j] = vall(al[3])*cost[j]*y0[j] + vall(al[2])*y1[j];
+V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];				
+				}
+				l+=2;	al+=4;
+				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
+					ny++;
+					for (int j=0; j<NWAY; j++) {
+						y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
+V						dy0[j] *= vall(1.0/SHT_SCALE_FACTOR);		dy1[j] *= vall(1.0/SHT_SCALE_FACTOR);
+					}
+				}
 			}
+		  if (ny == 0) {
+Q			q+=2*(l-m);
+V			s+=2*(l-m);		t+=2*(l-m);
 			for (int j=0; j<NWAY; j++) {	// prefetch
-				scale[j] *= vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
+				y0[j] *= vall(0.5)*vread(wg, k+j);		y1[j] *= vall(0.5)*vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
+V				dy0[j] *= vall(0.5)*vread(wg, k+j);		dy1[j] *= vall(0.5)*vread(wg, k+j);
 Q				rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( ror, k+j);		roik[j] = vread( roi, k+j);
 V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( tor, k+j);		toik[j] = vread( toi, k+j);
 V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
@@ -499,6 +515,7 @@ V					t[0] -= DY0 * pork[j]  - Y0 * teik[j];
 V					t[1] -= DY0 * poik[j]  + Y0 * terk[j];
 				}
 			}
+		  }
 			k+=NWAY;
 		} while (k < nk);
 		#undef Y0

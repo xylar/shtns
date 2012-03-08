@@ -378,7 +378,7 @@ V			BpF[k] = 0.0;		BpF[NLAT-l+k] = 0.0;
 	#endif
 		do {
 			al = alm;
-			rnd cost[NWAY], y0[NWAY], y1[NWAY], scale[NWAY];
+			rnd cost[NWAY], y0[NWAY], y1[NWAY];
 V			rnd st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			rnd rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];
 V			rnd ter[NWAY], tei[NWAY], tor[NWAY], toi[NWAY];
@@ -391,24 +391,30 @@ V				y0[j] *= vall(m);		// for the vector transform, compute ylm*m/sint
 			}
 Q			l=m;
 V			l=m-1;
-			for (int j=0; j<NWAY; j++) {
-				y0[j] *= vall(SHT_LEG_SCALEF);
-				scale[j] = vall(1.0/SHT_LEG_SCALEF);
-			}
-			long int ll = l >> 8;
-			do {		// sin(theta)^m
-				if (l&1) for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
+			long int nsint = 0;
+			long int ny = 0;
+			do {		// sin(theta)^m		(use rescaling to avoid underflow)
+				if (l&1) {
+					for (int j=0; j<NWAY; j++) y0[j] *= cost[j];
+					ny += nsint;
+					if (fabs(vlo(y0[0])) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
+						ny--;
+						for (int j=0; j<NWAY; j++) y0[j] *= vall(SHT_SCALE_FACTOR);
+					}
+				}
 				l >>= 1;
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
-			} while(l > ll);
-			while(--l >= 0) {
-				for (int j=0; j<NWAY; j++) scale[j] *= cost[j];
-			}
+				nsint += nsint;
+				if (vlo(cost[0]) < 1.0/SHT_SCALE_FACTOR) {
+					nsint--;
+					for (int j=0; j<NWAY; j++) cost[j] *= vall(SHT_SCALE_FACTOR);
+				}
+			} while(l > 0);
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = vread(ct, j+k);
-V				dy0[j] = cost[j]*y0[j];
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
+V				dy0[j] = cost[j]*y0[j];
 			}
 			for (int j=0; j<NWAY; j++) {
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
@@ -419,23 +425,29 @@ S				poi[j] = vall(0.0);		ter[j] = vall(0.0);
 T				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
-			if (SHT_ACCURACY > 0) {		// this saves a lot of work, as rescale is not needed here.
-				while ((fabs(vlo(y0[NWAY-1]*scale[NWAY-1])) < SHT_ACCURACY)&&(l<llim)) {
+			while ((ny < 0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
+				for (int j=0; j<NWAY; j++) {
+					y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
+V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
+				}
+				for (int j=0; j<NWAY; j++) {
+					y1[j] = vall(al[3])*cost[j]*y0[j] + vall(al[2])*y1[j];
+V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];				
+				}
+				l+=2;	al+=4;
+				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
+					ny++;
 					for (int j=0; j<NWAY; j++) {
-						y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
-V						dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
+						y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
+V						dy0[j] *= vall(1.0/SHT_SCALE_FACTOR);		dy1[j] *= vall(1.0/SHT_SCALE_FACTOR);
 					}
-					for (int j=0; j<NWAY; j++) {
-						y1[j] = vall(al[3])*cost[j]*y0[j] + vall(al[2])*y1[j];
-V						dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];				
-					}
-					l+=2;	al+=4;
 				}
 			}
-			#define Y0 (y0[j]*scale[j])
-			#define Y1 (y1[j]*scale[j])
-V			#define DY0 (dy0[j]*scale[j])
-V			#define DY1 (dy1[j]*scale[j])
+		  if (ny == 0) {
+			#define Y0 y0[j]
+			#define Y1 y1[j]
+V			#define DY0 dy0[j]
+V			#define DY1 dy1[j]
 			while (l<llim) {	// compute even and odd parts
 				for (int j=0; j<NWAY; j++) {
 Q					rer[j] += Y0 * qr(l);		rei[j] += Y0 * qi(l);
@@ -482,6 +494,7 @@ V			#undef DY0
 V			#undef DY1
 3			for (int j=0; j<NWAY; j++)	cost[j]  = vread(st, k+j) * vall(-m_1);
 3			for (int j=0; j<NWAY; j++) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
+		  }
 		#if _GCC_VEC_
 			for (int j=0; j<NWAY; j++) {
 Q				S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
