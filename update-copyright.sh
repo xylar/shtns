@@ -17,7 +17,7 @@ if [ "$1" == "-fortran" ]; then
 fi
 
 if [ "$1" == "-python" ]; then
-  cmtstart='#'
+  cmtstart="#!/usr/bin/python2\n#"
   cmt='#  '
   cmtend=''
   shift
@@ -29,7 +29,7 @@ if [ -f "$1" ]; then
   n=`head -5 $1 |grep -i Copyright |wc -l`
 
   # display the copyright notice within a comment block
-  echo "$cmtstart" > $tmp
+  echo -e "$cmtstart" > $tmp
   sed "s/^/$cmt/" COPYRIGHT >> $tmp
   if [ "x$cmtend" != "x" ]; then
 	  echo "$cmtend" >> $tmp

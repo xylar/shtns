@@ -1,3 +1,4 @@
+#!/usr/bin/python2
 #
 #  Copyright (c) 2010-2012 Centre National de la Recherche Scientifique.
 #  written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
@@ -14,10 +15,9 @@
 #  knowledge of the CeCILL license and that you accept its terms.
 #  
 
-#!/usr/bin/python2
-#
-# SHTns Python interface example (tested with Python 2.7)
-#
+###########################################################
+# SHTns Python interface example (tested with Python 2.7) #
+###########################################################
 
 import numpy		# numpy for arrays
 import shtns		# shtns interface: must be build with "make python" which produces

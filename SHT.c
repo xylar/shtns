@@ -82,6 +82,16 @@ long nlm_calc(long lmax, long mmax, long mres)
 	SHT FUNCTIONS
 */
 
+/** \addtogroup rotation Rotation of SH fields.
+Rotation around axis other than Z should be considered of beta quality (they have been tested but may still contain bugs).
+They also require \c mmax = \c lmax. They use an Algorithm inspired by the pseudospectral rotation described in
+Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" <i>Journal of Computational Physics</i>.
+doi:<a href="http://dx.doi.org/10.1016/j.jcp.2009.05.014">10.1016/j.jcp.2009.05.014</a>
+
+These functions do only require a call to \ref shtns_create, but not to \ref shtns_set_grid.
+*/
+//@{
+
 /// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
 /// which is the same as rotating the reference frame by angle -alpha.
 /// Result is stored in Rlm (which can be the same array as Qlm).
@@ -104,7 +114,9 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 	}
 }
 
-/** rotation kernel used by SH_Yrotate90(), SH_Xrotate90() and SH_rotate().
+//@}
+
+/** \internal rotation kernel used by SH_Yrotate90(), SH_Xrotate90() and SH_rotate().
  Algorithm based on the pseudospectral rotation[1] :
  - rotate around Z by angle dphi0.
  - synthetize for each l the spatial description for phi=0 and phi=pi on an equispaced latitudinal grid.
@@ -201,7 +213,11 @@ void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double
 	free(yl);	free(q0);	
 }
 
-/// rotate by 90 degrees around X axis
+
+/// \addtogroup rotation
+//@{
+
+/// rotate Qlm by 90 degrees around X axis and store the result in Rlm.
 /// shtns->mres MUST be 1, and lmax=mmax.
 void SH_Xrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 {
@@ -220,7 +236,7 @@ void SH_Xrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 	SH_rotK90(shtns, Qlm, Rlm, 0.0,  -M_PI/2);
 }
 
-/// rotate by 90 degrees around Y axis
+/// rotate Qlm by 90 degrees around Y axis and store the result in Rlm.
 /// shtns->mres MUST be 1, and lmax=mmax.
 void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 {
@@ -239,7 +255,7 @@ void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 	SH_rotK90(shtns, Qlm, Rlm, -M_PI/2, 0.0);
 }
 
-/// rotate around Y axis by arbitrary angle, using composition of rotations.
+/// rotate Qlm around Y axis by arbitrary angle, using composition of rotations. Store the result in Rlm.
 void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
 {
 	if ((shtns->mres != 1) || (shtns->mmax < shtns->lmax)) shtns_runerr("truncature makes rotation not closed.");
@@ -248,12 +264,16 @@ void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 	SH_rotK90(shtns, Rlm, Rlm, 0.0, M_PI/2);			// Yrotate90 + Zrotate(pi/2)
 }
 
+//@}
+
 // truncation at LMAX and MMAX
 #define LTR LMAX
 #define MTR MMAX
 
 /** \addtogroup local Local and partial evaluation of SH fields.
  * These do only require a call to \ref shtns_create, but not to \ref shtns_set_grid.
+ * These functions are not optimized and can be relatively slow, but they provide good
+ * reference implemenation for the transforms.
 */
 //@{
 
@@ -1938,13 +1958,13 @@ void shtns_print_cfg(shtns_cfg shtns)
 
 /*! This sets the description of spherical harmonic coefficients.
  * It tells SHTns how to interpret spherical harmonic coefficient arrays, and it sets usefull arrays.
- * Returns the configuration to be passed to subsequent transform functions.
+ * Returns the configuration to be passed to subsequent transform functions, which is basicaly a pointer to a \ref shtns_info struct.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
  * \param norm : define the normalization of the spherical harmonics (\ref shtns_norm)
- * + optionaly disable Condon-Shortley phase (ex: sht_schmidt | SHT_NO_CS_PHASE)
- * + optionaly use a 'real' normalization (ex: sht_fourpi | SHT_REAL_NORM)
+ * + optionaly disable Condon-Shortley phase (ex: \ref sht_schmidt | \ref SHT_NO_CS_PHASE)
+ * + optionaly use a 'real' normalization (ex: \ref sht_fourpi | \ref SHT_REAL_NORM)
 */
 shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 {
@@ -2050,7 +2070,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	return(shtns);
 }
 
-/// Copy a given config but allow a different (smaller) mmax and the possibility to enable/disable fft.
+/// Copy a given config but allow a different (smaller) mmax and the possibility to enable/disable fft (beta).
 shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 {
 	shtns_cfg shtns;
@@ -2129,7 +2149,7 @@ void shtns_reset()
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_create and before any SH transform.</b> and sets all global variables and internal data.
  * returns the required number of doubles to be allocated for a spatial field.
- * \param shtns is the config created by shtns_create for which the grid will be set.
+ * \param shtns is the config created by \ref shtns_create for which the grid will be set.
  * \param nlat,nphi pointers to the number of latitudinal and longitudinal grid points respectively. If 0, they are set to optimal values.
  * \param nl_order defines the maximum SH degree to be resolved by analysis : lmax_analysis = lmax*nl_order. It is used to set an optimal and anti-aliasing nlat. If 0, the default SHT_DEFAULT_NL_ORDER is used.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
@@ -2335,7 +2355,7 @@ int shtns_set_grid(shtns_cfg shtns, enum shtns_type flags, double eps, int nlat,
 /*! Simple initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * This function sets all global variables by calling \ref shtns_create followed by \ref shtns_set_grid, with the
  * default normalization and the default polar optimization (see \ref sht_config.h).
- * returns the configuration to be passed to subsequent transform functions.
+ * Returns the configuration to be passed to subsequent transform functions, which is basicaly a pointer to a \ref shtns_info struct.
  * \param lmax : maximum SH degree that we want to describe.
  * \param mmax : number of azimutal wave numbers.
  * \param mres : \c 2.pi/mres is the azimutal periodicity. \c mmax*mres is the maximum SH order.
@@ -2397,7 +2417,7 @@ void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nla
 
 /// Defines the size and convention of the transform.
 /// Allow to choose the normalization and whether or not to include the Condon-Shortley phase.
-/// \see shtns_set_size
+/// \see shtns_create
 void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm)
 {
 	shtns_reset();
@@ -2406,13 +2426,14 @@ void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm)
 
 /// Precompute matrices for synthesis and analysis.
 /// Allow to choose polar optimization threshold and algorithm type.
-/// \see shtns_precompute
+/// \see shtns_set_grid
 void shtns_precompute_(int *type, int *layout, double *eps, int *nlat, int *nphi)
 {
 	shtns_set_grid(sht_data, *type | *layout, *eps, *nlat, *nphi);
 }
 
 /// Same as shtns_precompute_ but choose optimal nlat and/or nphi.
+/// \see shtns_set_grid_auto
 void shtns_precompute_auto_(int *type, int *layout, double *eps, int *nl_order, int *nlat, int *nphi)
 {
 	shtns_set_grid_auto(sht_data, *type | *layout, *eps, *nl_order, nlat, nphi);

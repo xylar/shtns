@@ -1,7 +1,7 @@
 Run "make docs" to generate documentation with doxygen.
 Then browse the html documentation starting with doc/html/index.html
 
-/** \mainpage SHTns : Spherical Harmonic Transform for numerical simulations.
+/** \mainpage Spherical Harmonic Transform for numerical simulations.
  *
  * SHTns is a library for Spherical Harmonic Transform written in C, aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.\n
  *
@@ -20,6 +20,7 @@ Then browse the html documentation starting with doc/html/index.html
  * - ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
  * - <b>on-the-fly transforms</b> : saving memory and bandwidth, and can even be faster depending on architecture.
  * - accurate up to spherical harmonic degree l=8000 (at least).
+ * - rotation functions to rotate spherical harmonics (beta).
  *
  * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *
@@ -28,6 +29,8 @@ Then browse the html documentation starting with doc/html/index.html
  * If you use SHTns for research work, please <b>cite the paper</b>: <a href="http://arxiv.org/abs/1202.6522">Efficient Spherical Harmonic Transforms aimed at pseudo-spectral numerical simulations</a>.
  *
  * If you accept the open source \link license CeCILL License\endlink (GPL compatible french License), you can <a href="https://bitbucket.org/nschaeff/shtns/downloads">download SHTns</a>.
+ *
+ * Please report bugs and feature request on the <a href="https://bitbucket.org/nschaeff/shtns/issues">issue tracker</a>.
  *
  * \see shtns.h for the definitions of variables, macros and functions.
  * \see The example programs (in \link SHT_example.f Fortran \endlink, \link SHT_example.c C \endlink and \link SHT_example.py Python \endlink) to get started.
@@ -43,11 +46,11 @@ Then browse the html documentation starting with doc/html/index.html
 
 /** \page compil Compiling and installing SHTns
 
-To compile SHTns, you need a C compiler and the FFTW library version 3.3 or later carefully installed.
+To compile SHTns, you need a C compiler and the FFTW library version 3.3 or later carefully installed (optionally 3.0 or later, see below).
 We recommend using GCC 4.0 or later as it will produce the fastest vectorized code on x86_64 architecture.
 
 You should edit the Makefile to adapt it to your architecture and compiler. In particular, using gcc or icc will not lead to the same performance, and you
-should test on your system what gives the best result.
+should test on your system what gives the best result (gcc is usually the best choice for SHTns).
 
 \li type \code make \endcode to compile SHTns. it will produce the library \c libshtns.a
 
@@ -57,11 +60,12 @@ should test on your system what gives the best result.
 
 \section cflags Compilation flags and options
 
-A few compilation options can be set in \ref sht_config.h
+A few compilation options can be set in \ref sht_config.h and in particular \ref USE_LEGACY_FFTW3 can be changed in order to compile with FFTW 3 or more.
 
+\note SHTns uses FFTW. If FFTW has not been compiled and tuned carefuly for your machine, you may get bad performance with SHTns (down to 50% slower !).
+Look at the FFTW manual for compilation advice.
 
-<b> SHTns uses FFTW. If FFTW has not been compiled and tuned carefuly for your machine, you may get bad performance with SHTns (down to 50% slower !).
-Look at the FFTW manual for compilation advice.</b>
+\note We recommend to configure fftw by passing \c --enable-sse2 or \c --enable-avx to the configure script (if applicable).
 
 */
 
@@ -74,11 +78,11 @@ The angular coordinates on a spherical shell are the co-latitude \f$ \theta \f$ 
 The spatial discretization is defined by a call to \ref shtns_init; or to \ref shtns_set_grid or \ref shtns_set_grid_auto after \ref shtns_create.
 
 A field \e A (or one of its component in case of a vector field) is discretized on an ordered grid, which consists of
- - NPHI equally spaced nodes in longitude, spanning the range of angle between 0 and \f$2\pi\f$/MRES,
+ - NPHI equally spaced nodes in longitude, spanning the range of angle between 0 (included) and \f$2\pi\f$/MRES (excluded),
  - NLAT gauss nodes or equally spaced nodes (depending on \ref shtns_type) in latitude, spanning angles from 0 to \f$ \pi \f$.
 
 There are constraints on the sizes NLAT and NPHI. The sampling theorem requires NPHI > 2*MMAX, with MMAX the highest Fourier mode to be resolved.
-Similarly NLAT > LMAX is required.
+Similarly NLAT > LMAX is required for a Gauss-Legendre quadrature.
 
 When dealing with non-linear equation, or more generally when analysing data that is not band-limited to LMAX and/or MMAX, anti-aliasing constraints
 exist. For a given non-linear order of the equation N (typically 2), the anti-aliasing conditions are :
@@ -87,7 +91,7 @@ exist. For a given non-linear order of the equation N (typically 2), the anti-al
  - NLAT > N*LMAX for our DCT quadrature
 
 Furthermore, FFT is more efficient for certain values of NPHI and/or NLAT. If you do not require specific NLAT or NPHI, you can let SHTns choose them
-for you, by using \ref shtns_set_grid_auto with nphi and or nlat set to zero.
+for you, by using \ref shtns_set_grid_auto with nphi and/or nlat set to zero.
 
 Identifying a grid point with its indices \c it and \c ip in latitudinal and longitudinal direction respectively (indices start at 0), one has :
  - \f$ \theta \f$ = \c acos(ct[it]) where \ref ct is initialized by the call to \ref shtns_init
@@ -103,7 +107,7 @@ That is \f$ A(\theta,\phi) \f$ = \c A[it*NPHI + ip] in C or \c A(ip,it) in Fortr
 Use \ref SHT_PHI_CONTIGUOUS to instruct \ref shtns_init to use this spatial data layout :
 
 \code shtns_init ( sht_gauss | SHT_PHI_CONTIGUOUS, ... ) \endcode will tell shtns to
-precompute everything for a gauss nodes in latitude, and spatial data stored with phi varying
+precompute everything for a gauss grid, and spatial data stored with longitude varying
 fastest.
 
 \section theta_fast Contiguous latitudes
@@ -124,11 +128,13 @@ The aditional space, is located at the end of the useful data, and you don't nee
 
 To instruct \ref shtns_init that your spatial data has been set up using this layout, use \ref SHT_NATIVE_LAYOUT.
 
-One must be careful when allocating spatial data, as the Fourier transform requires some aditional space.\n Precisely, the number
+\note One must be careful when allocating spatial data, as the Fourier transform requires some aditional space.\n Precisely, the number
 of required \c double is \ref NSPAT_ALLOC = NLAT*(NPHI/2+1)*2. The first NLAT*NPHI values are the spatial data.
 
-In addition, spatial data must be allocated using the \c fftw_malloc function, for example using :
+\note In addition, spatial data must be allocated using the \c fftw_malloc function, for example using :
 \code A = fftw_malloc( NSPAT_ALLOC * sizeof(double) );\endcode
+
+\note <b>It is not recommanded to use the native layout with Fortran or Python.</b>
 
 
 */
@@ -139,7 +145,8 @@ In addition, spatial data must be allocated using the \c fftw_malloc function, f
 \section spec_data Spherical Harmonic coefficients layout
 
 <b>The collection of Alm (spherical harmonics coefficient of degree \e l and order \e m) is stored in an array of \c complex \c double floating point values.</b>
-The spherical harmonic truncation is defined by a call to \ref shtns_init or to \ref shtns_create which returns the size NLM of the array.
+The spherical harmonic truncation is defined by a call to \ref shtns_init or to \ref shtns_create which returns an \ref shtns_cfg object 
+from which the the size of the array, \ref shtns_info.nlm, can be read (see examples).
 
 The field \em A is decomposed on the basis of spherical harmonics Ylm (degree \e l, order \e m) :
 \f[ A(\theta,\phi) = \sum_{l,m} A_l^m Y_l^m(\theta,\phi)\f]
@@ -151,7 +158,7 @@ The details of the storage may depend on the algorithm, and to access a particul
  - \ref LM(l,m) gives the index in the array for coefficient of degree \e l and order \e m.
  - \ref LiM(l,im) gives the index in the array for coefficient of degree \e l and order \e im*MRES.
 
-Hence \c Alm[LM(l,m)] is the SH coefficient of degree \e l and order \e m.
+Hence \c Alm[LM(l,m)] is the (complex) SH coefficient of degree \e l and order \e m.
 
 \note Since SHTns only deals with real spatial data, the Spherical Harmonic coefficients wiht negative \e m are the complex conjugate of the
 positive \e m coefficents : \f$ A_l^{-m} = (A_l^m)^*\f$. For efficiency purposes, only the coefficients with positive \e m are stored.
@@ -160,12 +167,12 @@ positive \e m coefficents : \f$ A_l^{-m} = (A_l^m)^*\f$. For efficiency purposes
 (in particular for an \e m that is not a multiple of \c MRES)
 
 To perform loops on all coefficients, use the macros \ref LM_LOOP and \ref LM_L_LOOP
-in combination of the arrays \ref li, \ref el and \ref l2 which give the degree \e l and functions of it for any array index.
+in combination of the arrays \ref shtns_info.li which give the degree \e l and functions of it for any array index.
 
 \section Allocation
 Allocation for a SH description is simply done with :
 \code Alm = fftw_malloc( NLM * sizeof(complex double) );\endcode
-The use of fftw_malloc ensures proper alignement of data for SSE vectorization.
+The use of fftw_malloc ensures proper alignement of data for SSE vectorization (if fftw has been properly compiled with --enable-sse2 or --enable-avx).
 
 \section norm Normalization
 
@@ -217,7 +224,7 @@ A few useful examples, for orthonormal spherical harmonics :
  - \f$ \sin \theta \, \cos \phi \f$ is represented by \f$ c_1^1 =  -\sqrt{2\pi/3} \f$ (with Condon-Shortley phase)
  - with a "real" normalization instead, one would have \f$ c_1^1 = -\sqrt{4\pi/3} = -c_1^0 \f$.
 
-The functions \ref sh00_1(), \ref sh10_ct(), \ref sh11_st() will help to build simple
+The functions \ref sh00_1(), \ref sh10_ct(), \ref sh11_st() \ref shlm_e1() will help to build simple
 spectral fields, no matter what normalization you choose.
 
 \subsection Troubleshooting
@@ -230,6 +237,47 @@ If you have problem in getting your spherical harmonic coefficient right, you ma
 
 */
 
+
+/** \page vsh Vector Spherical Harmonics as implemented in SHTns
+
+SHTns also provides vector transforms.
+
+\section vsh_def Radial - Spheroidal - Toroidal decomposition
+
+The components of a vector field on a sphere \f$\mathbf{v}(\theta,\phi) = (v_r, v_\theta, v_\phi)\f$
+in canonical spherical coordinates cannot be transformed as scalars, because they do not behave like scalar fields
+under rotation for example (actually only the radial component does).
+
+To overcome this, we use the following decomposition:
+\f[ \mathbf{v} = Q(\theta,\phi) \mathbf{e_r}+ r \nabla S(\theta,\phi) + \nabla \times ( T(\theta,\phi) \mathbf{r} ) \f]
+where Q, S and T are scalar fields. We have explicitely:
+\f[ \mathbf{v} = \left( \begin{array}{rcl}
+Q  & & \\ 
+\partial_\theta S & + & \frac{1}{\sin\theta} \partial_\phi T \\
+\frac{1}{\sin\theta} \partial_\phi S & - &\partial_\theta T
+\end{array} \right) \f]
+
+Expanding Q, S and T (which are scalar fields) in spherical harmonics gives:
+\f[ \mathbf{v} = \sum_{l,m} \left( Q_l^m \, Y_l^m(\theta,\phi) \mathbf{e_r}+ S_l^m \, r \nabla Y_l^m(\theta,\phi) -  T_l^m \, \mathbf{r} \times \nabla Y_l^m(\theta,\phi) \right) \f]
+
+If this only involves a simple scalar transform for the radial component, it does involve derivatives of spherical harmonics for the tangential components.
+
+The functions \ref SHqst_to_spat and \ref spat_to_SHqst transform vector fields from their
+spherical coordinate spatial representation to their spectral representation using \c Qlm, \c Slm and \c Tlm.
+
+The functions \ref SHsphtor_to_spat and \ref spat_to_SHsphtor do the same for a tangential vector on the sphere (without radial component).
+
+\see A closely related definition of <a href="http://en.wikipedia.org/wiki/Vector_spherical_harmonics#Definition">vector spherical harmonics on wikipedia</a>.
+
+\section vsh_3d Special case of 3D divergence-free fields
+
+For a divergenceless 3D vector, the radial scalar Q and the spheroidal scalar S can be derived from the same poloidal scalar P :
+\f[ Q = \frac{l(l+1)}{r} P \f]
+\f[ S = \frac{1}{r} \frac{\partial \, rP}{\partial r} \f]
+which corresponds to the poloidal/toroidal decomposition that ensures the vector field to be divergence-free.
+\f[ \mathbf{v} = \nabla \times (T \mathbf{r}) + \nabla \times \nabla \times (P \mathbf{r}) \f]
+
+*/
 
 
 /** \page opt Optimizations implemented in SHTns
@@ -269,6 +317,13 @@ When using \ref shtns_set_grid_auto, you can let SHTns choose the optimal spatia
 the spherical harmonic truncation you specified with \ref shtns_create.
 The spatial sizes are chosen so that no aliasing occurs, and ensuring FFTW will perform as fast
 as possible.
+
+\section opt_vect Explicit Vectorization
+
+Most x86 CPUs have support for Single-Instruction-Multiple-Data (SIMD) operations in double precision,
+allowing to perform the same double precision arithmetic operations on a vector of 2 (SSE2) or 4 (AVX) double precision numbers,
+effectively multiplying by 2 or 4 the computing power. Modern compilers attempt to vectorize the code, but they cannot do miracles.
+SHTns uses explicit vectorization extensively (thanks to the GCC vector extensions) to use the full computing power of your CPU.
 
 \section opt_dct Discrete Cosine Transform optimization
 
@@ -341,7 +396,7 @@ show that <b>SHTns performs much faster than any other</b> (non-parallel). Furth
 We claim that the accuracy of SHTns is as good as it can be with double precision floating point math.
 Rescaling is performed for large transform where the recurrence relation would otherwise underflow the double precision numbers.
 SHTns has been tested on x86 architecture with SSE2 double precision floating point math (64 bit) to be <b>accurate up to l=8191</b>.
-The measured error for a back and forth scalar transform using a Gauss-Legendre algorithm for various truncation levels lmax is plotted below.
+The measured error for a back and forth scalar transform using a Gauss-Legendre algorithm for various truncation levels \c lmax is plotted below.
 
 \image html accuracy.png
 \image latex accuracy.png "Accuracy of our scalar Gauss-Legendre transform" width=10cm
@@ -365,9 +420,8 @@ in the preamble of your source file.
 
 First of all you need to initialize SHTns. There are two ways to do this :
 \li calling \ref shtns_init function,
-\li or calling \ref shtns_create followed by \ref shtns_set_grid. This way lets you choose normalization and optimization.
+\li or calling \ref shtns_create followed by \ref shtns_set_grid or \ref shtns_set_grid_auto. This way lets you choose normalization and optimization.
 
-Note that you can call initialization function(s) only once.
 Then you must allocate some memory (with fftw_malloc so that the memory is properly aligned for vectorized code),
 and finaly you can perform some spherical harmonic transforms.
 
@@ -387,10 +441,12 @@ When your program is ready, compile it adding these options to the compiler (gcc
 SHTns provides an interface to Fortran language (compatible with gfortran).
 
 First of all you need to initialize SHTns. There are two ways to do this :
-\li calling one of the shtns_init_* subroutines,
-\li or calling shtns_create followed by shtns_set_grid. This way lets you choose normalization and optimization.
+\li calling one of the \c shtns_init_* subroutines,
+\li or calling \c shtns_set_size followed by \c shtns_precompute or \c shtns_precompute_auto.
+This way lets you choose normalization and optimization.
 
-Note that you can call initialization function(s) only once.
+Note that you can call initialization function(s) only once, which means that only one size and grid can be
+used with the Fortran interface (C and Python do not have this limitation).
 Then you must allocate some memory, and finaly you can perform some spherical harmonic transforms.
 
 \see See The full reference of the \ref fortapi
@@ -412,7 +468,7 @@ When your program is ready, compile it adding these options to the compiler (gfo
 
 /** \page python Using SHTns with Python
 
-<b>This is a preliminary, alpha quality, Python interface; do not expect too much !</b>
+<b>This is a preliminary, beta quality, Python interface.</b>
 SHTns provides a Python interface that uses <a href="http://numpy.scipy.org/">NumPy</a> arrays to perform Spherical Harmonic Transforms.
 It uses <a href="http://www.swig.org/">SWIG</a> to generate the Python interface, so you have to install it in order to build the Python interface.
 
@@ -424,7 +480,7 @@ To start using SHTns you must then create an sht object, from which you can call
 The arrays should be created using <a href="http://numpy.scipy.org/">NumPy</a>.
 \see See the \link SHT_example.py Python example \endlink to get started.
 
-<i>In case of segfaults, you may have alignment problems. Please make a bugreport or contact the author.</i>
+<i>In case of segfaults, you may have alignment problems. Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a> or contact the author.</i>
 
 \example SHT_example.py
   \brief A Python example using NumPy and SHTns that performs backward and forward Spherical Harmonic Transforms.

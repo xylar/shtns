@@ -135,7 +135,7 @@ double sh11_st(shtns_cfg);	///< returns the spherical harmonic representation of
 double shlm_e1(shtns_cfg, int l, int m);		///< returns the l,m SH coefficient corresponding to unit energy.
 //@}
 
-/// \name utils functions
+/// \name Rotation functions
 //@{
 /// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
 /// which is the same as rotating the reference frame by angle -alpha.
@@ -149,37 +149,44 @@ void SH_Yrotate90(shtns_cfg, complex double *Qlm, complex double *Rlm);
 void SH_Xrotate90(shtns_cfg, complex double *Qlm, complex double *Rlm);
 //@}
 
+/** \addtogroup sht Spherical Harmonic transform functions.
+ * All these function perform a global spherical harmonic transform.
+ * Their first argument is a shtns_cfg variable (which is a pointer to a \ref shtns_info struct)
+ * obtained by a previous call to \ref shtns_create or \ref shtns_init.
+ * \see \ref spat \see \ref spec \see \ref vsh
+ */
+//@{
+
 /// \name Scalar transforms
 //@{
+/// transform the scalar field Vr into its spherical harmonic representation Qlm.
 void spat_to_SH(shtns_cfg, double *Vr, complex double *Qlm);
+/// transform the spherical harmonic coefficients Qlm into its spatial representation Vr.
 void SH_to_spat(shtns_cfg, complex double *Qlm, double *Vr);
 //@}
 
-/// \name Vector transforms
+/// \name 2D vector transforms
 //@{
+/// transform the theta and phi components (Vt,Vp) of a vector into its spheroidal-toroidal spherical harmonic representation (Slm,Tlm). \see \ref vsh
 void spat_to_SHsphtor(shtns_cfg, double *Vt, double *Vp, complex double *Slm, complex double *Tlm);
+/// transform spheroidal-toroidal spherical harmonic coefficients (Slm,Tlm) to the spatial theta and phi components (Vt,Vp). \see \ref vsh
 void SHsphtor_to_spat(shtns_cfg, complex double *Slm, complex double *Tlm, double *Vt, double *Vp);
+/// transform spheroidal spherical harmonic coefficients Slm to the spatial theta and phi components (Vt,Vp), effectively computing the gradient of S. \see \ref vsh
 void SHsph_to_spat(shtns_cfg, complex double *Slm, double *Vt, double *Vp);
+/// transform toroidal spherical harmonic coefficients Tlm to the spatial theta and phi components (Vt,Vp). \see \ref vsh
 void SHtor_to_spat(shtns_cfg, complex double *Tlm, double *Vt, double *Vp);
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat
 #define SH_to_grad_spat(shtns, S,Gt,Gp) SHsph_to_spat(shtns, S, Gt, Gp)
 
-/// \name 3D transforms (combine Scalar and Vector)
+/// \name 3D transforms (combine scalar and vector)
 //@{
+/// 3D vector transform from spherical coordinates to \link vsh_def radial-spheroidal-toroidal spectral components\endlink
+/// they should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
 void spat_to_SHqst(shtns_cfg, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm);
+/// 3D vector transform from spherical coordinates to \link vsh_def radial-spheroidal-toroidal spectral components\endlink
+/// they should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
 void SHqst_to_spat(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp);
-//@}
-
-/// \name Local and partial evalutions of a SH representation :
-/// Does not require a call to \ref shtns_precompute
-//@{
-double SH_to_point(shtns_cfg, complex double *Qlm, double cost, double phi);
-void SHqst_to_point(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm,
-					double cost, double phi, double *vr, double *vt, double *vp);
-
-void SHqst_to_lat(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
-					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
 //@}
 
 /// \name Truncated transforms at given degree l
@@ -197,5 +204,18 @@ void SHqst_to_spat_l(shtns_cfg, complex double *Qlm, complex double *Slm, comple
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_l(shtns, S,Gt,Gp,ltr) SHsph_to_spat_l(shtns, S, Gt, Gp, ltr)
+
+//@}
+
+/// \name Local and partial evalutions of a SH representation :
+/// Does not require a call to \ref shtns_precompute
+//@{
+double SH_to_point(shtns_cfg, complex double *Qlm, double cost, double phi);
+void SHqst_to_point(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm,
+					double cost, double phi, double *vr, double *vt, double *vp);
+
+void SHqst_to_lat(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
+					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
+//@}
 
 #endif
