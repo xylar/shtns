@@ -87,7 +87,8 @@ docs :
 clean :
 	$(MAKE) clean -C SHT
 	rm -f *.o
-	rm -rf doc/
+	rm -rf doc/html
+	rm -rf doc/latex
 
 # build a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
