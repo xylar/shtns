@@ -1815,8 +1815,9 @@ double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 	#if SHT_VERBOSE > 1
 		printf(" => nloop=%d (takes %g s)\n",nloop, tt);
 	#endif
-	if ((tt > 3.0) || (vector == 0))	typ_lim = SHT_TYP_VSY;		// time only scalar transforms.
-	if (tt > 10.0)	goto done;		// timing this will be too slow...
+	if (vector == 0)	typ_lim = SHT_TYP_VSY;		// time only scalar transforms.
+//	if (tt > 3.0)		typ_lim = SHT_TYP_VSY;		// time only scalar transforms.
+//	if (tt > 10.0)	goto done;		// timing this will be too slow...
 
 	int ityp = 0;	do {
 		if ((dct_mtr != 0) && (ityp >= 4)) break;		// dct !=0 : only scalar and vector.

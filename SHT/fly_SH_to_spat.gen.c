@@ -65,8 +65,8 @@ S	double Sl0[llim];
 T	double Tl0[llim];
 
   #ifndef SHT_AXISYM
-Q	BrF = (v2d *) Vr;
-V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
+Q	BrF = (v2d*) Vr;
+V	BtF = (v2d*) Vt;	BpF = (v2d*) Vp;
 	#ifdef _GCC_VEC_
 	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
 		unsigned long nv = shtns->nspat;
@@ -202,7 +202,7 @@ V		BtF += NLAT;	BpF += NLAT;
 	for(im=1; im<=imlim; im++) {
 		m = im*MRES;
 		l = LiM(shtns, 0,im);
-V		m_1 = -1.0/m;
+V		m_1 = 1.0/m;
 		alm = shtns->alm[im];
 Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
@@ -238,13 +238,13 @@ V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = vread(st, k+j);
 				y0[j] = vall(al[0]);
-V				st2[j] = cost[j]*cost[j]*vall(m_1);
+V				st2[j] = cost[j]*cost[j]*vall(-m_1);
 V				y0[j] *= vall(m);		// for the vector transform, compute ylm*m/sint
 			}
 Q			l=m;
 V			l=m-1;
 			long int ny = 0;
-		  if (llim <= SHT_L_RESCALE_FLY) {
+		  if ((int)llim <= SHT_L_RESCALE_FLY) {
 			do {		// sin(theta)^m
 				if (l&1) for (int j=0; j<NWAY; j++) y0[j] *= cost[j];
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
@@ -260,14 +260,13 @@ V			l=m-1;
 						for (int j=0; j<NWAY; j++) y0[j] *= vall(SHT_SCALE_FACTOR);
 					}
 				}
-				l >>= 1;
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
 				nsint += nsint;
 				if (vlo(cost[0]) < 1.0/SHT_SCALE_FACTOR) {
 					nsint--;
 					for (int j=0; j<NWAY; j++) cost[j] *= vall(SHT_SCALE_FACTOR);
 				}
-			} while(l > 0);
+			} while(l >>= 1);
 		  }
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = vread(ct, j+k);
@@ -284,7 +283,7 @@ S				poi[j] = vall(0.0);		ter[j] = vall(0.0);
 T				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
-			while ((ny < 0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
+			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
 				for (int j=0; j<NWAY; j++) {
 					y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
 V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
@@ -350,7 +349,7 @@ S				for (int j=0; j<NWAY; j++) {	toi[j] += dy0[j] * si(l);		per[j] -= y0[j] * s
 T				for (int j=0; j<NWAY; j++) {	por[j] -= dy0[j] * tr(l);		tei[j] += y0[j] * tr(l);	}
 T				for (int j=0; j<NWAY; j++) {	poi[j] -= dy0[j] * ti(l);		ter[j] -= y0[j] * ti(l);	}
 			}
-3			for (int j=0; j<NWAY; j++) cost[j]  = vread(st, k+j) * vall(-m_1);
+3			for (int j=0; j<NWAY; j++) cost[j]  = vread(st, k+j) * vall(m_1);
 3			for (int j=0; j<NWAY; j++) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
 		  }
 		#if _GCC_VEC_

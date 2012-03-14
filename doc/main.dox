@@ -248,7 +248,7 @@ under rotation for example (actually only the radial component does).
 
 To overcome this, we use the following decomposition:
 \f[ \mathbf{v} = Q(\theta,\phi) \mathbf{e_r}+ r \nabla S(\theta,\phi) + \nabla \times ( T(\theta,\phi) \mathbf{r} ) \f]
-where Q, S and T are scalar fields. We have explicitely:
+where Q, S and T are respectively the radial, spheroidal and toroidal scalar fields. We have explicitely:
 \f[ \mathbf{v} = \left( \begin{array}{rcl}
 Q  & & \\ 
 \partial_\theta S & + & \frac{1}{\sin\theta} \partial_\phi T \\
@@ -261,7 +261,7 @@ Expanding Q, S and T (which are scalar fields) in spherical harmonics gives:
 If this only involves a simple scalar transform for the radial component, it does involve derivatives of spherical harmonics for the tangential components.
 
 The functions \ref SHqst_to_spat and \ref spat_to_SHqst transform vector fields from their
-spherical coordinate spatial representation to their spectral representation using \c Qlm, \c Slm and \c Tlm.
+spherical coordinate spatial representation \c Vr, \c Vt, \c Vp to their spectral representation using \c Qlm, \c Slm and \c Tlm.
 
 The functions \ref SHsphtor_to_spat and \ref spat_to_SHsphtor do the same for a tangential vector on the sphere (without radial component).
 

@@ -160,9 +160,15 @@ void SH_Xrotate90(shtns_cfg, complex double *Qlm, complex double *Rlm);
 /// \name Scalar transforms
 //@{
 /// transform the scalar field Vr into its spherical harmonic representation Qlm.
-void spat_to_SH(shtns_cfg, double *Vr, complex double *Qlm);
+/// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by \ref shtns_set_grid or \ref shtns_set_grid_auto
+/// \param[in] Vr = spatial scalar field : double array of size shtns->nspat.
+/// \param[out] Qlm = spherical harmonics coefficients : complex double array of size shtns->nlm.
+void spat_to_SH(shtns_cfg shtns, double *Vr, complex double *Qlm);
 /// transform the spherical harmonic coefficients Qlm into its spatial representation Vr.
-void SH_to_spat(shtns_cfg, complex double *Qlm, double *Vr);
+/// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by \ref shtns_set_grid or \ref shtns_set_grid_auto
+/// \param[in] Qlm = spherical harmonics coefficients : complex double array of size shtns->nlm.
+/// \param[out] Vr = spatial scalar field : double array of size shtns->nspat.
+void SH_to_spat(shtns_cfg shtns, complex double *Qlm, double *Vr);
 //@}
 
 /// \name 2D vector transforms
@@ -190,6 +196,7 @@ void SHqst_to_spat(shtns_cfg, complex double *Qlm, complex double *Slm, complex 
 //@}
 
 /// \name Truncated transforms at given degree l
+/// wiht l <= lmax used for setup.
 //@{
 void spat_to_SH_l(shtns_cfg, double *Vr, complex double *Qlm, int ltr);
 void SH_to_spat_l(shtns_cfg, complex double *Qlm, double *Vr, int ltr);

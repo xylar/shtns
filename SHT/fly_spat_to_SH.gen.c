@@ -23,21 +23,6 @@
 # to keep or remove the line depending on the function to build. (Q for scalar, V for vector, # for comment)
 #
 //////////////////////////////////////////////////
-  #ifdef SHT_AXISYM
-/// The spatial field is assumed to be \b axisymmetric (spatial size NLAT), and only the m=0 harmonics are written to output.
-  #endif
-
-/// Truncation and spatial discretization are defined by \ref shtns_create and \ref shtns_set_grid_*
-/// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by shtns_set_grid_*
-Q/// \param[in] Vr = spatial scalar field : double array.
-V/// \param[in] Vt, Vp = spatial (theta, phi) vector components : double arrays.
-Q/// \param[out] Qlm = spherical harmonics coefficients :
-Q/// complex double arrays of size shtns->nlm.
-V/// \param[out] Slm,Tlm = spherical harmonics coefficients of \b Spheroidal and \b Toroidal scalars :
-V/// complex double arrays of size shtns->nlm.
-  #ifdef SHT_VAR_LTR
-/// \param[in] llim = specify maximum degree of spherical harmonic. ltr must be at most LMAX, and all spherical harmonic degree higher than ltr are set to zero. 
-  #endif
 
 QX	void GEN3(spat_to_SH_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
 VX	void GEN3(spat_to_SHsphtor_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
@@ -133,7 +118,7 @@ V			per[k] = vdup(0.0);		por[k] = vdup(0.0);
 		#if _GCC_VEC_
 Q			Qlm[0] = (vlo_to_dbl(r0) + vhi_to_dbl(r0)) * alm[0];					// l=0 is done.
 		#else
-Q			Qlm[0] = r0 * alm[0];					// l=0 is done.
+Q			Qlm[0] = r0 * alm[0];				// l=0 is done.
 		#endif
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
@@ -293,7 +278,7 @@ V			por[k] = an-as;		poi[k] = ani-asi;		por[k+1] = bn-bs;		poi[k+1] = bni-bsi;
 			k+=2;
  		} while (k<nk);
 	#endif
-V		m_1 = -1.0/m;
+V		m_1 = 1.0/m;
 		k=l;
 		#if _GCC_VEC_
 Q			rnd* q = qq;
@@ -328,13 +313,13 @@ V			rnd perk[NWAY], peik[NWAY], pork[NWAY], poik[NWAY];
 			for (int j=0; j<NWAY; j++) {
 				cost[j] = vread(st, k+j);
 				y0[j] = vall(al[0]*0.5);
-V				st2[j] = cost[j]*cost[j]*vall(m_1);
+V				st2[j] = cost[j]*cost[j]*vall(-m_1);
 V				y0[j] *= vall(m);		// for the vector transform, compute ylm*m/sint
 			}
 Q			l=m;
 V			l=m-1;
 			long int ny = 0;	// exponent to extend double precision range.
-		if (llim <= SHT_L_RESCALE_FLY) {
+		if ((int)llim <= SHT_L_RESCALE_FLY) {
 			do {		// sin(theta)^m
 				if (l&1) for (int j=0; j<NWAY; j++) y0[j] *= cost[j];
 				for (int j=0; j<NWAY; j++) cost[j] *= cost[j];
@@ -365,7 +350,7 @@ V				dy0[j] = cost[j]*y0[j];
 V				dy1[j] = (vall(al[1])*y0[j]) *(cost[j]*cost[j] + st2[j]);
 			}
 			l=m;	al+=2;
-			while ((ny < 0) && (l < llim)) {		// ylm treated as zero and ignored if ny < 0
+			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
 				for (int j=0; j<NWAY; j++) {
 					y0[j] = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
 V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
@@ -438,19 +423,19 @@ V		v2d *Tl = (v2d*) &Tlm[l];
 			#ifdef __AVX__
 Q				rnd qa = _mm256_hadd_pd(qq[2*l], qq[2*l+1]);
 QX				Ql[l] = _mm256_castpd256_pd128(qa) + _mm256_extractf128_pd(qa,1);
-3				Ql[l] = (_mm256_castpd256_pd128(qa) + _mm256_extractf128_pd(qa,1)) * vdup(-m_1);
+3				Ql[l] = (_mm256_castpd256_pd128(qa) + _mm256_extractf128_pd(qa,1)) * vdup(m_1);
 V				rnd sa = _mm256_hadd_pd(ss[2*l], ss[2*l+1]);		rnd ta = _mm256_hadd_pd(tt[2*l], tt[2*l+1]);
 V				sa = (_mm256_permute2f128_pd(sa, ta, 0x02) + _mm256_permute2f128_pd(sa, ta, 0x13)) * vall(l_2[l+m]);
 V				Sl[l] = _mm256_extractf128_pd(sa,1);	Tl[l] = _mm256_castpd256_pd128(sa);
 			#elif defined __SSE3__
 QX				Ql[l] = _mm_hadd_pd(qq[2*l], qq[2*l+1]);
-3				Ql[l] = _mm_hadd_pd(qq[2*l], qq[2*l+1]) * vdup(-m_1);
+3				Ql[l] = _mm_hadd_pd(qq[2*l], qq[2*l+1]) * vdup(m_1);
 V				Sl[l] = _mm_hadd_pd(ss[2*l], ss[2*l+1]) * vdup(l_2[l+m]);
 V				Tl[l] = _mm_hadd_pd(tt[2*l], tt[2*l+1]) * vdup(l_2[l+m]);
 			#else
 Q				s2d qa = _mm_unpacklo_pd(qq[2*l], qq[2*l+1]);		s2d qb = _mm_unpackhi_pd(qq[2*l], qq[2*l+1]);
 QX				Ql[l] = qa + qb;
-3				Ql[l] = (qa + qb)*vdup(-m_1);
+3				Ql[l] = (qa + qb)*vdup(m_1);
 V				s2d sa = _mm_unpacklo_pd(ss[2*l], ss[2*l+1]);		s2d sb = _mm_unpackhi_pd(ss[2*l], ss[2*l+1]);
 V				s2d ta = _mm_unpacklo_pd(tt[2*l], tt[2*l+1]);		s2d tb = _mm_unpackhi_pd(tt[2*l], tt[2*l+1]);
 V				Sl[l] = (sa + sb)*vdup(l_2[l+m]);
@@ -459,7 +444,7 @@ V				Tl[l] = (ta + tb)*vdup(l_2[l+m]);
 			}
 		#else
 V			for (l=0; l<=llim-m; l++) {
-3				Ql[l] *= -m_1;
+3				Ql[l] *= m_1;
 V				Sl[l] *= l_2[l+m];
 V				Tl[l] *= l_2[l+m];
 V			}

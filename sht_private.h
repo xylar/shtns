@@ -137,9 +137,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 // value for on-the-fly transforms is lower because it allows to optimize some more (don't compute l which are not significant).
 #define SHT_L_RESCALE_FLY 1000
 // set to a value close to the machine accuracy, it allows to speed-up on-the-fly SHTs with very large l (lmax > SHT_L_RESCALE_FLY).
-#define SHT_ACCURACY 1.0e-15
+#define SHT_ACCURACY 1.0e-20
 // scale factor for extended range numbers (used in on-the-fly transforms to compute recurrence)
 #define SHT_SCALE_FACTOR 2.9073548971824275622e+135
+//#define SHT_SCALE_FACTOR 2.0370359763344860863e+90
+
 
 /* for vectorization (SSE2) */
 
