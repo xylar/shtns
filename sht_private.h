@@ -131,9 +131,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 # define M_PIl 3.1415926535897932384626433832795L
 #endif
 
-// scale factor applied for LMAX larger than SHT_L_RESCALE. Allows accurate transforms up to l=2700 with 64 bit double precision.
-#define SHT_LEG_SCALEF 1.1018032079253110206e-280
-#define SHT_L_RESCALE 1536
 // value for on-the-fly transforms is lower because it allows to optimize some more (don't compute l which are not significant).
 #define SHT_L_RESCALE_FLY 1000
 // set to a value close to the machine accuracy, it allows to speed-up on-the-fly SHTs with very large l (lmax > SHT_L_RESCALE_FLY).

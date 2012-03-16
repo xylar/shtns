@@ -1106,7 +1106,7 @@ void init_SH_synth(shtns_cfg shtns)
 
 	{	im=0;	m=0;
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array_hp(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
 			for (l=0; l<=LMAX; l++)   YL0(it, l) = yl[l];
 			for (l=LMAX+1; l<=LMAX+3; l++)	YL0(it, l) = 0.0;	// allow overflow.
 			if (vector) {
@@ -1120,7 +1120,7 @@ void init_SH_synth(shtns_cfg shtns)
 		struct DtDp* dylm = vector ? shtns->dylm[im] : NULL;
 		m = im*MRES;
 		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
+			legendre_sphPlm_deriv_array_hp(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
 			for (l=m; l<=LMAX; l++) {
 				ylm[it*(LMAX-m+1) + (l-m)] = yl[l-m] * st[it];
 				if (vector) {
@@ -1139,19 +1139,17 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 {
 	double t,tmax;
 	long int it,im,m,l;
-	long double iylm_fft_norm;
-	long double xg[NLAT], wgl[NLAT];	// gauss points and weights.
+	real iylm_fft_norm;
+	real xg[NLAT], wgl[NLAT];	// gauss points and weights.
 	int vector = (shtns->dylm != NULL);
 	const int overflow = 8*VSIZE2-1;
 
 	shtns->grid = GRID_GAUSS;
 	shtns->wg = malloc((NLAT_2 +overflow) * sizeof(double));	// gauss weights, double precision.
 
- 	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
- 		iylm_fft_norm = 0.5/NPHI;		// FFT/SHT normalization for zlm (4pi normalized)
-	} else {
- 		iylm_fft_norm = 2.0*M_PIl/NPHI;		// FFT/SHT normalization for zlm (orthonormalized)
-	}
+	iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
+	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
+	iylm_fft_norm /= (2*NPHI);
 #if SHT_VERBOSE > 0
 	printf("        => using Gauss nodes\n");
 	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition 2*Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
@@ -1159,8 +1157,8 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 	gauss_nodes(xg,wgl,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
 	for (it=0; it<NLAT; it++) {
 		shtns->ct[it] = xg[it];
-		shtns->st[it] = sqrtl((1.-xg[it])*(1.+xg[it]));
-		shtns->st_1[it] = 1.0/sqrtl((1.-xg[it])*(1.+xg[it]));
+		shtns->st[it] = SQRT((1.-xg[it])*(1.+xg[it]));
+		shtns->st_1[it] = 1.0/SQRT((1.-xg[it])*(1.+xg[it]));
 	}
 	for (it=0; it<NLAT_2; it++)
 		shtns->wg[it] = wgl[it]*iylm_fft_norm;		// faster double-precision computations.
@@ -1245,7 +1243,7 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	fftw_plan dct, idct;
 	double *yk, *yk0, *dyk0, *yg;		// temp storage
 	struct DtDp *dyg, *dyk;
-	double iylm_fft_norm;
+	real iylm_fft_norm;
 	long int it,im,m,l;
 	long int sk, dsk;
 	double Z[2*NLAT_2], dZt[2*NLAT_2], dZp[2*NLAT_2];		// equally spaced theta points.
@@ -1258,11 +1256,9 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	int vector = (shtns->dylm != NULL);
 
 	shtns->grid = GRID_REGULAR;
-	if ((SHT_NORM == sht_fourpi)||(SHT_NORM == sht_schmidt)) {
- 		iylm_fft_norm = 0.5/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm (4pi)
-	} else {
- 		iylm_fft_norm = 2.0*M_PI/(NPHI*NLAT_2);	// FFT/DCT/SHT normalization for zlm (orthonormal)
-	}
+	iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
+ 	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
+	iylm_fft_norm /= (2*NPHI*NLAT_2);
 
 #if SHT_VERBOSE > 0
 	printf("        => using equaly spaced nodes with DCT acceleration\n");
@@ -1272,10 +1268,8 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
 	if (NLAT <= LMAX+1) shtns_runerr("NLAT should be at least LMAX+2 (DCT)");
 	for (it=0; it<NLAT; it++) {	// Chebychev points : equaly spaced but skipping poles.
-		long double th = M_PIl*(it+0.5)/NLAT;
-		ct[it] = cosl(th);
-		st[it] = sinl(th);
-		st_1[it] = 1.0/sinl(th);
+		real th = M_PIl;	th = (th*(2*it+1))/(2*NLAT);
+		ct[it] = COS(th);	st[it] = SIN(th);	st_1[it] = 1.0/SIN(th);
 	}
 #if SHT_VERBOSE > 1
 	{
@@ -2046,8 +2040,9 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	}
 	if (l_2_ok == 0) {
 		shtns->l_2 = (double *) malloc( (LMAX+1)*sizeof(double) );
-		shtns->l_2[0] = 0.0;	// undefined for l=0 => replace with 0.	
-		for (l=1; l<=LMAX; l++)		shtns->l_2[l] = 1.0/(l*(l+1.0));
+		shtns->l_2[0] = 0.0;	// undefined for l=0 => replace with 0.
+		real one = 1.0;
+		for (l=1; l<=LMAX; l++)		shtns->l_2[l] = one/(l*(l+1));
 	}
 
 	switch(SHT_NORM) {
