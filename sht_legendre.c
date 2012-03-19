@@ -61,7 +61,7 @@
 // returns 1 for large exponent only => useless.
 // returns 2 for extended precision only => ok to improve gauss points.
 // returns 3 for extended precision and large exponent => ok to improve legendre recurrence.
-int test_long_double()
+static int test_long_double()
 {
 	volatile real tt;	// volatile avoids optimizations.
 	int p = 0;
@@ -75,7 +75,7 @@ int test_long_double()
 }
 
 /// \internal high precision version of \ref a_sint_pow_n
-real a_sint_pow_n_hp(real val, real cost, long int n)
+static real a_sint_pow_n_hp(real val, real cost, long int n)
 {
 	real s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
 	long int k = n >> 7;
@@ -100,7 +100,7 @@ real a_sint_pow_n_hp(real val, real cost, long int n)
 /// \internal computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
 /// assumes: -1 <= cost <= 1, n>=0, and nval<=0 is the extended exponent associated to val.
 /// updates nval, and returns val such as the result is val.SHT_SCALE_FACTOR^(nval)
-double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
+static double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
 {
 	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
 	int ns2 = 0;
@@ -120,7 +120,7 @@ double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
 		}
 	}
 	while ((nv < 0) && (fabs(val) > 1.0/SHT_SCALE_FACTOR)) {	// try to minimize |nv|
-		nv++;	val *= 1.0/SHT_SCALE_FACTOR;
+		++nv;	val *= 1.0/SHT_SCALE_FACTOR;
 	}
 	*nval = nv;
 	return val;		// 1/S^2 < val < 1
@@ -130,7 +130,7 @@ double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
 /// \internal Returns the value of a legendre polynomial of degree l and order im*MRES, noramalized for spherical harmonics, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
-double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, const double x)
+static double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, const double x)
 {
 	double *al;
 	int m, ny;
@@ -149,25 +149,25 @@ double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, const double 
 	ymmp1 = ymm;			// l=m
 	if (l == m) goto done;
 
-	ymmp1 *= al[1] * x;		// l=m+1
+	ymmp1 = al[1] * (x*ymmp1);		// l=m+1
 	if (l == m+1) goto done;
 
 	m+=2;	al+=2;
 	while ((ny < 0) && (m < l)) {		// take care of scaled values
-		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
-		ymmp1 = al[3]*x*ymm + al[2]*ymmp1;
+		ymm   = al[1]*(x*ymmp1) + al[0]*ymm;
+		ymmp1 = al[3]*(x*ymm) + al[2]*ymmp1;
 		m+=2;	al+=4;
 		if (fabs(ymm) > 1.0/SHT_SCALE_FACTOR) {		// rescale when value is significant
-			ny++;	ymm *= 1.0/SHT_SCALE_FACTOR;	ymmp1 *= 1.0/SHT_SCALE_FACTOR;
+			++ny;	ymm *= 1.0/SHT_SCALE_FACTOR;	ymmp1 *= 1.0/SHT_SCALE_FACTOR;
 		}
 	}
 	while (m < l) {		// values are unscaled.
-		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
-		ymmp1 = al[3]*x*ymm + al[2]*ymmp1;
+		ymm   = al[1]*(x*ymmp1) + al[0]*ymm;
+		ymmp1 = al[3]*(x*ymm) + al[2]*ymmp1;
 		m+=2;	al+=4;
 	}
 	if (m == l) {
-		ymmp1 = al[1]*x*ymmp1 + al[0]*ymm;
+		ymmp1 = al[1]*(x*ymmp1) + al[0]*ymm;
 	}
 done:
 	if (ny < 0) {
@@ -178,7 +178,7 @@ done:
 }
 
 #if SHT_LONG_DOUBLE > 0
-double legendre_sphPlm_hp(shtns_cfg shtns, const int l, const int im, double x)
+static double legendre_sphPlm_hp(shtns_cfg shtns, const int l, const int im, double x)
 {
 	double *al;
 	int i,m;
@@ -197,17 +197,17 @@ double legendre_sphPlm_hp(shtns_cfg shtns, const int l, const int im, double x)
 	ymmp1 = ymm;
 	if (l==m) goto done;
 
-	ymmp1 *= al[1] * x;				// l=m+1
+	ymmp1 = al[1] * (x*ymmp1);				// l=m+1
 	al+=2;
 	if (l == m+1) goto done;
 
 	for (i=m+2; i<l; i+=2) {
-		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
-		ymmp1 = al[3]*x*ymm + al[2]*ymmp1;
+		ymm   = al[1]*(x*ymmp1) + al[0]*ymm;
+		ymmp1 = al[3]*(x*ymm) + al[2]*ymmp1;
 		al+=4;
 	}
 	if (i==l) {
-		ymmp1 = al[1]*x*ymmp1 + al[0]*ymm;
+		ymmp1 = al[1]*(x*ymmp1) + al[0]*ymm;
 	}
 done:
 	if (m>0) ymmp1 *= a_sint_pow_n_hp(1.0/SHT_LEG_SCALEF, x, m);
@@ -222,7 +222,7 @@ done:
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
 /// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
-void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl)
+static void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl)
 {
 	double *al;
 	int l, m, ny;
@@ -235,7 +235,7 @@ void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const 
 
 	al = shtns->alm[im];
 	yl -= m;			// shift pointer
-	for (l=m; l<=lmax; l++) yl[l] = 0.0;		// zero out array.
+	for (l=m; l<=lmax; ++l) yl[l] = 0.0;		// zero out array.
 
 	ny = 0;
 	ymm = al[0];
@@ -249,27 +249,27 @@ void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const 
 
 	l=m+2;	al+=2;
 	while ((ny < 0) && (l < lmax)) {		// values are negligible => discard.
-		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
-		ymmp1 = al[3]*x*ymm   + al[2]*ymmp1;
+		ymm   = al[1]*(x*ymmp1) + al[0]*ymm;
+		ymmp1 = al[3]*(x*ymm)   + al[2]*ymmp1;
 		l+=2;	al+=4;
 		if (fabs(ymm) > 1.0/SHT_SCALE_FACTOR) {		// rescale when value is significant
-			ny++;	ymm *= 1.0/SHT_SCALE_FACTOR;	ymmp1 *= 1.0/SHT_SCALE_FACTOR;
+			++ny;	ymm *= 1.0/SHT_SCALE_FACTOR;	ymmp1 *= 1.0/SHT_SCALE_FACTOR;
 		}
 	}
 	while (l < lmax) {		// values are unscaled => store
-		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
-		ymmp1 = al[3]*x*ymm   + al[2]*ymmp1;
+		ymm   = al[1]*(x*ymmp1) + al[0]*ymm;
+		ymmp1 = al[3]*(x*ymm)   + al[2]*ymmp1;
 		yl[l] = ymm;		yl[l+1] = ymmp1;
 		l+=2;	al+=4;
 	}
 	if ((l == lmax) && (ny == 0)) {
-		yl[l] = al[1]*x*ymmp1 + al[0]*ymm;
+		yl[l] = al[1]*(x*ymmp1) + al[0]*ymm;
 	}
 }
 
 #if SHT_LONG_DOUBLE > 0
 /// \internal high precision version of \ref legendre_sphPlm_array
-void legendre_sphPlm_array_hp(shtns_cfg shtns, const int lmax, const int im, const double cost, double *yl)
+static void legendre_sphPlm_array_hp(shtns_cfg shtns, const int lmax, const int im, const double cost, double *yl)
 {
 	double *al;
 	long int l,m;
@@ -306,19 +306,19 @@ void legendre_sphPlm_array_hp(shtns_cfg shtns, const int lmax, const int im, con
 	if (lmax==m+1) goto done;		// done.
 
 	for (l=m+2; l<lmax; l+=2) {
-		ymm   = al[1]*x*ymmp1 + al[0]*ymm;
-		ymmp1 = al[3]*x*ymm   + al[2]*ymmp1;
+		ymm   = al[1]*(x*ymmp1) + al[0]*ymm;
+		ymmp1 = al[3]*(x*ymm)   + al[2]*ymmp1;
 		yl[l] = ymm;
 		yl[l+1] = ymmp1;
 		al+=4;
 	}
 	if (l==lmax) {
-		yl[l] = al[1]*x*ymmp1 + al[0]*ymm;
+		yl[l] = al[1]*(x*ymmp1) + al[0]*ymm;
 	}
 done:
 	if (rescale != 0) {
 		ymm = a_sint_pow_n_hp(1.0/SHT_LEG_SCALEF, x, m);
-		for (l=m; l<=lmax; l++) {		// rescale.
+		for (l=m; l<=lmax; ++l) {		// rescale.
 			yl[l] *= ymm;
 		}
 	}
@@ -335,7 +335,7 @@ done:
 /// \param sint = sqrt(1-x^2) to avoid recomputation of sqrt.
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
 /// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
-void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
+static void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
 {
 	double *al;
 	int l,m, ny;
@@ -348,7 +348,7 @@ void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, 
 
 	al = shtns->alm[im];
 	yl -= m;	dyl -= m;			// shift pointers
-	for (l=m; l<=lmax; l++) {
+	for (l=m; l<=lmax; ++l) {
 		yl[l] = 0.0;	dyl[l] = 0.0;	// zero out arrays.
 	}
 
@@ -366,7 +366,7 @@ void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, 
 	}
 	if (lmax==m) return;		// done.
 
-	y1 = al[1] * x * y0;
+	y1 = al[1] * (x * y0);
 	dy1 = al[1]*( x*dy0 - st*y0 );
 	if (ny == 0) {
 		yl[m+1] = y1; 	dyl[m+1] = dy1;		// l=m+1
@@ -375,34 +375,34 @@ void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, 
 
 	l=m+2;	al+=2;
 	while ((ny < 0) && (l < lmax)) {		// values are negligible => discard.
-		y0 = al[1]*x*y1 + al[0]*y0;
+		y0 = al[1]*(x*y1) + al[0]*y0;
 		dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
-		y1 = al[3]*x*y0 + al[2]*y1;
+		y1 = al[3]*(x*y0) + al[2]*y1;
 		dy1 = al[3]*(x*dy0 - y0*st) + al[2]*dy1;
 		l+=2;	al+=4;
 		if (fabs(y0) > 1.0/SHT_SCALE_FACTOR) {		// rescale when value is significant
-			ny++;	y0 *= 1.0/SHT_SCALE_FACTOR;		dy0 *= 1.0/SHT_SCALE_FACTOR;
+			++ny;	y0 *= 1.0/SHT_SCALE_FACTOR;		dy0 *= 1.0/SHT_SCALE_FACTOR;
 					y1 *= 1.0/SHT_SCALE_FACTOR;		dy1 *= 1.0/SHT_SCALE_FACTOR;
 		}
 	}
 	while (l < lmax) {		// values are unscaled => store.
-		y0 = al[1]*x*y1 + al[0]*y0;
+		y0 = al[1]*(x*y1) + al[0]*y0;
 		dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
-		y1 = al[3]*x*y0 + al[2]*y1;
+		y1 = al[3]*(x*y0) + al[2]*y1;
 		dy1 = al[3]*(x*dy0 - y0*st) + al[2]*dy1;
 		yl[l] = y0;		dyl[l] = dy0;
 		yl[l+1] = y1;	dyl[l+1] = dy1;
 		l+=2;	al+=4;
 	}
 	if ((l==lmax) && (ny == 0)) {
-		yl[l] = al[1]*x*y1 + al[0]*y0;
+		yl[l] = al[1]*(x*y1) + al[0]*y0;
 		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 	}
 }
 
 #if SHT_LONG_DOUBLE > 0
 /// \internal high precision version of \ref legendre_sphPlm_deriv_array
-void legendre_sphPlm_deriv_array_hp(shtns_cfg shtns, const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
+static void legendre_sphPlm_deriv_array_hp(shtns_cfg shtns, const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
 {
 	double *al;
 	long int l,m;
@@ -441,7 +441,7 @@ void legendre_sphPlm_deriv_array_hp(shtns_cfg shtns, const int lmax, const int i
 	dyl[m] = dy0;
 	if (lmax==m) goto done;		// done.
 
-	y1 = al[1] * x * y0;
+	y1 = al[1] * (x * y0);
 	dy1 = al[1]*( x*dy0 - st*y0 );
 	yl[m+1] = y1;		// l=m+1
 	dyl[m+1] = dy1;
@@ -449,16 +449,16 @@ void legendre_sphPlm_deriv_array_hp(shtns_cfg shtns, const int lmax, const int i
 	al+=2;
 
 	for (l=m+2; l<lmax; l+=2) {
-		y0 = al[1]*x*y1 + al[0]*y0;
+		y0 = al[1]*(x*y1) + al[0]*y0;
 		dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 		yl[l] = y0;		dyl[l] = dy0;
-		y1 = al[3]*x*y0 + al[2]*y1;
+		y1 = al[3]*(x*y0) + al[2]*y1;
 		dy1 = al[3]*(x*dy0 - y0*st) + al[2]*dy1;
 		yl[l+1] = y1;		dyl[l+1] = dy1;
 		al+=4;
 	}
 	if (l==lmax) {
-		yl[l] = al[1]*x*y1 + al[0]*y0;
+		yl[l] = al[1]*(x*y1) + al[0]*y0;
 		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 	}
 done:
@@ -467,7 +467,7 @@ done:
 		if (l&1) {
 			y0 = a_sint_pow_n_hp(1.0/SHT_LEG_SCALEF, x, l-1) * sint;		// avoid computation of sqrt
 		} else  y0 = a_sint_pow_n_hp(1.0/SHT_LEG_SCALEF, x, l);
-		for (l=m; l<=lmax; l++) {
+		for (l=m; l<=lmax; ++l) {
 			yl[l] *= y0;		dyl[l] *= y0;		// rescale
 		}
 	}
@@ -483,7 +483,7 @@ done:
 /// \param[in] with_cs_phase : Condon-Shortley phase (-1)^m is included (1) or not (0)
 /// \param[in] mpos_renorm : Optional renormalization for m>0.
 ///  1.0 (no renormalization) is the "complex" convention, while 0.5 leads to the "real" convention (with FFTW).
-void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
+static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
 {
 	double *al0, *bl0;
 	double **alm, **blm;
@@ -511,14 +511,14 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 
 /// - Precompute the factors alm and blm of the recurrence relation :
   if (norm == sht_schmidt) {
-	for (im=0, lm=0; im<=MMAX; im++) {		/// <b> For Schmidt semi-normalized </b>
+	for (im=0, lm=0; im<=MMAX; ++im) {		/// <b> For Schmidt semi-normalized </b>
 		m = im*MRES;
 		alm[im] = al0 + lm;
 		t2 = SQRT(2*m+1);
 		al0[lm] = 1.0/t2;		/// starting value will be divided by \f$ \sqrt{2m+1} \f$ 
 		al0[lm+1] = t2;		// l=m+1
 		lm+=2;
-		for (l=m+2; l<=LMAX; l++) {
+		for (l=m+2; l<=LMAX; ++l) {
 			t1 = SQRT((l+m)*(l-m));
 			al0[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
 			al0[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
@@ -526,14 +526,14 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 		}
 	}
   } else {
-	for (im=0, lm=0; im<=MMAX; im++) {		/// <b> For orthonormal or 4pi-normalized </b>
+	for (im=0, lm=0; im<=MMAX; ++im) {		/// <b> For orthonormal or 4pi-normalized </b>
 		m = im*MRES;
 		alm[im] = al0 + lm;
 		t2 = 2*m+1;
 		al0[lm] = 1.0;		// will contain the starting value.
 		al0[lm+1] = SQRT(2*m+3);		// l=m+1
 		lm+=2;
-		for (l=m+2; l<=LMAX; l++) {
+		for (l=m+2; l<=LMAX; ++l) {
 			t1 = (l+m)*(l-m);
 			al0[lm+1] = SQRT(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
 			al0[lm] = - SQRT(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
@@ -552,9 +552,9 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 		al0[0] = SQRT(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
 	}
 	t1 *= mpos_renorm;		// renormalization for m>0
-	for (im=1, m=0; im<=MMAX; im++) {
+	for (im=1, m=0; im<=MMAX; ++im) {
 		while(m<im*MRES) {
-			m++;
+			++m;
 			t1 *= ((real)m + 0.5)/m;	// t1 *= (m+0.5)/m;
 		}
 		t2 = SQRT(t1);
@@ -567,8 +567,8 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 		im = ((MMAX+2)>>1)*2;
 		blm = (double **) malloc( im * sizeof(double *) + (2*NLM)*sizeof(double) );
 		bl0 = (double *) (blm + im);
-		for (lm=0; lm<2*NLM; lm++) bl0[lm] = al0[lm];		// copy
-		for (im=0, lm=0; im<=MMAX; im++) {
+		for (lm=0; lm<2*NLM; ++lm) bl0[lm] = al0[lm];		// copy
+		for (im=0, lm=0; im<=MMAX; ++im) {
 			m = im*MRES;
 			blm[im] = bl0 + lm;
 			t1 = 1.0;
@@ -579,7 +579,7 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 			if (m>0) t1 /= mpos_renorm;
 			bl0[lm] *= t1;
 			lm+=2;
-			for (l=m+2; l<=LMAX; l++) {
+			for (l=m+2; l<=LMAX; ++l) {
 				if (norm == sht_schmidt) {
 					t1 = 2*l+1;
 					bl0[lm] *= t1/(2*l-3);
@@ -595,7 +595,7 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 
 /// \internal returns the value of the Legendre Polynomial of degree l.
 /// l is arbitrary, a direct recurrence relation is used, and a previous call to legendre_precomp() is not required.
-double legendre_Pl(const int l, double x)
+static double legendre_Pl(const int l, double x)
 {
 	long int i;
 	real p, p0, p1;
@@ -605,7 +605,7 @@ double legendre_Pl(const int l, double x)
 
 	p0 = 1.0;		/// \f$  P_0 = 1  \f$
 	p1 = x;			/// \f$  P_1 = x  \f$
-	for (i=2; i<=l; i++) {		 /// recurrence : \f[  l P_l = (2l-1) x P_{l-1} - (l-1) P_{l-2}	 \f] (works ok up to l=100000)
+	for (i=2; i<=l; ++i) {		 /// recurrence : \f[  l P_l = (2l-1) x P_{l-1} - (l-1) P_{l-2}	 \f] (works ok up to l=100000)
 		p = ((x*p1)*(2*i-1) - (i-1)*p0)/i;
 		p0 = p1;
 		p1 = p;
@@ -618,7 +618,7 @@ double legendre_Pl(const int l, double x)
 /// Newton method from initial Guess to find the zeros of the Legendre Polynome
 /// \param x = abscissa, \param w = weights, \param n points.
 /// \note Reference:  Numerical Recipes, Cornell press.
-void gauss_nodes(real *x, real *w, int n)
+static void gauss_nodes(real *x, real *w, int n)
 {
 	long int i,l,m, k;
 	real z, z1, p1, p2, p3, pp;
@@ -628,14 +628,14 @@ void gauss_nodes(real *x, real *w, int n)
 	if ((sizeof(eps) > 8) && (long_double_caps > 1))	eps = 1.1e-19;		// desired precision, minimum = 1.0842e-19 (long double i387)
 
 	m = (n+1)/2;
-	for (i=1;i<=m;i++) {
+	for (i=1;i<=m;++i) {
 		k=10;		// maximum Newton iteration count to prevent infinite loop.
 		p1 = M_PIl;		p2 = 2*n;
 		z = (1.0 - (n-1)/(p2*p2*p2)) * COS((p1*(4*i-1))/(4*n+2));	// initial guess
 		do {
 			p1 = z;		// P_1
 			p2 = 1.0;	// P_0
-			for(l=2;l<=n;l++) {		 // recurrence : l P_l = (2l-1) z P_{l-1} - (l-1) P_{l-2}	(works ok up to l=100000)
+			for(l=2;l<=n;++l) {		 // recurrence : l P_l = (2l-1) z P_{l-1} - (l-1) P_{l-2}	(works ok up to l=100000)
 				p3 = p2;
 				p2 = p1;
 				p1 = ((2*l-1)*z*p2 - (l-1)*p3)/l;		// The Legendre polynomial...
@@ -654,7 +654,7 @@ void gauss_nodes(real *x, real *w, int n)
 #if SHT_VERBOSE > 1
 // test integral to compute :
 	z = 0;
-	for (i=0;i<m;i++) {
+	for (i=0;i<m;++i) {
 		z += w[i]*x[i]*x[i];
 	}
 	printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);

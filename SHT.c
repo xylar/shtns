@@ -37,7 +37,7 @@
 shtns_cfg sht_data = NULL;
 
 /// \internal Abort program with error message.
-void shtns_runerr(const char * error_text)
+static void shtns_runerr(const char * error_text)
 {
 	printf("*** [SHTns] Run-time error : %s\n",error_text);
 	exit(1);
@@ -109,7 +109,7 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 		complex double eima = 1.0;
 		im=1; do {
 			eima *= eia;
-			for (l=im*mres; l<=lmax; l++)	Rlm[LiM(shtns, l, im)] = Qlm[LiM(shtns, l, im)] * eima;
+			for (l=im*mres; l<=lmax; ++l)	Rlm[LiM(shtns, l, im)] = Qlm[LiM(shtns, l, im)] * eima;
 		} while(++im <= mmax);
 	}
 }
@@ -123,7 +123,7 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
  - Fourier ananlyze as data on the equator to recover the m in the 90 degrees rotated frame.
  - rotate around new Z by angle dphi1.
  [1] Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" Journal of Computational Physics. **/
-void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double dphi0, double dphi1)
+static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double dphi0, double dphi1)
 {
 	fftw_plan fft;
 	complex double *q;
@@ -147,13 +147,13 @@ void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double
 	}
 
 	// compute q(l) on the meridian phi=0 and phi=pi. (rotate around X)
-	for (k=0; k<ntheta/2; k++) {
+	for (k=0; k<ntheta/2; ++k) {
 		double cost= cos(M_PI*(k+0.5)/ntheta);
 		double sint_1 = 1.0/sqrt((1.0-cost)*(1.0+cost));
 		m=0;
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
 			double sgnt = -1.0;
-			for (l=1; l<=lmax; l++) {
+			for (l=1; l<=lmax; ++l) {
 				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
 				q0[k*2*lmax +2*(l-1)] = qr;
 				q0[(ntheta-1-k)*2*lmax +2*(l-1)] = sgnt*qr;
@@ -162,11 +162,11 @@ void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double
 				sgnt *= -1.0;
 			}
 		double sgnm = 1.0;
-		for (m=1; m<=lmax; m++) {
+		for (m=1; m<=lmax; ++m) {
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
 			double sgnt = 1.0;
 			sgnm *= -1.0;
-			for (l=m; l<=lmax; l++) {
+			for (l=m; l<=lmax; ++l) {
 				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
 				double qi = cimag(Qlm[LiM(shtns, l, m)]) * m*yl[l]*sint_1;
 				qr += qr;	qi += qi;		// x2 for m>0
@@ -199,7 +199,7 @@ void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double
 			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*ntheta);
 		}
 	dphi1 += M_PI/ntheta;	// shift rotation angle by angle of first synthesis latitude.
-	for (m=1; m<=lmax; m++) {
+	for (m=1; m<=lmax; ++m) {
 		legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
 		complex double eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);
 		for (l=m; l<lmax; l+=2) {
@@ -288,18 +288,18 @@ double SH_to_point(shtns_cfg shtns, complex double *Qlm, double cost, double phi
 	vr = 0.0;
 	m=0;	im=0;
 		legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
-		for (l=m; l<=LTR; l++)
+		for (l=m; l<=LTR; ++l)
 			vr += yl[l] * creal( Qlm[l] );
 	if (MTR>0) {
 		complex double eip, eimp;
 		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
-		for (im=1; im<=MTR; im++) {
+		for (im=1; im<=MTR; ++im) {
 			m = im*MRES;
 			legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
 //			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 			eimp *= eip;			// not so accurate, but it should be enough for rendering uses.
 			Ql = &Qlm[LiM(shtns, 0,im)];	// virtual pointer for l=0 and im
-			for (l=m; l<=LTR; l++)
+			for (l=m; l<=LTR; ++l)
 				vr += yl[l] * creal( Ql[l]*eimp );
 		}
 	}
@@ -320,7 +320,7 @@ void SHqst_to_point(shtns_cfg shtns, complex double *Qlm, complex double *Slm, c
 	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; vr0 = 0.; vrm = 0.;
 	m=0;	im=0;
 		legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
-		for (l=m; l<=LTR; l++) {
+		for (l=m; l<=LTR; ++l) {
 			vr0 += yl[l] * creal( Qlm[l] );
 			vst += dtyl[l] * creal( Slm[l] );
 			vtt += dtyl[l] * creal( Tlm[l] );
@@ -328,7 +328,7 @@ void SHqst_to_point(shtns_cfg shtns, complex double *Qlm, complex double *Slm, c
 	if (MTR>0) {
 		complex double eip, eimp, imeimp;
 		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
-		for (im=1; im<=MTR; im++) {
+		for (im=1; im<=MTR; ++im) {
 			m = im*MRES;
 			legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
 //			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
@@ -336,7 +336,7 @@ void SHqst_to_point(shtns_cfg shtns, complex double *Qlm, complex double *Slm, c
 			imeimp = I*m*eimp;
 			l = LiM(shtns, 0,im);
 			Ql = &Qlm[l];	Sl = &Slm[l];	Tl = &Tlm[l];
-			for (l=m; l<=LTR; l++) {
+			for (l=m; l<=LTR; ++l) {
 				vrm += yl[l] * creal( Ql[l]*eimp );
 				vst += dtyl[l] * creal(Sl[l]*eimp);
 				vtt += dtyl[l] * creal(Tl[l]*eimp);
@@ -399,19 +399,19 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 	}
 	if (cost != ct_lat) {		// don't recompute if same latitude (ie equatorial disc rendering)
 		st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)
-		for (m=0,j=0; m<=mtr; m++) {
+		for (m=0,j=0; m<=mtr; ++m) {
 			legendre_sphPlm_deriv_array(shtns, ltr, m, cost, st_lat, &ylm_lat[j], &dylm_lat[j]);
 			j += LMAX -m*MRES +1;
 		}
 	}
 
-	for (m = 0; m<nphi/2+1; m++) {	// init with zeros
+	for (m = 0; m<nphi/2+1; ++m) {	// init with zeros
 		vrc[m] = 0.0;	vtc[m] = 0.0;	vpc[m] = 0.0;
 	}
 	j=0;
 	m=0;
 		vrr=0;	vtt=0;	vst=0;
-		for(l=m; l<=ltr; l++, j++) {
+		for(l=m; l<=ltr; ++l, ++j) {
 			vrr += ylm_lat[j] * creal(Qlm[j]);
 			vst += dylm_lat[j] * creal(Slm[j]);
 			vtt += dylm_lat[j] * creal(Tlm[j]);
@@ -422,7 +422,7 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 		vpc[m] = -vtt;	// Vp = - dT/dt
 	for (m=MRES; m<=mtr*MRES; m+=MRES) {
 		vrr=0;	vtt=0;	vst=0;	vsp=0;	vtp=0;
-		for(l=m; l<=ltr; l++, j++) {
+		for(l=m; l<=ltr; ++l, ++j) {
 			vrr += ylm_lat[j] * Qlm[j];
 			vst += dylm_lat[j] * Slm[j];
 			vtt += dylm_lat[j] * Tlm[j];
@@ -459,7 +459,7 @@ extern void* sht_array_m0l[SHT_NALG][SHT_NTYP];
 void* sht_func[SHT_NVAR][SHT_NTYP][SHT_NALG];
 
 /// \internal use on-the-fly alogorithm (guess without measuring)
-void set_sht_fly(shtns_cfg shtns, int typ_start)
+static void set_sht_fly(shtns_cfg shtns, int typ_start)
 {
 	for (int it=typ_start; it<SHT_NTYP; it++) {
 		for (int v=0; v<SHT_NVAR; v++)
@@ -468,7 +468,7 @@ void set_sht_fly(shtns_cfg shtns, int typ_start)
 }
 
 /// \internal choose memory algorithm everywhere.
-void set_sht_mem(shtns_cfg shtns) {
+static void set_sht_mem(shtns_cfg shtns) {
 	for (int it=0; it<SHT_NTYP; it++) {
 		for (int v=0; v<SHT_NVAR; v++)
 			shtns->fptr[v][it] = sht_func[v][it][SHT_MEM];
@@ -477,7 +477,7 @@ void set_sht_mem(shtns_cfg shtns) {
 
 /// \internal copy all algos to sht_func array (should be called by set_grid befor choosing variants).
 /// if nphi is 1, axisymmetric algorythms are used.
-void init_sht_array_func(shtns_cfg shtns)
+static void init_sht_array_func(shtns_cfg shtns)
 {
 	int it, j;
 	int alg_lim = SHT_NALG-1;
@@ -518,7 +518,7 @@ void init_sht_array_func(shtns_cfg shtns)
 }
 
 /// \internal return the smallest power of 2 larger than n.
-int next_power_of_2(int n)
+static int next_power_of_2(int n)
 {
 	int f = 1;
 	if ( (n<=0) || (n>(1<<(sizeof(int)*8-2))) ) return 0;
@@ -529,7 +529,7 @@ int next_power_of_2(int n)
 /// \internal find the closest integer that is larger than n and that contains only factors up to fmax.
 /// fmax is 7 for optimal FFTW fourier transforms.
 /// return only even integers for n>fmax.
-int fft_int(int n, int fmax)
+static int fft_int(int n, int fmax)
 {
 	int k,f;
 
@@ -557,7 +557,7 @@ int fft_int(int n, int fmax)
 
 /// \internal returns an aproximation of the memory usage in mega bytes for the scalar matrices.
 /// \ingroup init
-double sht_mem_size(int lmax, int mmax, int mres, int nlat)
+static double sht_mem_size(int lmax, int mmax, int mres, int nlat)
 {
 	double s = 1./(1024*1024);
 	s *= ((nlat+1)/2) * sizeof(double) * nlm_calc(lmax, mmax, mres);
@@ -565,7 +565,7 @@ double sht_mem_size(int lmax, int mmax, int mres, int nlat)
 }
 
 /// \internal return the number of shtns config that contain a reference to the memory location *pp.
-int ref_count(shtns_cfg shtns, void* pp)
+static int ref_count(shtns_cfg shtns, void* pp)
 {
 	shtns_cfg s2 = sht_data;
 	void* p;
@@ -588,7 +588,7 @@ int ref_count(shtns_cfg shtns, void* pp)
 /// \internal check if the memory location *pp is referenced by another sht config before freeing it.
 /// returns the number of other references, or -1 on error. If >=1, the memory location could not be freed.
 /// If the return value is 0, the ressource has been freed.
-int free_unused(shtns_cfg shtns, void* pp)
+static int free_unused(shtns_cfg shtns, void* pp)
 {
 	int n = ref_count(shtns, pp);	// howmany shtns config do reference this memory location ?
 	if (n <= 0) return n;		// nothing to free.
@@ -600,8 +600,8 @@ int free_unused(shtns_cfg shtns, void* pp)
 	return (n-1);
 }
 
-/// Free matrices if on-the-fly has been selected.
-void free_unused_matrices(shtns_cfg shtns)
+/// \internal Free matrices if on-the-fly has been selected.
+static void free_unused_matrices(shtns_cfg shtns)
 {
 	long int marray_size = (MMAX+1)*sizeof(double) + (MIN_ALIGNMENT-1);
 	int count[SHT_NTYP];
@@ -659,7 +659,7 @@ void free_unused_matrices(shtns_cfg shtns)
 
 
 /// \internal allocate arrays for SHT related to a given grid.
-void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
+static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
 {
 	long int im, l0;
 	long int size, marray_size, lstride;
@@ -717,7 +717,7 @@ void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
 
 
 /// \internal free arrays allocated by init_SH_dct
-void free_SH_dct(shtns_cfg shtns)
+static void free_SH_dct(shtns_cfg shtns)
 {
 	if (shtns->zlm_dct0 == NULL) return;
 
@@ -734,7 +734,7 @@ void free_SH_dct(shtns_cfg shtns)
 }
 
 /// \internal free arrays allocated by alloc_SHTarrays.
-void free_SHTarrays(shtns_cfg shtns)
+static void free_SHTarrays(shtns_cfg shtns)
 {
 	free_SH_dct(shtns);
 	free_unused(shtns, &shtns->ylm);
@@ -758,7 +758,7 @@ void free_SHTarrays(shtns_cfg shtns)
 /// \internal initialize FFTs using FFTW.
 /// \param[in] layout defines the spatial layout (see \ref spat).
 /// returns the number of double to be allocated for a spatial field.
-void planFFT(shtns_cfg shtns, int layout)
+static void planFFT(shtns_cfg shtns, int layout)
 {
 	double cost_fft_ip, cost_fft_oop, cost_ifft_ip, cost_ifft_oop;
 	complex double *ShF;
@@ -892,7 +892,7 @@ void planFFT(shtns_cfg shtns, int layout)
 }
 
 /// \internal initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
-void planDCT(shtns_cfg shtns)
+static void planDCT(shtns_cfg shtns)
 {
 	double *Sh;
 	int ndct = NLAT;
@@ -938,7 +938,7 @@ void planDCT(shtns_cfg shtns)
 }
 
 /// \internal SET MTR_DCT and updates fftw_plan for DCT's
-void Set_MTR_DCT(shtns_cfg shtns, int m)
+static void Set_MTR_DCT(shtns_cfg shtns, int m)
 {
 	if ((shtns->zlm_dct0 == NULL)||(m == MTR_DCT)) return;
 	if ( m < 0 ) {	// don't use dct
@@ -951,12 +951,12 @@ void Set_MTR_DCT(shtns_cfg shtns, int m)
 }
 
 /// \internal returns the m-truncation of DCT part of synthesis
-int Get_MTR_DCT(shtns_cfg shtns) {
+static int Get_MTR_DCT(shtns_cfg shtns) {
 	return MTR_DCT;
 }
 
 /// \internal Sets the value tm[im] used for polar optimiation on-the-fly.
-void PolarOptimize(shtns_cfg shtns, double eps)
+static void PolarOptimize(shtns_cfg shtns, double eps)
 {
 	int im, m, l, it;
 	double v;
@@ -992,7 +992,7 @@ void PolarOptimize(shtns_cfg shtns, double eps)
 }
 
 /// \internal Perform some optimization on the SHT matrices.
-void OptimizeMatrices(shtns_cfg shtns, double eps)
+static void OptimizeMatrices(shtns_cfg shtns, double eps)
 {
 	unsigned short *tm;
 	double **ylm, **zlm;
@@ -1093,7 +1093,7 @@ void OptimizeMatrices(shtns_cfg shtns, double eps)
 #define DPYLM(it, l, im) ( (im==0) ? 0.0 : shtns->dylm[im][(it)*(LMAX-(im)*MRES+1) + ((l)-(im)*MRES)].p )
 
 /// \internal Precompute the matrix for SH synthesis.
-void init_SH_synth(shtns_cfg shtns)
+static void init_SH_synth(shtns_cfg shtns)
 {
 	double *yl, *dyl;		// temp storage for derivative for legendre function values.
 	long int it,im,m,l;
@@ -1135,7 +1135,7 @@ void init_SH_synth(shtns_cfg shtns)
 
 
 /// \internal Precompute matrices for SH synthesis and analysis, on a Gauss-Legendre grid.
-void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
+static void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 {
 	double t,tmax;
 	long int it,im,m,l;
@@ -1238,7 +1238,7 @@ void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
 
 /// \internal Computes the matrices required for SH transform on a regular grid (with or without DCT).
 /// \param analysis : 0 => synthesis only.
-void init_SH_dct(shtns_cfg shtns, int analysis)
+static void init_SH_dct(shtns_cfg shtns, int analysis)
 {
 	fftw_plan dct, idct;
 	double *yk, *yk0, *dyk0, *yg;		// temp storage
@@ -1608,7 +1608,7 @@ void init_SH_dct(shtns_cfg shtns, int analysis)
 }
 
 /// \internal Generates an equi-spaced theta grid including the poles, for synthesis only.
-void EqualPolarGrid(shtns_cfg shtns)
+static void EqualPolarGrid(shtns_cfg shtns)
 {
 	int j;
 	double f;
@@ -1714,7 +1714,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 #endif
 
 /// \internal measure time used for a transform function
-double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, void *i1, void *i2, void *i3, void *o1, void *o2, void *o3, int l)
+static double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, void *i1, void *i2, void *i3, void *o1, void *o2, void *o3, int l)
 {
 	double t;
 	int i;
@@ -1749,7 +1749,7 @@ double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *fptr, vo
 /// *nlp is the number of loops. If zero, it is set to a good value.
 /// on_the_fly : 1 = skip all memory algorithm. 0 = include memory and on-the-fly. -1 = test only DCT.
 /// returns time without dct / best time with dct (or 0 if no dct available).
-double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
+static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 {
 	complex double *Qlm, *Slm, *Tlm;
 	double *Qh, *Sh, *Th;

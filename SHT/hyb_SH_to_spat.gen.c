@@ -57,13 +57,13 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
 
-3	void GEN3(SHqst_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	void GEN3(SH_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
+3	static void GEN3(SHqst_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	static void GEN3(SH_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	void GEN3(SHsphtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+VX	static void GEN3(SHsphtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-S	void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
-T	void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+S	static void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
+T	static void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 Q	v2d *BrF;
@@ -165,7 +165,7 @@ S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
 SO			te =  dyl0[0] * Sl[2*l-2];		// l-1
 TE			pe = -dyl0[0] * Tl[2*l-2];		// l-1
-V			dyl0 ++;
+V			++dyl0;
 			while(l<llim) {
 QE				re += yl[0]  * Ql[2*l];
 QO				ro += yl[1]  * Ql[2*l+2];
@@ -183,7 +183,7 @@ SE				to += dyl0[0] * Sl[2*l];
 TO				po -= dyl0[0] * Tl[2*l];
 Q				yl+=2;
 			}
-V			dyl0++;
+V			++dyl0;
 Q			BR0(k) = re;	BR0(k+1) = ro;
 VX		#ifndef SHT_AXISYM
 VX			BT0(k) = 0.0;	BT0(k+1) = 0.0;			// required for tor or sph only transform
@@ -211,7 +211,7 @@ QX			s2d r1 = vdup(0.0);
 Q				r += yl[l+1] * Ql0[l+1];	// { re, ro }
 S				t += dyl0[l] * Sl0[l];		// { te, to }
 T				p -= dyl0[l] * Tl0[l];		// { pe, po }
-V				l++;
+V				++l;
 QX				r1 += yl[l+2] * Ql0[l+2];	// { re, ro }
 QX				l+=2;
 QX			} while(2*l < llim-1);		// 2*(l+1) <= llim
@@ -262,8 +262,7 @@ V			double sin_1 = st_1[2*k]; 	double sin_2 = st_1[2*k+1];
 S			Vt[2*k] *= sin_1;		Vt[2*k+1] *= sin_2;
 T			Vp[2*k] *= sin_1;		Vp[2*k+1] *= sin_2;
 V		#endif
-V			k++;
-V		} while (k<NLAT_2);
+V		} while (++k<NLAT_2);
     #endif
 	}
   #else		// ifndef SHT_NO_DCT
@@ -280,7 +279,7 @@ V		s2d* dyl0 = (s2d*) shtns->dylm[0];	// only theta derivative (d/dphi = 0 for m
 	#ifndef _GCC_VEC_
 			l=1;
 Q			re = yl[0] * Ql[0];		// re += ylm[im][k*(LMAX-m+1) + (l-m)] * Qlm[LiM(l,im)];
-Q			yl++;
+Q			++yl;
 Q			ro = 0.0;
 S			te = 0.0;	to = 0.0;
 T			pe = 0.0;	po = 0.0;
@@ -301,7 +300,7 @@ TB				pe -= dyl0[0] * Tl[2*l];
 S				te += dyl0[0] * Sl[2*l];
 V				dyl0+=2;
 			}
-Q			yl++;
+Q			++yl;
 		#ifdef SHT_VAR_LTR
 Q			yl  += ((LMAX>>1) - (llim>>1))*2;
 V			dyl0 += (((LMAX+1)>>1) - ((llim+1)>>1))*2;
@@ -328,9 +327,9 @@ QX			s2d r1 = vdup(0.0);
 S				t += dyl0[l] * Sl0[l];		// { te, to }
 T				p -= dyl0[l] * Tl0[l];		// { pe, po }
 Q				r += yl[l]   * Ql0[l];		// { re, ro }
-				l++;
+				++l;
 QX				r1 += yl[l]   * Ql0[l];	// reduce dependency
-QX				l++;
+QX				++l;
 Q			} while (2*l <= llim);
 VX			} while (2*l < llim);
 QX			r += r1;
@@ -411,8 +410,8 @@ TO				dte += vdup(dyl[0].p) * Tl[l];
 TO				po  -= vdup(dyl[0].t) * Tl[l];
 SE				dpe += vdup(dyl[0].p) * Sl[l];
 SE				to  += vdup(dyl[0].t) * Sl[l];
-Q				yl++;
-V				dyl++;
+Q				++yl;
+V				++dyl;
 			}
 Q			BrF[k] = re;	BrF[k+1] = ro;
 V			BtF[k] = addi(te, dte);		BtF[k+1] = addi(to, dto);
@@ -437,7 +436,7 @@ V			BtF[k] = vdup(0.0);		BpF[k] = vdup(0.0);
 V			BtF[k+1] = vdup(0.0);	BpF[k+1] = vdup(0.0);
 			k+=2;
 		}
-		im++;
+		++im;
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
@@ -456,7 +455,7 @@ Q			BrF[k] = vdup(0.0);
 QB			BrF[NLAT-l + k] = vdup(0.0);	// south pole zeroes <=> BrF[im*NLAT + NLAT-(k+1)] = 0.0;
 V			BtF[k] = vdup(0.0);		BpF[k] = vdup(0.0);
 VB			BtF[NLAT-l + k] = vdup(0.0);		BpF[NLAT-l + k] = vdup(0.0);	// south pole zeroes
-			k++;
+			++k;
 		}
 Q		double* yl  = shtns->ylm[im];
 V		dyl = shtns->dylm[im];
@@ -489,8 +488,8 @@ SE				dto += vdup(dyl[0].t) * Sl[l];
 TO				te  += vdup(dyl[0].p) * Tl[l];
 SE				pe  += vdup(dyl[0].p) * Sl[l];
 3				re  += vdup(dyl[0].p) * Ql[l];
-Q				yl++;
-V				dyl++;
+Q				++yl;
+V				++dyl;
 			}
 3			s2d qv = vdup(shtns->st[k]*m_1);
 V			BtF[k] = addi(dte+dto, te+to);		// Bt = dS/dt       + I.m/sint *T
@@ -500,17 +499,16 @@ V			BpF[k] = addi(dpe+dpo, pe+po);		// Bp = I.m/sint * S - dT/dt
 VB			BpF[NLAT-1-k] = addi(dpe-dpo, pe-po);
 Q			BrF[k] = re + ro;
 QB			BrF[NLAT-1-k] = re - ro;
-			k++;
 		#ifdef SHT_VAR_LTR
 Q			yl  += (LMAX-llim);
 V			dyl += (LMAX-llim);
 		#endif
-		} while (k < NLAT_2);
-		im++;
+		} while (++k < NLAT_2);
+		++im;
 Q		BrF += NLAT;
 V		BtF += NLAT;	BpF += NLAT;
 	}
-	for (k=0; k < NLAT*((NPHI>>1) -imlim); k++) {	// padding for high m's
+	for (k=0; k < NLAT*((NPHI>>1) -imlim); ++k) {	// padding for high m's
 Q			BrF[k] = vdup(0.0);
 V			BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
 	}
