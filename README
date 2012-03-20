@@ -36,7 +36,7 @@ DOCUMENTATION:
 CHANGELOG:
 
   v2.1  (8 Mar 2012)
-	- no more limit to the maximum degree of spherical harmonics (tested up to l=8191).
+	- support for huge spherical harmonic degree (tested up to l>43600).
 	- speed improvements, especially for large transforms.
 	- compilation with FFTW v3.0 or more is now possible through a config option (see sht_config.h)
 

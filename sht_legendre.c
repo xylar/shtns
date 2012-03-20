@@ -657,7 +657,11 @@ static void gauss_nodes(real *x, real *w, int n)
 	for (i=0;i<m;++i) {
 		z += w[i]*x[i]*x[i];
 	}
-	printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);
+	#if SHT_LONG_DOUBLE == 0
+		printf("          Gauss quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*3.,z*3.-1.0);
+	#else
+		printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);
+	#endif
 #endif
 
 // as we started with initial guesses, we should check if the gauss points are actually unique.
