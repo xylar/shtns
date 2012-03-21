@@ -90,12 +90,15 @@ clean :
 	rm -rf doc/html
 	rm -rf doc/latex
 
-# build a python interface using SWIG.
+# "make python" builds a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
-python : shtns.h shtns_numpy.i Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
-	swig -python shtns_numpy.i
-	gcc $(march) -O2 -fpic -I/usr/include/python2.7 -c shtns_numpy_wrap.c 
+python : shtns_numpy_wrap.c Makefile $(hfiles) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+	gcc $(march) -O2 -fpic -I/usr/include/python2.7 -c shtns_numpy_wrap.c
 	gcc $(march) -O2 -fpic -shared /usr/lib/libfftw3.so SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o shtns_numpy_wrap.o -o _shtns.so
+
+# generate python and c glue code with SWIG.
+shtns_numpy_wrap.c : shtns_numpy.i sht_private.h shtns.h
+	swig -python shtns_numpy.i
 
 # update the copyright notice
 updatecpy : COPYRIGHT

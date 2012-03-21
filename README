@@ -10,7 +10,7 @@ FEATURES:
 
 	- both scalar and vector transforms
 	- backward and forward (synthesis and analysis) functions
-	- flexible truncation
+	- flexible truncation (degree, order, azimutal periodicity)
 	- spatial data can be stored in latitude-major or longitude-major order arrays.
 	- various conventions (normalization and Condon-Shortley phase)
 	- can be used from fortran, c/c++, and Python programs
