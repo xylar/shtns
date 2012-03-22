@@ -955,6 +955,7 @@ static int Get_MTR_DCT(shtns_cfg shtns) {
 	return MTR_DCT;
 }
 
+
 /// \internal Sets the value tm[im] used for polar optimiation on-the-fly.
 static void PolarOptimize(shtns_cfg shtns, double eps)
 {
@@ -1135,57 +1136,10 @@ static void init_SH_synth(shtns_cfg shtns)
 
 
 /// \internal Precompute matrices for SH synthesis and analysis, on a Gauss-Legendre grid.
-static void init_SH_gauss(shtns_cfg shtns, int on_the_fly)
+static void init_SH_gauss(shtns_cfg shtns)
 {
-	double t,tmax;
 	long int it,im,m,l;
-	real iylm_fft_norm;
-	real xg[NLAT], wgl[NLAT];	// gauss points and weights.
 	int vector = (shtns->dylm != NULL);
-	const int overflow = 8*VSIZE2-1;
-
-	shtns->grid = GRID_GAUSS;
-	shtns->wg = malloc((NLAT_2 +overflow) * sizeof(double));	// gauss weights, double precision.
-
-	iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
-	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
-	iylm_fft_norm /= (2*NPHI);
-#if SHT_VERBOSE > 0
-	printf("        => using Gauss nodes\n");
-	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition 2*Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
-#endif
-	gauss_nodes(xg,wgl,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
-	for (it=0; it<NLAT; it++) {
-		shtns->ct[it] = xg[it];
-		shtns->st[it] = SQRT((1.-xg[it])*(1.+xg[it]));
-		shtns->st_1[it] = 1.0/SQRT((1.-xg[it])*(1.+xg[it]));
-	}
-	for (it=0; it<NLAT_2; it++)
-		shtns->wg[it] = wgl[it]*iylm_fft_norm;		// faster double-precision computations.
-	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point.
-		shtns->wg[NLAT_2-1] *= 0.5;
-	}
-	for (it=NLAT_2; it < NLAT_2 +overflow; it++) shtns->wg[it] = 0.0;		// padding for multi-way algorithm.
-
-#if SHT_VERBOSE > 1
-	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
-// TEST if gauss points are ok.
-	tmax = 0.0;
-	for (it = 0; it<NLAT_2; it++) {
-		t = legendre_Pl(NLAT, shtns->ct[it]);
-		if (t>tmax) tmax = t;
-//		printf("i=%d, x=%12.12g, p=%12.12g\n",it,ct[it],t);
-	}
-	printf("          max zero at Gauss nodes for Pl[l=NLAT] : %g\n",tmax);
-	if (NLAT_2 < 100) {
-		printf("          Gauss nodes :");
-		for (it=0;it<NLAT_2; it++)
-			printf(" %g",shtns->ct[it]);
-		printf("\n");
-	}
-#endif
-
-	if (on_the_fly != 0) return;
 
 	init_SH_synth(shtns);
 
@@ -1249,44 +1203,14 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 	double Z[2*NLAT_2], dZt[2*NLAT_2], dZp[2*NLAT_2];		// equally spaced theta points.
 	double is1[NLAT];		// tabulate values for integrals.
 
-	double *ct = shtns->ct;
 	double *st = shtns->st;
 	double *st_1 = shtns->st_1;
 	long int marray_size = sizeof(void*)*(MMAX+1) + (MIN_ALIGNMENT-1);
 	int vector = (shtns->dylm != NULL);
 
-	shtns->grid = GRID_REGULAR;
 	iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
  	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
 	iylm_fft_norm /= (2*NPHI*NLAT_2);
-
-#if SHT_VERBOSE > 0
-	printf("        => using equaly spaced nodes with DCT acceleration\n");
-	if (NLAT <= SHT_NL_ORDER *LMAX)	printf("     !! Warning : DCT anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER);
-	if (NLAT != fft_int(NLAT,7))	printf("     !! Warning : Nlat is not optimal for FFTW !\n");
-#endif
-	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
-	if (NLAT <= LMAX+1) shtns_runerr("NLAT should be at least LMAX+2 (DCT)");
-	for (it=0; it<NLAT; it++) {	// Chebychev points : equaly spaced but skipping poles.
-		real th = M_PIl;	th = (th*(2*it+1))/(2*NLAT);
-		ct[it] = COS(th);	st[it] = SIN(th);	st_1[it] = 1.0/SIN(th);
-	}
-#if SHT_VERBOSE > 1
-	{
-	double tsum, t;
-	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
-	if (NLAT_2 < 100) {
-		printf("          DCT nodes :");
-		tsum = 0.0;
-		for (it=0;it<NLAT_2; it++) {
-			printf(" %g",ct[it]);
-			t = fabs(ct[it]*ct[it] + st[it]*st[it] -1.0);
-			if (t > tsum) tsum=t;
-		}
-	}
-	printf("\n max st^2 + ct^2 -1 = %lg\n",tsum);
-	}
-#endif
 
 #define KMAX (LMAX+1)
 
@@ -1607,22 +1531,111 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
 
-/// \internal Generates an equi-spaced theta grid including the poles, for synthesis only.
-static void EqualPolarGrid(shtns_cfg shtns)
+
+/// \internal Generate a gauss grid (including weights)
+static void grid_gauss(shtns_cfg shtns, double latdir)
 {
-	int j;
-	double f;
+	long int it;
+	real iylm_fft_norm;
+	real xg[NLAT], wgl[NLAT];	// gauss points and weights.
+	const int overflow = 8*VSIZE2-1;
+
+	shtns->grid = GRID_GAUSS;
+	shtns->wg = malloc((NLAT_2 +overflow) * sizeof(double));	// gauss weights, double precision.
+
+	iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
+	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
+	iylm_fft_norm /= (2*NPHI);
+#if SHT_VERBOSE > 0
+	printf("        => using Gauss nodes\n");
+	if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition 2*Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
+#endif
+	gauss_nodes(xg,wgl,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
+	for (it=0; it<NLAT; it++) {
+		shtns->ct[it] = latdir * xg[it];
+		shtns->st[it] = SQRT((1.-xg[it])*(1.+xg[it]));
+		shtns->st_1[it] = 1.0/SQRT((1.-xg[it])*(1.+xg[it]));
+	}
+	for (it=0; it<NLAT_2; it++)
+		shtns->wg[it] = wgl[it]*iylm_fft_norm;		// faster double-precision computations.
+	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point.
+		shtns->wg[NLAT_2-1] *= 0.5;
+	}
+	for (it=NLAT_2; it < NLAT_2 +overflow; it++) shtns->wg[it] = 0.0;		// padding for multi-way algorithm.
+
+#if SHT_VERBOSE > 1
+	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
+// TEST if gauss points are ok.
+	double tmax = 0.0;
+	for (it = 0; it<NLAT_2; it++) {
+		double t = legendre_Pl(NLAT, shtns->ct[it]);
+		if (t>tmax) tmax = t;
+//		printf("i=%d, x=%12.12g, p=%12.12g\n",it,ct[it],t);
+	}
+	printf("          max zero at Gauss nodes for Pl[l=NLAT] : %g\n",tmax);
+	if (NLAT_2 < 100) {
+		printf("          Gauss nodes :");
+		for (it=0;it<NLAT_2; it++)
+			printf(" %g",shtns->ct[it]);
+		printf("\n");
+	}
+#endif
+}
+
+/// \internal Generate an equi-spaced theta grid (Chebychev points, excluding poles) for Féjer-DCT SHT.
+static void grid_dct(shtns_cfg shtns, double latdir)
+{
+	long int it;
+
+	shtns->grid = GRID_REGULAR;
+#if SHT_VERBOSE > 0
+	printf("        => using equaly spaced nodes with DCT acceleration\n");
+	if (NLAT <= SHT_NL_ORDER *LMAX)	printf("     !! Warning : DCT anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER);
+	if (NLAT != fft_int(NLAT,7))	printf("     !! Warning : Nlat is not optimal for FFTW !\n");
+#endif
+	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
+	if (NLAT <= LMAX+1) shtns_runerr("NLAT should be at least LMAX+2 (DCT)");
+
+	for (it=0; it<NLAT; it++) {		// Chebychev points : equaly spaced but skipping poles.
+		real th = M_PIl;	th = (th*(2*it+1))/(2*NLAT);
+		shtns->ct[it] = latdir * COS(th);
+		shtns->st[it] = SIN(th);
+		shtns->st_1[it] = 1.0/SIN(th);
+	}
+
+#if SHT_VERBOSE > 1
+	printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
+	double tmax = 0.0;
+	for (it=0;it<NLAT_2; it++) {
+		double ct = shtns->ct[it];		double st = shtns->st[it];
+		double t = fabs((ct*ct + st*st) -1.0);
+		if (t > tmax) tmax=t;
+	}
+	printf(" max st^2 + ct^2 -1 = %g\n",tmax);
+	if (NLAT_2 < 100) {
+		printf("          DCT nodes :");
+		for (it=0; it<NLAT_2; it++)
+			printf(" %g",shtns->ct[it]);
+		printf("\n");
+	}
+#endif
+}
+
+/// \internal Generate an equi-spaced theta grid including the poles, for synthesis only.
+static void grid_equal_polar(shtns_cfg shtns, double latdir)
+{
+	long int j;
 
 	shtns->grid = GRID_POLES;
 #if SHT_VERBOSE > 0
 	printf("        => using Equaly Spaced Nodes including poles\n");
 #endif
 // cos theta of latidunal points (equaly spaced in theta)
-	f = M_PI/(NLAT-1.0);
+	double f = M_PIl/(NLAT-1);
 	for (j=0; j<NLAT; j++) {
-		shtns->ct[j] = cos(f*j);
+		shtns->ct[j] = latdir * cos(f*j);
 		shtns->st[j] = sin(f*j);
-		shtns->st_1[j] = 1.0/(shtns->st[j]);
+		shtns->st_1[j] = 1.0/sin(f*j);
 	}
 #if SHT_VERBOSE > 0
 	printf("     !! Warning : only synthesis (inverse transform) supported for this grid !\n");
@@ -2154,7 +2167,7 @@ void shtns_reset()
 */
 int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi)
 {
-	double t;
+	double t, latdir;
 	int im,m;
 	int layout;
 	int nloop = 0;
@@ -2175,6 +2188,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	shtns->nspat = 0;
 	shtns->nlorder = nl_order;
 	shtns->mtr_dct = -1;		// dct switched off completely.
+	latdir = (flags & SHT_SOUTH_POLE_FIRST) ? -1 : 1;		// choose latitudinal direction (change sign of ct)
 	layout = flags & 0xFFFF00;
 	flags = flags & 255;	// clear higher bits.
 
@@ -2241,14 +2255,14 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 
 	if (flags == sht_reg_dct) {		// pure dct.
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
-		init_SH_dct(shtns, 1);
+		grid_dct(shtns, latdir);		init_SH_dct(shtns, 1);
 		OptimizeMatrices(shtns, eps);
 		Set_MTR_DCT(shtns, MMAX);
 	}
 	if ((flags == sht_auto)||(flags == sht_reg_fast))
 	{
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
-		init_SH_dct(shtns, 1);
+		grid_dct(shtns, latdir);		init_SH_dct(shtns, 1);
 		OptimizeMatrices(shtns, eps);
 		if (NLAT >= SHT_MIN_NLAT_DCT) {			// dct requires large NLAT to perform well.
 			t = choose_best_sht(shtns, &nloop, vector, 1);		// find optimal MTR_DCT.
@@ -2291,17 +2305,19 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if (flags == sht_gauss)
 	{
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
-		init_SH_gauss(shtns, on_the_fly);
-		if (on_the_fly == 0) OptimizeMatrices(shtns, eps);
+		grid_gauss(shtns, latdir);
+		if (on_the_fly == 0) {
+			init_SH_gauss(shtns);			// precompute matrices
+			OptimizeMatrices(shtns, eps);
+		}
 	}
 	if (flags == sht_reg_poles)
 	{
 		alloc_SHTarrays(shtns, on_the_fly, vector, 0);		// allocate dynamic arrays (no analysis)
-		EqualPolarGrid(shtns);
+		grid_equal_polar(shtns, latdir);
 		if (on_the_fly == 0) {
 			init_SH_synth(shtns);
 			for (im=0; im<=MMAX; im++) shtns->tm[im] = 0;	// avoid problems with tm[im] modified ????
-			//OptimizeMatrices(shtns, eps);		// does not work for sht_reg_poles.
 		}
 	}
 

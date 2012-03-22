@@ -15,7 +15,7 @@
  * 
  */
 
-/* shtns.i : SWIG interface to Python using NumPy */
+/* shtns_numpy.i : SWIG interface to Python using NumPy */
 
 /* TODO and known problems :
  * - exception handling does not work well : some functions will still return incorect values when parameters are wrong
@@ -88,7 +88,7 @@ long nlm_calc(long lmax, long mmax, long mres);
 
 %extend shtns_info {
 	shtns_info(int lmax, int mmax, int mres=1, int norm=sht_orthonormal) {	// default arguments : mres and norm
-		import_array();
+		import_array();		// required by NumPy
 		return shtns_create(lmax, mmax, mres, norm);
 	}
 	~shtns_info() {

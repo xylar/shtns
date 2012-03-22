@@ -74,6 +74,8 @@ except AttributeError:
 sht_orthonormal = _shtns.sht_orthonormal
 sht_fourpi = _shtns.sht_fourpi
 sht_schmidt = _shtns.sht_schmidt
+SHT_NO_CS_PHASE = _shtns.SHT_NO_CS_PHASE
+SHT_REAL_NORM = _shtns.SHT_REAL_NORM
 sht_gauss = _shtns.sht_gauss
 sht_auto = _shtns.sht_auto
 sht_reg_fast = _shtns.sht_reg_fast
@@ -84,8 +86,7 @@ sht_gauss_fly = _shtns.sht_gauss_fly
 SHT_NATIVE_LAYOUT = _shtns.SHT_NATIVE_LAYOUT
 SHT_THETA_CONTIGUOUS = _shtns.SHT_THETA_CONTIGUOUS
 SHT_PHI_CONTIGUOUS = _shtns.SHT_PHI_CONTIGUOUS
-SHT_NO_CS_PHASE = _shtns.SHT_NO_CS_PHASE
-SHT_REAL_NORM = _shtns.SHT_REAL_NORM
+SHT_SOUTH_POLE_FIRST = _shtns.SHT_SOUTH_POLE_FIRST
 SHT_SCALAR_ONLY = _shtns.SHT_SCALAR_ONLY
 class sht(_object):
     __swig_setmethods__ = {}

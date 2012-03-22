@@ -3180,7 +3180,7 @@ SWIG_AsVal_int (PyObject * obj, int *val)
 }
 
 SWIGINTERN struct shtns_info *new_shtns_info(int lmax,int mmax,int mres,int norm){	// default arguments : mres and norm
-		import_array();
+		import_array();		// required by NumPy
 		return shtns_create(lmax, mmax, mres, norm);
 	}
 SWIGINTERN void delete_shtns_info(struct shtns_info *self){
@@ -5338,6 +5338,8 @@ SWIG_init(void) {
   SWIG_Python_SetConstant(d, "sht_orthonormal",SWIG_From_int((int)(sht_orthonormal)));
   SWIG_Python_SetConstant(d, "sht_fourpi",SWIG_From_int((int)(sht_fourpi)));
   SWIG_Python_SetConstant(d, "sht_schmidt",SWIG_From_int((int)(sht_schmidt)));
+  SWIG_Python_SetConstant(d, "SHT_NO_CS_PHASE",SWIG_From_int((int)((256*4))));
+  SWIG_Python_SetConstant(d, "SHT_REAL_NORM",SWIG_From_int((int)((256*8))));
   SWIG_Python_SetConstant(d, "sht_gauss",SWIG_From_int((int)(sht_gauss)));
   SWIG_Python_SetConstant(d, "sht_auto",SWIG_From_int((int)(sht_auto)));
   SWIG_Python_SetConstant(d, "sht_reg_fast",SWIG_From_int((int)(sht_reg_fast)));
@@ -5348,8 +5350,7 @@ SWIG_init(void) {
   SWIG_Python_SetConstant(d, "SHT_NATIVE_LAYOUT",SWIG_From_int((int)(0)));
   SWIG_Python_SetConstant(d, "SHT_THETA_CONTIGUOUS",SWIG_From_int((int)(256)));
   SWIG_Python_SetConstant(d, "SHT_PHI_CONTIGUOUS",SWIG_From_int((int)((256*2))));
-  SWIG_Python_SetConstant(d, "SHT_NO_CS_PHASE",SWIG_From_int((int)((256*4))));
-  SWIG_Python_SetConstant(d, "SHT_REAL_NORM",SWIG_From_int((int)((256*8))));
+  SWIG_Python_SetConstant(d, "SHT_SOUTH_POLE_FIRST",SWIG_From_int((int)((256*32))));
   SWIG_Python_SetConstant(d, "SHT_SCALAR_ONLY",SWIG_From_int((int)((256*16))));
 #if PY_VERSION_HEX >= 0x03000000
   return m;

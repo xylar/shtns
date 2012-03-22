@@ -28,6 +28,8 @@ enum shtns_norm {
 	sht_fourpi,			///< Geodesy and spectral analysis : 4.pi normalization.
 	sht_schmidt			///< Schmidt semi-normalized : 4.pi/(2l+1)
 };
+#define SHT_NO_CS_PHASE (256*4)		///< don't include Condon-Shortley phase (add to last argument of \ref shtns_create)
+#define SHT_REAL_NORM (256*8)		///< use a "real" normalization. (add to last argument of \ref shtns_create)
 
 /// different SHT types and algorithms
 enum shtns_type {
@@ -39,13 +41,10 @@ enum shtns_type {
 	sht_reg_poles,	///< use a <b>synthesis only</b> algo <b>including poles</b>, not suitable for computations. Useful for vizualisation.
 	sht_gauss_fly	///< legendre polynomials are recomputed on-the-fly for each transform (may be faster on some machines, saves memory and bandwidth).
 };
-
 #define SHT_NATIVE_LAYOUT 0			///< Tells shtns_init to use \ref native
 #define SHT_THETA_CONTIGUOUS 256	///< use \ref theta_fast
 #define SHT_PHI_CONTIGUOUS (256*2)	///< use \ref phi_fast
-
-#define SHT_NO_CS_PHASE (256*4)		///< don't include Condon-Shortley phase (add to last argument of \ref shtns_create)
-#define SHT_REAL_NORM (256*8)		///< use a "real" normalization. (add to last argument of \ref shtns_create)
+#define SHT_SOUTH_POLE_FIRST (256*32)	///< latitudinal data are stored starting from south pole.
 
 #define SHT_SCALAR_ONLY (256*16)	///< don't compute vector matrices. (add to flags in shtns_set_grid)
 
