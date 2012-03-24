@@ -237,9 +237,9 @@ V			rnd ter[NWAY], tei[NWAY], tor[NWAY], toi[NWAY];
 V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(st, k+j);
-				y0[j] = vall(al[0]);
+QX				y0[j] = vall(1.0);
 V				st2[j] = cost[j]*cost[j]*vall(-m_1);
-V				y0[j] *= vall(m);		// for the vector transform, compute ylm*m/sint
+V				y0[j] = vall(m);		// for the vector transform, compute ylm*m/sint
 			}
 Q			l=m;
 V			l=m-1;
@@ -255,7 +255,7 @@ V			l=m-1;
 				if (l&1) {
 					for (int j=0; j<NWAY; ++j) y0[j] *= cost[j];
 					ny += nsint;
-					if (fabs(vlo(y0[0])) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
+					if (vlo(y0[0]) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
 						ny--;
 						for (int j=0; j<NWAY; ++j) y0[j] *= vall(SHT_SCALE_FACTOR);
 					}
@@ -269,6 +269,7 @@ V			l=m-1;
 			} while(l >>= 1);
 		  }
 			for (int j=0; j<NWAY; ++j) {
+				y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, j+k);
 V				dy0[j] = cost[j]*y0[j];
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);

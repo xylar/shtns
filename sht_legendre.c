@@ -81,6 +81,10 @@ static real a_sint_pow_n_hp(real val, real cost, long int n)
 	long int k = n >> 7;
 	if (sizeof(s2) > 8) k = 0;		// enough accuracy, we do not bother.
 
+#ifdef LEG_RANGE_CHECK
+	if (s2 < 0) shtns_runerr("sin(t)^2 < 0 !!!");
+#endif
+
 	if (n&1) val *= SQRT(s2);	// = sin(t)
 	do {
 		if (n&2) val *= s2;
@@ -102,26 +106,33 @@ static real a_sint_pow_n_hp(real val, real cost, long int n)
 /// updates nval, and returns val such as the result is val.SHT_SCALE_FACTOR^(nval)
 static double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
 {
-	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2
+	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2 >= 0
+	double val0 = val;		// store sign
 	int ns2 = 0;
 	int nv = *nval;
 
+#ifdef LEG_RANGE_CHECK
+	if (s2 < 0) shtns_runerr("sin(t)^2 < 0 !!!");
+#endif
+
+	val = fabs(val);		// val >= 0
 	if (n&1) val *= sqrt(s2);	// = sin(t)
 	while (n >>= 1) {
 		if (n&1) {
-			if (fabs(val) < 1.0/SHT_SCALE_FACTOR) {
+			if (val < 1.0/SHT_SCALE_FACTOR) {		// val >= 0
 				nv--;		val *= SHT_SCALE_FACTOR;
 			}
 			val *= s2;		nv += ns2;		// 1/S^2 < val < 1
 		}
 		s2 *= s2;		ns2 += ns2;
-		if (fabs(s2) < 1.0/SHT_SCALE_FACTOR) {
+		if (s2 < 1.0/SHT_SCALE_FACTOR) {	// s2 >= 0
 			ns2--;		s2 *= SHT_SCALE_FACTOR;		// 1/S < s2 < 1
 		}
 	}
-	while ((nv < 0) && (fabs(val) > 1.0/SHT_SCALE_FACTOR)) {	// try to minimize |nv|
+	while ((nv < 0) && (val > 1.0/SHT_SCALE_FACTOR)) {	// try to minimize |nv|
 		++nv;	val *= 1.0/SHT_SCALE_FACTOR;
 	}
+	if (val0 < 0) val *= -1.0;		// restore sign.
 	*nval = nv;
 	return val;		// 1/S^2 < val < 1
 }
