@@ -74,6 +74,19 @@ void write_mx(char *fn, double *mx, int N1, int N2)
 	fclose(fp);
 }
 
+double tdiff(struct timespec *start, struct timespec *end)
+{
+	double s = 1.e9 * start->tv_sec + start->tv_nsec;
+	double e = 1.e9 * end->tv_sec + end->tv_nsec;
+	return (e-s) * (1.e-6/SHT_ITER);	// time in ms.
+}
+
+// isNaN testing that works with -ffast-math
+double isNaN_0=0, isNaN_1=1;
+inline int isNaN(double x) {
+        return ((x == isNaN_0)&&(x == isNaN_1));
+}
+
 double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 {
 	long int jj,i, nlm_cplx;
@@ -83,6 +96,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
+		if ((isNaN(creal(Slm[i]))) || (isNaN(cimag(Slm[i])))) printf("NaN @ lm=%d (l=%d)\n",i,shtns->li[i]);
 		if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
 			if (shtns->li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
@@ -163,25 +177,32 @@ int test_SHT()
 {
 	long int jj,i;
 	clock_t tcpu;
-	double ts, ta;
+	double ts, ta, ts2, ta2;
+	struct timespec t1, t2;
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
+	clock_gettime(CLOCK_REALTIME, &t1);
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SH_to_spat(shtns, Slm,Sh);
 	}
 	tcpu = clock() - tcpu;
+	clock_gettime(CLOCK_REALTIME, &t2);
 	ts = tcpu / (1000.*SHT_ITER);
+	ts2 = tdiff(&t1, &t2);
 
+	clock_gettime(CLOCK_REALTIME, &t1);
 	tcpu = clock();
 	spat_to_SH(shtns, Sh,Slm);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SH(shtns, Sh,Tlm);
 	}
 	tcpu = clock() - tcpu;
+	clock_gettime(CLOCK_REALTIME, &t2);
 	ta = tcpu / (1000.*SHT_ITER);
-	printf("   SHT time : \t synthesis = %f ms \t analysis = %f ms\n", ts, ta);
+	ta2 = tdiff(&t1, &t2);
+	printf("   SHT time : \t synthesis = %f ms [%f] \t analysis = %f ms [%f] \n", ts, ts2, ta, ta2);
 
 	scal_error(Slm, Slm0, LMAX);
 	return (int) tcpu;
@@ -245,6 +266,7 @@ int test_SHT_l(int ltr)
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
+	
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SH_to_spat_l(shtns, Slm,Sh,ltr);

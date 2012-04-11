@@ -3,6 +3,7 @@
   => we should therefore use our own aligned memory allocation ... (or use autoconf ?)
 
 *** TODO ***
+- make equal_polar_grid invertible ???
 - complex fft is much faster, resulting in 15-20% faster SHT for mmax=lmax. => switch to complex for nlat even, (at the expense of some accuracy) !!
 - split the fft and the legendre transform so that they can be done independantly ?
    -OR- allow to deactivate fft.

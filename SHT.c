@@ -757,8 +757,9 @@ static void free_SHTarrays(shtns_cfg shtns)
 
 /// \internal initialize FFTs using FFTW.
 /// \param[in] layout defines the spatial layout (see \ref spat).
+/// \param[in] on_the_fly is one, if only on-the-fly transform are considered.
 /// returns the number of double to be allocated for a spatial field.
-static void planFFT(shtns_cfg shtns, int layout)
+static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 {
 	double cost_fft_ip, cost_fft_oop, cost_ifft_ip, cost_ifft_oop;
 	complex double *ShF;
@@ -770,6 +771,15 @@ static void planFFT(shtns_cfg shtns, int layout)
 
 	if (NPHI <= 2*MMAX) shtns_runerr("the sampling condition Nphi > 2*Mmax is not met.");
 
+	#ifdef _OPENMP
+		fftw_init_threads();
+		fftw_plan_with_nthreads(1);
+		fftw_plan_with_nthreads(omp_get_num_procs());
+		printf("using OpenMP with %d processors\n",omp_get_num_procs());
+		if (shtns->fftw_plan_mode == FFTW_EXHAUSTIVE) shtns->fftw_plan_mode = FFTW_PATIENT;
+	#endif
+
+	shtns->fft = NULL;		shtns->ifft = NULL;
 	if (NPHI==1) 	// no FFT needed.
 	{
 		shtns->fftc_mode = -1;		// no FFT
@@ -778,7 +788,6 @@ static void planFFT(shtns_cfg shtns, int layout)
 		#endif
 		shtns->nspat = NLAT;
 		shtns->ncplx_fft = -1;	// no fft.
-		shtns->fft = NULL;		shtns->ifft = NULL;
 	}
 	else	/* NPHI > 1 */
 	{
@@ -823,6 +832,7 @@ static void planFFT(shtns_cfg shtns, int layout)
 			#endif
 		}
 
+	  if ((_GCC_VEC_ == 0) || (on_the_fly == 0)) {		// the real ffts are required if _GCC_VC_ == 0 or if on_the_fly is zero.
 	// IFFT : unnormalized.  FFT : must be normalized.
 		cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
 		if (in_place) {		// in-place FFT (if allowed)
@@ -876,6 +886,7 @@ static void planFFT(shtns_cfg shtns, int layout)
 			#endif
 		}
 		shtns->fft = fft;		shtns->ifft = ifft;
+	  }
 		shtns->nspat = phi_embed * NLAT;
 		VFREE(Sh);		VFREE(ShF);
 
@@ -2249,7 +2260,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	shtns->nphi = *nphi;
 	shtns->nlat_2 = (*nlat+1)/2;	shtns->nlat = *nlat;
 
-	planFFT(shtns, layout);		// initialize fftw
+	planFFT(shtns, layout, on_the_fly);		// initialize fftw
 	shtns->zlm_dct0 = NULL;		// used as a flag.
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
 
@@ -2297,7 +2308,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 					free_SHTarrays(shtns);
 					*nlat = n_gauss;
 					shtns->nlat_2 = (*nlat+1)/2;	shtns->nlat = *nlat;
-					planFFT(shtns, layout);		// fft must be replanned because NLAT has changed.
+					planFFT(shtns, layout, on_the_fly);		// fft must be replanned because NLAT has changed.
 				}
 			}
 		}

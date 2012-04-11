@@ -33,6 +33,11 @@
 #include "sht_config.h"
 #include "shtns.h"
 
+#ifdef _OPENMP
+  #warning "using OpenMP"
+  #include <omp.h>
+#endif
+
 // sht variants (std, ltr)
 enum sht_variants { SHT_STD, SHT_LTR, SHT_NVAR };
 // sht types (scal synth, scal analys, vect synth, ...)

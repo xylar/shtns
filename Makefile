@@ -7,7 +7,7 @@ march = -march=native
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(march) -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE -fpic
+go= $(march) -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE -fpic -fopenmp
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
@@ -70,7 +70,7 @@ sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c 
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile
-	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -o time_SHT
+	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3_omp -lfftw3 -lm -lrt -o time_SHT
 test_rot : shtns.h test_rot.c libshtns.a Makefile
 	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -o test_rot
 
