@@ -27,13 +27,13 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
-3	static void GEN3(_SHqst_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, long int llim, int imlim, int k0, int nk) {
-QX	static void GEN3(_SH_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, long int llim, int imlim, int k0, int nk) {
+3	static void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
+QX	static void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, long int llim, int m0, int m1) {
   #ifndef SHT_GRAD
-VX	static void GEN3(_SHsphtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int imlim, int k0, int nk) {
+VX	static void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
   #else
-S	static void GEN3(_SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, long int llim, int imlim, int k0, int nk) {
-T	static void GEN3(_SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int imlim, int k0, int nk) {
+S	static void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
+T	static void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
   #endif
 
   #ifndef SHT_AXISYM
@@ -53,7 +53,7 @@ Q	#define BR0(i) ((double *)BrF)[i]
 S	#define BT0(i) ((double *)BtF)[i]
 T	#define BP0(i) ((double *)BpF)[i]
   #endif
-	long int k,l,m;
+	long int nk,k,l,m;
 	double *alm, *al;
 	s2d *ct, *st;
 Q	double Ql0[llim+1];
@@ -61,7 +61,12 @@ S	double Sl0[llim];
 T	double Tl0[llim];
 
 	ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
-	//	im=0;
+	nk = NLAT_2;
+	#if _GCC_VEC_
+		nk = ((unsigned long)(nk+VSIZE2-1)) / VSIZE2;
+	#endif
+
+	if ((m0 == 0) && (m1 > 0)) {	//	im=0;
  		l=1;
 		alm = shtns->alm[0];
 Q		Ql0[0] = (double) Qlm[0];		// l=0
@@ -71,7 +76,7 @@ S			Sl0[l-1] = (double) Slm[l];	//	Sl[l] = (double) Slm[l+1];
 T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 			++l;
 		} while(l<=llim);
-		k=k0;
+		k=0;
 		do {
 			l=0;	al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
@@ -148,16 +153,18 @@ T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
 		#endif
 			k+=NWAY;
 		} while (k < nk);
+		m0++;
+	}
 
   #ifndef SHT_AXISYM
 	#if _GCC_VEC_
-Q		BrF += NLAT_2;
-V		BtF += NLAT_2;	BpF += NLAT_2;
+Q		BrF += m0*NLAT_2;
+V		BtF += m0*NLAT_2;	BpF += m0*NLAT_2;
 	#else
-Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
+Q		BrF += m0*NLAT;
+V		BtF += m0*NLAT;		BpF += m0*NLAT;
 	#endif
-	for(im=1; im<=imlim; ++im) {
+	for(im=m0; im<m1; ++im) {
 		m = im*MRES;
 		l = LiM(shtns, 0,im);
 V		m_1 = 1.0/m;
@@ -165,7 +172,27 @@ V		m_1 = 1.0/m;
 Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
 T		complex double* Tl = &Tlm[l];
-		k=k0;
+		k=0;	l=shtns->tm[im];
+	#if _GCC_VEC_
+		l>>=1;		// stay on a 16 byte boundary
+		while (k<l) {	// polar optimization
+Q			BrF[k] = vdup(0.0);				BrF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
+Q			BrF[NLAT_2-l+k] = vdup(0.0);	BrF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
+V			BtF[k] = vdup(0.0);				BtF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
+V			BtF[NLAT_2-l+k] = vdup(0.0);	BtF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
+V			BpF[k] = vdup(0.0);				BpF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
+V			BpF[NLAT_2-l+k] = vdup(0.0);	BpF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
+			++k;
+		}
+		k = ((unsigned) k) / (VSIZE2/2);
+	#else
+		while (k<l) {	// polar optimization
+Q			BrF[k] = 0.0;		BrF[NLAT-l+k] = 0.0;
+V			BtF[k] = 0.0;		BtF[NLAT-l+k] = 0.0;
+V			BpF[k] = 0.0;		BpF[NLAT-l+k] = 0.0;
+			++k;
+		}
+	#endif
 		do {
 			al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
@@ -182,6 +209,12 @@ V				y0[j] = vall(m);		// for the vector transform, compute ylm*m/sint
 Q			l=m;
 V			l=m-1;
 			long int ny = 0;
+		if ((int)llim <= SHT_L_RESCALE_FLY) {
+			do {		// sin(theta)^m
+				if (l&1) for (int j=0; j<NWAY; ++j) y0[j] *= cost[j];
+				for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
+			} while(l >>= 1);
+		} else {
 			long int nsint = 0;
 			do {		// sin(theta)^m		(use rescaling to avoid underflow)
 				if (l&1) {
@@ -199,6 +232,7 @@ V			l=m-1;
 					for (int j=0; j<NWAY; ++j) cost[j] *= vall(SHT_SCALE_FACTOR);
 				}
 			} while(l >>= 1);
+		}
 			for (int j=0; j<NWAY; ++j) {
 				y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, j+k);
@@ -333,7 +367,7 @@ T	static void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex doubl
   #endif
 
 	int k;
-	unsigned imlim;
+	unsigned imlim = 0;
 Q	v2d* BrF = (v2d*) Vr;
 V	v2d* BtF = (v2d*) Vt;	v2d* BpF = (v2d*) Vp;
 
@@ -366,43 +400,58 @@ S		if (Vp != NULL) { int k=0; do { ((v2d*)Vp)[k]=vdup(0.0); } while(++k<NLAT_2);
 T		if (Vt != NULL) { int k=0; do { ((v2d*)Vt)[k]=vdup(0.0); } while(++k<NLAT_2); BtF = NULL; }
 	#endif
   #endif
+	imlim += 1;
   
+  //omp_set_num_threads(8);
   #pragma omp parallel
   {
-	unsigned n = NLAT_2;	unsigned ith = 0;
+	unsigned m0, m1, m2, m3, ith, n;
+	int dm, rm, cm;
+	ith = 0;	n = 2;
 	#ifdef _OPENMP
 		ith = omp_get_thread_num();
+		n = omp_get_num_threads() *2;
 	#endif
-	#if _GCC_VEC_
-		n = (n + VSIZE2-1) / VSIZE2;
-	#endif	
-	unsigned it0 = ith * n;
-	unsigned it1 = (ith+1) * n;
-	#ifdef _OPENMP
-		n = omp_get_num_threads();
-		it0 /= n;		it1 /= n;
-	#endif
+	
+	dm = (imlim) / n;		rm = (imlim) % n;
+	m0 = dm * ith;		m1 = m0+dm;
+	m3 = dm * (n-ith);	m2 = m3-dm;
+	cm = ith-n+rm;
+	if (cm>=0) {
+		m0 += cm;	m1 = m0+dm+1;
+	}
+	cm = rm-ith;
+	if (cm>0) {
+		m3 += cm;	m2 = m3-dm-1;
+	}
 
-3	GEN3(_SHqst_to_spat_fly,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim, it0, it1);
-QX	GEN3(_SH_to_spat_fly,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim, it0, it1);
+	//printf("ith=%d, m0=%d, m1=%d, m0'=%d, m1'=%d, total=%d\n",ith,m0,m1,m2,m3, m1-m0+m3-m2);
+
+3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m0, m1);
+3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m2, m3);
+QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, m0, m1);
+QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, m2, m3);
   #ifndef SHT_GRAD
-VX	GEN3(_SHsphtor_to_spat_fly,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim, it0, it1);
+VX	GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, m0, m1);
+VX	GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, m2, m3);
   #else
-S	GEN3(_SHsph_to_spat_fly,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim, it0, it1);
-T	GEN3(_SHtor_to_spat_fly,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim, it0, it1);
+S	GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, m0, m1);
+S	GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, m2, m3);
+T	GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, m0, m1);
+T	GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, m2, m3);
   #endif
   }
 
   #ifndef SHT_AXISYM
   #if _GCC_VEC_
-	for (k=0; k < NLAT_2*(NPHI-1-2*imlim); ++k) {	// padding for high m's
-Q		BrF[k +NLAT_2*(imlim+1)] = vdup(0.0);
-V		BtF[k +NLAT_2*(imlim+1)] = vdup(0.0);	BpF[k +NLAT_2*(imlim+1)] = vdup(0.0);
+	for (k=0; k < NLAT_2*(NPHI+1-2*imlim); ++k) {	// padding for high m's
+Q		BrF[k +NLAT_2*imlim] = vdup(0.0);
+V		BtF[k +NLAT_2*imlim] = vdup(0.0);	BpF[k +NLAT_2*imlim] = vdup(0.0);
 	}
   #else
-	for (k=0; k < NLAT*((NPHI>>1) -imlim); ++k) {	// padding for high m's
-Q			BrF[k +NLAT*(imlim+1)] = 0.0;
-V			BtF[k +NLAT*(imlim+1)] = 0.0;	BpF[k +NLAT*(imlim+1)] = 0.0;
+	for (k=0; k < NLAT*((NPHI>>1) -imlim+1); ++k) {	// padding for high m's
+Q			BrF[k +NLAT*imlim] = 0.0;
+V			BtF[k +NLAT*imlim] = 0.0;	BpF[k +NLAT*imlim] = 0.0;
 	}
   #endif
     // NPHI > 1 as SHT_AXISYM is not defined.

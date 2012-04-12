@@ -1,13 +1,16 @@
 ## path prefix for make install (installs to $(PREFIX)/lib and $(PREFIX)/include)
 PREFIX=$(HOME)
 
+## comment to disable parallel spherical harmonic transforms using openmp
+#OMP=-fopenmp -lfftw3_omp
+
 # compile for a given architecture : native is the best (gcc >= 4.0), generic if you don't know.
 #march = -march=core2
 march = -march=native
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(march) -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE -fpic -fopenmp
+go= $(march) -pipe -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE -fpic $(OMP)
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
@@ -19,8 +22,6 @@ cc = gcc $(go) -O2 -ffast-math
 
 ## "version" identification string
 HGID=`hg id -ti`
-
-shtfiles = SHT/SH_to_spat_fly.c SHT/fly_spat_to_SH.gen.c SHT/spat_to_SH_fly.c SHT/fly_SH_to_spat.gen.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/hyb_SH_to_spat.gen.c SHT/hyb_spat_to_SH.gen.c SHT/Makefile sht_legendre.c
 
 hfiles = sht_private.h sht_config.h shtns.h
 
@@ -40,37 +41,47 @@ install :
 	@echo " "
 	@cat COPYRIGHT
 
+ifeq ($(strip $(OMP)),)
+  codelets = SHT/SH_to_spat.c SHT/SH_to_spat_fly.c SHT/spat_to_SH.c SHT/spat_to_SH_fly.c SHT/sht_generic.c
+else
+  codelets = SHT/SH_to_spat.c SHT/SH_to_spat_omp.c SHT/spat_to_SH.c SHT/spat_to_SH_omp.c SHT/sht_generic.c
+endif
+
 # codelets :
-SHT/SH_to_spat_fly.c : SHT/fly_SH_to_spat.gen.c SHT/Makefile
-	$(MAKE) SH_to_spat_fly.c -C SHT
-SHT/spat_to_SH_fly.c : SHT/fly_spat_to_SH.gen.c SHT/Makefile
-	$(MAKE) spat_to_SH_fly.c -C SHT
-SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c SHT/Makefile
-	$(MAKE) SH_to_spat.c -C SHT
-SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c SHT/Makefile
-	$(MAKE) spat_to_SH.c -C SHT
+SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c
+	$(MAKE) SH_to_spat.c -C SHT 
+SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c
+	$(MAKE) spat_to_SH.c -C SHT 
+SHT/SH_to_spat_fly.c : SHT/fly_SH_to_spat.gen.c 
+	$(MAKE) SH_to_spat_fly.c -C SHT SFX=fly
+SHT/spat_to_SH_fly.c : SHT/fly_spat_to_SH.gen.c 
+	$(MAKE) spat_to_SH_fly.c -C SHT SFX=fly
+SHT/SH_to_spat_omp.c : SHT/omp_SH_to_spat.gen.c
+	$(MAKE) SH_to_spat_omp.c -C SHT SFX=omp
+SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
+	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp
 
 # objects :
 SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
 	$(cc) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
 	@echo "DONE SHT.o"
 
-sht_std.o : sht_std.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
+sht_std.o : sht_std.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c sht_std.c -o sht_std.o
 	@echo "DONE sht_std"
-sht_ltr.o : sht_ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
+sht_ltr.o : sht_ltr.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c sht_ltr.c -o sht_ltr.o
 	@echo "DONE sht_ltr"
-sht_m0.o : sht_m0.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c
+sht_m0.o : sht_m0.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c sht_m0.c -o sht_m0.o
 	@echo "DONE sht_m0"
-sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) SHT/sht_generic.c SHT/SH_to_spat.c SHT/spat_to_SH.c SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
+sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c sht_m0ltr.c -o sht_m0ltr.o
 	@echo "DONE sht_m0ltr"
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile
-	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3_omp -lfftw3 -lm -lrt -o time_SHT
+	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -lrt -o time_SHT
 test_rot : shtns.h test_rot.c libshtns.a Makefile
 	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -o test_rot
 
@@ -94,7 +105,7 @@ clean :
 # use it with "from shtns import *" in a python program/shell
 python : shtns_numpy_wrap.c Makefile $(hfiles) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	gcc $(march) -O2 -fpic -I/usr/include/python2.7 -c shtns_numpy_wrap.c
-	gcc $(march) -O2 -fpic -shared /usr/lib/libfftw3.so SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o shtns_numpy_wrap.o -o _shtns.so
+	gcc $(march) -O2 -fpic -shared $(OMP) -lfftw3 SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o shtns_numpy_wrap.o -o _shtns.so
 
 # generate python and c glue code with SWIG.
 shtns_numpy_wrap.c : shtns_numpy.i sht_private.h shtns.h
@@ -115,6 +126,9 @@ updatecpy : COPYRIGHT
 	./update-copyright.sh SHT/hyb_SH_to_spat.gen.c
 	./update-copyright.sh SHT/hyb_spat_to_SH.gen.c
 	./update-copyright.sh SHT/fly_SH_to_spat.gen.c
+	./update-copyright.sh SHT/fly_spat_to_SH.gen.c
+	./update-copyright.sh SHT/omp_SH_to_spat.gen.c
+	./update-copyright.sh SHT/omp_spat_to_SH.gen.c
 	./update-copyright.sh time_SHT.c
 	./update-copyright.sh SHT_example.c
 	./update-copyright.sh -fortran SHT_example.f
@@ -122,5 +136,9 @@ updatecpy : COPYRIGHT
 	./update-copyright.sh shtns_numpy.i
 	./update-copyright.sh -python SHT_example.py
 
+.PHONY : updatecpy install clean docs python
+
+
 #fftw compiling options :
 #-O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math -fno-schedule-insns -fno-web -fno-loop-optimize --param inline-unit-growth=1000 --param large-function-growth=1000
+

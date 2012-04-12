@@ -49,34 +49,65 @@
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
-#define NWAY 1
-#include "spat_to_SHst_fly.c"
-#include "SHst_to_spat_fly.c"
-#undef NWAY
-#define NWAY 2
-#include "spat_to_SH_fly.c"
-#include "SH_to_spat_fly.c"
-#include "spat_to_SHst_fly.c"
-#include "SHst_to_spat_fly.c"
-#undef NWAY
-#define NWAY 3
-#include "spat_to_SH_fly.c"
-#include "SH_to_spat_fly.c"
-#include "spat_to_SHst_fly.c"
-#include "SHst_to_spat_fly.c"
-#undef NWAY
-#define NWAY 4
-#include "spat_to_SH_fly.c"
-#include "SH_to_spat_fly.c"
-#undef NWAY
-#define NWAY 6
-#include "spat_to_SH_fly.c"
-#include "SH_to_spat_fly.c"
-#undef NWAY
-#define NWAY 8
-#include "spat_to_SH_fly.c"
-#include "SH_to_spat_fly.c"
-#undef NWAY
+  #ifndef _OPENMP
+	#define NWAY 1
+	#include "spat_to_SHst_fly.c"
+	#include "SHst_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 2
+	#include "spat_to_SH_fly.c"
+	#include "SH_to_spat_fly.c"
+	#include "spat_to_SHst_fly.c"
+	#include "SHst_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 3
+	#include "spat_to_SH_fly.c"
+	#include "SH_to_spat_fly.c"
+	#include "spat_to_SHst_fly.c"
+	#include "SHst_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 4
+	#include "spat_to_SH_fly.c"
+	#include "SH_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 6
+	#include "spat_to_SH_fly.c"
+	#include "SH_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 8
+	#include "spat_to_SH_fly.c"
+	#include "SH_to_spat_fly.c"
+	#undef NWAY
+  #else
+	#define NWAY 1
+	#include "spat_to_SHst_omp.c"
+	#include "SHst_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 2
+	#include "spat_to_SH_omp.c"
+	#include "SH_to_spat_omp.c"
+	#include "spat_to_SHst_omp.c"
+	#include "SHst_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 3
+	#include "spat_to_SH_omp.c"
+	#include "SH_to_spat_omp.c"
+	#include "spat_to_SHst_omp.c"
+	#include "SHst_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 4
+	#include "spat_to_SH_omp.c"
+	#include "SH_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 6
+	#include "spat_to_SH_omp.c"
+	#include "SH_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 8
+	#include "spat_to_SH_omp.c"
+	#include "SH_to_spat_omp.c"
+	#undef NWAY
+  #endif
 #endif
 
 #ifdef IVAR
@@ -121,22 +152,41 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
-#define NWAY 1
-#include "SHs_to_spat_fly.c"
-#include "SHt_to_spat_fly.c"
-#undef NWAY
-#define NWAY 2
-#include "SHs_to_spat_fly.c"
-#include "SHt_to_spat_fly.c"
-#undef NWAY
-#define NWAY 3
-#include "SHs_to_spat_fly.c"
-#include "SHt_to_spat_fly.c"
-#undef NWAY
-#define NWAY 4
-#include "SHs_to_spat_fly.c"
-#include "SHt_to_spat_fly.c"
-#undef NWAY
+  #ifndef _OPENMP
+	#define NWAY 1
+	#include "SHs_to_spat_fly.c"
+	#include "SHt_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 2
+	#include "SHs_to_spat_fly.c"
+	#include "SHt_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 3
+	#include "SHs_to_spat_fly.c"
+	#include "SHt_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 4
+	#include "SHs_to_spat_fly.c"
+	#include "SHt_to_spat_fly.c"
+	#undef NWAY
+  #else
+	#define NWAY 1
+	#include "SHs_to_spat_omp.c"
+	#include "SHt_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 2
+	#include "SHs_to_spat_omp.c"
+	#include "SHt_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 3
+	#include "SHs_to_spat_omp.c"
+	#include "SHt_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 4
+	#include "SHs_to_spat_omp.c"
+	#include "SHt_to_spat_omp.c"
+	#undef NWAY
+  #endif
 #endif
 
 #undef SHT_GRAD
@@ -200,18 +250,33 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
-#define NWAY 1
-#include "spat_to_SHqst_fly.c"
-#include "SHqst_to_spat_fly.c"
-#undef NWAY
-#define NWAY 2
-#include "spat_to_SHqst_fly.c"
-#include "SHqst_to_spat_fly.c"
-#undef NWAY
-#define NWAY 3
-#include "spat_to_SHqst_fly.c"
-#include "SHqst_to_spat_fly.c"
-#undef NWAY
+  #ifndef _OPENMP
+	#define NWAY 1
+	#include "spat_to_SHqst_fly.c"
+	#include "SHqst_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 2
+	#include "spat_to_SHqst_fly.c"
+	#include "SHqst_to_spat_fly.c"
+	#undef NWAY
+	#define NWAY 3
+	#include "spat_to_SHqst_fly.c"
+	#include "SHqst_to_spat_fly.c"
+	#undef NWAY
+  #else
+	#define NWAY 1
+	#include "spat_to_SHqst_omp.c"
+	#include "SHqst_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 2
+	#include "spat_to_SHqst_omp.c"
+	#include "SHqst_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 3
+	#include "spat_to_SHqst_omp.c"
+	#include "SHqst_to_spat_omp.c"
+	#undef NWAY
+  #endif
 #endif
 #undef SHT_3COMP
 

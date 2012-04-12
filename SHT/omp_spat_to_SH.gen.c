@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2011 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2012 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@ujf-grenoble.fr
@@ -70,7 +70,7 @@ V	s2d poi[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
 	  nk = ((unsigned) nk+(VSIZE2-1))/VSIZE2;
 	#endif
 V	l_2 = shtns->l_2;
-	if (m0 == 0) {		// dzl.p = 0.0 : and evrything is REAL
+	if ((m0 == 0) && (m1 > 0)) {		// dzl.p = 0.0 : and evrything is REAL
 		k=0;
 		alm = shtns->blm[0];
 Q		s2d r0 = vdup(0.0);
@@ -473,6 +473,7 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
   #endif
   imlim += 1;
 
+	//omp_set_num_threads(8);
   #pragma omp parallel
   {
 	unsigned m0, m1, m2, m3, ith, n;
