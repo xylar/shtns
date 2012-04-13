@@ -24,9 +24,14 @@
 #
 //////////////////////////////////////////////////
 
-QX	static void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, complex double *Qlm, long int llim, int m0, int m1) {
-VX	static void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BtF, s2d *BpF, complex double *Slm, complex double *Tlm, long int llim, int m0, int m1) {
-3	static void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, s2d *BtF, s2d *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim, int m0, int m1) {
+	#ifndef _OPENMP
+	inline
+	#else
+	static
+	#endif
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, complex double *Qlm, long int llim, int m0, int m1) {
+VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BtF, s2d *BpF, complex double *Slm, complex double *Tlm, long int llim, int m0, int m1) {
+3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, s2d *BtF, s2d *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim, int m0, int m1) {
 
 	double *alm, *al;
 	s2d *wg, *ct, *st;
@@ -63,14 +68,28 @@ V	s2d poi[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
   #endif
 
 
-	vnlat = ((unsigned) NLAT)/VSIZE;		// vector size.
 	nk = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
-	wg = (s2d*) shtns->wg;		ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
 	#if _GCC_VEC_
 	  nk = ((unsigned) nk+(VSIZE2-1))/VSIZE2;
 	#endif
+	wg = (s2d*) shtns->wg;		ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
 V	l_2 = shtns->l_2;
-	if ((m0 == 0) && (m1 > 0)) {		// dzl.p = 0.0 : and evrything is REAL
+	vnlat = ((unsigned) NLAT)/VSIZE;		// vector size.
+	for (k=nk*(VSIZE2/VSIZE); k<(nk+NWAY)*(VSIZE2/VSIZE)-1; ++k) {		// never written, so this is now done for all m's
+Q		rer[k] = vdup(0.0);		ror[k] = vdup(0.0);
+V		ter[k] = vdup(0.0);		tor[k] = vdup(0.0);
+V		per[k] = vdup(0.0);		por[k] = vdup(0.0);
+	  #ifndef SHT_AXISYM
+Q		rei[k] = vdup(0.0);		roi[k] = vdup(0.0);
+V		tei[k] = vdup(0.0);		toi[k] = vdup(0.0);
+V		pei[k] = vdup(0.0);		poi[k] = vdup(0.0);
+	  #endif
+	}
+
+	#ifdef _OPENMP
+	if ((m0 == 0) && (m1 > 0))
+	#endif
+	{		// im=0 : dzl.p = 0.0 and evrything is REAL
 		k=0;
 		alm = shtns->blm[0];
 Q		s2d r0 = vdup(0.0);
@@ -83,11 +102,6 @@ V			ter[k] = c+d;		tor[k] = c-d;
 V			s2d e = BpF[k];		s2d f = vxchg(BpF[vnlat-1-k]);
 V			per[k] = e+f;		por[k] = e-f;
 		} while(++k < nk*(VSIZE2/VSIZE));
-		for (k=nk*(VSIZE2/VSIZE); k<(nk+NWAY)*(VSIZE2/VSIZE)-1; ++k) {
-Q			rer[k] = vdup(0.0);		ror[k] = vdup(0.0);
-V			ter[k] = vdup(0.0);		tor[k] = vdup(0.0);
-V			per[k] = vdup(0.0);		por[k] = vdup(0.0);
-		}
 		#if _GCC_VEC_
 Q			Qlm[0] = (vlo_to_dbl(r0) + vhi_to_dbl(r0)) * alm[0];					// l=0 is done.
 		#else
@@ -175,23 +189,18 @@ Q				Qlm[l] = 0.0;
 V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 			}
 		#endif
-		m0++;
+		m0=1;
 	}
 
   #ifndef SHT_AXISYM
+Q	BrF += m0*vnlat;
+V	BtF += m0*vnlat;	BpF += m0*vnlat;
 	#if _GCC_VEC_
 		sgn_mask = vdup(0.0);		// build mask to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
 		sgn_mask = (s2d) _mm_cmpeq_epi16((__m128i) sgn_mask, (__m128i) sgn_mask);
 		sgn_mask = (s2d) _mm_slli_epi64((__m128i) sgn_mask, 63);		// (-0,-0)
 		sgn_mask = _mm_unpackhi_pd(vdup(0.0), sgn_mask);	// (0, -0)
 	#endif
-	for (k=nk*(VSIZE2/VSIZE); k<(nk+NWAY)*(VSIZE2/VSIZE)-1; ++k) {		// never written, so this is now done for all m's (real parts already zero)
-Q		rei[k] = vdup(0.0);		roi[k] = vdup(0.0);
-V		tei[k] = vdup(0.0);		toi[k] = vdup(0.0);
-V		pei[k] = vdup(0.0);		poi[k] = vdup(0.0);
-	}
-Q	BrF += m0*vnlat;
-V	BtF += m0*vnlat;	BpF += m0*vnlat;
 	for (im=m0; im<m1; ++im) {
 		l = shtns->tm[im] / VSIZE2;
 		alm = shtns->blm[im];
@@ -449,6 +458,10 @@ V	s2d *BtF, *BpF;	// contains the Fourier transformed data
 Q	BrF = (s2d *) Vr;
 V	BtF = (s2d *) Vt;	BpF = (s2d *) Vp;
   #ifndef SHT_AXISYM
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
 	if (shtns->fftc_mode >= 0) {
 	    if (shtns->fftc_mode == 0) {	// in-place
 Q			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
@@ -466,42 +479,47 @@ V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, ((double*)BtF)+1, ((double*
 V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*)BpF));
 	    }
 	}
-	imlim = MTR;
-	#ifdef SHT_VAR_LTR
-		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
-	#endif
   #endif
-  imlim += 1;
+	imlim += 1;
 
-	//omp_set_num_threads(8);
+  //omp_set_num_threads(8);
   #pragma omp parallel
   {
-	unsigned m0, m1, m2, m3, ith, n;
-	ith = 0;	n = 2;
 	#ifdef _OPENMP
-		ith = omp_get_thread_num();
+		unsigned m0, m1, m2, m3, n;
+		int dm, rm, cm, ith;
 		n = omp_get_num_threads() *2;
-	#endif
-	m0 = ith * imlim;
-	m1 = (ith+1) * imlim;
-	m2 = (n-1-ith) * imlim;
-	m3 = (n-ith) * imlim;
-	#ifdef _OPENMP
-		m0 /= n;	m1 /= n;	m2 /= n;	m3 /= n;
+		dm = (imlim) / n;		rm = (imlim) % n;
+		ith = omp_get_thread_num();
+		m0 = dm * ith;		m3 = dm * (n-ith);
+		m1 = m0+dm;			m2 = m3-dm;
+		cm = ith-n+rm;
+		if (cm>=0) {
+			m0 += cm;	m1 = m0+dm+1;
+		}
+		cm = rm-ith;
+		if (cm>0) {
+			m3 += cm;	m2 = m3-dm-1;
+		}
 		//printf("ith=%d, m0=%d, m1=%d, m0'=%d, m1'=%d, total=%d\n",ith,m0,m1,m2,m3, m1-m0+m3-m2);
-	#endif
 
-QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, m0, m1);
-QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, m2, m3);
-VX	GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, m0, m1);
-VX	GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, m2, m3);
-3	GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, m0, m1);
-3	GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, m2, m3);
-  }
+QX		GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, m0, m1);
+QX		GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, m2, m3);
+VX		GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, m0, m1);
+VX		GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, m2, m3);
+3		GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, m0, m1);
+3		GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, m2, m3);
+	#else
+QX		GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, 0, imlim);
+VX		GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, 0, imlim);
+3		GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, 0, imlim);
+	#endif
 
   #ifndef SHT_AXISYM
   	#ifdef SHT_VAR_LTR
-	if (imlim <= MMAX) {
+	if (imlim <= MMAX)
+	#pragma omp single nowait
+	{
 		long int l = LiM(shtns, imlim*MRES, imlim);
 		do {
 Q			((v2d*)Qlm)[l] = vdup(0.0);
@@ -509,6 +527,10 @@ V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 		} while(++l < shtns->nlm);
 	}
 	#endif
+  #endif
+  }
+
+  #ifndef SHT_AXISYM
   	if (shtns->fftc_mode > 0) {		// free memory
 Q	    VFREE(BrF);
 VX	    VFREE(BtF);	// this frees also BpF.

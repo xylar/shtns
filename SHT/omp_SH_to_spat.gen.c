@@ -27,13 +27,18 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
-3	static void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
-QX	static void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, long int llim, int m0, int m1) {
+	#ifndef _OPENMP
+	inline
+	#else
+	static
+	#endif
+3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, long int llim, int m0, int m1) {
   #ifndef SHT_GRAD
-VX	static void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
+VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
   #else
-S	static void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
-T	static void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
+S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
+T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
   #endif
 
   #ifndef SHT_AXISYM
@@ -66,7 +71,10 @@ T	double Tl0[llim];
 		nk = ((unsigned long)(nk+VSIZE2-1)) / VSIZE2;
 	#endif
 
-	if ((m0 == 0) && (m1 > 0)) {	//	im=0;
+	#ifdef _OPENMP
+	if ((m0 == 0) && (m1 > 0))
+	#endif
+	{	//	im=0;
  		l=1;
 		alm = shtns->alm[0];
 Q		Ql0[0] = (double) Qlm[0];		// l=0
@@ -153,7 +161,7 @@ T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
 		#endif
 			k+=NWAY;
 		} while (k < nk);
-		m0++;
+		m0=1;
 	}
 
   #ifndef SHT_AXISYM
@@ -372,6 +380,10 @@ Q	v2d* BrF = (v2d*) Vr;
 V	v2d* BtF = (v2d*) Vt;	v2d* BpF = (v2d*) Vp;
 
   #ifndef SHT_AXISYM
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
 	#ifdef _GCC_VEC_
 	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
 		unsigned long nv = shtns->nspat;
@@ -390,10 +402,6 @@ VX		BpF = BtF + shtns->ncplx_fft;
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
 	#endif
-	imlim = MTR;
-	#ifdef SHT_VAR_LTR
-		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
-	#endif
   #else
 	#ifdef SHT_GRAD
 S		if (Vp != NULL) { int k=0; do { ((v2d*)Vp)[k]=vdup(0.0); } while(++k<NLAT_2); BpF = NULL; }
@@ -405,55 +413,70 @@ T		if (Vt != NULL) { int k=0; do { ((v2d*)Vt)[k]=vdup(0.0); } while(++k<NLAT_2);
   //omp_set_num_threads(8);
   #pragma omp parallel
   {
-	unsigned m0, m1, m2, m3, ith, n;
-	int dm, rm, cm;
-	ith = 0;	n = 2;
 	#ifdef _OPENMP
-		ith = omp_get_thread_num();
+		unsigned m0, m1, m2, m3, n;
+		int dm, rm, cm, ith;
 		n = omp_get_num_threads() *2;
+		dm = (imlim) / n;		rm = (imlim) % n;
+		ith = omp_get_thread_num();
+		m0 = dm * ith;		m3 = dm * (n-ith);
+		m1 = m0+dm;			m2 = m3-dm;
+		cm = ith-n+rm;
+		if (cm>=0) {
+			m0 += cm;	m1 = m0+dm+1;
+		}
+		cm = rm-ith;
+		if (cm>0) {
+			m3 += cm;	m2 = m3-dm-1;
+		}		
+		//printf("ith=%d, m0=%d, m1=%d, m0'=%d, m1'=%d, total=%d\n",ith,m0,m1,m2,m3, m1-m0+m3-m2);
+
+3		GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m0, m1);
+3		GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m2, m3);
+QX		GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, m0, m1);
+QX		GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, m2, m3);
+	  #ifndef SHT_GRAD
+VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, m0, m1);
+VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, m2, m3);
+	  #else
+S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, m0, m1);
+S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, m2, m3);
+T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, m0, m1);
+T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, m2, m3);
+	  #endif
+	#else
+3		GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, 0, imlim);
+QX		GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, 0, imlim);
+	  #ifndef SHT_GRAD
+VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, 0, imlim);
+	  #else
+S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, 0, imlim);
+T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, 0, imlim);
+	  #endif
 	#endif
-	
-	dm = (imlim) / n;		rm = (imlim) % n;
-	m0 = dm * ith;		m1 = m0+dm;
-	m3 = dm * (n-ith);	m2 = m3-dm;
-	cm = ith-n+rm;
-	if (cm>=0) {
-		m0 += cm;	m1 = m0+dm+1;
-	}
-	cm = rm-ith;
-	if (cm>0) {
-		m3 += cm;	m2 = m3-dm-1;
-	}
 
-	//printf("ith=%d, m0=%d, m1=%d, m0'=%d, m1'=%d, total=%d\n",ith,m0,m1,m2,m3, m1-m0+m3-m2);
 
-3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m0, m1);
-3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m2, m3);
-QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, m0, m1);
-QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, m2, m3);
-  #ifndef SHT_GRAD
-VX	GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, m0, m1);
-VX	GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, m2, m3);
-  #else
-S	GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, m0, m1);
-S	GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, m2, m3);
-T	GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, m0, m1);
-T	GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, m2, m3);
+  #ifndef SHT_AXISYM
+    if (NPHI >= 2*imlim)	// padding for high m's
+    #pragma omp single nowait
+    {
+		k=0;
+	  #if _GCC_VEC_
+		do {
+Q			BrF[k +NLAT_2*imlim] = vdup(0.0);
+V			BtF[k +NLAT_2*imlim] = vdup(0.0);	BpF[k +NLAT_2*imlim] = vdup(0.0);
+		} while ( ++k < NLAT_2*(NPHI+1-2*imlim) );
+	  #else
+		do {
+Q			BrF[k +NLAT*imlim] = 0.0;
+V			BtF[k +NLAT*imlim] = 0.0;	BpF[k +NLAT*imlim] = 0.0;
+		} while (++k < NLAT*((NPHI>>1) -imlim+1) );
+	  #endif
+	}
   #endif
   }
 
   #ifndef SHT_AXISYM
-  #if _GCC_VEC_
-	for (k=0; k < NLAT_2*(NPHI+1-2*imlim); ++k) {	// padding for high m's
-Q		BrF[k +NLAT_2*imlim] = vdup(0.0);
-V		BtF[k +NLAT_2*imlim] = vdup(0.0);	BpF[k +NLAT_2*imlim] = vdup(0.0);
-	}
-  #else
-	for (k=0; k < NLAT*((NPHI>>1) -imlim+1); ++k) {	// padding for high m's
-Q			BrF[k +NLAT*imlim] = 0.0;
-V			BtF[k +NLAT*imlim] = 0.0;	BpF[k +NLAT*imlim] = 0.0;
-	}
-  #endif
     // NPHI > 1 as SHT_AXISYM is not defined.
 	#if _GCC_VEC_
   	if (shtns->fftc_mode >= 0) {
