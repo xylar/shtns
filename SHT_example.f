@@ -44,6 +44,9 @@
       call shtns_calc_nlm(nlm, lmax, mmax, mres)
       print*,'NLM=',nlm
 
+! enable multi-threaded transform (OpenMP) if supported.
+      call shtns_use_threads(0)
+
 ! init SHT. SHT_PHI_CONTIGUOUS is defined in 'shtns.f'
       layout = SHT_PHI_CONTIGUOUS
       call shtns_init_sh_gauss(layout, lmax, mmax, mres, nlat, nphi)

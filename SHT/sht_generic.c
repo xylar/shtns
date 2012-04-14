@@ -36,6 +36,13 @@
   #define SUPARG2 , shtns->lmax
 #endif
 
+#ifdef _OPENMP
+  #ifndef SHT_AXISYM
+    #define ADD_OPENMP
+  #endif
+#endif
+
+
 /// \name scalar transforms
 //@{
 
@@ -77,7 +84,7 @@
 	#include "spat_to_SH_fly.c"
 	#include "SH_to_spat_fly.c"
 	#undef NWAY
-  #ifdef _OPENMP
+  #ifdef ADD_OPENMP
 	#define NWAY 1
 	#include "spat_to_SHst_omp.c"
 	#include "SHst_to_spat_omp.c"
@@ -167,7 +174,7 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 	#include "SHs_to_spat_fly.c"
 	#include "SHt_to_spat_fly.c"
 	#undef NWAY
-  #ifdef _OPENMP
+  #ifdef ADD_OPENMP
 	#define NWAY 1
 	#include "SHs_to_spat_omp.c"
 	#include "SHt_to_spat_omp.c"
@@ -260,7 +267,7 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 	#include "spat_to_SHqst_fly.c"
 	#include "SHqst_to_spat_fly.c"
 	#undef NWAY
-  #ifdef _OPENMP
+  #ifdef ADD_OPENMP
 	#define NWAY 1
 	#include "spat_to_SHqst_omp.c"
 	#include "SHqst_to_spat_omp.c"
@@ -351,7 +358,7 @@ void* GEN(sht_array, SUFFIX)[SHT_NALG][SHT_NTYP] = {
 				NULL, NULL, NULL, NULL },
 /* fly8 */	{ GEN(SH_to_spat_fly8, SUFFIX), GEN(spat_to_SH_fly8, SUFFIX), NULL, NULL, 
 				NULL, NULL, NULL, NULL },
-  #ifdef _OPENMP
+  #ifdef ADD_OPENMP
 /* omp1 */	{ NULL, NULL, GEN(SHsphtor_to_spat_omp1, SUFFIX), GEN(spat_to_SHsphtor_omp1, SUFFIX), 
 				GEN(SHsph_to_spat_omp1, SUFFIX), GEN(SHtor_to_spat_omp1, SUFFIX), GEN(SHqst_to_spat_omp1, SUFFIX), GEN(spat_to_SHqst_omp1, SUFFIX) },
 /* omp2 */	{ GEN(SH_to_spat_omp2, SUFFIX), GEN(spat_to_SH_omp2, SUFFIX), GEN(SHsphtor_to_spat_omp2, SUFFIX), GEN(spat_to_SHsphtor_omp2, SUFFIX), 
@@ -471,3 +478,4 @@ void GENF(spat_to_qst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double
 #undef SHT_AXISYM
 #undef SHT_VAR_LTR
 #undef IVAR
+#undef ADD_OPENMP

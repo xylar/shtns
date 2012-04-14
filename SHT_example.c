@@ -49,6 +49,7 @@ int main()
 	lmax = 5;	nlat = 32;
 	mmax = 3;	nphi = 10;
 	mres = 1;
+	shtns_use_threads(0);		// enable multi-threaded transforms (if supported).
 	shtns = shtns_init( sht_gauss, lmax, mmax, mres, nlat, nphi );
 //	shtns = shtns_create(lmax, mmax, mres, sht_orthonormal | SHT_REAL_NORM);
 //	shtns_set_grid(shtns, sht_gauss, 0.0, nlat, nphi);

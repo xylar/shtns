@@ -34,7 +34,6 @@
 #include "shtns.h"
 
 #ifdef _OPENMP
-  #warning "using OpenMP"
   #include <omp.h>
 #endif
 

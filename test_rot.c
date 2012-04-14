@@ -79,6 +79,7 @@ int main(int argc, char *argv[])
 	NLAT=64;
 	NPHI=128;
 
+	shtns_use_threads(0);
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
 	NLM = shtns->nlm;
 	shtns_set_grid_auto(shtns, sht_quick_init, 0.0, 1e-10, &NLAT, &NPHI);
