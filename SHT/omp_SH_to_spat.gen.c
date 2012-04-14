@@ -365,13 +365,13 @@ S	#undef si
 T	#undef tr
 T	#undef ti
 
-3	static void GEN3(SHqst_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	static void GEN3(SH_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
+3	static void GEN3(SHqst_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	static void GEN3(SH_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	static void GEN3(SHsphtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+VX	static void GEN3(SHsphtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-S	static void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
-T	static void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+S	static void GEN3(SHsph_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
+T	static void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 	int k;
@@ -410,8 +410,8 @@ T		if (Vt != NULL) { int k=0; do { ((v2d*)Vt)[k]=vdup(0.0); } while(++k<NLAT_2);
   #endif
 	imlim += 1;
   
-  //omp_set_num_threads(8);
-  #pragma omp parallel
+  //omp_set_num_threads(shtns->nthreads);
+  #pragma omp parallel num_threads(shtns->nthreads)
   {
 	#ifdef _OPENMP
 		unsigned m0, m1, m2, m3, n;

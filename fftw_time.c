@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
 
 	dims[0].n = NPHI;		many[0].n = NLAT;
 
+#ifdef DONT
 /* split */
 	dims[0].is = 2*NLAT;	dims[0].os = NLAT;
 	many[0].is = 1;	many[0].os = 1;
@@ -122,6 +123,49 @@ int main(int argc, char *argv[])
 	dims[0].is = NLAT;	dims[0].os = NLAT;
 	many[0].is = 1;	many[0].os = 1;
 	fft = fftw_plan_guru_dft_r2c( 1, dims, 1, many, Sh, (complex double *) Sh, fftw_plan_mode);
+	printf(" fft=%g", fftw_cost(fft));
+	t = fftw_cost(fft) + fftw_cost(ifft);
+	if (t < tref) {
+		tref = t;		printf("  ***");
+	}
+#endif
+
+/* complex in-place */
+	dims[0].n = NPHI;		many[0].n = NLAT/2;
+	dims[0].is = NLAT/2;	dims[0].os = NLAT/2;
+	many[0].is = 1;			many[0].os = 1;
+	ifft = fftw_plan_guru_dft( 1, dims, 1, many, (complex double *) Sh, (complex double *) Sh, FFTW_BACKWARD, fftw_plan_mode);
+	printf("\n complex (in-place) : ifft=%g", fftw_cost(ifft));
+	fft = fftw_plan_guru_dft( 1, dims, 1, many, (complex double *) Sh, (complex double *) Sh, FFTW_FORWARD, fftw_plan_mode);
+	printf(" fft=%g", fftw_cost(fft));
+	t = fftw_cost(fft) + fftw_cost(ifft);
+	if (t < tref) {
+		tref = t;		printf("  ***");
+	}
+	ifft = fftw_plan_guru_dft( 1, dims, 1, many, (complex double *) ShF, (complex double *) Sh, FFTW_BACKWARD, fftw_plan_mode);
+	printf("\n complex (oop) : ifft=%g", fftw_cost(ifft));
+	fft = fftw_plan_guru_dft( 1, dims, 1, many, (complex double *) Sh, (complex double *) ShF, FFTW_FORWARD, fftw_plan_mode);
+	printf(" fft=%g", fftw_cost(fft));
+	t = fftw_cost(fft) + fftw_cost(ifft);
+	if (t < tref) {
+		tref = t;		printf("  ***");
+	}
+
+/* phi-first in-place */
+	dims[0].n = NPHI;		many[0].n = NLAT/2;
+	dims[0].is = 1;			dims[0].os = 1;
+	many[0].is = NPHI;		many[0].os = NPHI;
+	ifft = fftw_plan_guru_dft( 1, dims, 1, many, (complex double *) Sh, (complex double *) Sh, FFTW_BACKWARD, fftw_plan_mode);
+	printf("\n ref complex phi-first : ifft=%g", fftw_cost(ifft));
+	fft = fftw_plan_guru_dft( 1, dims, 1, many, (complex double *) Sh, (complex double *) Sh, FFTW_FORWARD, fftw_plan_mode);
+	printf(" fft=%g", fftw_cost(fft));
+	t = fftw_cost(fft) + fftw_cost(ifft);
+	if (t < tref) {
+		tref = t;		printf("  ***");
+	}
+	ifft = fftw_plan_guru_dft( 1, dims, 1, many, (complex double *) ShF, (complex double *) Sh, FFTW_BACKWARD, fftw_plan_mode);
+	printf("\n ref complex phi-first oop : ifft=%g", fftw_cost(ifft));
+	fft = fftw_plan_guru_dft( 1, dims, 1, many, (complex double *) Sh, (complex double *) ShF, FFTW_FORWARD, fftw_plan_mode);
 	printf(" fft=%g", fftw_cost(fft));
 	t = fftw_cost(fft) + fftw_cost(ifft);
 	if (t < tref) {

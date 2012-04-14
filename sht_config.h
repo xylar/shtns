@@ -23,7 +23,7 @@
 /// \file sht_config.h compile-time configuration.
 
 /// 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.
-#define SHT_VERBOSE 2
+#define SHT_VERBOSE 1
 
 /// defines the maximum amount of memory in megabytes that SHTns should use.
 #define SHTNS_MAX_MEMORY 2048
@@ -31,7 +31,7 @@
 /// Compile the \ref fortapi
 #define SHT_F77_API
 
-/// 0:use new features of FFTW 3.3 or more, 1: allows to compile with older FFTW 3.0 or more
+/// 0:use new features of FFTW 3.3 or more, 1: allows to compile with older FFTW 3.0 or more (also removes parallel fft support)
 #define USE_LEGACY_FFTW3 0
 
 /// 0: don't use long double, only portable double; 1: use long double at initialization for (maybe) slightly better precision.

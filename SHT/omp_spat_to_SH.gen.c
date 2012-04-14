@@ -447,9 +447,9 @@ V		BtF += vnlat;	BpF += vnlat;
 }
 
 
-QX	static void GEN3(spat_to_SH_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
-VX	static void GEN3(spat_to_SHsphtor_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
-3	static void GEN3(spat_to_SHqst_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
+QX	static void GEN3(spat_to_SH_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
+VX	static void GEN3(spat_to_SHsphtor_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
+3	static void GEN3(spat_to_SHqst_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
 
 Q	s2d *BrF;		// contains the Fourier transformed data
 V	s2d *BtF, *BpF;	// contains the Fourier transformed data
@@ -482,8 +482,8 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
   #endif
 	imlim += 1;
 
-  //omp_set_num_threads(8);
-  #pragma omp parallel
+  //omp_set_num_threads(shtns->nthreads);
+  #pragma omp parallel num_threads(shtns->nthreads)
   {
 	#ifdef _OPENMP
 		unsigned m0, m1, m2, m3, n;

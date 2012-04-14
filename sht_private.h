@@ -44,7 +44,10 @@ enum sht_variants { SHT_STD, SHT_LTR, SHT_NVAR };
 enum sht_types { SHT_TYP_SSY, SHT_TYP_SAN, SHT_TYP_VSY, SHT_TYP_VAN,
 				SHT_TYP_GSP, SHT_TYP_GTO, SHT_TYP_3SY, SHT_TYP_3AN, SHT_NTYP };
 // sht algorithms (hyb, fly1, ...)
-enum sht_algos { SHT_DCT, SHT_MEM, SHT_SV, SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8, SHT_NALG };
+enum sht_algos { SHT_DCT, SHT_MEM, SHT_SV,
+	SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8,
+	SHT_OMP1, SHT_OMP2, SHT_OMP3, SHT_OMP4, SHT_OMP6, SHT_OMP8,
+	SHT_NALG };
 
 // sht grids
 enum sht_grids { GRID_NONE, GRID_GAUSS, GRID_REGULAR, GRID_POLES };
@@ -71,10 +74,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 	unsigned int nspat;			///< number of real numbers that must be allocated in a spatial field.
 /* END OF PUBLIC PART */
 
-	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
-	unsigned short *tm;		///< start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
-	double *wg;				///< Gauss weights for Gauss-Legendre quadrature.
-	double *st_1;			///< 1/sin(theta);
+	short fftc_mode;			///< how to perform the complex fft : -1 = no fft; 0 = interleaved/native; 1 = split/transpose.
+	unsigned short nthreads;	///< number of threads (openmp).
+	unsigned short *tm;			///< start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+	double *wg;					///< Gauss weights for Gauss-Legendre quadrature.
+	double *st_1;				///< 1/sin(theta);
 
 	fftw_plan ifft, fft;		// plans for FFTW.
 	fftw_plan ifftc, fftc;
@@ -92,11 +96,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double **zlm;		// matrix for direct transform (analysis)
 	struct DtDp** dzlm;
 
+	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
+
 	/* DCT stuff */
 	short mtr_dct;			///< m truncation for dct. -1 means no dct at all.
-	short nlorder;			///< order of non-linear terms to be resolved by SH transform.
 	unsigned short klim;	///< Limit to k for non-linear terms (dct)
-	short fftc_mode;		///< how to perform the complex fft : -1 = no fft; 0 = interleaved/native; 1 = split/transpose.
 	fftw_plan idct, dct_m0;			// (I)DCT
 	double **ykm_dct;	// matrix for inverse transform (synthesis) using dct.
 	struct DtDp** dykm_dct;	// theta and phi derivative of Ykm matrix.
@@ -104,11 +108,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *dzlm_dct0;
 
 	/* other misc informations */
+	unsigned char nlorder;	// order of non-linear terms to be resolved by SH transform.
+	unsigned char grid;		// store grid type.
+	short norm;				// store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
+	unsigned fftw_plan_mode;
 	double Y00_1, Y10_ct, Y11_st;
 	shtns_cfg next;		// pointer to next sht_setup or NULL (records a chained list of SHT setup).
-	short norm;			// store the normalization of the Spherical Harmonics (enum \ref shtns_norm + \ref SHT_NO_CS_PHASE flag)
-	short grid;			// store grid type.
-	unsigned fftw_plan_mode;
 	// the end should be aligned on the size of int, to allow the storage of small arrays.
 };
 

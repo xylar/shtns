@@ -41,10 +41,11 @@ install :
 	@echo " "
 	@cat COPYRIGHT
 
+codelets1 = SHT/SH_to_spat.c SHT/SH_to_spat_fly.c SHT/spat_to_SH.c SHT/spat_to_SH_fly.c SHT/sht_generic.c
 ifeq ($(strip $(OMP)),)
-  codelets = SHT/SH_to_spat.c SHT/SH_to_spat_fly.c SHT/spat_to_SH.c SHT/spat_to_SH_fly.c SHT/sht_generic.c
+  codelets = $(codelets1)
 else
-  codelets = SHT/SH_to_spat.c SHT/SH_to_spat_omp.c SHT/spat_to_SH.c SHT/spat_to_SH_omp.c SHT/sht_generic.c
+  codelets = $(codelets1) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
 endif
 
 # codelets :

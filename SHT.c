@@ -35,6 +35,11 @@
 
 // chained list of sht_setup : start with NULL
 shtns_cfg sht_data = NULL;
+#ifdef _OPENMP
+  int omp_threads = 1;	// multi-thread disabled by default.
+#else
+  #define omp_threads 1
+#endif
 
 /// \internal Abort program with error message.
 static void shtns_runerr(const char * error_text)
@@ -445,7 +450,7 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 	INTERNAL INITIALIZATION FUNCTIONS
 */
 
-char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8" };
+char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "omp1", "omp2", "omp3", "omp4", "omp6", "omp8" };
 char* sht_var[SHT_NVAR] = {"std", "ltr"};
 char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
@@ -461,9 +466,11 @@ void* sht_func[SHT_NVAR][SHT_NTYP][SHT_NALG];
 /// \internal use on-the-fly alogorithm (guess without measuring)
 static void set_sht_fly(shtns_cfg shtns, int typ_start)
 {
+	int algo = SHT_FLY2;
+	if (shtns->nthreads > 1) algo = SHT_OMP2;
 	for (int it=typ_start; it<SHT_NTYP; it++) {
 		for (int v=0; v<SHT_NVAR; v++)
-			shtns->fptr[v][it] = sht_func[v][it][SHT_FLY2];
+			shtns->fptr[v][it] = sht_func[v][it][algo];
 	}
 }
 
@@ -482,8 +489,8 @@ static void init_sht_array_func(shtns_cfg shtns)
 	int it, j;
 	int alg_lim = SHT_NALG-1;
 
-	if (shtns->nlat_2 < 8*VSIZE) {		// limit available on-the-fly algorithm to avoid overflow (and segfaults).
-		it = shtns->nlat_2 / VSIZE;
+	if (shtns->nlat_2 < 8*VSIZE2) {		// limit available on-the-fly algorithm to avoid overflow (and segfaults).
+		it = shtns->nlat_2 / VSIZE2;
 		switch(it) {
 			case 0 : alg_lim = SHT_FLY1-1; break;
 			case 1 : alg_lim = SHT_FLY1; break;
@@ -771,12 +778,13 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 
 	if (NPHI <= 2*MMAX) shtns_runerr("the sampling condition Nphi > 2*Mmax is not met.");
 
-	#ifdef _OPENMP
+	#if _OPENMP
+	  #ifndef USE_LEGACY_FFTW3
 		fftw_init_threads();
-		fftw_plan_with_nthreads(1);
-		fftw_plan_with_nthreads(omp_get_num_procs());
-		printf("using OpenMP with %d processors\n",omp_get_num_procs());
-		if (shtns->fftw_plan_mode == FFTW_EXHAUSTIVE) shtns->fftw_plan_mode = FFTW_PATIENT;
+		fftw_plan_with_nthreads(omp_threads);
+		if ((shtns->fftw_plan_mode == FFTW_EXHAUSTIVE) && (omp_threads > 1))
+			shtns->fftw_plan_mode = FFTW_PATIENT;
+	  #endif
 	#endif
 
 	shtns->fft = NULL;		shtns->ifft = NULL;
@@ -1845,6 +1853,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		if (MTR_DCT < 0)     i0 = SHT_MEM;		// skip dct.
 		if (on_the_fly_only) i0 = SHT_SV;		// only on-the-fly (SV is then also on-the-fly)
 		alg_end = SHT_NALG;
+		if (shtns->nthreads <= 1) alg_end = SHT_OMP1;		// no OpenMP with 1 thread.
 		if ((ityp&1) && (otf_analys == 0)) alg_end = SHT_FLY1;		// no on-the-fly analysis for regular grid.
 		for (i=i0, m=0;	i<alg_end; i++) {
 			if (sht_func[0][ityp][i] != NULL) m++;		// count number of algos
@@ -1863,6 +1872,9 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 						t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 					}
 					if (i < SHT_FLY1) t *= 1.03;	// 3% penality for memory based transforms.
+				#ifdef _OPENMP
+					if ((i >= SHT_OMP1)||(i == SHT_SV)) t *= 1.3;	// 30% penality for openmp transforms.
+				#endif
 					if (t < t0) {	i0 = i;		t0 = t;		PRINT_VERB("*");	}
 				}
 			}
@@ -2203,6 +2215,12 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	layout = flags & 0xFFFF00;
 	flags = flags & 255;	// clear higher bits.
 
+	shtns->nthreads = omp_threads;
+	if (omp_threads > shtns->mmax+1) shtns->nthreads = shtns->mmax+1;	// limit the number of threads to mmax+1
+	#if SHT_VERBOSE > 0
+		if (shtns->nthreads > 1) printf("        => enabled %d OpenMP threads\n",shtns->nthreads);
+	#endif
+
 	switch (flags) {
 		case sht_gauss_fly :  flags = sht_gauss;  on_the_fly = 1;  break;
 		case sht_quick_init : flags = sht_gauss;  quick_init = 1;  break;
@@ -2236,6 +2254,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		}
 //		if (t > 10*SHTNS_MAX_MEMORY) quick_init =1;			// do not time such large transforms.
 	}
+
 	if (quick_init == 0) {		// do not waste too much time finding optimal fftw.
 		shtns->fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 	// fftw_set_timelimit(60.0);		// do not search plans for more than 1 minute (does it work well ???)
@@ -2243,7 +2262,8 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		if (*nphi > 1024) shtns->fftw_plan_mode = FFTW_MEASURE;
 	} else {
 		shtns->fftw_plan_mode = FFTW_ESTIMATE;
-		if ((VSIZE2 >= 4) && (NLAT > VSIZE2*4)) on_the_fly = 1;		// with AVX, on-the-fly should be the default (faster).
+		if ((VSIZE2 >= 4) && (*nlat >= VSIZE2*4)) on_the_fly = 1;		// with AVX, on-the-fly should be the default (faster).
+		if ((shtns->nthreads > 1) && (*nlat >= VSIZE2*16)) on_the_fly = 1;		// force multi-thread transforms
 	}
 
 	if (flags == sht_auto) {
@@ -2391,6 +2411,20 @@ shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nl
 	if (shtns != NULL)
 		shtns_set_grid(shtns, flags, SHT_DEFAULT_POLAR_OPT, nlat, nphi);
 	return shtns;
+}
+
+///  Eneables OpenMP parallel transfroms. Call before any initialization of shtns to use mutliple threads.
+/// if num_threads > 0, specifies the maximum number of threads.
+/// if num_threads <= 0, maximum number of threads is set to the number of processors.
+/// if num_threads == 1, openmp will be disabled.
+/// returns the actual number of threads.
+int shtns_use_threads(int num_threads)
+{
+#ifdef _OPENMP
+	if (num_threads <= 0)  num_threads = omp_get_num_procs();
+	omp_threads = num_threads;
+#endif
+	return omp_threads;
 }
 
 //@}

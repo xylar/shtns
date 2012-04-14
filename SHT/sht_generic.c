@@ -49,7 +49,6 @@
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
-  #ifndef _OPENMP
 	#define NWAY 1
 	#include "spat_to_SHst_fly.c"
 	#include "SHst_to_spat_fly.c"
@@ -78,7 +77,7 @@
 	#include "spat_to_SH_fly.c"
 	#include "SH_to_spat_fly.c"
 	#undef NWAY
-  #else
+  #ifdef _OPENMP
 	#define NWAY 1
 	#include "spat_to_SHst_omp.c"
 	#include "SHst_to_spat_omp.c"
@@ -152,7 +151,6 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
-  #ifndef _OPENMP
 	#define NWAY 1
 	#include "SHs_to_spat_fly.c"
 	#include "SHt_to_spat_fly.c"
@@ -169,7 +167,7 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 	#include "SHs_to_spat_fly.c"
 	#include "SHt_to_spat_fly.c"
 	#undef NWAY
-  #else
+  #ifdef _OPENMP
 	#define NWAY 1
 	#include "SHs_to_spat_omp.c"
 	#include "SHt_to_spat_omp.c"
@@ -250,7 +248,6 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
-  #ifndef _OPENMP
 	#define NWAY 1
 	#include "spat_to_SHqst_fly.c"
 	#include "SHqst_to_spat_fly.c"
@@ -263,7 +260,7 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 	#include "spat_to_SHqst_fly.c"
 	#include "SHqst_to_spat_fly.c"
 	#undef NWAY
-  #else
+  #ifdef _OPENMP
 	#define NWAY 1
 	#include "spat_to_SHqst_omp.c"
 	#include "SHqst_to_spat_omp.c"
@@ -353,7 +350,28 @@ void* GEN(sht_array, SUFFIX)[SHT_NALG][SHT_NTYP] = {
 /* fly6 */	{ GEN(SH_to_spat_fly6, SUFFIX), GEN(spat_to_SH_fly6, SUFFIX), NULL, NULL, 
 				NULL, NULL, NULL, NULL },
 /* fly8 */	{ GEN(SH_to_spat_fly8, SUFFIX), GEN(spat_to_SH_fly8, SUFFIX), NULL, NULL, 
+				NULL, NULL, NULL, NULL },
+  #ifdef _OPENMP
+/* omp1 */	{ NULL, NULL, GEN(SHsphtor_to_spat_omp1, SUFFIX), GEN(spat_to_SHsphtor_omp1, SUFFIX), 
+				GEN(SHsph_to_spat_omp1, SUFFIX), GEN(SHtor_to_spat_omp1, SUFFIX), GEN(SHqst_to_spat_omp1, SUFFIX), GEN(spat_to_SHqst_omp1, SUFFIX) },
+/* omp2 */	{ GEN(SH_to_spat_omp2, SUFFIX), GEN(spat_to_SH_omp2, SUFFIX), GEN(SHsphtor_to_spat_omp2, SUFFIX), GEN(spat_to_SHsphtor_omp2, SUFFIX), 
+				GEN(SHsph_to_spat_omp2, SUFFIX), GEN(SHtor_to_spat_omp2, SUFFIX), GEN(SHqst_to_spat_omp2, SUFFIX), GEN(spat_to_SHqst_omp2, SUFFIX) },
+/* omp3 */	{ GEN(SH_to_spat_omp3, SUFFIX), GEN(spat_to_SH_omp3, SUFFIX), GEN(SHsphtor_to_spat_omp3, SUFFIX), GEN(spat_to_SHsphtor_omp3, SUFFIX), 
+				GEN(SHsph_to_spat_omp3, SUFFIX), GEN(SHtor_to_spat_omp3, SUFFIX), GEN(SHqst_to_spat_omp3, SUFFIX), GEN(spat_to_SHqst_omp3, SUFFIX) },
+/* omp4 */	{ GEN(SH_to_spat_omp4, SUFFIX), GEN(spat_to_SH_omp4, SUFFIX), NULL, NULL, 
+				GEN(SHsph_to_spat_omp4, SUFFIX), GEN(SHtor_to_spat_omp4, SUFFIX), NULL, NULL },
+/* omp6 */	{ GEN(SH_to_spat_omp6, SUFFIX), GEN(spat_to_SH_omp6, SUFFIX), NULL, NULL, 
+				NULL, NULL, NULL, NULL },
+/* omp8 */	{ GEN(SH_to_spat_omp8, SUFFIX), GEN(spat_to_SH_omp8, SUFFIX), NULL, NULL, 
 				NULL, NULL, NULL, NULL }
+  #else
+/* omp1 */	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+/* omp2 */	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+/* omp3 */	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+/* omp4 */	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+/* omp6 */	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+/* omp8 */	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
+  #endif
 #endif
 };
 

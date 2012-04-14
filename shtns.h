@@ -114,6 +114,8 @@ int shtns_set_grid(shtns_cfg, enum shtns_type flags, double eps, int nlat, int n
 int shtns_set_grid_auto(shtns_cfg, enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi);
 /// Copy a given config but allow a different (smaller) mmax and the possibility to enable/disable fft.
 shtns_cfg shtns_create_with_grid(shtns_cfg, int mmax, int nofft);
+/// Enables multi-thread transform using OpenMP (if available). Returns number of threads that will be used.
+int shtns_use_threads(int num_threads);
 
 /// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require any previous setup.
 long nlm_calc(long lmax, long mmax, long mres);
@@ -123,7 +125,6 @@ void shtns_destroy(shtns_cfg);	///< free memory of given config, which cannot be
 
 void shtns_print_version();			///< print version information to stdout.
 void shtns_print_cfg(shtns_cfg);	///< print information about given config to stdout.
-
 //@}
 
 /// \name special values

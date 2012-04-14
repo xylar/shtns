@@ -553,13 +553,17 @@ void usage()
 	printf(" -nlorder : define non-linear order to be resolved.\n");
 	printf(" -schmidt : use schmidt semi-normalization.\n");
 	printf(" -4pi : use 4pi normalization.\n");
+  #ifdef _OPENMP
+	printf(" -nth=<n> : use n threads.\n");
+  #endif
 }
 
 int main(int argc, char *argv[])
 {
 	complex double t1, t2;
 	double t,tmax,n2;
-	int i,im,m,l,jj;
+	int nthreads = 0;
+	int i,im,m,l;
 	clock_t tcpu;
 	ticks tik0, tik1;
 	double e0,e1;
@@ -599,6 +603,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"nphi") == 0) NPHI = t;
 		if (strcmp(name,"polaropt") == 0) polaropt = t;
 		if (strcmp(name,"iter") == 0) SHT_ITER = t;
+		if (strcmp(name,"nth") == 0) nthreads = t;
 		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
 		if (strcmp(name,"fly") == 0) shtmode = sht_gauss_fly;		// force gauss grid with on-the-fly computation.
 		if (strcmp(name,"reg") == 0) shtmode = sht_reg_fast;	// force regular grid.
@@ -613,6 +618,7 @@ int main(int argc, char *argv[])
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
 	if (MMAX == -1) MMAX=LMAX/MRES;
+	shtns_use_threads(nthreads);		// 0 : means automatically chooses the number of threads.
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
 	NLM = shtns->nlm;
 	shtns_set_grid_auto(shtns, shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);

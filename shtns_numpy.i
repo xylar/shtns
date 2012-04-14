@@ -87,8 +87,10 @@ long nlm_calc(long lmax, long mmax, long mres);
 
 
 %extend shtns_info {
-	shtns_info(int lmax, int mmax, int mres=1, int norm=sht_orthonormal) {	// default arguments : mres and norm
+	shtns_info(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal) {	// default arguments : mmax, mres and norm
 		import_array();		// required by NumPy
+		shtns_use_threads(0);		// use openmp threads if available
+		if (mmax < 0) mmax = lmax;
 		return shtns_create(lmax, mmax, mres, norm);
 	}
 	~shtns_info() {

@@ -3179,8 +3179,10 @@ SWIG_AsVal_int (PyObject * obj, int *val)
   return res;
 }
 
-SWIGINTERN struct shtns_info *new_shtns_info(int lmax,int mmax,int mres,int norm){	// default arguments : mres and norm
+SWIGINTERN struct shtns_info *new_shtns_info(int lmax,int mmax,int mres,int norm){	// default arguments : mmax, mres and norm
 		import_array();		// required by NumPy
+		shtns_use_threads(0);		// use openmp threads if available
+		if (mmax < 0) mmax = lmax;
 		return shtns_create(lmax, mmax, mres, norm);
 	}
 SWIGINTERN void delete_shtns_info(struct shtns_info *self){
@@ -3566,7 +3568,7 @@ fail:
 SWIGINTERN PyObject *_wrap_new_sht(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   int arg1 ;
-  int arg2 ;
+  int arg2 = (int) -1 ;
   int arg3 = (int) 1 ;
   int arg4 = (int) sht_orthonormal ;
   int val1 ;
@@ -3583,17 +3585,19 @@ SWIGINTERN PyObject *_wrap_new_sht(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
   PyObject * obj3 = 0 ;
   struct shtns_info *result = 0 ;
   
-  if (!PyArg_ParseTuple(args,(char *)"OO|OO:new_sht",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"O|OOO:new_sht",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
   ecode1 = SWIG_AsVal_int(obj0, &val1);
   if (!SWIG_IsOK(ecode1)) {
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "new_sht" "', argument " "1"" of type '" "int""'");
   } 
   arg1 = (int)(val1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "new_sht" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = (int)(val2);
+  if (obj1) {
+    ecode2 = SWIG_AsVal_int(obj1, &val2);
+    if (!SWIG_IsOK(ecode2)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "new_sht" "', argument " "2"" of type '" "int""'");
+    } 
+    arg2 = (int)(val2);
+  }
   if (obj2) {
     ecode3 = SWIG_AsVal_int(obj2, &val3);
     if (!SWIG_IsOK(ecode3)) {
@@ -4553,7 +4557,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_ct_get", _wrap_sht_ct_get, METH_VARARGS, NULL},
 	 { (char *)"sht_st_get", _wrap_sht_st_get, METH_VARARGS, NULL},
 	 { (char *)"sht_nspat_get", _wrap_sht_nspat_get, METH_VARARGS, NULL},
-	 { (char *)"new_sht", _wrap_new_sht, METH_VARARGS, (char *)"new_sht(int lmax, int mmax, int mres = 1, int norm = sht_orthonormal) -> struct shtns_info"},
+	 { (char *)"new_sht", _wrap_new_sht, METH_VARARGS, (char *)"new_sht(int lmax, int mmax = -1, int mres = 1, int norm = sht_orthonormal) -> struct shtns_info"},
 	 { (char *)"delete_sht", _wrap_delete_sht, METH_VARARGS, (char *)"delete_sht(struct shtns_info self)"},
 	 { (char *)"sht_set_grid", _wrap_sht_set_grid, METH_VARARGS, (char *)"\n"
 		"sht_set_grid(struct shtns_info self, int nlat, int nphi, enum shtns_type flags = sht_quick_init|256, \n"

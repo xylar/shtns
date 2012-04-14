@@ -119,7 +119,7 @@ class sht(_object):
     __swig_getmethods__["nspat"] = _shtns.sht_nspat_get
     if _newclass:nspat = _swig_property(_shtns.sht_nspat_get)
     def __init__(self, *args): 
-        """__init__(self, int lmax, int mmax, int mres = 1, int norm = sht_orthonormal) -> sht"""
+        """__init__(self, int lmax, int mmax = -1, int mres = 1, int norm = sht_orthonormal) -> sht"""
         this = _shtns.new_sht(*args)
         try: self.this.append(this)
         except: self.this = this
