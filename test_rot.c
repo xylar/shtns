@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 
 	srand( time(NULL) );	// initialise les nombres.
 	
-	MMAX=LMAX=2;
+	MMAX=LMAX=63;
 	MRES=1;
 	NLAT=64;
 	NPHI=128;

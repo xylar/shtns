@@ -136,19 +136,12 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 	fftw_plan fft;
 	complex double *q;
 	double *q0;
-	double *yl, *dyl;
 	int k, m, l, lmax, ntheta, nrembed, ncembed;
 
 	lmax = shtns->lmax;
 	ntheta = ((lmax+2)>>1)*2;
-	q0 = malloc(2* sizeof(double)*(2*ntheta+2)*lmax);
-	memset(q0, 0, 2* sizeof(double)*(2*ntheta+2)*lmax);		// zero out.
-	dyl = malloc(sizeof(double)*(lmax+1) * (1+shtns->nthreads));
-	yl = dyl + (lmax+1);
-	#ifdef OMP_FFTW
-		k = (lmax < 63) ? 1 : shtns->nthreads;
-		fftw_plan_with_nthreads(k);
-	#endif
+	m = 2* sizeof(double)*(2*ntheta+2)*lmax;
+	q0 = fftw_malloc(m);		memset(q0, 0, m);		// alloc & zero out.
 
 	// rotate around Z by dphi0
 	if (dphi0 != 0.0) {
@@ -158,15 +151,13 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 		Rlm[0] = Qlm[0];		// l=0 is rotation invariant.
 	}
 
-  #pragma omp parallel private(k,m,l) firstprivate(yl) num_threads(shtns->nthreads)
+  #pragma omp parallel private(k,m,l) num_threads(shtns->nthreads)
   {
-	#ifdef _OPENMP
-		yl += (lmax+1)*omp_get_thread_num();
-	#endif
+	double yl[lmax+1];
 	// compute q(l) on the meridian phi=0 and phi=pi. (rotate around X)
 	#pragma omp for schedule(static)
 	for (k=0; k<ntheta/2; ++k) {
-		double cost= cos(M_PI*(k+0.5)/ntheta);
+		double cost= cos(((0.5*M_PI)*(2*k+1))/ntheta);
 		double sint_1 = 1.0/sqrt((1.0-cost)*(1.0+cost));
 		m=0;
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
@@ -202,12 +193,18 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 	}
   }
 
+	// perform FFT
+	#ifdef OMP_FFTW
+		k = (lmax < 63) ? 1 : shtns->nthreads;
+		fftw_plan_with_nthreads(k);
+	#endif
 	q = (complex double*) q0;
 	ntheta*=2;		nrembed = ntheta+2;		ncembed = nrembed/2;
 	fft = fftw_plan_many_dft_r2c(1, &ntheta, 2*lmax, q0, &nrembed, 2*lmax, 1, q, &ncembed, 2*lmax, 1, FFTW_ESTIMATE);
 	fftw_execute_dft_r2c(fft, q0, q);
 	fftw_destroy_plan(fft);
 
+	double yl[lmax+1];		double dyl[lmax+1];
 	m=0;
 		legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
 		for (l=1; l<lmax; l+=2) {
@@ -222,14 +219,14 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 		legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
 		complex double eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);
 		for (l=m; l<lmax; l+=2) {
-			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]/yl[l];
-			Rlm[LiM(shtns, l+1,m)] =  -eimdp*q[m*2*lmax +2*l+1]/dyl[l+1];
+			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./yl[l]);
+			Rlm[LiM(shtns, l+1,m)] =  eimdp*q[m*2*lmax +2*l+1]*(-1./dyl[l+1]);
 		}
 		if (l==lmax) {
-			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]/yl[l];
+			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./yl[l]);
 		}
 	}
-	free(dyl);	free(q0);
+	fftw_free(q0);
 }
 
 
