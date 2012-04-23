@@ -55,7 +55,7 @@
 /// must be larger or equal to 1.
 #define SHT_DEFAULT_NL_ORDER 1
 
-/// I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 is supported) !
+/// I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 or AVX is supported) !
 /// (set to zero to disable, may be useful for calling from Fortran)
 #define _GCC_VEC_ 1
 

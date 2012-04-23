@@ -932,7 +932,7 @@ static void planDCT(shtns_cfg shtns)
 	double Sh0[NLAT] SSE;				// temp storage on the stack, aligned.
 
 	#ifdef OMP_FFTW
-		if ((shtns->fftw_plan_mode & (FFTW_EXHAUSTIVE | FFTW_PATIENT)) && (omp_threads > 1)) {
+		if (shtns->fftw_plan_mode & (FFTW_EXHAUSTIVE | FFTW_PATIENT) {
 			fftw_plan_with_nthreads(omp_threads);
 		} else fftw_plan_with_nthreads(1);
 	#endif
@@ -2434,11 +2434,11 @@ shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nl
 	return shtns;
 }
 
-///  Eneables OpenMP parallel transfroms. Call before any initialization of shtns to use mutliple threads.
-/// if num_threads > 0, specifies the maximum number of threads.
-/// if num_threads <= 0, maximum number of threads is set to the number of processors.
-/// if num_threads == 1, openmp will be disabled.
-/// returns the actual number of threads.
+/** Enables OpenMP parallel transforms, if available (see \ref compil).
+ Call before any initialization of shtns to use mutliple threads. Returns the actual number of threads.
+ \li If num_threads > 0, specifies the maximum number of threads that should be used.
+ \li If num_threads <= 0, maximum number of threads is automatically set to the number of processors.
+ \li If num_threads == 1, openmp will be disabled. */
 int shtns_use_threads(int num_threads)
 {
 #ifdef _OPENMP

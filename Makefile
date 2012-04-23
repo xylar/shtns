@@ -1,8 +1,11 @@
 ## path prefix for make install (installs to $(PREFIX)/lib and $(PREFIX)/include)
 PREFIX=$(HOME)
 
-## comment to disable parallel spherical harmonic transforms using openmp
+## comment the following lines to disable parallel spherical harmonic transforms using openmp
+## allow parallel SHT and fft (with fftw 3.3 or more)
 #OMP=-fopenmp -lfftw3_omp
+## only use parallel legendre transform
+#OMP=-fopenmp
 
 # compile for a given architecture : native is the best (gcc >= 4.0), generic if you don't know.
 #march = -march=core2

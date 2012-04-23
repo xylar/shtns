@@ -10,12 +10,13 @@ FEATURES:
 
 	- both scalar and vector transforms
 	- backward and forward (synthesis and analysis) functions
-	- flexible truncation (degree, order, azimutal periodicity)
+	- flexible truncation (degree, order, azimuthal periodicity)
 	- spatial data can be stored in latitude-major or longitude-major order arrays.
 	- various conventions (normalization and Condon-Shortley phase)
-	- can be used from fortran, c/c++, and Python programs
+	- can be used from Fortran, c/c++, and Python programs
 	- a highly efficient Gauss algorithm working with Gauss nodes (based on Gauss-Legendre quadrature)
 	- support for SSE2, SSE3 and AVX vectorization with gcc.
+	- parallel transforms with OpenMP (for Gauss grid only).
 	- an algorithm using DCT for regular nodes (based on a generalized Fejer quadrature)
 	- synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
 	- ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
@@ -26,26 +27,29 @@ FEATURES:
 
 DOCUMENTATION:
 
-	- Online doc is available: http://users.isterre.fr/nschaeff/SHTns/
+	- On-line doc is available: http://users.isterre.fr/nschaeff/SHTns/
 	- You can build it locally: Run "make docs" to generate documentation with doxygen.
 	  Then browse the html documentation starting with doc/html/index.html
 	- A related research paper can be found on arXiv: http://arxiv.org/abs/1202.6522
 	  If you use SHTns for research work, please cite this paper.
 
 
-CHANGELOG:
+CHANGE LOG:
+
+  v2.2  (23 Apr 2012)
+	- parallel transforms with OpenMP (for Gauss grid, significant benefit for l>=127).
 
   v2.1  (8 Mar 2012)
 	- support for huge spherical harmonic degree (tested up to l>43600).
 	- speed improvements, especially for large transforms.
-	- compilation with FFTW v3.0 or more is now possible through a config option (see sht_config.h)
+	- compilation with FFTW v3.0 or more is now possible through a configuration option (see sht_config.h)
 
   v2.0  (9 Feb 2012)
-	- support for AVX instruction set (almost x2 speedup on Sandy-Bridge processors).
-	- allow multiple transforms with different sizes, normalizations and grids (C interfcace only).
+	- support for AVX instruction set (almost x2 speed-up on Sandy-Bridge processors).
+	- allow multiple transforms with different sizes, normalizations and grids (C interface only).
 	- changes to C interface : most functions now require a handle to identify the transform. (Fortran interface unchanged)
 	- transforms are accurate up to spherical harmonic degree l=2700 (at least).
-	- lots of small improvements, speedups and a few bugfixes.
+	- lots of small improvements, speed-ups and a few bug fixes.
 	- requires FFTW v3.3.
 	- better Python interface using NumPy arrays (beta).
 	- rotation functions to rotate spherical harmonics (beta).
@@ -63,7 +67,7 @@ CHANGELOG:
 	- scalar and vector, forward and backward transforms.
 	- support several normalization conventions.
 	- transforms are accurate up to spherical harmonic degree l=1300 (at least).
-	- flexible truncation ans spatial sizes.
+	- flexible truncation and spatial sizes.
 	- support spatial data stored in latitude-major or longitude-major arrays.
 	- regular grid (with DCT acceleration) or Gauss grid (highly optimized).
 	- SSE2 vectorization.

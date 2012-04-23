@@ -428,7 +428,7 @@ T		if (Vt != NULL) { int k=0; do { ((v2d*)Vt)[k]=vdup(0.0); } while(++k<NLAT_2);
 		cm = rm-ith;
 		if (cm>0) {
 			m3 += cm;	m2 = m3-dm-1;
-		}		
+		}
 		//printf("ith=%d, m0=%d, m1=%d, m0'=%d, m1'=%d, total=%d\n",ith,m0,m1,m2,m3, m1-m0+m3-m2);
 
 3		GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m0, m1);
