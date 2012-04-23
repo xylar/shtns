@@ -2060,7 +2060,6 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	#if SHT_VERBOSE > 0
 		shtns_print_version();
 		printf("        ");		shtns_print_cfg(shtns);
-		if (shtns->nthreads > 1) printf("        => enabled %d OpenMP threads\n",shtns->nthreads);
 	#endif
 
 	s2 = sht_data;		// check if some data can be shared ...
