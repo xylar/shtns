@@ -104,11 +104,11 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 
 /// \name initialization
 //@{
-/// Simple initialization of the spherical harmonic transforms of given size. Calls \ref shtns_set_size and \ref shtns_precompute.
+/// Simple initialization of the spherical harmonic transforms of given size. Calls \ref shtns_create and \ref shtns_set_grid_auto.
 shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nlat, int nphi);
 /// Defines the sizes of the spectral description. Use for advanced initialization.
 shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm);
-/// Precompute everything for a given spatial grid. Use for advanced initialization, after \ref shtns_set_size.
+/// Precompute everything for a given spatial grid. Use for advanced initialization, after \ref shtns_create.
 int shtns_set_grid(shtns_cfg, enum shtns_type flags, double eps, int nlat, int nphi);
 /// Precompute everything and choose the optimal nlat and nphi for a given non-linear order.
 int shtns_set_grid_auto(shtns_cfg, enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi);
@@ -187,11 +187,11 @@ void SHtor_to_spat(shtns_cfg, complex double *Tlm, double *Vt, double *Vp);
 
 /// \name 3D transforms (combine scalar and vector)
 //@{
-/// 3D vector transform from spherical coordinates to \link vsh_def radial-spheroidal-toroidal spectral components\endlink
-/// they should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
+/// 3D vector transform from spherical coordinates to radial-spheroidal-toroidal spectral components (see \ref vsh_def).
+/// They should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
 void spat_to_SHqst(shtns_cfg, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm);
-/// 3D vector transform from spherical coordinates to \link vsh_def radial-spheroidal-toroidal spectral components\endlink
-/// they should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
+/// 3D vector transform from spherical coordinates to radial-spheroidal-toroidal spectral components (see \ref vsh_def).
+/// They should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
 void SHqst_to_spat(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp);
 //@}
 
@@ -215,7 +215,7 @@ void SHqst_to_spat_l(shtns_cfg, complex double *Qlm, complex double *Slm, comple
 //@}
 
 /// \name Local and partial evalutions of a SH representation :
-/// Does not require a call to \ref shtns_precompute
+/// Does not require a call to \ref shtns_set_grid_auto
 //@{
 double SH_to_point(shtns_cfg, complex double *Qlm, double cost, double phi);
 void SHqst_to_point(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm,

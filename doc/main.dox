@@ -128,7 +128,7 @@ Furthermore, FFT is more efficient for certain values of NPHI and/or NLAT. If yo
 for you, by using \ref shtns_set_grid_auto with nphi and/or nlat set to zero.
 
 Identifying a grid point with its indices \c it and \c ip in latitudinal and longitudinal direction respectively (indices start at 0), one has :
- - \f$ \theta \f$ = \c acos(ct[it]) where \ref ct is initialized by the call to \ref shtns_init
+ - \f$ \theta \f$ = \c acos(ct[it]) where \c ct = \ref shtns_info.ct is initialized by the call to \ref shtns_init
  - \f$ \phi \f$ = \c ip * 2\f$\pi\f$/(NPHI*MRES)  and \ref PHI_RAD and \ref PHI_DEG can be used to get the phi angle corresponding to \c ip.
  - How to access \f$ A(\theta,\phi) \f$ depends on the data layout, but it is always <b>a contiguous array of double precision floating point values</b> (64 bit)
 
@@ -179,7 +179,7 @@ of required \c double is \ref NSPAT_ALLOC = NLAT*(NPHI/2+1)*2. The first NLAT*NP
 \section spec_data Spherical Harmonic coefficients layout
 
 <b>The collection of Alm (spherical harmonics coefficient of degree \e l and order \e m) is stored in an array of \c complex \c double floating point values.</b>
-The spherical harmonic truncation is defined by a call to \ref shtns_init or to \ref shtns_create which returns an \ref shtns_cfg object 
+The spherical harmonic truncation is defined by a call to \ref shtns_init or to \ref shtns_create which returns an \c shtns_cfg object (pointer to \ref shtns_info)
 from which the the size of the array, \ref shtns_info.nlm, can be read (see examples).
 
 The field \em A is decomposed on the basis of spherical harmonics Ylm (degree \e l, order \e m) :
