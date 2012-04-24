@@ -1236,7 +1236,9 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 	real iylm_fft_norm;
 	long int it,im,m,l;
 	long int sk, dsk;
-	double Z[2*NLAT_2], dZt[2*NLAT_2], dZp[2*NLAT_2];		// equally spaced theta points.
+	double Z[2*NLAT_2] SSE;
+	double dZt[2*NLAT_2] SSE;
+	double dZp[2*NLAT_2] SSE;		// equally spaced theta points.
 	double is1[NLAT];		// tabulate values for integrals.
 
 	double *st = shtns->st;
@@ -1299,8 +1301,8 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 	#ifdef OMP_FFTW
 		fftw_plan_with_nthreads(1);
 	#endif
-	dct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT10, FFTW_ESTIMATE );	// quick and dirty dct.
-	idct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT01, FFTW_ESTIMATE );	// quick and dirty idct.
+	dct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT10, FFTW_MEASURE );	// quick and dirty dct.
+	idct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT01, FFTW_MEASURE );	// quick and dirty idct.
 
 #if SHT_VERBOSE > 1
 	ticks tik0, tik1;
@@ -1391,11 +1393,11 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 	*/
 		if (analysis) {
 	#if SHT_VERBOSE > 0
-		printf("computing weights m=%d\r",m);	fflush(stdout);
+		if (LMAX>126) printf("computing weights m=%d\r",m);	fflush(stdout);
 	#endif
 		for (l=m; l<=LMAX; l++) {
-			long int k0,k1, k,i,d;
-			double Jik, yy, dyy;
+			unsigned k0,k1, k,i,d;
+			double Jik0, Jik1, yy, dyp, dyt;
 			double lnorm = iylm_fft_norm;
 
 			if (SHT_NORM == sht_schmidt)	lnorm *= (2*l+1);		// Schmidt semi-normalization
@@ -1403,26 +1405,19 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 
 			k0 = (l-m)&1;	k1 = 1-k0;
 			for(k=0; k<NLAT; k++) {	Z[k] = 0.0;		dZt[k] = 0.0;	dZp[k] = 0.0; }
-			for (i=k0; i<=l+1; i+=2) {		// i+k even
-				yy = yk[(i/2)*(LMAX+1-m) + (l-m)] * lnorm;
-				dyy = dyk[(i/2)*(LMAX+1-m) + (l-m)].p * lnorm/(l*(l+1));
-				if (i==0) {	yy*=0.5;	dyy*=0.5; }
-				for (k=k0; k<NLAT; k+=2) {
-					d = (k<i) ? i-k : k-i;		// d=|i-k|
-					Jik = is1[(i+k)/2] + is1[d/2];
-					Z[k] += yy * Jik;
-					if (m&1) dZp[k] += dyy * Jik;
-				}
-			}
-			if (l != 0) {
-				for (i=k1; i<=l+1; i+=2) {		// i+k even
-					yy = dyk[(i/2)*(LMAX+1-m) + (l-m)].t * lnorm/(l*(l+1));
-					if (i==0) yy*=0.5;
-					for (k=k1; k<NLAT; k+=2) {
-						d = (k<i) ? i-k : k-i;		// d=|i-k|
-						Jik = is1[(i+k)/2] + is1[d/2];
-						dZt[k] += yy * Jik;
-					}
+			for (i=0; i<=(l+1)/2; i++) {
+				yy = yk[i*(LMAX+1-m) + (l-m)] * lnorm;
+				dyp = dyk[i*(LMAX+1-m) + (l-m)].p * lnorm/(l*(l+1));
+				dyt = dyk[i*(LMAX+1-m) + (l-m)].t * lnorm/(l*(l+1));
+				if (i+k0==0) {	yy*=0.5;	dyp*=0.5; }
+				if (i+k1==0) dyt*=0.5;
+				for (k=0; k<NLAT_2; k++) {
+					d = (k<i) ? i-k : k-i;
+					Jik0 = is1[(i+k0)+k] + is1[d];
+					Jik1 = is1[(i+k1)+k] + is1[d];
+					Z[2*k+k0] += yy * Jik0;
+					dZt[2*k+k1] += dyt * Jik1;
+					if (m&1) dZp[2*k+k0] += dyp * Jik0;
 				}
 			}
 #if SHT_VERBOSE > 1
