@@ -34,10 +34,10 @@ V	s2d *BtF, *BpF;	// contains the Fourier transformed data
 	s2d *wg, *ct, *st;
 V	double *l_2;
 	long int nk, k, vnlat, l,m;
-	unsigned imlim, im;
-V	double m_1;
   #ifndef SHT_AXISYM
-    s2d sgn_mask;
+	s2d sgn_mask;
+V	double m_1;
+	unsigned imlim, im;
   #endif
   #if _GCC_VEC_
 Q	rnd qq[2*llim];

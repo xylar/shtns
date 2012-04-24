@@ -29,17 +29,18 @@
 	#else
 	static
 	#endif
-QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, complex double *Qlm, long int llim, int m0, int m1) {
-VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BtF, s2d *BpF, complex double *Slm, complex double *Tlm, long int llim, int m0, int m1) {
-3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, s2d *BtF, s2d *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim, int m0, int m1) {
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, complex double *Qlm, long int llim, int imlim) {
+VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BtF, s2d *BpF, complex double *Slm, complex double *Tlm, long int llim, int imlim) {
+3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, s2d *BtF, s2d *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim, int imlim) {
 
 	double *alm, *al;
 	s2d *wg, *ct, *st;
 V	double *l_2;
 	long int nk, k, vnlat, l,m;
+	unsigned m0, mstep;
+  #ifndef SHT_AXISYM
 	unsigned im;
 V	double m_1;
-  #ifndef SHT_AXISYM
     s2d sgn_mask;
   #endif
   #if _GCC_VEC_
@@ -86,8 +87,12 @@ V		pei[k] = vdup(0.0);		poi[k] = vdup(0.0);
 	  #endif
 	}
 
-	#ifdef _OPENMP
-	if ((m0 == 0) && (m1 > 0))
+	#ifndef _OPENMP
+		m0 = 0;		mstep = 1;
+	#else
+		m0 = omp_get_thread_num();
+		mstep = omp_get_num_threads();
+		if (m0 == 0)
 	#endif
 	{		// im=0 : dzl.p = 0.0 and evrything is REAL
 		k=0;
@@ -189,7 +194,7 @@ Q				Qlm[l] = 0.0;
 V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 			}
 		#endif
-		m0=1;
+		m0=mstep;
 	}
 
   #ifndef SHT_AXISYM
@@ -201,7 +206,7 @@ V	BtF += m0*vnlat;	BpF += m0*vnlat;
 		sgn_mask = (s2d) _mm_slli_epi64((__m128i) sgn_mask, 63);		// (-0,-0)
 		sgn_mask = _mm_unpackhi_pd(vdup(0.0), sgn_mask);	// (0, -0)
 	#endif
-	for (im=m0; im<m1; ++im) {
+	for (im=m0; im<imlim; im+=mstep) {
 		l = shtns->tm[im] / VSIZE2;
 		alm = shtns->blm[im];
 		m = im*MRES;
@@ -440,8 +445,8 @@ Q				Ql[l] = vdup(0.0);
 V				Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
 			}
 		#endif
-Q		BrF += vnlat;
-V		BtF += vnlat;	BpF += vnlat;
+Q		BrF += mstep*vnlat;
+V		BtF += mstep*vnlat;	BpF += mstep*vnlat;
 	}
   #endif
 }
@@ -485,35 +490,9 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
   //omp_set_num_threads(shtns->nthreads);
   #pragma omp parallel num_threads(shtns->nthreads)
   {
-	#ifdef _OPENMP
-		unsigned m0, m1, m2, m3, n;
-		int dm, rm, cm, ith;
-		n = omp_get_num_threads() *2;
-		dm = (imlim) / n;		rm = (imlim) % n;
-		ith = omp_get_thread_num();
-		m0 = dm * ith;		m3 = dm * (n-ith);
-		m1 = m0+dm;			m2 = m3-dm;
-		cm = ith-n+rm;
-		if (cm>=0) {
-			m0 += cm;	m1 = m0+dm+1;
-		}
-		cm = rm-ith;
-		if (cm>0) {
-			m3 += cm;	m2 = m3-dm-1;
-		}
-		//printf("ith=%d, m0=%d, m1=%d, m0'=%d, m1'=%d, total=%d\n",ith,m0,m1,m2,m3, m1-m0+m3-m2);
-
-QX		GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, m0, m1);
-QX		GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, m2, m3);
-VX		GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, m0, m1);
-VX		GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, m2, m3);
-3		GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, m0, m1);
-3		GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, m2, m3);
-	#else
-QX		GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, 0, imlim);
-VX		GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, 0, imlim);
-3		GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, 0, imlim);
-	#endif
+QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
+VX	GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
+3	GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
 
   #ifndef SHT_AXISYM
   	#ifdef SHT_VAR_LTR

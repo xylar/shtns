@@ -32,13 +32,13 @@
 	#else
 	static
 	#endif
-3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
-QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, long int llim, int m0, int m1) {
+3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, long int llim, int imlim) {
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, long int llim, int imlim) {
   #ifndef SHT_GRAD
-VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
+VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int imlim) {
   #else
-S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
-T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int m0, int m1) {
+S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, long int llim, int imlim) {
+T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int imlim) {
   #endif
 
   #ifndef SHT_AXISYM
@@ -58,6 +58,7 @@ Q	#define BR0(i) ((double *)BrF)[i]
 S	#define BT0(i) ((double *)BtF)[i]
 T	#define BP0(i) ((double *)BpF)[i]
   #endif
+	unsigned m0, mstep;
 	long int nk,k,l,m;
 	double *alm, *al;
 	s2d *ct, *st;
@@ -71,8 +72,12 @@ T	double Tl0[llim];
 		nk = ((unsigned long)(nk+VSIZE2-1)) / VSIZE2;
 	#endif
 
-	#ifdef _OPENMP
-	if ((m0 == 0) && (m1 > 0))
+	#ifndef _OPENMP
+		m0 = 0;		mstep = 1;
+	#else
+		m0 = omp_get_thread_num();
+		mstep = omp_get_num_threads();
+		if (m0 == 0)
 	#endif
 	{	//	im=0;
  		l=1;
@@ -161,7 +166,7 @@ T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
 		#endif
 			k+=NWAY;
 		} while (k < nk);
-		m0=1;
+		m0=mstep;
 	}
 
   #ifndef SHT_AXISYM
@@ -172,7 +177,7 @@ V		BtF += m0*NLAT_2;	BpF += m0*NLAT_2;
 Q		BrF += m0*NLAT;
 V		BtF += m0*NLAT;		BpF += m0*NLAT;
 	#endif
-	for(im=m0; im<m1; ++im) {
+	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 		l = LiM(shtns, 0,im);
 V		m_1 = 1.0/m;
@@ -345,11 +350,11 @@ V				BpF[NLAT-1-k-j] = (per[j]-por[j]) + I*(pei[j]-poi[j]);
 			k+=NWAY;
 		} while (k < nk);
 	#if _GCC_VEC_
-Q		BrF += NLAT_2;
-V		BtF += NLAT_2;	BpF += NLAT_2;
+Q		BrF += mstep*NLAT_2;
+V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
 	#else
-Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
+Q		BrF += mstep*NLAT;
+V		BtF += mstep*NLAT;	BpF += mstep*NLAT;
 	#endif
 	}
   #endif
@@ -413,48 +418,14 @@ T		if (Vt != NULL) { int k=0; do { ((v2d*)Vt)[k]=vdup(0.0); } while(++k<NLAT_2);
   //omp_set_num_threads(shtns->nthreads);
   #pragma omp parallel num_threads(shtns->nthreads)
   {
-	#ifdef _OPENMP
-		unsigned m0, m1, m2, m3, n;
-		int dm, rm, cm, ith;
-		n = omp_get_num_threads() *2;
-		dm = (imlim) / n;		rm = (imlim) % n;
-		ith = omp_get_thread_num();
-		m0 = dm * ith;		m3 = dm * (n-ith);
-		m1 = m0+dm;			m2 = m3-dm;
-		cm = ith-n+rm;
-		if (cm>=0) {
-			m0 += cm;	m1 = m0+dm+1;
-		}
-		cm = rm-ith;
-		if (cm>0) {
-			m3 += cm;	m2 = m3-dm-1;
-		}
-		//printf("ith=%d, m0=%d, m1=%d, m0'=%d, m1'=%d, total=%d\n",ith,m0,m1,m2,m3, m1-m0+m3-m2);
-
-3		GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m0, m1);
-3		GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, m2, m3);
-QX		GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, m0, m1);
-QX		GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, m2, m3);
-	  #ifndef SHT_GRAD
-VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, m0, m1);
-VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, m2, m3);
-	  #else
-S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, m0, m1);
-S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, m2, m3);
-T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, m0, m1);
-T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, m2, m3);
-	  #endif
+3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim);
+QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim);
+	#ifndef SHT_GRAD
+VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
 	#else
-3		GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, 0, imlim);
-QX		GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, 0, imlim);
-	  #ifndef SHT_GRAD
-VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, 0, imlim);
-	  #else
-S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, 0, imlim);
-T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, 0, imlim);
-	  #endif
+S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
+T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
 	#endif
-
 
   #ifndef SHT_AXISYM
     if (NPHI >= 2*imlim)	// padding for high m's
