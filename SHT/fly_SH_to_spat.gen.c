@@ -112,7 +112,7 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 		} while(l<=llim);
 		k=0;	nk = NLAT_2;
 	#if _GCC_VEC_
-		nk = ((unsigned long)(nk+VSIZE2-1)) / VSIZE2;
+		nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
 	#endif
 		do {
 			l=0;	al = alm;

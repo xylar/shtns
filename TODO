@@ -7,8 +7,6 @@
 - complex fft is much faster, resulting in 15-20% faster SHT for mmax=lmax. => switch to complex for nlat even, (at the expense of some accuracy) !!
 - split the fft and the legendre transform so that they can be done independantly ?
    -OR- allow to deactivate fft.
-- use split-array (FFTW guru interface) : seems more natural for on-the-fly transforms
-- AVX support (may benefit from split-arrays also !)
 - Using OpenCL may be interesting !
 
 - m=0 :
@@ -16,10 +14,6 @@
 	* nphi>1 : fft should be replaced by phi-averaging => then call (nphi=1) version. [handles stride problem]
 
 - split m=0 and m>0 ?? [allow faster operation with on-the-fly at different NWAY]
-
-- Implement l even/odd sub-transforms ???
-- Implement separate m sub-transforms ???
-
 
 *** OPTIMIZATIONS ***
 

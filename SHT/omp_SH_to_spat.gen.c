@@ -32,13 +32,13 @@
 	#else
 	static
 	#endif
-3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, long int llim, int imlim) {
-QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, long int llim, int imlim) {
+3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, const long int llim, const int imlim) {
   #ifndef SHT_GRAD
-VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int imlim) {
+VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
   #else
-S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, long int llim, int imlim) {
-T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, long int llim, int imlim) {
+S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
   #endif
 
   #ifndef SHT_AXISYM
@@ -69,7 +69,7 @@ T	double Tl0[llim];
 	ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
 	nk = NLAT_2;
 	#if _GCC_VEC_
-		nk = ((unsigned long)(nk+VSIZE2-1)) / VSIZE2;
+		nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
 	#endif
 
 	#ifndef _OPENMP
