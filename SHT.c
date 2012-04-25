@@ -1226,105 +1226,34 @@ static void init_SH_gauss(shtns_cfg shtns)
 	}
 }
 
-/// \internal Computes the matrices required for SH transform on a regular grid (with or without DCT).
-/// \param analysis : 0 => synthesis only.
-static void init_SH_dct(shtns_cfg shtns, int analysis)
+static void init_SH_dct_m(shtns_cfg shtns, double* is1, fftw_plan dct, fftw_plan idct, int analysis, const int m0, const int mstep)
 {
-	fftw_plan dct, idct;
 	double *yk, *yk0, *dyk0, *yg;		// temp storage
 	struct DtDp *dyg, *dyk;
-	real iylm_fft_norm;
 	long int it,im,m,l;
-	long int sk, dsk;
 	double Z[2*NLAT_2] SSE;
 	double dZt[2*NLAT_2] SSE;
 	double dZp[2*NLAT_2] SSE;		// equally spaced theta points.
-	double is1[NLAT];		// tabulate values for integrals.
 
 	double *st = shtns->st;
 	double *st_1 = shtns->st_1;
-	long int marray_size = sizeof(void*)*(MMAX+1) + (MIN_ALIGNMENT-1);
-	int vector = (shtns->dylm != NULL);
+	const int vector = (shtns->dylm != NULL);
+	const int KMAX = LMAX+1;
 
-	iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
+	real iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
  	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
 	iylm_fft_norm /= (2*NPHI*NLAT_2);
-
-#define KMAX (LMAX+1)
-
-	for(im=0, sk=0, dsk=0; im<=MMAX; im++) {	// how much memory to allocate for ykm_dct ?
-		m = im*MRES;
-		for (it=0; it<= KMAX; it+=2) {
-			l = (it < m) ? m : it-(m&1);
-			sk += LMAX+1 - l;
-			if ((m==0) && ((LMAX & 1) ==0)) sk++;		// SSE padding for m=0
-		}
-		for (it=0; it<= KMAX; it+=2) {
-			l = (it-2 < m) ? m : it-2+(m&1);
-			dsk += LMAX+1 - l;
-		}
-	}
-	if (MMAX == 0) sk+=3;	// allow some overflow.
-	for (l=0, it=0; l<=LMAX; l+=2)	// how much memory for zlm_dct0 ?
-		it += (2*NLAT_2 -l);
-	for (l=1, im=0; l<=LMAX; l+=2)	// how much memory for dzlm_dct0 ?
-		im += (2*NLAT_2 -l+1);
-
-#if SHT_VERBOSE > 1
-	printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
-#endif
-	shtns->ykm_dct = (double **) malloc( marray_size + sizeof(double)*sk );
-	shtns->ykm_dct[0] = (double *) PTR_ALIGN( shtns->ykm_dct + (MMAX+1) );
-	if (vector) {
-		shtns->dykm_dct = (struct DtDp **) malloc( marray_size + sizeof(struct DtDp)*dsk );
-		shtns->dykm_dct[0] = (struct DtDp *) PTR_ALIGN( shtns->dykm_dct + (MMAX+1) );
-	}
-	shtns->zlm_dct0 = (double *) VMALLOC( sizeof(double)* it );
-	if (vector) {
-		shtns->dzlm_dct0 = (double *) VMALLOC( sizeof(double)* im );
-	}
-	for (im=0; im<MMAX; im++) {
-		m = im*MRES;
-		for (it=0, sk=0; it<= KMAX; it+=2) {
-			l = (it < m) ? m : it-(m&1);
-			sk += LMAX+1 - l;
-			if ((m==0) && ((LMAX & 1) ==0)) sk++;		// SSE padding for m=0
-		}
-		for (it=0, dsk=0; it<= KMAX; it+=2) {
-			l = (it-2 < m) ? m : it-2+(m&1);
-			dsk += LMAX+1 - l;
-		}
-		shtns->ykm_dct[im+1] = shtns->ykm_dct[im] + sk;
-		if (vector)  shtns->dykm_dct[im+1] = shtns->dykm_dct[im] + dsk;
-	}
-
-	#ifdef OMP_FFTW
-		fftw_plan_with_nthreads(1);
-	#endif
-	dct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT10, FFTW_MEASURE );	// quick and dirty dct.
-	idct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT01, FFTW_MEASURE );	// quick and dirty idct.
-
-#if SHT_VERBOSE > 1
-	ticks tik0, tik1;
-	tik0 = getticks();
-#endif
-
-// precomputation for scalar product of Chebychev polynomials.
-	for(it=0; it<NLAT; it++)
-		is1[it] = 1./(1. - 4.*it*it);
 
 // Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT_2 points required.
 	// temp memory for ykm_dct.
 	yk = (double *) malloc( sizeof(double) * (KMAX+1)*(LMAX+1) );
 	dyk = (struct DtDp *) malloc( sizeof(struct DtDp)* (KMAX+1)*(LMAX+1) );
-	if (analysis) {
+	if ((m0==0)&&(analysis)) {
 		yk0 = (double *) malloc( sizeof(double) * (LMAX/2+1)*(2*NLAT_2) * 2 );		// temp for zlm_dct0
 		dyk0 = yk0 + (LMAX/2+1)*(2*NLAT_2);
 	}
 
-	init_SH_synth(shtns);
-
-	for (im=0; im<=MMAX; im++) {
+	for (im=m0; im<=MMAX; im+=mstep) {
 		m = im*MRES;
 	// go to DCT space
 		for (it=0;it<=KMAX;it+=2) {
@@ -1365,11 +1294,13 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 					dZp[it] =   dZp[2*NLAT_2-it-1];
 				}
 			}
-			fftw_execute(dct);
+			fftw_execute_r2r(dct, Z, Z);
 			fftw_execute_r2r(dct, dZt, dZt);
 			fftw_execute_r2r(dct, dZp, dZp);
 #if SHT_VERBOSE > 1
-			if (LMAX <= 12) {
+			if (LMAX <= 12)
+			#pragma omp critical
+			{
 				printf("\nl=%d, m=%d ::\t", l,m);
 				for(it=0;it<2*NLAT_2;it++) printf("%e ",Z[it]/(2*NLAT));
 				printf("\n     dYt ::\t");
@@ -1393,7 +1324,9 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 	*/
 		if (analysis) {
 	#if SHT_VERBOSE > 0
-		if (LMAX>126) printf("computing weights m=%d\r",m);	fflush(stdout);
+		if ((LMAX>126)&&(m0==0)) {		// only one thread prints this message.
+			printf("computing weights m=%d\r",m);	fflush(stdout);
+		}
 	#endif
 		for (l=m; l<=LMAX; l++) {
 			unsigned k0,k1, k,i,d;
@@ -1421,7 +1354,9 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 				}
 			}
 #if SHT_VERBOSE > 1
-		if (LMAX <= 12) {
+		if (LMAX <= 12)
+		#pragma omp critical
+		{
 			printf("\nl=%d, m=%d ::\t",l,m);
 			for (k=0; k<(2*NLAT_2); k++) printf("%f ",Z[k]);
 			printf("\n       dZt ::\t");
@@ -1465,7 +1400,7 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 
 			long int l0 = (m==0) ? 1 : m;
 			long int talign = (m==0)*(NLAT_2 & 1);
-			sk = (l-l0)&1;
+			long int sk = (l-l0)&1;
 			if (l==0) {
 				for (it=0; it<NLAT_2; it++) {
 					shtns->zlm[im][it] =  Z[it];
@@ -1531,7 +1466,7 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 	}
 	
 	// compact yk to zlm_dct0
-	if (analysis) {
+	if ((m0==0)&&(analysis)) {
 		long int klim = (LMAX * SHT_NL_ORDER) + 2;		// max k needed for nl-terms...
 		klim = (klim/2)*2;		// must be even...
 		if (klim > 2*NLAT_2) klim = 2*NLAT_2;		// but no more than 2*NLAT_2.
@@ -1557,11 +1492,101 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 		free(yk0 - (2*NLAT_2)*(LMAX/2+1));
 	}
 
+	free(dyk);	free(yk);
+}
+
+/// \internal Computes the matrices required for SH transform on a regular grid (with or without DCT).
+/// \param analysis : 0 => synthesis only.
+static void init_SH_dct(shtns_cfg shtns, int analysis)
+{
+	fftw_plan dct, idct;
+	long int it,im,m,l;
+	long int sk, dsk;
+	double Z[2*NLAT_2] SSE;
+	double is1[NLAT];		// tabulate values for integrals.
+
+	const long int marray_size = sizeof(void*)*(MMAX+1) + (MIN_ALIGNMENT-1);
+	const int vector = (shtns->dylm != NULL);
+	const int KMAX = LMAX+1;
+
+	for(im=0, sk=0, dsk=0; im<=MMAX; im++) {	// how much memory to allocate for ykm_dct ?
+		m = im*MRES;
+		for (it=0; it<= KMAX; it+=2) {
+			l = (it < m) ? m : it-(m&1);
+			sk += LMAX+1 - l;
+			if ((m==0) && ((LMAX & 1) ==0)) sk++;		// SSE padding for m=0
+		}
+		for (it=0; it<= KMAX; it+=2) {
+			l = (it-2 < m) ? m : it-2+(m&1);
+			dsk += LMAX+1 - l;
+		}
+	}
+	if (MMAX == 0) sk+=3;	// allow some overflow.
+	for (l=0, it=0; l<=LMAX; l+=2)	// how much memory for zlm_dct0 ?
+		it += (2*NLAT_2 -l);
+	for (l=1, im=0; l<=LMAX; l+=2)	// how much memory for dzlm_dct0 ?
+		im += (2*NLAT_2 -l+1);
+
+#if SHT_VERBOSE > 1
+	printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
+#endif
+	shtns->ykm_dct = (double **) malloc( marray_size + sizeof(double)*sk );
+	shtns->ykm_dct[0] = (double *) PTR_ALIGN( shtns->ykm_dct + (MMAX+1) );
+	if (vector) {
+		shtns->dykm_dct = (struct DtDp **) malloc( marray_size + sizeof(struct DtDp)*dsk );
+		shtns->dykm_dct[0] = (struct DtDp *) PTR_ALIGN( shtns->dykm_dct + (MMAX+1) );
+	}
+	shtns->zlm_dct0 = (double *) VMALLOC( sizeof(double)* it );
+	if (vector) {
+		shtns->dzlm_dct0 = (double *) VMALLOC( sizeof(double)* im );
+	}
+	for (im=0; im<MMAX; im++) {
+		m = im*MRES;
+		for (it=0, sk=0; it<= KMAX; it+=2) {
+			l = (it < m) ? m : it-(m&1);
+			sk += LMAX+1 - l;
+			if ((m==0) && ((LMAX & 1) ==0)) sk++;		// SSE padding for m=0
+		}
+		for (it=0, dsk=0; it<= KMAX; it+=2) {
+			l = (it-2 < m) ? m : it-2+(m&1);
+			dsk += LMAX+1 - l;
+		}
+		shtns->ykm_dct[im+1] = shtns->ykm_dct[im] + sk;
+		if (vector)  shtns->dykm_dct[im+1] = shtns->dykm_dct[im] + dsk;
+	}
+
+#if SHT_VERBOSE > 1
+	ticks tik0, tik1;
+	tik0 = getticks();
+#endif
+
+	#ifdef OMP_FFTW
+		fftw_plan_with_nthreads(1);
+	#endif
+	dct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT10, FFTW_MEASURE );	// quick and dirty dct.
+	idct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT01, FFTW_MEASURE );	// quick and dirty idct.
+
+	init_SH_synth(shtns);
+
+// precomputation for scalar product of Chebychev polynomials.
+	for(it=0; it<NLAT; it++)
+		is1[it] = 1./(1. - 4.*it*it);
+
+  #ifdef _OPENMP
+	#pragma omp parallel
+	{
+		int n=omp_get_num_threads();
+		int k=omp_get_thread_num();
+		init_SH_dct_m(shtns, is1, dct, idct, analysis, k, n);
+	}
+  #else
+	init_SH_dct_m(shtns, is1, dct, idct, analysis, 0, 1);
+  #endif
+
 #if SHT_VERBOSE > 1
 	tik1 = getticks();
 	printf("\n    ticks : %.3f\n", elapsed(tik1,tik0)/(NLM*NLAT*(MMAX+1)));
 #endif
-	free(dyk);	free(yk);
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
 
