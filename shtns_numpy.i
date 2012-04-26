@@ -104,13 +104,17 @@ long nlm_calc(long lmax, long mmax, long mres);
 		}
 	}
 
+	%feature("kwargs") shtns_info;
 	shtns_info(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal) {	// default arguments : mmax, mres and norm
 		if (lmax < 2) {
 			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
 		}
+		if (mmax < 0) mmax = lmax/mres;		// default mmax
+		if (mmax*mres > lmax) {
+			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres");	return NULL;
+		}
 		import_array();		// required by NumPy
 		shtns_use_threads(0);		// use openmp threads if available
-		if (mmax < 0) mmax = lmax;
 		return shtns_create(lmax, mmax, mres, norm);
 	}
 	~shtns_info() {
@@ -118,14 +122,10 @@ long nlm_calc(long lmax, long mmax, long mres);
 	}
 	%apply int *OUTPUT { int *nlat_out };
 	%apply int *OUTPUT { int *nphi_out };
-	void set_grid(int nlat=0, int nphi=0, enum shtns_type flags=sht_quick_init, double eps=1.0e-8, int nl_order=1, int *nlat_out, int *nphi_out) {	// default arguments
+	%feature("kwargs") set_grid;
+	void set_grid(int nlat=0, int nphi=0, int flags=sht_quick_init, double eps=1.0e-8, int nl_order=1, int *nlat_out, int *nphi_out) {	// default arguments
 		if (!(flags & SHT_THETA_CONTIGUOUS))  flags |= SHT_PHI_CONTIGUOUS;	// default to SHT_PHI_CONTIGUOUS.
 		*nlat_out = nlat;		*nphi_out = nphi;
-		shtns_set_grid_auto($self, flags, eps, nl_order, nlat_out, nphi_out);
-	}
-	void set_grid_auto(int nl_order=1, enum shtns_type flags=sht_quick_init, double eps=1.0e-8, int *nlat_out, int *nphi_out) {
-		if (!(flags & SHT_THETA_CONTIGUOUS))  flags |= SHT_PHI_CONTIGUOUS;	// default to SHT_PHI_CONTIGUOUS.
-		*nlat_out = 0;		*nphi_out = 0;
 		shtns_set_grid_auto($self, flags, eps, nl_order, nlat_out, nphi_out);
 	}
 

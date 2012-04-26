@@ -37,9 +37,9 @@ DOCUMENTATION:
 CHANGE LOG:
 
   tip:
-	- slightly faster parallel transforms
-	- Python interface has now decent error handling.
-	- Python grid defaults to SHT_PHI_CONTIGUOUS instead of SHT_THETA_CONTIGUOUS.
+	- slightly faster parallel transforms.
+	- better Python interface: decent error handling and keyword argument support.
+	- changes to Python interface: grid defaults to SHT_PHI_CONTIGUOUS, set_grid_auto() removed.
 
   v2.2  (23 Apr 2012)
 	- parallel transforms with OpenMP (for Gauss grid, significant benefit for l>=127).

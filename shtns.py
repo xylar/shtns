@@ -117,26 +117,19 @@ class sht(_object):
     if _newclass:st = _swig_property(_shtns.sht_st_get)
     __swig_getmethods__["nspat"] = _shtns.sht_nspat_get
     if _newclass:nspat = _swig_property(_shtns.sht_nspat_get)
-    def __init__(self, *args): 
+    def __init__(self, *args, **kwargs): 
         """__init__(self, int lmax, int mmax = -1, int mres = 1, int norm = sht_orthonormal) -> sht"""
-        this = _shtns.new_sht(*args)
+        this = _shtns.new_sht(*args, **kwargs)
         try: self.this.append(this)
         except: self.this = this
     __swig_destroy__ = _shtns.delete_sht
     __del__ = lambda self : None;
-    def set_grid(self, *args):
+    def set_grid(self, *args, **kwargs):
         """
-        set_grid(self, int nlat = 0, int nphi = 0, enum shtns_type flags = sht_quick_init, 
+        set_grid(self, int nlat = 0, int nphi = 0, int flags = sht_quick_init, 
             double eps = 1.0e-8, int nl_order = 1)
         """
-        return _shtns.sht_set_grid(self, *args)
-
-    def set_grid_auto(self, *args):
-        """
-        set_grid_auto(self, int nl_order = 1, enum shtns_type flags = sht_quick_init, 
-            double eps = 1.0e-8)
-        """
-        return _shtns.sht_set_grid_auto(self, *args)
+        return _shtns.sht_set_grid(self, *args, **kwargs)
 
     def _print(self):
         """_print(self)"""
