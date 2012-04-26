@@ -29,25 +29,27 @@ mmax = 3			# maximum order of spherical harmonic representation.
 
 sh = shtns.sht(lmax, mmax)		# create sht object with given lmax and mmax.
 # mres = 2						# use 2-fold symmetry in phi
-# norm = sht_schmidt			# use schmidt semi-normalized harmonics
+# norm = shtns.sht_schmidt | shtns.SHT_NO_CS_PHASE			# use schmidt semi-normalized harmonics
 # sh = shtns.sht(lmax, mmax, mres, norm)	# advanced creation of sht object.
 
-sh.set_grid_auto()				# build grid with default size
+nlat, nphi = sh.set_grid()		# build default grid (gauss grid, phi-contiguous)
 print(sh.nlat, sh.nphi)			# displays the latitudinal and longitudinal grid sizes.
 
 cost = sh.cos_theta()			# latitudinal coordinates of the grid as cos(theta)
 el = sh.l()						# array of size sh.nlm giving the spherical harmonic degree l for any sh coefficient
 l2 = el*(el+1)					# array l(l+1) that is useful for computing laplacian
 
+### use advanced options to create a regular grid, theta-contiguous, and with south-pole comming first.
 # nlat = lmax*2
 # nphi = mmax*3
-# sh.set_grid(nlat, nphi, sht_gauss_fly|SHT_PHI_CONTIGUOUS, 1.0e-10)		# use advanced options to create a gauss grid with optimized on-the-fly transforms.
-								# warning : the use of SHT_NATIVE_LAYOUT is tricky with NumPy arrays.
+# grid_typ = shtns.sht_reg_fast | shtns.SHT_THETA_CONTIGUOUS | shtns.SHT_SOUTH_POLE_FIRST
+# polar_opt_threshold = 1.0e-10
+# sh.set_grid(nlat, nphi, grid_type, polar_opt_threshold)
 
 ylm = numpy.zeros(sh.nlm, dtype=complex)		# a spherical harmonic spectral array
 
-vr = numpy.zeros((sh.nphi, sh.nlat))			# a spatial array matching the grid (with SHT_THETA_CONTIGUOUS by default)
-# vr = numpy.zeros((sh.nlat, sh.nphi))			# a spatial array matching a grid build with SHT_PHI_CONTIGUOUS
+vr = numpy.zeros((sh.nlat, sh.nphi))			# a spatial array matching the default grid (with SHT_PHI_CONTIGUOUS by default) 
+#vr = numpy.zeros((sh.nphi, sh.nlat))			# a spatial array matching the grid with SHT_THETA_CONTIGUOUS
 
 
 ylm[sh.idx(1,0)] = 1.0		# set sh coefficient l=1, m=0 to value 1

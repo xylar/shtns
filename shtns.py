@@ -83,7 +83,6 @@ sht_reg_dct = _shtns.sht_reg_dct
 sht_quick_init = _shtns.sht_quick_init
 sht_reg_poles = _shtns.sht_reg_poles
 sht_gauss_fly = _shtns.sht_gauss_fly
-SHT_NATIVE_LAYOUT = _shtns.SHT_NATIVE_LAYOUT
 SHT_THETA_CONTIGUOUS = _shtns.SHT_THETA_CONTIGUOUS
 SHT_PHI_CONTIGUOUS = _shtns.SHT_PHI_CONTIGUOUS
 SHT_SOUTH_POLE_FIRST = _shtns.SHT_SOUTH_POLE_FIRST
@@ -127,15 +126,15 @@ class sht(_object):
     __del__ = lambda self : None;
     def set_grid(self, *args):
         """
-        set_grid(self, int nlat, int nphi, enum shtns_type flags = sht_quick_init|256, 
-            double eps = 1.0e-8) -> int
+        set_grid(self, int nlat = 0, int nphi = 0, enum shtns_type flags = sht_quick_init, 
+            double eps = 1.0e-8, int nl_order = 1)
         """
         return _shtns.sht_set_grid(self, *args)
 
     def set_grid_auto(self, *args):
         """
-        set_grid_auto(self, int nlat = 0, int nphi = 0, int nl_order = 1, enum shtns_type flags = sht_quick_init|256, 
-            double eps = 1.0e-8) -> int
+        set_grid_auto(self, int nl_order = 1, enum shtns_type flags = sht_quick_init, 
+            double eps = 1.0e-8)
         """
         return _shtns.sht_set_grid_auto(self, *args)
 
