@@ -3,7 +3,7 @@ PREFIX=$(HOME)
 
 ## comment the following lines to disable parallel spherical harmonic transforms using openmp
 ## allow parallel SHT and fft (with fftw 3.3 or more)
-#OMP=-fopenmp -lfftw3_omp
+OMP=-fopenmp -lfftw3_omp
 ## only use parallel legendre transform
 #OMP=-fopenmp
 

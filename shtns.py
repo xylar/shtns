@@ -105,16 +105,6 @@ class sht(_object):
     if _newclass:nphi = _swig_property(_shtns.sht_nphi_get)
     __swig_getmethods__["nlat"] = _shtns.sht_nlat_get
     if _newclass:nlat = _swig_property(_shtns.sht_nlat_get)
-    __swig_getmethods__["nlat_2"] = _shtns.sht_nlat_2_get
-    if _newclass:nlat_2 = _swig_property(_shtns.sht_nlat_2_get)
-    __swig_getmethods__["lmidx"] = _shtns.sht_lmidx_get
-    if _newclass:lmidx = _swig_property(_shtns.sht_lmidx_get)
-    __swig_getmethods__["li"] = _shtns.sht_li_get
-    if _newclass:li = _swig_property(_shtns.sht_li_get)
-    __swig_getmethods__["ct"] = _shtns.sht_ct_get
-    if _newclass:ct = _swig_property(_shtns.sht_ct_get)
-    __swig_getmethods__["st"] = _shtns.sht_st_get
-    if _newclass:st = _swig_property(_shtns.sht_st_get)
     __swig_getmethods__["nspat"] = _shtns.sht_nspat_get
     if _newclass:nspat = _swig_property(_shtns.sht_nspat_get)
     def __init__(self, *args, **kwargs): 

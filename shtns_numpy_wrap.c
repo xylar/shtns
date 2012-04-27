@@ -2922,9 +2922,8 @@ SWIG_Python_NonDynamicSetAttr(PyObject *obj, PyObject *name, PyObject *value) {
 #define SWIGTYPE_p_double swig_types[1]
 #define SWIGTYPE_p_int swig_types[2]
 #define SWIGTYPE_p_shtns_info swig_types[3]
-#define SWIGTYPE_p_unsigned_short swig_types[4]
-static swig_type_info *swig_types[6];
-static swig_module_info swig_module = {swig_types, 5, 0, 0, 0, 0};
+static swig_type_info *swig_types[5];
+static swig_module_info swig_module = {swig_types, 4, 0, 0, 0, 0};
 #define SWIG_TypeQuery(name) SWIG_TypeQueryModule(&swig_module, &swig_module, name)
 #define SWIG_MangledTypeQuery(name) SWIG_MangledTypeQueryModule(&swig_module, &swig_module, name)
 
@@ -3445,116 +3444,6 @@ SWIGINTERN PyObject *_wrap_sht_nlat_get(PyObject *SWIGUNUSEDPARM(self), PyObject
   arg1 = (struct shtns_info *)(argp1);
   result = (unsigned short)(unsigned short) ((arg1)->nlat);
   resultobj = SWIG_From_unsigned_SS_short((unsigned short)(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_sht_nlat_2_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  unsigned short result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:sht_nlat_2_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_nlat_2_get" "', argument " "1"" of type '" "struct shtns_info *""'"); 
-  }
-  arg1 = (struct shtns_info *)(argp1);
-  result = (unsigned short)(unsigned short) ((arg1)->nlat_2);
-  resultobj = SWIG_From_unsigned_SS_short((unsigned short)(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_sht_lmidx_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  int *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:sht_lmidx_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_lmidx_get" "', argument " "1"" of type '" "struct shtns_info *""'"); 
-  }
-  arg1 = (struct shtns_info *)(argp1);
-  result = (int *)(int *) ((arg1)->lmidx);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_int, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_sht_li_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  unsigned short *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:sht_li_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_li_get" "', argument " "1"" of type '" "struct shtns_info *""'"); 
-  }
-  arg1 = (struct shtns_info *)(argp1);
-  result = (unsigned short *)(unsigned short *) ((arg1)->li);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_unsigned_short, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_sht_ct_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  double *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:sht_ct_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_ct_get" "', argument " "1"" of type '" "struct shtns_info *""'"); 
-  }
-  arg1 = (struct shtns_info *)(argp1);
-  result = (double *)(double *) ((arg1)->ct);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_double, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_sht_st_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  double *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:sht_st_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_st_get" "', argument " "1"" of type '" "struct shtns_info *""'"); 
-  }
-  arg1 = (struct shtns_info *)(argp1);
-  result = (double *)(double *) ((arg1)->st);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_double, 0 |  0 );
   return resultobj;
 fail:
   return NULL;
@@ -4707,11 +4596,6 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_mres_get", _wrap_sht_mres_get, METH_VARARGS, NULL},
 	 { (char *)"sht_nphi_get", _wrap_sht_nphi_get, METH_VARARGS, NULL},
 	 { (char *)"sht_nlat_get", _wrap_sht_nlat_get, METH_VARARGS, NULL},
-	 { (char *)"sht_nlat_2_get", _wrap_sht_nlat_2_get, METH_VARARGS, NULL},
-	 { (char *)"sht_lmidx_get", _wrap_sht_lmidx_get, METH_VARARGS, NULL},
-	 { (char *)"sht_li_get", _wrap_sht_li_get, METH_VARARGS, NULL},
-	 { (char *)"sht_ct_get", _wrap_sht_ct_get, METH_VARARGS, NULL},
-	 { (char *)"sht_st_get", _wrap_sht_st_get, METH_VARARGS, NULL},
 	 { (char *)"sht_nspat_get", _wrap_sht_nspat_get, METH_VARARGS, NULL},
 	 { (char *)"new_sht", (PyCFunction) _wrap_new_sht, METH_VARARGS | METH_KEYWORDS, (char *)"new_sht(int lmax, int mmax = -1, int mres = 1, int norm = sht_orthonormal) -> struct shtns_info"},
 	 { (char *)"delete_sht", _wrap_delete_sht, METH_VARARGS, (char *)"delete_sht(struct shtns_info self)"},
@@ -4784,28 +4668,24 @@ static swig_type_info _swigt__p_char = {"_p_char", "char *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_double = {"_p_double", "double *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_int = {"_p_int", "int *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_shtns_info = {"_p_shtns_info", "struct shtns_info *|shtns_info *", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_unsigned_short = {"_p_unsigned_short", "unsigned short *", 0, 0, (void*)0, 0};
 
 static swig_type_info *swig_type_initial[] = {
   &_swigt__p_char,
   &_swigt__p_double,
   &_swigt__p_int,
   &_swigt__p_shtns_info,
-  &_swigt__p_unsigned_short,
 };
 
 static swig_cast_info _swigc__p_char[] = {  {&_swigt__p_char, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_double[] = {  {&_swigt__p_double, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_int[] = {  {&_swigt__p_int, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_shtns_info[] = {  {&_swigt__p_shtns_info, 0, 0, 0},{0, 0, 0, 0}};
-static swig_cast_info _swigc__p_unsigned_short[] = {  {&_swigt__p_unsigned_short, 0, 0, 0},{0, 0, 0, 0}};
 
 static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_char,
   _swigc__p_double,
   _swigc__p_int,
   _swigc__p_shtns_info,
-  _swigc__p_unsigned_short,
 };
 
 

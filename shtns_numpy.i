@@ -86,6 +86,11 @@ static int check_spectral(int i, PyObject *a, int size) {
 // main object is renamed to sht.
 %rename("sht") shtns_info;
 %ignore SHT_NATIVE_LAYOUT;
+%ignore nlat_2;
+%ignore lmidx;
+%ignore li;
+%ignore ct;
+%ignore st;
 
 %include "shtns.h"
 
