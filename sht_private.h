@@ -151,6 +151,10 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 /* for vectorization (SSE2) */
 
+#define MIN_ALIGNMENT 16
+/// align pointer on MIN_ALIGNMENT (must be a power of 2)
+#define PTR_ALIGN(p) ((((size_t)(p)) + (MIN_ALIGNMENT-1)) & (~((size_t)(MIN_ALIGNMENT-1))))
+
 #define SSE __attribute__((aligned (16)))
 
 #ifdef __INTEL_COMPILER
@@ -235,6 +239,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define vlo_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 0)
 		#define vhi_to_dbl(a) __builtin_ia32_vec_ext_v2df (a, 1)
 	#endif
+
+	// Allocate memory aligned on 16 bytes for SSE2 (fftw_malloc works only if fftw was compiled with --enable-sse2)
+	// in 64 bit system, malloc should be 16 bytes aligned anyway.
+	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : _mm_malloc(s, MIN_ALIGNMENT) )
+	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : _mm_free(s) )
 #else
 	#undef _GCC_VEC_
 	#define VSIZE 1
@@ -250,6 +259,10 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define addi(a,b) ((a) + I*(b))
 	#define vlo_to_dbl(a) (a)
 	#define vhi_to_dbl(a) (a)
+
+	// allocate memory aligned for FFTW. In 64 bit system, malloc should be 16 bytes aligned.
+	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
+	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
 #endif
 
 
@@ -259,15 +272,6 @@ struct DtDp {		// theta and phi derivatives stored together.
 
 #define GLUE2(a,b) a##b
 #define GLUE3(a,b,c) a##b##c
-
-// how to allocate memory aligned on 16 bytes ? this works only if fftw was compiled with --enable-sse2...
-// in 64 bit system, malloc should be 16bytes aligned.
-#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
-#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
-
-#define MIN_ALIGNMENT 16
-/// align pointer on MIN_ALIGNMENT (must be a power of 2)
-#define PTR_ALIGN(p) ((((size_t)(p)) + (MIN_ALIGNMENT-1)) & (~((size_t)(MIN_ALIGNMENT-1))))
 
 // verbose printing
 #if SHT_VERBOSE > 1
