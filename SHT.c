@@ -78,7 +78,7 @@ double shlm_e1(shtns_cfg shtns, int l, int m) {
 long nlm_calc(long lmax, long mmax, long mres)
 {
 	if (mmax*mres > lmax) mmax = lmax/mres;
-	return( (mmax+1)*(lmax+1) - mres*(mmax*(mmax+1))/2 );	// this is wrong if lmax < mmax*mres
+	return (mmax+1)*(lmax+1) - ((mmax*mres)*(mmax+1))/2;	// this is wrong if lmax < mmax*mres
 }
 
 

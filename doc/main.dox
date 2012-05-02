@@ -1,9 +1,10 @@
 
-/** \mainpage Spherical Harmonic Transform for numerical simulations.
+/** \mainpage High performance Spherical Harmonic Transform for numerical simulations.
  *
- * SHTns is a library for Spherical Harmonic Transform written in C, aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.\n
+ * SHTns is a high performance library for Spherical Harmonic Transform written in C, aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.\n
  *
  * Main features :
+ * - <b>blazingly fast</b>
  * - distributed under the open source \link license CeCILL License\endlink (GPL compatible)
  * - both <b>scalar and vector transforms</b>
  * - backward and forward (synthesis and analysis) functions
@@ -12,7 +13,7 @@
  * - various conventions (normalization and Condon-Shortley phase)
  * - can be used from <b>Fortran, c/c++, and Python</b> programs
  * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature)
- * - an even faster algorithm using DCT for <b>regular nodes</b> (based on a generalized Fejer quadrature)
+ * - an algorithm using DCT for <b>regular nodes</b> (based on a generalized Fejer quadrature)
  * - support for SSE2, SSE3 and <b>AVX</b> vectorization with gcc.
  * - <b>parallel transforms with OpenMP</b> (for Gauss grid only).
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.

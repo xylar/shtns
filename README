@@ -1,4 +1,4 @@
-SHTns is a library for Spherical Harmonic Transform written in C, aimed at
+SHTns is a high performance library for Spherical Harmonic Transform written in C, aimed at
 numerical simulation (fluid flows, mhd, ...) in spherical geometries.
 
 Copyright (c) 2010-2012 Centre National de la Recherche Scientifique.
@@ -8,6 +8,7 @@ located in the LICENSE file.
 
 FEATURES:
 
+	- blazingly fast
 	- both scalar and vector transforms
 	- backward and forward (synthesis and analysis) functions
 	- flexible truncation (degree, order, azimuthal periodicity)

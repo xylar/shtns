@@ -92,12 +92,10 @@ static int check_spectral(int i, PyObject *a, int size) {
 %ignore ct;
 %ignore st;
 
-%include "shtns.h"
-
-%include "exception.i"
 %feature("autodoc");
+%include "shtns.h"
+%include "exception.i"
 
-long nlm_calc(long lmax, long mmax, long mres);
 
 %extend shtns_info {
 

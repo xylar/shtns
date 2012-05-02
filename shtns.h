@@ -100,6 +100,9 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 
 // FUNCTIONS //
 
+/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require any previous setup.
+long nlm_calc(long lmax, long mmax, long mres);
+
 #ifndef SWIG
 
 /// \name initialization
@@ -116,9 +119,6 @@ int shtns_set_grid_auto(shtns_cfg, enum shtns_type flags, double eps, int nl_ord
 shtns_cfg shtns_create_with_grid(shtns_cfg, int mmax, int nofft);
 /// Enables multi-thread transform using OpenMP with num_threads (if available). Returns number of threads that will be used.
 int shtns_use_threads(int num_threads);
-
-/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require any previous setup.
-long nlm_calc(long lmax, long mmax, long mres);
 
 void shtns_reset();				///< destroy all configs, free memory, and go back to initial state.
 void shtns_destroy(shtns_cfg);	///< free memory of given config, which cannot be used afterwards.
