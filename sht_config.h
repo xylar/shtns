@@ -32,7 +32,7 @@
 #define SHT_F77_API
 
 /// 0:use new features of FFTW 3.3 or more, 1: allows to compile with older FFTW 3.0 or more (also removes parallel fft support)
-#define USE_LEGACY_FFTW3 0
+#define USE_LEGACY_FFTW3 1
 
 /// 0: don't use long double, only portable double; 1: use long double at initialization for (maybe) slightly better precision.
 #define SHT_LONG_DOUBLE 0

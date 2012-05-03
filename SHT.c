@@ -852,7 +852,10 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			#endif
 		}
 
-	  if ((_GCC_VEC_ == 0) || (on_the_fly == 0)) {		// the real ffts are required if _GCC_VC_ == 0 or if on_the_fly is zero.
+	#if _GCC_VEC_
+	  if (on_the_fly == 0)
+	#endif
+	  {		// the real ffts are required if _GCC_VEC_ == 0 or if on_the_fly is zero.
 	// IFFT : unnormalized.  FFT : must be normalized.
 		cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
 		if (in_place) {		// in-place FFT (if allowed)
@@ -1600,7 +1603,7 @@ static void grid_gauss(shtns_cfg shtns, double latdir)
 	const int overflow = 8*VSIZE2-1;
 
 	shtns->grid = GRID_GAUSS;
-	shtns->wg = malloc((NLAT_2 +overflow) * sizeof(double));	// gauss weights, double precision.
+	shtns->wg = VMALLOC((NLAT_2 +overflow) * sizeof(double));	// gauss weights, double precision.
 
 	iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
 	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
@@ -2192,7 +2195,7 @@ void shtns_destroy(shtns_cfg shtns)
 		free_unused(shtns, &shtns->blm);
 	free_unused(shtns, &shtns->alm);
 	free_unused(shtns, &shtns->li);
-	free_unused(shtns, &shtns->wg);
+	if (ref_count(shtns, &shtns->wg) == 1)	VFREE(shtns->wg);
 
 	free_SH_dct(shtns);
 	free_SHTarrays(shtns);
