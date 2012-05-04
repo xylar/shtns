@@ -357,6 +357,30 @@ Q		BrF += mstep*NLAT;
 V		BtF += mstep*NLAT;	BpF += mstep*NLAT;
 	#endif
 	}
+
+	#if _GCC_VEC_
+	while(im <= NPHI-imlim) {	// padding for high m's
+		k=0;
+		do {
+Q			BrF[k] = vdup(0.0);
+V			BtF[k] = vdup(0.0);		BpF[k] = vdup(0.0);
+		} while (++k < NLAT_2);
+Q		BrF += mstep*NLAT_2;
+V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
+	  im+=mstep;
+	}
+	#else
+	while(im <= NPHI/2) {	// padding for high m's
+		k=0;
+		do {
+Q			BrF[k] = 0.0;
+V			BtF[k] = 0.0;	BpF[k] = 0.0;
+		} while (++k < NLAT);
+Q		BrF += mstep*NLAT;
+V		BtF += mstep*NLAT;	BpF += mstep*NLAT;
+	  im+=mstep;
+	}
+	#endif
   #endif
 }
 
@@ -426,25 +450,6 @@ VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
 S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
 T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
 	#endif
-
-  #ifndef SHT_AXISYM
-    if (NPHI >= 2*imlim)	// padding for high m's
-    #pragma omp single nowait
-    {
-		k=0;
-	  #if _GCC_VEC_
-		do {
-Q			BrF[k +NLAT_2*imlim] = vdup(0.0);
-V			BtF[k +NLAT_2*imlim] = vdup(0.0);	BpF[k +NLAT_2*imlim] = vdup(0.0);
-		} while ( ++k < NLAT_2*(NPHI+1-2*imlim) );
-	  #else
-		do {
-Q			BrF[k +NLAT*imlim] = 0.0;
-V			BtF[k +NLAT*imlim] = 0.0;	BpF[k +NLAT*imlim] = 0.0;
-		} while (++k < NLAT*((NPHI>>1) -imlim+1) );
-	  #endif
-	}
-  #endif
   }
 
   #ifndef SHT_AXISYM

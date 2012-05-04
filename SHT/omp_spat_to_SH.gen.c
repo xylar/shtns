@@ -190,9 +190,18 @@ V				Slm[l] = ss[l-1]*l_2[l];		Tlm[l] = tt[l-1]*l_2[l];
 		}
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1; l<= LMAX; ++l) {
-Q				Qlm[l] = 0.0;
-V				Slm[l] = 0.0;		Tlm[l] = 0.0;
+Q				((v2d*)Qlm)[l] = vdup(0.0);
+V				((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 			}
+			#ifndef SHT_AXISYM
+			if (imlim <= MMAX) {		// zero out m >= imlim
+				l = LiM(shtns, imlim*MRES, imlim);
+				do {
+Q					((v2d*)Qlm)[l] = vdup(0.0);
+V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
+				} while(++l < shtns->nlm);
+			}
+			#endif
 		#endif
 		m0=mstep;
 	}
@@ -493,20 +502,6 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
 QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
 VX	GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
 3	GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
-
-  #ifndef SHT_AXISYM
-  	#ifdef SHT_VAR_LTR
-	if (imlim <= MMAX)
-	#pragma omp single nowait
-	{
-		long int l = LiM(shtns, imlim*MRES, imlim);
-		do {
-Q			((v2d*)Qlm)[l] = vdup(0.0);
-V			((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
-		} while(++l < shtns->nlm);
-	}
-	#endif
-  #endif
   }
 
   #ifndef SHT_AXISYM
