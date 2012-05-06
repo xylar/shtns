@@ -3,6 +3,9 @@
 
 SFX=
 
+#default sed program
+SED=sed
+
 #first char : V,Q,S,T
 # Spheroidal and Toroidal (V,S,T)
 vect=-e "/^[3Q\#]/d" -e "s/^[VST]X*//"
@@ -65,11 +68,11 @@ $(Q) : $(GSH) Makefile
 	@cp $(ST) $(Q)
 	@cp $(ST) $(QST)
 #EVEN/ODD
-	@sed $(eo) $(vect) $(GSH) >> $(ST)
-	@sed $(eo) $(sph)  $(GSH) >> $(S)
-	@sed $(eo) $(tor)  $(GSH) >> $(T)
-	@sed $(eo) $(scal) $(GSH) >> $(Q)
-	@sed $(eo) $(v3d)  $(GSH) >> $(QST)
+	@$(SED) $(eo) $(vect) $(GSH) >> $(ST)
+	@$(SED) $(eo) $(sph)  $(GSH) >> $(S)
+	@$(SED) $(eo) $(tor)  $(GSH) >> $(T)
+	@$(SED) $(eo) $(scal) $(GSH) >> $(Q)
+	@$(SED) $(eo) $(v3d)  $(GSH) >> $(QST)
 	@echo "SH*_to_spat code generated."
 
 # spat_to_SH generation
@@ -81,11 +84,11 @@ $(SC) : $(GSP) Makefile
 #	@cp $(SC) $(VS0)
 #	@cp $(SC) $(VT0)
 #EVEN/ODD
-	@sed $(eo) $(scal) $(GSP) >> $(SC)
-	@sed $(eo) $(vect) $(GSP) >> $(VE)
-	@sed $(eo) $(v3d)  $(GSP) >> $(V3)
-#	@sed $(eo) $(sph)  $(GSP) >> $(VS0)
-#	@sed $(eo) $(tor)  $(GSP) >> $(VT0)
+	@$(SED) $(eo) $(scal) $(GSP) >> $(SC)
+	@$(SED) $(eo) $(vect) $(GSP) >> $(VE)
+	@$(SED) $(eo) $(v3d)  $(GSP) >> $(V3)
+#	@$(SED) $(eo) $(sph)  $(GSP) >> $(VS0)
+#	@$(SED) $(eo) $(tor)  $(GSP) >> $(VT0)
 	@echo "spat_to_SH* code generated."
 
 clean:

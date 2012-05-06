@@ -1,27 +1,23 @@
 ## path prefix for make install (installs to $(PREFIX)/lib and $(PREFIX)/include)
 PREFIX=$(HOME)
+SED=@SED@
+CC=@CC@
+OMP=@OPENMP_CFLAGS@
+CFLAGS=@CFLAGS@
+LIBS=@LIBS@
 
-## comment the following lines to disable parallel spherical harmonic transforms using openmp
-## allow parallel SHT and fft (with fftw 3.3 or more)
-#OMP=-fopenmp -lfftw3_omp
-## only use parallel legendre transform
-#OMP=-fopenmp
-
-# compile for a given architecture : native is the best (gcc >= 4.0), generic if you don't know.
-#march = -march=core2
-march = -march=native
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(march) -pipe -fomit-frame-pointer -std=gnu99 -D_GNU_SOURCE -fpic $(OMP)
+go= $(CFLAGS) -pipe -D_GNU_SOURCE -fpic $(OMP)
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
 # gcc + vector intrinsic leads to faster code (with _GCC_VEC_ set to 1 in sht_config.h)
 # gcc compiler command with options for the sht codelets
-shtcc = gcc $(go) -O3 -ffast-math
+shtcc = $(CC) $(go) -O3
 # gcc compiler command with options for other source (initialization, ...)
-cc = gcc $(go) -O2 -ffast-math
+cc = $(CC) $(go) -O2
 
 ## "version" identification string
 HGID=`hg id -ti`
@@ -53,17 +49,17 @@ endif
 
 # codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c
-	$(MAKE) SH_to_spat.c -C SHT 
+	$(MAKE) SH_to_spat.c -C SHT SED=$(SED)
 SHT/spat_to_SH.c : SHT/hyb_spat_to_SH.gen.c
-	$(MAKE) spat_to_SH.c -C SHT 
-SHT/SH_to_spat_fly.c : SHT/fly_SH_to_spat.gen.c 
-	$(MAKE) SH_to_spat_fly.c -C SHT SFX=fly
-SHT/spat_to_SH_fly.c : SHT/fly_spat_to_SH.gen.c 
-	$(MAKE) spat_to_SH_fly.c -C SHT SFX=fly
+	$(MAKE) spat_to_SH.c -C SHT SED=$(SED)
+SHT/SH_to_spat_fly.c : SHT/fly_SH_to_spat.gen.c
+	$(MAKE) SH_to_spat_fly.c -C SHT SFX=fly SED=$(SED)
+SHT/spat_to_SH_fly.c : SHT/fly_spat_to_SH.gen.c
+	$(MAKE) spat_to_SH_fly.c -C SHT SFX=fly SED=$(SED)
 SHT/SH_to_spat_omp.c : SHT/omp_SH_to_spat.gen.c
-	$(MAKE) SH_to_spat_omp.c -C SHT SFX=omp
+	$(MAKE) SH_to_spat_omp.c -C SHT SFX=omp SED=$(SED)
 SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
-	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp
+	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp SED=$(SED)
 
 # objects :
 SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
@@ -85,15 +81,15 @@ sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) $(codelets)
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile
-	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -lrt -o time_SHT
+	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -lrt -o time_SHT
 test_rot : shtns.h test_rot.c libshtns.a Makefile
-	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a -lfftw3 -lm -o test_rot
+	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o test_rot
 
 SHT_example : SHT_example.c libshtns.a Makefile shtns.h
-	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c ./libshtns.a -lfftw3 -lm -o SHT_example
+	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c ./libshtns.a $(LIBS) -o SHT_example
 
 SHT_fort_ex : SHT_example.f libshtns.a Makefile shtns.f
-	gfortran -fdefault-real-8 -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.f -lshtns -lfftw3 -lm -lc -o SHT_fort_ex
+	gfortran -fdefault-real-8 -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.f -lshtns $(LIBS) -lc -o SHT_fort_ex
 
 #documentation :
 docs :
@@ -108,8 +104,8 @@ clean :
 # "make python" builds a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
 python : shtns_numpy_wrap.c Makefile $(hfiles) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
-	gcc $(march) -O2 -fpic -I/usr/include/python2.7 -c shtns_numpy_wrap.c
-	gcc $(march) -O2 -fpic -shared $(OMP) -lfftw3 SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o shtns_numpy_wrap.o -o _shtns.so
+	$(CC) -O2 -fpic -I/usr/include/python2.7 -c shtns_numpy_wrap.c
+	$(CC) -O2 -fpic -shared $(LIBS) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o shtns_numpy_wrap.o -o _shtns.so
 
 # generate python and c glue code with SWIG.
 shtns_numpy_wrap.c : shtns_numpy.i sht_private.h shtns.h
