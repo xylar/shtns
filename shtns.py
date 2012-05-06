@@ -109,7 +109,7 @@ class sht(_object):
     __swig_getmethods__["nspat"] = _shtns.sht_nspat_get
     if _newclass:nspat = _swig_property(_shtns.sht_nspat_get)
     def __init__(self, *args, **kwargs): 
-        """__init__(shtns_info self, int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal) -> sht"""
+        """__init__(shtns_info self, int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal, int nthreads=0) -> sht"""
         this = _shtns.new_sht(*args, **kwargs)
         try: self.this.append(this)
         except: self.this = this
@@ -119,9 +119,9 @@ class sht(_object):
         """set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double eps=1.0e-8, int nl_order=1)"""
         return _shtns.sht_set_grid(self, *args, **kwargs)
 
-    def _print(self):
-        """_print(sht self)"""
-        return _shtns.sht__print(self)
+    def print_info(self):
+        """print_info(sht self)"""
+        return _shtns.sht_print_info(self)
 
     def sh00_1(self):
         """sh00_1(sht self) -> double"""

@@ -3201,7 +3201,7 @@ SWIG_AsVal_int (PyObject * obj, int *val)
   return res;
 }
 
-SWIGINTERN struct shtns_info *new_shtns_info(int lmax,int mmax,int mres,int norm){	// default arguments : mmax, mres and norm
+SWIGINTERN struct shtns_info *new_shtns_info(int lmax,int mmax,int mres,int norm,int nthreads){	// default arguments : mmax, mres and norm
 		if (lmax < 2) {
 			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
 		}
@@ -3210,7 +3210,7 @@ SWIGINTERN struct shtns_info *new_shtns_info(int lmax,int mmax,int mres,int norm
 			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres");	return NULL;
 		}
 		import_array();		// required by NumPy
-		shtns_use_threads(0);		// use openmp threads if available
+		shtns_use_threads(nthreads);		// use nthreads openmp threads if available (0 means auto)
 		return shtns_create(lmax, mmax, mres, norm);
 	}
 SWIGINTERN void delete_shtns_info(struct shtns_info *self){
@@ -3221,7 +3221,7 @@ SWIGINTERN void shtns_info_set_grid(struct shtns_info *self,int nlat,int nphi,in
 		*nlat_out = nlat;		*nphi_out = nphi;
 		shtns_set_grid_auto(self, flags, eps, nl_order, nlat_out, nphi_out);
 	}
-SWIGINTERN void shtns_info_print(struct shtns_info *self){
+SWIGINTERN void shtns_info_print_info(struct shtns_info *self){
 		shtns_print_cfg(self);
 	}
 SWIGINTERN double shtns_info_sh00_1(struct shtns_info *self){
@@ -3490,6 +3490,7 @@ SWIGINTERN PyObject *_wrap_new_sht(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
   int arg2 = (int) -1 ;
   int arg3 = (int) 1 ;
   int arg4 = (int) sht_orthonormal ;
+  int arg5 = (int) 0 ;
   int val1 ;
   int ecode1 = 0 ;
   int val2 ;
@@ -3498,16 +3499,19 @@ SWIGINTERN PyObject *_wrap_new_sht(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
   int ecode3 = 0 ;
   int val4 ;
   int ecode4 = 0 ;
+  int val5 ;
+  int ecode5 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
   PyObject * obj2 = 0 ;
   PyObject * obj3 = 0 ;
+  PyObject * obj4 = 0 ;
   char *  kwnames[] = {
-    (char *) "lmax",(char *) "mmax",(char *) "mres",(char *) "norm", NULL 
+    (char *) "lmax",(char *) "mmax",(char *) "mres",(char *) "norm",(char *) "nthreads", NULL 
   };
   struct shtns_info *result = 0 ;
   
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O|OOO:new_sht",kwnames,&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  if (!PyArg_ParseTupleAndKeywords(args,kwargs,(char *)"O|OOOO:new_sht",kwnames,&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
   ecode1 = SWIG_AsVal_int(obj0, &val1);
   if (!SWIG_IsOK(ecode1)) {
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "new_sht" "', argument " "1"" of type '" "int""'");
@@ -3534,9 +3538,16 @@ SWIGINTERN PyObject *_wrap_new_sht(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
     } 
     arg4 = (int)(val4);
   }
+  if (obj4) {
+    ecode5 = SWIG_AsVal_int(obj4, &val5);
+    if (!SWIG_IsOK(ecode5)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode5), "in method '" "new_sht" "', argument " "5"" of type '" "int""'");
+    } 
+    arg5 = (int)(val5);
+  }
   {
     shtns_error = 0;	// clear exception
-    result = (struct shtns_info *)new_shtns_info(arg1,arg2,arg3,arg4);
+    result = (struct shtns_info *)new_shtns_info(arg1,arg2,arg3,arg4,arg5);
     if (shtns_error) {
       // test for exception
       SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
@@ -3683,22 +3694,22 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_sht__print(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_sht_print_info(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   PyObject * obj0 = 0 ;
   
-  if (!PyArg_ParseTuple(args,(char *)"O:sht__print",&obj0)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"O:sht_print_info",&obj0)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht__print" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_print_info" "', argument " "1"" of type '" "struct shtns_info *""'"); 
   }
   arg1 = (struct shtns_info *)(argp1);
   {
     shtns_error = 0;	// clear exception
-    shtns_info_print(arg1);
+    shtns_info_print_info(arg1);
     if (shtns_error) {
       // test for exception
       SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
@@ -4609,10 +4620,10 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_nphi_get", _wrap_sht_nphi_get, METH_VARARGS, (char *)"sht_nphi_get(sht self) -> unsigned short const"},
 	 { (char *)"sht_nlat_get", _wrap_sht_nlat_get, METH_VARARGS, (char *)"sht_nlat_get(sht self) -> unsigned short const"},
 	 { (char *)"sht_nspat_get", _wrap_sht_nspat_get, METH_VARARGS, (char *)"sht_nspat_get(sht self) -> unsigned int const"},
-	 { (char *)"new_sht", (PyCFunction) _wrap_new_sht, METH_VARARGS | METH_KEYWORDS, (char *)"new_sht(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal) -> sht"},
+	 { (char *)"new_sht", (PyCFunction) _wrap_new_sht, METH_VARARGS | METH_KEYWORDS, (char *)"new_sht(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal, int nthreads=0) -> sht"},
 	 { (char *)"delete_sht", _wrap_delete_sht, METH_VARARGS, (char *)"delete_sht(sht self)"},
 	 { (char *)"sht_set_grid", (PyCFunction) _wrap_sht_set_grid, METH_VARARGS | METH_KEYWORDS, (char *)"sht_set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double eps=1.0e-8, int nl_order=1)"},
-	 { (char *)"sht__print", _wrap_sht__print, METH_VARARGS, (char *)"sht__print(sht self)"},
+	 { (char *)"sht_print_info", _wrap_sht_print_info, METH_VARARGS, (char *)"sht_print_info(sht self)"},
 	 { (char *)"sht_sh00_1", _wrap_sht_sh00_1, METH_VARARGS, (char *)"sht_sh00_1(sht self) -> double"},
 	 { (char *)"sht_sh10_ct", _wrap_sht_sh10_ct, METH_VARARGS, (char *)"sht_sh10_ct(sht self) -> double"},
 	 { (char *)"sht_sh11_st", _wrap_sht_sh11_st, METH_VARARGS, (char *)"sht_sh11_st(sht self) -> double"},

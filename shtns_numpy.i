@@ -108,7 +108,7 @@ static int check_spectral(int i, PyObject *a, int size) {
 	}
 
 	%feature("kwargs") shtns_info;
-	shtns_info(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal) {	// default arguments : mmax, mres and norm
+	shtns_info(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal, int nthreads=0) {	// default arguments : mmax, mres and norm
 		if (lmax < 2) {
 			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
 		}
@@ -117,7 +117,7 @@ static int check_spectral(int i, PyObject *a, int size) {
 			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres");	return NULL;
 		}
 		import_array();		// required by NumPy
-		shtns_use_threads(0);		// use openmp threads if available
+		shtns_use_threads(nthreads);		// use nthreads openmp threads if available (0 means auto)
 		return shtns_create(lmax, mmax, mres, norm);
 	}
 	~shtns_info() {
@@ -132,7 +132,7 @@ static int check_spectral(int i, PyObject *a, int size) {
 		shtns_set_grid_auto($self, flags, eps, nl_order, nlat_out, nphi_out);
 	}
 
-	void print() {
+	void print_info() {
 		shtns_print_cfg($self);
 	}
 	double sh00_1() {
