@@ -49,10 +49,12 @@
 To compile SHTns, you need a C compiler and the FFTW library version 3.0 (or better 3.3) or later, carefully optimized and installed.
 On modern x86 processors, we recommend using GCC 4.0 or later as it produces the fastest vectorized code.
 
-First run the \c ./configure script. If you want multi-threaded transforms, make sure to pass \c --enable-openmp to the configure script :
-\code ./configure --enable-openmp \endcode
-which will detect your FFTW library capabilities and other system dependant features.
-You may optionally adapt the resulting \c Makefile to your architecture and compiler.
+First run \code ./configure --help \endcode to see the available configure options.
+Then, for example run \code ./configure --prefix=$HOME --enable-openmp \endcode
+if you want to install the multi-threaded transform library to $HOME/lib and the headers to $HOME/include
+
+The configure script will detect your FFTW library capabilities and other system dependant features.
+You may optionally adapt the resulting \c Makefile and \c sht_config.h to your architecture and compiler.
 Then compile with \c make and install with \c make \c install.
 
 SHTns requires FFTW, which can be installed as a compiled package on many operating systems.
@@ -90,7 +92,7 @@ You can then edit the resulting Makefile:
 
 \section config Changing default options
 
-Simple tunings can be done by editing \ref sht_config.h.
+Simple tunings can be done by passing options to \c ./configure (see \c ./configure \c --help)
 
 \section comp Compiling
 

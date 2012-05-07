@@ -4,13 +4,20 @@
 AC_PREREQ([2.68])
 AC_INIT([SHTns],[2.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([SHT.c])
-AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_HEADERS([sht_config.h])
 
 # optional features with --enable-XXX
+AC_ARG_ENABLE([verbose],
+	AS_HELP_STRING([--enable-verbose=0-3], [define verbosity level for the library: 0=silent, 1=default, 2=debug, 3=full]),
+	[],[enable_verbose=1])
 AC_ARG_ENABLE([openmp],
 	AS_HELP_STRING([--enable-openmp], [Enable multi-threading with OpenMP]))
 AC_ARG_ENABLE([long-double],
 	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
+AC_ARG_ENABLE([f77],
+	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
+AC_ARG_ENABLE([simd],
+	AS_HELP_STRING([--disable-simd], [Do not use SSE2 or AVX extensions]))
 
 # Checks for programs.
 if test "x$CFLAGS" = "x"; then
@@ -61,6 +68,23 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 # Checks related to long double
 AS_IF([test "x$enable_long_double" = "xyes"], [
 	AC_TYPE_LONG_DOUBLE_WIDER])
+
+# Disable Fortran interface ?
+AS_IF([test "x$enable_f77" != "xno"], [
+	AC_DEFINE([SHT_F77_API],[1],[Compile the Fortran API])
+])
+
+# Disable SIMD ?
+AS_IF([test "x$enable_simd" != "xno"], [
+	AC_DEFINE([_GCC_VEC_],[1],[I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 or AVX is supported) !])
+])
+
+
+# Verbosity setting
+AS_IF([test "x$enable_verbose" == "xno"], [enable_verbose=0])
+AS_IF([test "x$enable_verbose" == "xyes"], [enable_verbose=1])
+AC_DEFINE_UNQUOTED([SHT_VERBOSE],$enable_verbose,[0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.])
+echo "verbose level = $enable_verbose"
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T

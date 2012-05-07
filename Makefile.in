@@ -1,5 +1,5 @@
 ## path prefix for make install (installs to $(PREFIX)/lib and $(PREFIX)/include)
-PREFIX=$(HOME)
+PREFIX=@prefix@
 SED=@SED@
 CC=@CC@
 OMP=@OPENMP_CFLAGS@
@@ -9,7 +9,7 @@ LIBS=@LIBS@
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(CFLAGS) -pipe -D_GNU_SOURCE -fpic $(OMP)
+go= $(CFLAGS) -pipe -D_GNU_SOURCE -fpic $(OMP) -L$(PREFIX)/lib -I$(PREFIX)/include
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range

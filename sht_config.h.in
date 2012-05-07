@@ -1,4 +1,4 @@
-/* config.h.in.  Generated from configure.ac by autoheader.  */
+/* sht_config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Define to 1 if you have the `clock_gettime' function. */
 #undef HAVE_CLOCK_GETTIME
@@ -106,11 +106,22 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* Compile the Fortran API */
+#undef SHT_F77_API
+
+/* 0:no output, 1:output info to stdout, 2:more output (debug info), 3:also
+   print fftw plans. */
+#undef SHT_VERBOSE
+
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #undef TIME_WITH_SYS_TIME
+
+/* I compile with GCC 4 or later, and I would like fast vectorized code (if
+   SSE2 or AVX is supported) ! */
+#undef _GCC_VEC_
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */

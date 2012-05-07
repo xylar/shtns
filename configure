@@ -674,8 +674,11 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+enable_verbose
 enable_openmp
 enable_long_double
+enable_f77
+enable_simd
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1295,9 +1298,14 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-verbose=0-3    define verbosity level for the library: 0=silent,
+                          1=default, 2=debug, 3=full
   --enable-openmp         Enable multi-threading with OpenMP
   --enable-long-double    Use long double during initialization for (maybe)
                           slightly better precision
+  --disable-f77           Do not include F77 wrapper to call SHTns library
+                          from Fortran
+  --disable-simd          Do not use SSE2 or AVX extensions
   --disable-openmp        do not use OpenMP
 
 Some influential environment variables:
@@ -2145,10 +2153,17 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_headers="$ac_config_headers config.h"
+ac_config_headers="$ac_config_headers sht_config.h"
 
 
 # optional features with --enable-XXX
+# Check whether --enable-verbose was given.
+if test "${enable_verbose+set}" = set; then :
+  enableval=$enable_verbose;
+else
+  enable_verbose=1
+fi
+
 # Check whether --enable-openmp was given.
 if test "${enable_openmp+set}" = set; then :
   enableval=$enable_openmp;
@@ -2157,6 +2172,16 @@ fi
 # Check whether --enable-long-double was given.
 if test "${enable_long_double+set}" = set; then :
   enableval=$enable_long_double;
+fi
+
+# Check whether --enable-f77 was given.
+if test "${enable_f77+set}" = set; then :
+  enableval=$enable_f77;
+fi
+
+# Check whether --enable-simd was given.
+if test "${enable_simd+set}" = set; then :
+  enableval=$enable_simd;
 fi
 
 
@@ -3853,6 +3878,39 @@ $as_echo "#define HAVE_LONG_DOUBLE_WIDER 1" >>confdefs.h
 
 fi
 
+# Disable Fortran interface ?
+if test "x$enable_f77" != "xno"; then :
+
+
+$as_echo "#define SHT_F77_API 1" >>confdefs.h
+
+
+fi
+
+# Disable SIMD ?
+if test "x$enable_simd" != "xno"; then :
+
+
+$as_echo "#define _GCC_VEC_ 1" >>confdefs.h
+
+
+fi
+
+
+# Verbosity setting
+if test "x$enable_verbose" == "xno"; then :
+  enable_verbose=0
+fi
+if test "x$enable_verbose" == "xyes"; then :
+  enable_verbose=1
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define SHT_VERBOSE $enable_verbose
+_ACEOF
+
+echo "verbose level = $enable_verbose"
+
 # Checks for typedefs, structures, and compiler characteristics.
 ac_fn_c_check_type "$LINENO" "size_t" "ac_cv_type_size_t" "$ac_includes_default"
 if test "x$ac_cv_type_size_t" = xyes; then :
@@ -4718,7 +4776,7 @@ cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
 for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
-    "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
+    "sht_config.h") CONFIG_HEADERS="$CONFIG_HEADERS sht_config.h" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
