@@ -2,20 +2,20 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([SHTns], [2.2],, [shtns], [https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[2.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([SHT.c])
-#AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_HEADERS([config.h])
 
 # optional features with --enable-XXX
 AC_ARG_ENABLE([openmp],
 	AS_HELP_STRING([--enable-openmp], [Enable multi-threading with OpenMP]))
 AC_ARG_ENABLE([long-double],
-	AS_HELP_STRING([--enable-long-double], [Use long double at initialization for (maybe) slightly better precision]))
+	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
 
 # Checks for programs.
-dnl if test "x$CFLAGS" = "x"; then
-dnl	CFLAGS="-O2"
-dnl fi
+if test "x$CFLAGS" = "x"; then
+	CFLAGS="-O2"
+fi
 AC_PROG_CC
 AC_PROG_SED
 if test "$SED" = :; then
@@ -24,8 +24,7 @@ fi
 
 # define macrao AX_CHECK_COMPILE_FLAG
 AC_DEFUN([AX_CHECK_COMPILE_FLAG],
-[AC_PREREQ(2.59)dnl for _AC_LANG_PREFIX
-AS_VAR_PUSHDEF([CACHEVAR],[ax_cv_check_[]_AC_LANG_ABBREV[]flags_$4_$1])dnl
+[AS_VAR_PUSHDEF([CACHEVAR],[ax_cv_check_[]_AC_LANG_ABBREV[]flags_$4_$1])dnl
 AC_CACHE_CHECK([whether _AC_LANG compiler accepts $1], CACHEVAR, [
   ax_check_save_flags=$[]_AC_LANG_PREFIX[]FLAGS
   _AC_LANG_PREFIX[]FLAGS="$[]_AC_LANG_PREFIX[]FLAGS $4 $1"
@@ -39,16 +38,15 @@ AS_IF([test x"AS_VAR_GET(CACHEVAR)" = xyes],
 AS_VAR_POPDEF([CACHEVAR])dnl
 ])dnl AX_CHECK_COMPILE_FLAGS
 
-# add compile option if supported.
+# add gcc compile options if supported.
 AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"])
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-pointer"])
 AX_CHECK_COMPILE_FLAG([-std=gnu99],[CFLAGS="$CFLAGS -std=gnu99"])
-AX_CHECK_COMPILE_FLAG([-foo=bar],[CFLAGS="$CFLAGS -foo=bar"])
 
 # Checks for libraries.
-AC_CHECK_LIB([m], [cos],, AC_MSG_ERROR([math library not found.]))
-AC_CHECK_LIB([fftw3], [fftw_plan_many_dft],, AC_MSG_ERROR([FFTW3 library required.]))
+AC_CHECK_LIB([m],[cos],,AC_MSG_ERROR([math library not found.]))
+AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.]))
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h fftw3.h])
@@ -57,12 +55,12 @@ AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h fftw3.h])
 AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	AC_CHECK_LIB([fftw3_omp], [fftw_init_threads])
-	AC_CHECK_HEADERS([omp.h])
+	dnl AC_CHECK_HEADERS([omp.h])
 ])
 
 # Checks related to long double
 AS_IF([test "x$enable_long_double" = "xyes"], [
-	AC_C_LONG_DOUBLE])
+	AC_TYPE_LONG_DOUBLE_WIDER])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
@@ -92,6 +90,5 @@ AC_CHECK_FUNCS([fftw_cost])
    AC_MSG_RESULT($rtc_ok)
 ### end cycle.h ###
 
-echo "$CC  $CFLAGS  $LIBS"
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

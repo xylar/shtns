@@ -46,17 +46,20 @@
 
 /** \page compil Compiling and installing SHTns
 
-To compile SHTns, you need a C compiler and the FFTW library version 3.3 or later carefully installed (optionally 3.0 or later, see below).
+To compile SHTns, you need a C compiler and the FFTW library version 3.0 (or better 3.3) or later, carefully optimized and installed.
 On modern x86 processors, we recommend using GCC 4.0 or later as it produces the fastest vectorized code.
 
-You should edit the Makefile to adapt it to your architecture and compiler. In particular, using gcc or icc will not lead to the same performance, and you
-should test on your system what gives the best result (gcc is usually the best choice for SHTns).
+First run the \c ./configure script. If you want multi-threaded transforms, make sure to pass \c --enable-openmp to the configure script :
+\code ./configure --enable-openmp \endcode
+which will detect your FFTW library capabilities and other system dependant features.
+You may optionally adapt the resulting \c Makefile to your architecture and compiler.
+Then compile with \c make and install with \c make \c install.
 
 SHTns requires FFTW, which can be installed as a compiled package on many operating systems.
 However, we recommend to compile it and install it yourself, as it can lead to much better performance.
 If FFTW has not been compiled and tuned carefully for your machine, you may get bad performance with SHTns (down to 50% slower !).
-
-\note If you decide to use a precompiled package, you may need to set \c USE_LEGACY_FFTW3 to 0 in the file \c sht_config.h for SHTns to compile.
+Furthermore, if FFTW is more recent than 3.3, or has not been configured with \c --enable-openmp (see below), SHTns cannot do the
+Fourier transform part in parallel.
 
 \section fftw Compiling and installing FFTW
 
@@ -76,19 +79,18 @@ That's it, FFTW is now installed and ready for use.
 
 \section makefile Preparing the Makefile
 
+Run \c ./configure in the SHTns directory.
+You can use \c --enable-openmp to enable multi-threaded transforms,
+and \c --enable-long-double to (maybe) increase accuracy during initialization (not recommended).
+You can then edit the resulting Makefile:
+
 \li set \c PREFIX= to the desired install path.
-
-\li uncomment a line starting with \c OMP= to <b>enable multi-threaded transform</b> (the compiler must support OpenMP).
-the line containing \c fftw3_omp allows to use the parallel version of FFTW 3.3 (if it has been compiled with \c --enable-openmp).
-
-\li you may need to change the \c march line to fit your architecture.
 
 \li further editing is needed if you don't use gcc
 
 \section config Changing default options
 
-simple configuration can be done by editing \ref sht_config.h.
-In particular \ref USE_LEGACY_FFTW3 can be changed in order to compile with FFTW 3 or more (as opposed to 3.3 or more) or a precompiled package of fftw.
+Simple tunings can be done by editing \ref sht_config.h.
 
 \section comp Compiling
 

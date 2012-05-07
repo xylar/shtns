@@ -36,7 +36,7 @@
   #define LEG_RANGE_CHECK
 #endif
 
-#if SHT_LONG_DOUBLE == 0
+#ifndef HAVE_LONG_DOUBLE_WIDER
   #define long_double_caps 0
   typedef double real;
   #define SQRT sqrt
@@ -188,7 +188,7 @@ done:
 	return ymmp1;
 }
 
-#if SHT_LONG_DOUBLE > 0
+#if HAVE_LONG_DOUBLE_WIDER
 static double legendre_sphPlm_hp(shtns_cfg shtns, const int l, const int im, double x)
 {
 	double *al;
@@ -278,7 +278,7 @@ static void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im,
 	}
 }
 
-#if SHT_LONG_DOUBLE > 0
+#if HAVE_LONG_DOUBLE_WIDER
 /// \internal high precision version of \ref legendre_sphPlm_array
 static void legendre_sphPlm_array_hp(shtns_cfg shtns, const int lmax, const int im, const double cost, double *yl)
 {
@@ -411,7 +411,7 @@ static void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const i
 	}
 }
 
-#if SHT_LONG_DOUBLE > 0
+#if HAVE_LONG_DOUBLE_WIDER
 /// \internal high precision version of \ref legendre_sphPlm_deriv_array
 static void legendre_sphPlm_deriv_array_hp(shtns_cfg shtns, const int lmax, const int im, const double cost, const double sint, double *yl, double *dyl)
 {
@@ -501,7 +501,7 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 	long int im, m, l, lm;
 	real t1, t2;
 
-#if SHT_LONG_DOUBLE > 0
+#if HAVE_LONG_DOUBLE_WIDER
 	test_long_double();
 #endif
 #if SHT_VERBOSE > 1
@@ -668,7 +668,7 @@ static void gauss_nodes(real *x, real *w, int n)
 	for (i=0;i<m;++i) {
 		z += w[i]*x[i]*x[i];
 	}
-	#if SHT_LONG_DOUBLE == 0
+	#ifndef HAVE_LONG_DOUBLE_WIDER
 		printf("          Gauss quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*3.,z*3.-1.0);
 	#else
 		printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);

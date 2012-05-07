@@ -62,7 +62,7 @@ SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp SED=$(SED)
 
 # objects :
-SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
+SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h config.h
 	$(cc) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
 	@echo "DONE SHT.o"
 

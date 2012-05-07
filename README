@@ -41,6 +41,9 @@ CHANGE LOG:
 	- slightly faster parallel transforms.
 	- better Python interface: decent error handling and keyword argument support.
 	- changes to Python interface: grid defaults to SHT_PHI_CONTIGUOUS, set_grid_auto() removed.
+	- bugfix: default compilation with FFTW 3.0 to avoid "bad Gauss points" error.
+	- bugfix: correct alignement of gauss weights in 32 bit systems to avoid segfaults.
+	- new ./configure script for easier configuration and compilation.
 
   v2.2  (23 Apr 2012)
 	- parallel transforms with OpenMP (for Gauss grid, significant benefit for l>=127).
