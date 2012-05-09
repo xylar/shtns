@@ -621,6 +621,9 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+target
+python_inc
+numpy_inc
 OPENMP_CFLAGS
 EGREP
 GREP
@@ -633,6 +636,7 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
+PYTHON
 target_alias
 host_alias
 build_alias
@@ -676,6 +680,7 @@ ac_user_opts='
 enable_option_checking
 enable_verbose
 enable_openmp
+enable_python
 enable_long_double
 enable_f77
 enable_simd
@@ -683,6 +688,7 @@ enable_simd
       ac_precious_vars='build_alias
 host_alias
 target_alias
+PYTHON
 CC
 CFLAGS
 LDFLAGS
@@ -1301,6 +1307,9 @@ Optional Features:
   --enable-verbose=0-3    define verbosity level for the library: 0=silent,
                           1=default, 2=debug, 3=full
   --enable-openmp         Enable multi-threading with OpenMP
+  --enable-python=python-interpreter
+                          Build Python interface using python-interpreter
+                          (default is python or python2)
   --enable-long-double    Use long double during initialization for (maybe)
                           slightly better precision
   --disable-f77           Do not include F77 wrapper to call SHTns library
@@ -1309,6 +1318,7 @@ Optional Features:
   --disable-openmp        do not use OpenMP
 
 Some influential environment variables:
+  PYTHON      the python interpreter (defaults to 'python')
   CC          C compiler command
   CFLAGS      C compiler flags
   LDFLAGS     linker flags, e.g. -L<lib dir> if you have libraries in a
@@ -2155,6 +2165,9 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 ac_config_headers="$ac_config_headers sht_config.h"
 
+target="libshtns.a"		# by default, build the library.
+
+# optional variables :
 
 # optional features with --enable-XXX
 # Check whether --enable-verbose was given.
@@ -2167,6 +2180,13 @@ fi
 # Check whether --enable-openmp was given.
 if test "${enable_openmp+set}" = set; then :
   enableval=$enable_openmp;
+fi
+
+# Check whether --enable-python was given.
+if test "${enable_python+set}" = set; then :
+  enableval=$enable_python;
+else
+  enable_python=no
 fi
 
 # Check whether --enable-long-double was given.
@@ -3821,6 +3841,52 @@ fi
 
 fi
 
+# Checks related to Python and NumPy paths:
+if test "x$enable_python" != "xno"; then :
+
+	if test "x$PYTHON" = "x"; then :
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for python with numpy package" >&5
+$as_echo_n "checking for python with numpy package... " >&6; }
+		py_test="python python2 python3"
+
+else
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking if $PYTHON has numpy package" >&5
+$as_echo_n "checking if $PYTHON has numpy package... " >&6; }
+		py_test="$PYTHON"
+
+fi
+	for py in $py_test
+	do :
+		numpy_inc=`$py -c "from numpy import get_include; print(get_include())" 2>/dev/null`
+		if test "x$numpy_inc" != "x"; then :
+  break
+fi
+	done
+	if test "x$numpy_inc" = "x"; then :
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+		as_fn_error $? "NumPy package is required for the python interface." "$LINENO" 5
+
+else
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $py" >&5
+$as_echo "$py" >&6; }
+		PYTHON=$py
+
+fi
+	python_inc=`$PYTHON -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())"  2>/dev/null`
+	echo "  python include path = $python_inc"
+	echo "  numpy include path = $numpy_inc"
+
+
+	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
+	target="_shtns.so"		# build python extension instead of C library.
+
+fi
+
 # Checks related to long double
 if test "x$enable_long_double" = "xyes"; then :
 
@@ -3900,8 +3966,7 @@ fi
 # Verbosity setting
 if test "x$enable_verbose" == "xno"; then :
   enable_verbose=0
-fi
-if test "x$enable_verbose" == "xyes"; then :
+elif test "x$enable_verbose" == "xyes"; then :
   enable_verbose=1
 fi
 
@@ -3909,7 +3974,7 @@ cat >>confdefs.h <<_ACEOF
 #define SHT_VERBOSE $enable_verbose
 _ACEOF
 
-echo "verbose level = $enable_verbose"
+echo "  verbose level = $enable_verbose"
 
 # Checks for typedefs, structures, and compiler characteristics.
 ac_fn_c_check_type "$LINENO" "size_t" "ac_cv_type_size_t" "$ac_includes_default"
@@ -4083,6 +4148,7 @@ rm -f core conftest.err conftest.$ac_objext \
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $rtc_ok" >&5
 $as_echo "$rtc_ok" >&6; }
 ### end cycle.h ###
+
 
 ac_config_files="$ac_config_files Makefile"
 

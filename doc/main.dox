@@ -102,8 +102,6 @@ Simple tunings can be done by passing options to \c ./configure (see \c ./config
 
 \li type \code make docs \endcode to generate this documentation, placed in the doc/html/ subdirectory.
 
-\li type \code make python \endcode to build the python extension (see \ref python)
-
 \li type \code make time_SHT \endcode to build the test and timing program.
 
 */
@@ -511,13 +509,15 @@ When your program is ready, compile it adding these options to the compiler (gfo
 
 /** \page python Using SHTns with Python
 
-<b>This is a preliminary, beta quality, Python interface.</b>
 SHTns provides a Python interface that uses <a href="http://numpy.scipy.org/">NumPy</a> arrays to perform Spherical Harmonic Transforms.
-It uses <a href="http://www.swig.org/">SWIG</a> to generate the Python interface, so you have to install it in order to build the Python interface.
+The Python interface has been generated using <a href="http://www.swig.org/">SWIG</a> (but you don't need it to compile the the Python package).
 
-\li Compile using \code make python \endcode
+\li Compile using 
+\code ./configure --enable-openmp --enable-python
+make \endcode
+Optionally you can give indicate an alternate pyhton interpreter to \c ./configure using PYTHON=<my-python> (see ./configure --help)
 
-\li Use within a python script or shell in the same directory \code import shtns \endcode
+\li Use within a python script or shell in the same directory \code import shtns \endcode (automatic install not supported yet)
 
 To start using SHTns you must then create an sht object, from which you can call the transform functions and more.
 The arrays should be created using <a href="http://numpy.scipy.org/">NumPy</a>.

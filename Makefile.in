@@ -9,7 +9,7 @@ LIBS=@LIBS@
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(CFLAGS) -pipe -D_GNU_SOURCE -fpic $(OMP) -L$(PREFIX)/lib -I$(PREFIX)/include
+go= $(CFLAGS) -pipe -D_GNU_SOURCE $(OMP) -L$(PREFIX)/lib -I$(PREFIX)/include
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
@@ -24,7 +24,7 @@ HGID=`hg id -ti`
 
 hfiles = sht_private.h sht_config.h shtns.h
 
-default : libshtns.a
+default : @target@
 
 libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
@@ -62,7 +62,7 @@ SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp SED=$(SED)
 
 # objects :
-SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h config.h
+SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
 	$(cc) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
 	@echo "DONE SHT.o"
 
@@ -103,9 +103,9 @@ clean :
 
 # "make python" builds a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
-python : shtns_numpy_wrap.c Makefile $(hfiles) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
-	$(CC) -O2 -fpic -I/usr/include/python2.7 -c shtns_numpy_wrap.c
-	$(CC) -O2 -fpic -shared $(LIBS) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o shtns_numpy_wrap.o -o _shtns.so
+_shtns.so : shtns_numpy_wrap.c Makefile $(hfiles) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+	$(cc) -I@python_inc@ -I@numpy_inc@ -c shtns_numpy_wrap.c
+	$(cc) -shared $(LIBS) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o shtns_numpy_wrap.o -o _shtns.so
 
 # generate python and c glue code with SWIG.
 shtns_numpy_wrap.c : shtns_numpy.i sht_private.h shtns.h
@@ -136,7 +136,7 @@ updatecpy : COPYRIGHT
 	./update-copyright.sh shtns_numpy.i
 	./update-copyright.sh -python SHT_example.py
 
-.PHONY : updatecpy install clean docs python
+.PHONY : updatecpy install clean docs
 
 
 #fftw compiling options :

@@ -935,7 +935,7 @@ static void planDCT(shtns_cfg shtns)
 	double Sh0[NLAT] SSE;				// temp storage on the stack, aligned.
 
 	#ifdef OMP_FFTW
-		if (shtns->fftw_plan_mode & (FFTW_EXHAUSTIVE | FFTW_PATIENT) {
+		if (shtns->fftw_plan_mode & (FFTW_EXHAUSTIVE | FFTW_PATIENT)) {
 			fftw_plan_with_nthreads(omp_threads);
 		} else fftw_plan_with_nthreads(1);
 	#endif

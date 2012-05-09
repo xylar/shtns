@@ -5,13 +5,19 @@ AC_PREREQ([2.68])
 AC_INIT([SHTns],[2.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([SHT.c])
 AC_CONFIG_HEADERS([sht_config.h])
+target="libshtns.a"		# by default, build the library.
 
+# optional variables :
+AC_ARG_VAR(PYTHON, [the python interpreter (defaults to 'python')])
 # optional features with --enable-XXX
 AC_ARG_ENABLE([verbose],
 	AS_HELP_STRING([--enable-verbose=0-3], [define verbosity level for the library: 0=silent, 1=default, 2=debug, 3=full]),
 	[],[enable_verbose=1])
 AC_ARG_ENABLE([openmp],
 	AS_HELP_STRING([--enable-openmp], [Enable multi-threading with OpenMP]))
+AC_ARG_ENABLE([python],
+	AS_HELP_STRING([--enable-python=python-interpreter], [Build Python interface using python-interpreter (default is python or python2)]),
+	[], [enable_python=no])
 AC_ARG_ENABLE([long-double],
 	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
 AC_ARG_ENABLE([f77],
@@ -65,6 +71,36 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 	dnl AC_CHECK_HEADERS([omp.h])
 ])
 
+# Checks related to Python and NumPy paths:
+AS_IF([test "x$enable_python" != "xno"], [
+	AS_IF([test "x$PYTHON" = "x"], [
+		AC_MSG_CHECKING(for python with numpy package)
+		py_test="python python2 python3"
+	],[
+		AC_MSG_CHECKING(if $PYTHON has numpy package)
+		py_test="$PYTHON"
+	])
+	for py in $py_test
+	do :
+		numpy_inc=`$py -c "from numpy import get_include; print(get_include())" 2>/dev/null`
+		AS_IF([test "x$numpy_inc" != "x"],[break])
+	done
+	AS_IF([test "x$numpy_inc" = "x"], [
+		AC_MSG_RESULT(no)
+		AC_MSG_ERROR([NumPy package is required for the python interface.])
+	],[
+		AC_MSG_RESULT($py)
+		PYTHON=$py
+	])
+	python_inc=`$PYTHON -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())"  2>/dev/null`
+	echo "  python include path = $python_inc"
+	echo "  numpy include path = $numpy_inc"
+	AC_SUBST([numpy_inc])
+	AC_SUBST([python_inc])
+	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
+	target="_shtns.so"		# build python extension instead of C library.
+])
+
 # Checks related to long double
 AS_IF([test "x$enable_long_double" = "xyes"], [
 	AC_TYPE_LONG_DOUBLE_WIDER])
@@ -81,10 +117,10 @@ AS_IF([test "x$enable_simd" != "xno"], [
 
 
 # Verbosity setting
-AS_IF([test "x$enable_verbose" == "xno"], [enable_verbose=0])
-AS_IF([test "x$enable_verbose" == "xyes"], [enable_verbose=1])
+AS_IF([test "x$enable_verbose" == "xno"], [enable_verbose=0],
+	[test "x$enable_verbose" == "xyes"], [enable_verbose=1])
 AC_DEFINE_UNQUOTED([SHT_VERBOSE],$enable_verbose,[0:no output, 1:output info to stdout, 2:more output (debug info), 3:also print fftw plans.])
-echo "verbose level = $enable_verbose"
+echo "  verbose level = $enable_verbose"
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
@@ -114,5 +150,6 @@ AC_CHECK_FUNCS([fftw_cost])
    AC_MSG_RESULT($rtc_ok)
 ### end cycle.h ###
 
+AC_SUBST([target])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
