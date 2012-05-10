@@ -71,6 +71,8 @@ except AttributeError:
     _newclass = 0
 
 
+import numpy as np
+
 sht_orthonormal = _shtns.sht_orthonormal
 sht_fourpi = _shtns.sht_fourpi
 sht_schmidt = _shtns.sht_schmidt
@@ -113,11 +115,28 @@ class sht(_object):
         this = _shtns.new_sht(*args, **kwargs)
         try: self.this.append(this)
         except: self.this = this
+        self.m = np.zeros(self.nlm, dtype=np.int32)
+        self.l = np.zeros(self.nlm, dtype=np.int32)
+        for mloop in range(0, self.mmax*self.mres+1, self.mres):
+        	for lloop in range(mloop, self.lmax+1):
+        		ii = self.idx(lloop,mloop)
+        		self.m[ii] = mloop
+        		self.l[ii] = lloop
+        self.m.flags.writeable = False		# prevent writing in m and l arrays
+        self.l.flags.writeable = False
+
+
+
     __swig_destroy__ = _shtns.delete_sht
     __del__ = lambda self : None;
     def set_grid(self, *args, **kwargs):
         """set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double eps=1.0e-8, int nl_order=1)"""
-        return _shtns.sht_set_grid(self, *args, **kwargs)
+        val = _shtns.sht_set_grid(self, *args, **kwargs)
+        self.cos_theta = self.__ct()
+        self.cos_theta.flags.writeable = False
+
+
+        return val
 
     def print_info(self):
         """print_info(sht self)"""
@@ -136,19 +155,22 @@ class sht(_object):
         return _shtns.sht_sh11_st(self)
 
     def shlm_e1(self, *args):
-        """shlm_e1(sht self, int l, int m) -> double"""
+        """shlm_e1(sht self, unsigned int l, unsigned int m) -> double"""
         return _shtns.sht_shlm_e1(self, *args)
 
-    def l(self):
-        """l(sht self) -> PyObject *"""
-        return _shtns.sht_l(self)
+    def __ct(self):
+        """__ct(sht self) -> PyObject *"""
+        return _shtns.sht___ct(self)
 
-    def cos_theta(self):
-        """cos_theta(sht self) -> PyObject *"""
-        return _shtns.sht_cos_theta(self)
+    def spec_array(self):
+    	return np.zeros(self.nlm, dtype=complex)
+
+    def spat_array(self):
+        """spat_array(sht self) -> PyObject *"""
+        return _shtns.sht_spat_array(self)
 
     def idx(self, *args):
-        """idx(sht self, int l, int m) -> int"""
+        """idx(sht self, unsigned int l, unsigned int m) -> int"""
         return _shtns.sht_idx(self, *args)
 
     def spat_to_SH(self, *args):

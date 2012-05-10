@@ -2975,8 +2975,9 @@ static swig_module_info swig_module = {swig_types, 4, 0, 0, 0, 0};
 static int shtns_error = 0;
 static char* shtns_err_msg;
 static char msg_buffer[128];
-static char msg_grid_err[] = "Grid not set. Call .set_grid_auto() or .set_grid() mehtod.";
+static char msg_grid_err[] = "Grid not set. Call .set_grid() mehtod.";
 static char msg_numpy_arr[] = "Numpy array expected.";
+static char msg_rot_err[] = "truncation must be triangular (lmax=mmax, mres=1)";
 
 static void throw_exception(int error, int iarg, char* msg)
 {
@@ -3205,9 +3206,12 @@ SWIGINTERN struct shtns_info *new_shtns_info(int lmax,int mmax,int mres,int norm
 		if (lmax < 2) {
 			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
 		}
+		if (mres <= 0) {
+			throw_exception(SWIG_ValueError,3,"mres <= 0 invalid");	return NULL;
+		}
 		if (mmax < 0) mmax = lmax/mres;		// default mmax
 		if (mmax*mres > lmax) {
-			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres");	return NULL;
+			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres invalid");	return NULL;
 		}
 		import_array();		// required by NumPy
 		shtns_use_threads(nthreads);		// use nthreads openmp threads if available (0 means auto)
@@ -3217,6 +3221,17 @@ SWIGINTERN void delete_shtns_info(struct shtns_info *self){
 		shtns_destroy(self);		// free memory.
 	}
 SWIGINTERN void shtns_info_set_grid(struct shtns_info *self,int nlat,int nphi,int flags,double eps,int nl_order,int *nlat_out,int *nphi_out){	// default arguments
+		if (nlat != 0) {
+			if (nlat <= self->lmax) {	// nlat too small
+				throw_exception(SWIG_ValueError,1,"nlat <= lmax");		return;
+			}
+			if (nlat & 1) {		// nlat must be even
+				throw_exception(SWIG_ValueError,1,"nlat must be even");		return;
+			}
+		}
+		if ((nphi != 0) && (nphi <= self->mmax *2)) {		// nphi too small
+			throw_exception(SWIG_ValueError,2,"nphi <= 2*mmax");	return;
+		}
 		if (!(flags & 256))  flags |= (256*2);	// default to SHT_PHI_CONTIGUOUS.
 		*nlat_out = nlat;		*nphi_out = nphi;
 		shtns_set_grid_auto(self, flags, eps, nl_order, nlat_out, nphi_out);
@@ -3236,19 +3251,70 @@ SWIGINTERN double shtns_info_sh10_ct(struct shtns_info *self){
 SWIGINTERN double shtns_info_sh11_st(struct shtns_info *self){
 		return sh11_st(self);
 	}
-SWIGINTERN double shtns_info_shlm_e1(struct shtns_info *self,int l,int m){
+
+SWIGINTERN int
+SWIG_AsVal_unsigned_SS_long (PyObject *obj, unsigned long *val) 
+{
+  if (PyInt_Check(obj)) {
+    long v = PyInt_AsLong(obj);
+    if (v >= 0) {
+      if (val) *val = v;
+      return SWIG_OK;
+    } else {
+      return SWIG_OverflowError;
+    }
+  } else if (PyLong_Check(obj)) {
+    unsigned long v = PyLong_AsUnsignedLong(obj);
+    if (!PyErr_Occurred()) {
+      if (val) *val = v;
+      return SWIG_OK;
+    } else {
+      PyErr_Clear();
+    }
+  }
+#ifdef SWIG_PYTHON_CAST_MODE
+  {
+    int dispatch = 0;
+    unsigned long v = PyLong_AsUnsignedLong(obj);
+    if (!PyErr_Occurred()) {
+      if (val) *val = v;
+      return SWIG_AddCast(SWIG_OK);
+    } else {
+      PyErr_Clear();
+    }
+    if (!dispatch) {
+      double d;
+      int res = SWIG_AddCast(SWIG_AsVal_double (obj,&d));
+      if (SWIG_IsOK(res) && SWIG_CanCastAsInteger(&d, 0, ULONG_MAX)) {
+	if (val) *val = (unsigned long)(d);
+	return res;
+      }
+    }
+  }
+#endif
+  return SWIG_TypeError;
+}
+
+
+SWIGINTERN int
+SWIG_AsVal_unsigned_SS_int (PyObject * obj, unsigned int *val)
+{
+  unsigned long v;
+  int res = SWIG_AsVal_unsigned_SS_long (obj, &v);
+  if (SWIG_IsOK(res)) {
+    if ((v > UINT_MAX)) {
+      return SWIG_OverflowError;
+    } else {
+      if (val) *val = (unsigned int)(v);
+    }
+  }  
+  return res;
+}
+
+SWIGINTERN double shtns_info_shlm_e1(struct shtns_info *self,unsigned int l,unsigned int m){
 		return shlm_e1(self, l, m);
 	}
-SWIGINTERN PyObject *shtns_info_l(struct shtns_info *self){
-		int i;
-		npy_intp dims = self->nlm;
-		npy_intp strides = sizeof(double);
-		PyObject *obj = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
-		double *el = (double*) PyArray_DATA(obj);
-		for (i=0; i<self->nlm; i++)		el[i] = self->li[i];		// convert and copy
-		return obj;
-	}
-SWIGINTERN PyObject *shtns_info_cos_theta(struct shtns_info *self){		// grid must have been initialized.
+SWIGINTERN PyObject *shtns_info___ct(struct shtns_info *self){		// grid must have been initialized.
 		int i;
 		npy_intp dims = self->nlat;
 		npy_intp strides = sizeof(double);
@@ -3261,11 +3327,23 @@ SWIGINTERN PyObject *shtns_info_cos_theta(struct shtns_info *self){		// grid mus
 		for (i=0; i<self->nlat; i++)		ct[i] = self->ct[i];		// copy
 		return obj;
 	}
-SWIGINTERN int shtns_info_idx(struct shtns_info *self,int l,int m){
-		if ( (l < 0) || (l > self->lmax) ) {
+SWIGINTERN PyObject *shtns_info_spat_array(struct shtns_info *self){
+		npy_intp dims[2];
+		if (self->nlat == 0) {	// no grid
+			throw_exception(SWIG_RuntimeError,0,msg_grid_err);
+			return NULL;
+		}
+		dims[0] = self->nphi;	dims[1] = self->nlat;
+		if (self->fftc_mode == 1) {	// phi-contiguous
+			dims[0] = self->nlat;		dims[1] = self->nphi;
+		}
+		return PyArray_ZEROS(2, dims, PyArray_DOUBLE, 0);
+	}
+SWIGINTERN int shtns_info_idx(struct shtns_info *self,unsigned int l,unsigned int m){
+		if (l > self->lmax) {
 			throw_exception(SWIG_ValueError,1,"l invalid");	return 0;
 		}
-		if ( (m < 0) || (m > self->mmax * self->mres) || (m % self->mres != 0) ) {
+		if ( (m > l) || (m > self->mmax * self->mres) || (m % self->mres != 0) ) {
 			throw_exception(SWIG_ValueError,2,"m invalid");	return 0;
 		}
 		return ( self->lmidx[((unsigned)(m))/self->mres] + (l) );
@@ -3316,14 +3394,23 @@ SWIGINTERN void shtns_info_SH_Zrotate(struct shtns_info *self,PyObject *Qlm,doub
 			SH_Zrotate(self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
 	}
 SWIGINTERN void shtns_info_SH_Yrotate(struct shtns_info *self,PyObject *Qlm,double alpha,PyObject *Rlm){
+		if ((self->mres != 1)||(self->mmax != self->lmax)) {
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+		}
 		if (check_spectral(1,Qlm, self->nlm) && check_spectral(3,Rlm, self->nlm))
 			SH_Yrotate(self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
 	}
 SWIGINTERN void shtns_info_SH_Yrotate90(struct shtns_info *self,PyObject *Qlm,PyObject *Rlm){
+		if ((self->mres != 1)||(self->mmax != self->lmax)) {
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+		}
 		if (check_spectral(1,Qlm, self->nlm) && check_spectral(2,Rlm, self->nlm))
 			SH_Yrotate90(self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 	}
 SWIGINTERN void shtns_info_SH_Xrotate90(struct shtns_info *self,PyObject *Qlm,PyObject *Rlm){
+		if ((self->mres != 1)||(self->mmax != self->lmax)) {
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+		}
 		if (check_spectral(1,Qlm, self->nlm) && check_spectral(2,Rlm, self->nlm))
 			SH_Xrotate90(self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 	}
@@ -3812,13 +3899,13 @@ fail:
 SWIGINTERN PyObject *_wrap_sht_shlm_e1(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
-  int arg2 ;
-  int arg3 ;
+  unsigned int arg2 ;
+  unsigned int arg3 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  int val2 ;
+  unsigned int val2 ;
   int ecode2 = 0 ;
-  int val3 ;
+  unsigned int val3 ;
   int ecode3 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
@@ -3831,16 +3918,16 @@ SWIGINTERN PyObject *_wrap_sht_shlm_e1(PyObject *SWIGUNUSEDPARM(self), PyObject 
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_shlm_e1" "', argument " "1"" of type '" "struct shtns_info *""'"); 
   }
   arg1 = (struct shtns_info *)(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
+  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
   if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "sht_shlm_e1" "', argument " "2"" of type '" "int""'");
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "sht_shlm_e1" "', argument " "2"" of type '" "unsigned int""'");
   } 
-  arg2 = (int)(val2);
-  ecode3 = SWIG_AsVal_int(obj2, &val3);
+  arg2 = (unsigned int)(val2);
+  ecode3 = SWIG_AsVal_unsigned_SS_int(obj2, &val3);
   if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "sht_shlm_e1" "', argument " "3"" of type '" "int""'");
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "sht_shlm_e1" "', argument " "3"" of type '" "unsigned int""'");
   } 
-  arg3 = (int)(val3);
+  arg3 = (unsigned int)(val3);
   {
     shtns_error = 0;	// clear exception
     result = (double)shtns_info_shlm_e1(arg1,arg2,arg3);
@@ -3856,7 +3943,7 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_sht_l(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_sht___ct(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
   void *argp1 = 0 ;
@@ -3864,15 +3951,15 @@ SWIGINTERN PyObject *_wrap_sht_l(PyObject *SWIGUNUSEDPARM(self), PyObject *args)
   PyObject * obj0 = 0 ;
   PyObject *result = 0 ;
   
-  if (!PyArg_ParseTuple(args,(char *)"O:sht_l",&obj0)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"O:sht___ct",&obj0)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_l" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht___ct" "', argument " "1"" of type '" "struct shtns_info *""'"); 
   }
   arg1 = (struct shtns_info *)(argp1);
   {
     shtns_error = 0;	// clear exception
-    result = (PyObject *)shtns_info_l(arg1);
+    result = (PyObject *)shtns_info___ct(arg1);
     if (shtns_error) {
       // test for exception
       SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
@@ -3885,7 +3972,7 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_sht_cos_theta(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_sht_spat_array(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
   void *argp1 = 0 ;
@@ -3893,15 +3980,15 @@ SWIGINTERN PyObject *_wrap_sht_cos_theta(PyObject *SWIGUNUSEDPARM(self), PyObjec
   PyObject * obj0 = 0 ;
   PyObject *result = 0 ;
   
-  if (!PyArg_ParseTuple(args,(char *)"O:sht_cos_theta",&obj0)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"O:sht_spat_array",&obj0)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_cos_theta" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_spat_array" "', argument " "1"" of type '" "struct shtns_info *""'"); 
   }
   arg1 = (struct shtns_info *)(argp1);
   {
     shtns_error = 0;	// clear exception
-    result = (PyObject *)shtns_info_cos_theta(arg1);
+    result = (PyObject *)shtns_info_spat_array(arg1);
     if (shtns_error) {
       // test for exception
       SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
@@ -3917,13 +4004,13 @@ fail:
 SWIGINTERN PyObject *_wrap_sht_idx(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
-  int arg2 ;
-  int arg3 ;
+  unsigned int arg2 ;
+  unsigned int arg3 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
-  int val2 ;
+  unsigned int val2 ;
   int ecode2 = 0 ;
-  int val3 ;
+  unsigned int val3 ;
   int ecode3 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
@@ -3936,16 +4023,16 @@ SWIGINTERN PyObject *_wrap_sht_idx(PyObject *SWIGUNUSEDPARM(self), PyObject *arg
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_idx" "', argument " "1"" of type '" "struct shtns_info *""'"); 
   }
   arg1 = (struct shtns_info *)(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
+  ecode2 = SWIG_AsVal_unsigned_SS_int(obj1, &val2);
   if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "sht_idx" "', argument " "2"" of type '" "int""'");
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "sht_idx" "', argument " "2"" of type '" "unsigned int""'");
   } 
-  arg2 = (int)(val2);
-  ecode3 = SWIG_AsVal_int(obj2, &val3);
+  arg2 = (unsigned int)(val2);
+  ecode3 = SWIG_AsVal_unsigned_SS_int(obj2, &val3);
   if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "sht_idx" "', argument " "3"" of type '" "int""'");
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "sht_idx" "', argument " "3"" of type '" "unsigned int""'");
   } 
-  arg3 = (int)(val3);
+  arg3 = (unsigned int)(val3);
   {
     shtns_error = 0;	// clear exception
     result = (int)shtns_info_idx(arg1,arg2,arg3);
@@ -4627,10 +4714,10 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_sh00_1", _wrap_sht_sh00_1, METH_VARARGS, (char *)"sht_sh00_1(sht self) -> double"},
 	 { (char *)"sht_sh10_ct", _wrap_sht_sh10_ct, METH_VARARGS, (char *)"sht_sh10_ct(sht self) -> double"},
 	 { (char *)"sht_sh11_st", _wrap_sht_sh11_st, METH_VARARGS, (char *)"sht_sh11_st(sht self) -> double"},
-	 { (char *)"sht_shlm_e1", _wrap_sht_shlm_e1, METH_VARARGS, (char *)"sht_shlm_e1(sht self, int l, int m) -> double"},
-	 { (char *)"sht_l", _wrap_sht_l, METH_VARARGS, (char *)"sht_l(sht self) -> PyObject *"},
-	 { (char *)"sht_cos_theta", _wrap_sht_cos_theta, METH_VARARGS, (char *)"sht_cos_theta(sht self) -> PyObject *"},
-	 { (char *)"sht_idx", _wrap_sht_idx, METH_VARARGS, (char *)"sht_idx(sht self, int l, int m) -> int"},
+	 { (char *)"sht_shlm_e1", _wrap_sht_shlm_e1, METH_VARARGS, (char *)"sht_shlm_e1(sht self, unsigned int l, unsigned int m) -> double"},
+	 { (char *)"sht___ct", _wrap_sht___ct, METH_VARARGS, (char *)"sht___ct(sht self) -> PyObject *"},
+	 { (char *)"sht_spat_array", _wrap_sht_spat_array, METH_VARARGS, (char *)"sht_spat_array(sht self) -> PyObject *"},
+	 { (char *)"sht_idx", _wrap_sht_idx, METH_VARARGS, (char *)"sht_idx(sht self, unsigned int l, unsigned int m) -> int"},
 	 { (char *)"sht_spat_to_SH", _wrap_sht_spat_to_SH, METH_VARARGS, (char *)"sht_spat_to_SH(sht self, PyObject * Vr, PyObject * Qlm)"},
 	 { (char *)"sht_SH_to_spat", _wrap_sht_SH_to_spat, METH_VARARGS, (char *)"sht_SH_to_spat(sht self, PyObject * Qlm, PyObject * Vr)"},
 	 { (char *)"sht_spat_to_SHsphtor", _wrap_sht_spat_to_SHsphtor, METH_VARARGS, (char *)"sht_spat_to_SHsphtor(sht self, PyObject * Vt, PyObject * Vp, PyObject * Slm, PyObject * Tlm)"},

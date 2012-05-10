@@ -1307,9 +1307,7 @@ Optional Features:
   --enable-verbose=0-3    define verbosity level for the library: 0=silent,
                           1=default, 2=debug, 3=full
   --enable-openmp         Enable multi-threading with OpenMP
-  --enable-python=python-interpreter
-                          Build Python interface using python-interpreter
-                          (default is python or python2)
+  --enable-python         Build Python interface
   --enable-long-double    Use long double during initialization for (maybe)
                           slightly better precision
   --disable-f77           Do not include F77 wrapper to call SHTns library

@@ -24,6 +24,10 @@
 
 %module (docstring="Python/NumPy interface to the SHTns spherical harmonic transform library") shtns
 
+%pythoncode{
+	import numpy as np
+}
+
 %{
 	
 #include <numpy/arrayobject.h>
@@ -33,8 +37,9 @@
 static int shtns_error = 0;
 static char* shtns_err_msg;
 static char msg_buffer[128];
-static char msg_grid_err[] = "Grid not set. Call .set_grid_auto() or .set_grid() mehtod.";
+static char msg_grid_err[] = "Grid not set. Call .set_grid() mehtod.";
 static char msg_numpy_arr[] = "Numpy array expected.";
+static char msg_rot_err[] = "truncation must be triangular (lmax=mmax, mres=1)";
 
 static void throw_exception(int error, int iarg, char* msg)
 {
@@ -98,7 +103,6 @@ static int check_spectral(int i, PyObject *a, int size) {
 
 
 %extend shtns_info {
-
 	%exception {
 		shtns_error = 0;	// clear exception
 		$function
@@ -107,26 +111,57 @@ static int check_spectral(int i, PyObject *a, int size) {
 		}
 	}
 
+	%pythonappend shtns_info %{
+		self.m = np.zeros(self.nlm, dtype=np.int32)
+		self.l = np.zeros(self.nlm, dtype=np.int32)
+		for mloop in range(0, self.mmax*self.mres+1, self.mres):
+			for lloop in range(mloop, self.lmax+1):
+				ii = self.idx(lloop,mloop)
+				self.m[ii] = mloop
+				self.l[ii] = lloop
+		self.m.flags.writeable = False		# prevent writing in m and l arrays
+		self.l.flags.writeable = False
+	%}
 	%feature("kwargs") shtns_info;
 	shtns_info(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal, int nthreads=0) {	// default arguments : mmax, mres and norm
 		if (lmax < 2) {
 			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
 		}
+		if (mres <= 0) {
+			throw_exception(SWIG_ValueError,3,"mres <= 0 invalid");	return NULL;
+		}
 		if (mmax < 0) mmax = lmax/mres;		// default mmax
 		if (mmax*mres > lmax) {
-			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres");	return NULL;
+			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres invalid");	return NULL;
 		}
 		import_array();		// required by NumPy
 		shtns_use_threads(nthreads);		// use nthreads openmp threads if available (0 means auto)
 		return shtns_create(lmax, mmax, mres, norm);
 	}
+
 	~shtns_info() {
 		shtns_destroy($self);		// free memory.
 	}
+	
+	%pythonappend set_grid %{
+		self.cos_theta = self.__ct()
+		self.cos_theta.flags.writeable = False
+	%}
 	%apply int *OUTPUT { int *nlat_out };
 	%apply int *OUTPUT { int *nphi_out };
 	%feature("kwargs") set_grid;
 	void set_grid(int nlat=0, int nphi=0, int flags=sht_quick_init, double eps=1.0e-8, int nl_order=1, int *nlat_out, int *nphi_out) {	// default arguments
+		if (nlat != 0) {
+			if (nlat <= $self->lmax) {	// nlat too small
+				throw_exception(SWIG_ValueError,1,"nlat <= lmax");		return;
+			}
+			if (nlat & 1) {		// nlat must be even
+				throw_exception(SWIG_ValueError,1,"nlat must be even");		return;
+			}
+		}
+		if ((nphi != 0) && (nphi <= $self->mmax *2)) {		// nphi too small
+			throw_exception(SWIG_ValueError,2,"nphi <= 2*mmax");	return;
+		}
 		if (!(flags & SHT_THETA_CONTIGUOUS))  flags |= SHT_PHI_CONTIGUOUS;	// default to SHT_PHI_CONTIGUOUS.
 		*nlat_out = nlat;		*nphi_out = nphi;
 		shtns_set_grid_auto($self, flags, eps, nl_order, nlat_out, nphi_out);
@@ -144,21 +179,12 @@ static int check_spectral(int i, PyObject *a, int size) {
 	double sh11_st() {
 		return sh11_st($self);
 	}
-	double shlm_e1(int l, int m) {
+	double shlm_e1(unsigned l, unsigned m) {
 		return shlm_e1($self, l, m);
 	}
 
 	/* returns useful data */
-	PyObject* l() {
-		int i;
-		npy_intp dims = $self->nlm;
-		npy_intp strides = sizeof(double);
-		PyObject *obj = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
-		double *el = (double*) PyArray_DATA(obj);
-		for (i=0; i<$self->nlm; i++)		el[i] = $self->li[i];		// convert and copy
-		return obj;
-	}
-	PyObject* cos_theta() {		// grid must have been initialized.
+	PyObject* __ct() {		// grid must have been initialized.
 		int i;
 		npy_intp dims = $self->nlat;
 		npy_intp strides = sizeof(double);
@@ -172,12 +198,30 @@ static int check_spectral(int i, PyObject *a, int size) {
 		return obj;
 	}
 
+	%pythoncode %{
+		def spec_array(self):
+			return np.zeros(self.nlm, dtype=complex)
+	%}
+
+	PyObject* spat_array() {
+		npy_intp dims[2];
+		if ($self->nlat == 0) {	// no grid
+			throw_exception(SWIG_RuntimeError,0,msg_grid_err);
+			return NULL;
+		}
+		dims[0] = $self->nphi;	dims[1] = $self->nlat;
+		if ($self->fftc_mode == 1) {	// phi-contiguous
+			dims[0] = $self->nlat;		dims[1] = $self->nphi;
+		}
+		return PyArray_ZEROS(2, dims, PyArray_DOUBLE, 0);
+	}
+
 	// returns the index in a spectral array of (l,m) coefficient.
-	int idx(int l, int m) {
-		if ( (l < 0) || (l > $self->lmax) ) {
+	int idx(unsigned l, unsigned m) {
+		if (l > $self->lmax) {
 			throw_exception(SWIG_ValueError,1,"l invalid");	return 0;
 		}
-		if ( (m < 0) || (m > $self->mmax * $self->mres) || (m % $self->mres != 0) ) {
+		if ( (m > l) || (m > $self->mmax * $self->mres) || (m % $self->mres != 0) ) {
 			throw_exception(SWIG_ValueError,2,"m invalid");	return 0;
 		}
 		return LM($self, l, m);
@@ -245,14 +289,23 @@ static int check_spectral(int i, PyObject *a, int size) {
 			SH_Zrotate($self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
 	}
 	void SH_Yrotate(PyObject *Qlm, double alpha, PyObject *Rlm) {
+		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+		}
 		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(3,Rlm, $self->nlm))
 			SH_Yrotate($self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
 	}
 	void SH_Yrotate90(PyObject *Qlm, PyObject *Rlm) {
+		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+		}
 		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Rlm, $self->nlm))
 			SH_Yrotate90($self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 	}
 	void SH_Xrotate90(PyObject *Qlm, PyObject *Rlm) {
+		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+		}
 		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Rlm, $self->nlm))
 			SH_Xrotate90($self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 	}

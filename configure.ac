@@ -16,7 +16,7 @@ AC_ARG_ENABLE([verbose],
 AC_ARG_ENABLE([openmp],
 	AS_HELP_STRING([--enable-openmp], [Enable multi-threading with OpenMP]))
 AC_ARG_ENABLE([python],
-	AS_HELP_STRING([--enable-python=python-interpreter], [Build Python interface using python-interpreter (default is python or python2)]),
+	AS_HELP_STRING([--enable-python], [Build Python interface]),
 	[], [enable_python=no])
 AC_ARG_ENABLE([long-double],
 	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
