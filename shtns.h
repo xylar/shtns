@@ -120,10 +120,10 @@ shtns_cfg shtns_create_with_grid(shtns_cfg, int mmax, int nofft);
 /// Enables multi-thread transform using OpenMP with num_threads (if available). Returns number of threads that will be used.
 int shtns_use_threads(int num_threads);
 
-void shtns_reset();				///< destroy all configs, free memory, and go back to initial state.
+void shtns_reset(void);				///< destroy all configs, free memory, and go back to initial state.
 void shtns_destroy(shtns_cfg);	///< free memory of given config, which cannot be used afterwards.
 
-void shtns_print_version();			///< print version information to stdout.
+void shtns_print_version(void);			///< print version information to stdout.
 void shtns_print_cfg(shtns_cfg);	///< print information about given config to stdout.
 //@}
 

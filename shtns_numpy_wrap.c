@@ -3384,6 +3384,7 @@ SWIGINTERN void shtns_info_SHqst_to_spat(struct shtns_info *self,PyObject *Qlm,P
 	}
 SWIGINTERN double shtns_info_SH_to_point(struct shtns_info *self,PyObject *Qlm,double cost,double phi){
 		if (check_spectral(1,Qlm, self->nlm))	return SH_to_point(self, PyArray_DATA(Qlm), cost, phi);
+		return 0.0;
 	}
 SWIGINTERN void shtns_info_SHqst_to_point(struct shtns_info *self,PyObject *Qlm,PyObject *Slm,PyObject *Tlm,double cost,double phi,double *vr,double *vt,double *vp){
 		if (check_spectral(1,Qlm, self->nlm) && check_spectral(2,Slm, self->nlm) && check_spectral(3,Tlm, self->nlm))

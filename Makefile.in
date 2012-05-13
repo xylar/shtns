@@ -5,6 +5,7 @@ CC=@CC@
 OMP=@OPENMP_CFLAGS@
 CFLAGS=@CFLAGS@
 LIBS=@LIBS@
+PYTHON=@PYTHON@
 
 
 ## global options for gcc
@@ -26,12 +27,14 @@ hfiles = sht_private.h sht_config.h shtns.h
 
 default : @target@
 
+install : @install@
+
 libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	@echo " "
 	@cat COPYRIGHT
 
-install :
+install-lib : libshtns.a
 	@mkdir -p $(PREFIX)/lib/
 	@mkdir -p $(PREFIX)/include/
 	cp libshtns.a $(PREFIX)/lib/
@@ -100,16 +103,21 @@ clean :
 	rm -f *.o
 	rm -rf doc/html
 	rm -rf doc/latex
+	rm -rf build
 
-# "make python" builds a python interface using SWIG.
+
+# build a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
 _shtns.so : shtns_numpy_wrap.c Makefile $(hfiles) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
-	$(cc) -I@python_inc@ -I@numpy_inc@ -c shtns_numpy_wrap.c
-	$(cc) -shared $(LIBS) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o shtns_numpy_wrap.o -o _shtns.so
+	$(PYTHON) setup.py build
 
 # generate python and c glue code with SWIG.
 shtns_numpy_wrap.c : shtns_numpy.i sht_private.h shtns.h
 	swig -python shtns_numpy.i
+
+install-py : _shtns.so
+	$(PYTHON) setup.py install
+
 
 # update the copyright notice
 updatecpy : COPYRIGHT
@@ -136,7 +144,7 @@ updatecpy : COPYRIGHT
 	./update-copyright.sh shtns_numpy.i
 	./update-copyright.sh -python SHT_example.py
 
-.PHONY : updatecpy install clean docs
+.PHONY : updatecpy install install-py install-lib clean docs
 
 
 #fftw compiling options :

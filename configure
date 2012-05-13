@@ -621,6 +621,7 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+install
 target
 python_inc
 numpy_inc
@@ -2164,6 +2165,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 ac_config_headers="$ac_config_headers sht_config.h"
 
 target="libshtns.a"		# by default, build the library.
+install="install-lib"	# by default, install the library.
 
 # optional variables :
 
@@ -3882,6 +3884,7 @@ fi
 
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
 	target="_shtns.so"		# build python extension instead of C library.
+	install="install-py"	# install python extension instead of C library.
 
 fi
 
@@ -4146,6 +4149,7 @@ rm -f core conftest.err conftest.$ac_objext \
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $rtc_ok" >&5
 $as_echo "$rtc_ok" >&6; }
 ### end cycle.h ###
+
 
 
 ac_config_files="$ac_config_files Makefile"

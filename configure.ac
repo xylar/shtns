@@ -6,6 +6,7 @@ AC_INIT([SHTns],[2.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([SHT.c])
 AC_CONFIG_HEADERS([sht_config.h])
 target="libshtns.a"		# by default, build the library.
+install="install-lib"	# by default, install the library.
 
 # optional variables :
 AC_ARG_VAR(PYTHON, [the python interpreter (defaults to 'python')])
@@ -99,6 +100,7 @@ AS_IF([test "x$enable_python" != "xno"], [
 	AC_SUBST([python_inc])
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
 	target="_shtns.so"		# build python extension instead of C library.
+	install="install-py"	# install python extension instead of C library.
 ])
 
 # Checks related to long double
@@ -151,5 +153,6 @@ AC_CHECK_FUNCS([fftw_cost])
 ### end cycle.h ###
 
 AC_SUBST([target])
+AC_SUBST([install])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

@@ -270,6 +270,7 @@ static int check_spectral(int i, PyObject *a, int size) {
 	/* local evaluations */
 	double SH_to_point(PyObject *Qlm, double cost, double phi) {
 		if (check_spectral(1,Qlm, $self->nlm))	return SH_to_point($self, PyArray_DATA(Qlm), cost, phi);
+		return 0.0;
 	}
 	%apply double *OUTPUT { double *vr };
 	%apply double *OUTPUT { double *vt };
