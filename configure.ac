@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.68])
+AC_PREREQ([2.59])
 AC_INIT([SHTns],[2.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([SHT.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -15,7 +15,7 @@ AC_ARG_ENABLE([verbose],
 	AS_HELP_STRING([--enable-verbose=0-3], [define verbosity level for the library: 0=silent, 1=default, 2=debug, 3=full]),
 	[],[enable_verbose=1])
 AC_ARG_ENABLE([openmp],
-	AS_HELP_STRING([--enable-openmp], [Enable multi-threading with OpenMP]))
+	AS_HELP_STRING([--enable-openmp], [Enable multi-threading with OpenMP]), [], [enable_openmp=default])
 AC_ARG_ENABLE([python],
 	AS_HELP_STRING([--enable-python], [Build Python interface]),
 	[], [enable_python=no])
@@ -26,10 +26,16 @@ AC_ARG_ENABLE([f77],
 AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use SSE2 or AVX extensions]))
 
+dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
+dnl generated configure script that the expansion does not occur until
+dnl after our eval magic below.
+AS_IF([test "$prefix" = "NONE"],[prefix=$ac_default_prefix])
+
 # Checks for programs.
 if test "x$CFLAGS" = "x"; then
 	CFLAGS="-O2"
 fi
+CFLAGS="$CFLAGS -I$prefix/include -L$prefix/lib"
 AC_PROG_CC
 AC_PROG_SED
 if test "$SED" = :; then
@@ -66,6 +72,9 @@ AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.
 AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h fftw3.h])
 
 # Checks related to OpenMP
+AS_IF([test "x$enable_python" != "xno"], [
+	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
+])
 AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	AC_CHECK_LIB([fftw3_omp], [fftw_init_threads])
@@ -152,7 +161,8 @@ AC_CHECK_FUNCS([fftw_cost])
    AC_MSG_RESULT($rtc_ok)
 ### end cycle.h ###
 
+echo "prefix=$prefix"
 AC_SUBST([target])
 AC_SUBST([install])
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile setup.py])
 AC_OUTPUT

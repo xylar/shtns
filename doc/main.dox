@@ -513,7 +513,7 @@ SHTns provides a Python interface that uses <a href="http://numpy.scipy.org/">Nu
 The Python interface has been generated using <a href="http://www.swig.org/">SWIG</a> (but you don't need it to compile the the Python package).
 
 \li Compile using 
-\code ./configure --enable-openmp --enable-python
+\code ./configure --enable-python
 make \endcode
 Optionally you can give indicate an alternate pyhton interpreter to \c ./configure using PYTHON=<my-python> (see ./configure --help)
 

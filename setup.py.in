@@ -5,11 +5,17 @@ from numpy import get_include
 
 numpy_inc = get_include()		#  NumPy include path.
 shtns_o = ['SHT.o', 'sht_std.o', 'sht_ltr.o', 'sht_m0.o', 'sht_m0ltr.o']
+libdir = "@prefix@/lib"
+cargs = "@OPENMP_CFLAGS@"
+libs = "@LIBS@"
+libslist = libs.replace('-l','').split()	# transform to list of libraries
 
 shtns_module = Extension('_shtns', sources=['shtns_numpy_wrap.c'],
 	extra_objects=shtns_o, depends=shtns_o,
-	include_dirs=[numpy_inc],
-	libraries=['fftw3', 'fftw3_omp'])
+	extra_compile_args=[cargs],
+	library_dirs=[libdir],
+	libraries=libslist,
+	include_dirs=[numpy_inc])
 
 setup(name='SHTns',
 	version='2.2',

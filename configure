@@ -2180,6 +2180,8 @@ fi
 # Check whether --enable-openmp was given.
 if test "${enable_openmp+set}" = set; then :
   enableval=$enable_openmp;
+else
+  enable_openmp=default
 fi
 
 # Check whether --enable-python was given.
@@ -2205,10 +2207,15 @@ if test "${enable_simd+set}" = set; then :
 fi
 
 
+if test "$prefix" = "NONE"; then :
+  prefix=$ac_default_prefix
+fi
+
 # Checks for programs.
 if test "x$CFLAGS" = "x"; then
 	CFLAGS="-O2"
 fi
+CFLAGS="$CFLAGS -I$prefix/include -L$prefix/lib"
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -3725,6 +3732,13 @@ done
 
 
 # Checks related to OpenMP
+if test "x$enable_python" != "xno"; then :
+
+	if test "x$enable_openmp" = "xdefault"; then :
+  enable_openmp=yes
+fi
+
+fi
 if test "x$enable_openmp" = "xyes"; then :
 
 
@@ -4150,9 +4164,10 @@ rm -f core conftest.err conftest.$ac_objext \
 $as_echo "$rtc_ok" >&6; }
 ### end cycle.h ###
 
+echo "prefix=$prefix"
 
 
-ac_config_files="$ac_config_files Makefile"
+ac_config_files="$ac_config_files Makefile setup.py"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -4846,6 +4861,7 @@ do
   case $ac_config_target in
     "sht_config.h") CONFIG_HEADERS="$CONFIG_HEADERS sht_config.h" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+    "setup.py") CONFIG_FILES="$CONFIG_FILES setup.py" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

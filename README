@@ -25,6 +25,13 @@ FEATURES:
 	- accurate up to spherical harmonic degree l=8000 (at least).
 	- rotation functions to rotate spherical harmonics (beta).
 
+INSTALL:
+	Briefly, the shell commands `./configure; make; make install' should
+	configure, build, and install this package. `./configure --help' will list
+	available options. However, in order to get the best performance, it is highly
+	recommended to compile and install the FFTW library yourself, because many
+	distribution include a non-optimized FFTW library.
+
 
 DOCUMENTATION:
 
@@ -37,7 +44,7 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
-  tip:
+  v2.2.1  (21 May 2012)
 	- slightly faster parallel transforms.
 	- better Python interface: decent error handling and keyword argument support.
 	- changes to Python interface: grid defaults to SHT_PHI_CONTIGUOUS, set_grid_auto() removed.
