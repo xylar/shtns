@@ -2310,6 +2310,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		}
 	}
 
+	if (*nlat <= shtns->lmax) shtns_runerr("Nlat must be larger than Lmax");
 	if (IS_TOO_LARGE(*nlat, shtns->nlat)) shtns_runerr("Nlat too large");
 	if (IS_TOO_LARGE(*nphi, shtns->nphi)) shtns_runerr("Nphi too large");
 
