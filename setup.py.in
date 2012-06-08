@@ -5,15 +5,19 @@ from numpy import get_include
 
 numpy_inc = get_include()		#  NumPy include path.
 shtns_o = ['SHT.o', 'sht_std.o', 'sht_ltr.o', 'sht_m0.o', 'sht_m0ltr.o']
-libdir = "@prefix@/lib"
+libdir = "@prefix@"
+if len(libdir) == 0:
+	libdir = []
+else:
+	libdir = [libdir+"/lib"]
 cargs = "@OPENMP_CFLAGS@"
 libs = "@LIBS@"
 libslist = libs.replace('-l','').split()	# transform to list of libraries
 
 shtns_module = Extension('_shtns', sources=['shtns_numpy_wrap.c'],
 	extra_objects=shtns_o, depends=shtns_o,
-	extra_compile_args=[cargs],
-	library_dirs=[libdir],
+	extra_compile_args=cargs.split(),
+	library_dirs=libdir,
 	libraries=libslist,
 	include_dirs=[numpy_inc])
 
