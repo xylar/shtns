@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python
 #
 #  Copyright (c) 2010-2012 Centre National de la Recherche Scientifique.
 #  written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
@@ -15,53 +15,57 @@
 #  knowledge of the CeCILL license and that you accept its terms.
 #  
 
-###########################################################
-# SHTns Python interface example (tested with Python 2.7) #
-###########################################################
+###################################
+# SHTns Python interface example  #
+###################################
 
 import numpy		# numpy for arrays
-import shtns		# shtns interface: must be build with "make python" which produces
-					#   files "shtns.py" and "_shtns.so" that must be either in the current directory
-					#   or copied to the python search path (typically "/usr/lib/python2.7/site-packages/")
+import shtns		# shtns module
+					#   compiled and installe using ./configure --enable-python && make && make install
 
-lmax = 15			# maximum degree of spherical harmonic representation.
+lmax = 7			# maximum degree of spherical harmonic representation.
 mmax = 3			# maximum order of spherical harmonic representation.
 
-sh = shtns.sht(lmax, mmax)		# create sht object with given lmax and mmax.
-# mres = 2						# use 2-fold symmetry in phi
-# norm = shtns.sht_schmidt | shtns.SHT_NO_CS_PHASE			# use schmidt semi-normalized harmonics
-# sh = shtns.sht(lmax, mmax, mres, norm)	# advanced creation of sht object.
+sh = shtns.sht(lmax, mmax)		# create sht object with given lmax and mmax (orthonormalized)
+# sh = shtns.sht(lmax, mmax, mres=2, norm=shtns.sht_schmidt | shtns.SHT_NO_CS_PHASE)	# use schmidt semi-normalized harmonics
 
 nlat, nphi = sh.set_grid()		# build default grid (gauss grid, phi-contiguous)
 print(sh.nlat, sh.nphi)			# displays the latitudinal and longitudinal grid sizes.
 
-cost = sh.cos_theta()			# latitudinal coordinates of the grid as cos(theta)
-el = sh.l()						# array of size sh.nlm giving the spherical harmonic degree l for any sh coefficient
-l2 = el*(el+1)					# array l(l+1) that is useful for computing laplacian
+cost = sh.cos_theta			# latitudinal coordinates of the grid as cos(theta)
+el = sh.l					# array of size sh.nlm giving the spherical harmonic degree l for any sh coefficient
+l2 = el*(el+1)				# array l(l+1) that is useful for computing laplacian
 
 ### use advanced options to create a regular grid, theta-contiguous, and with south-pole comming first.
 # nlat = lmax*2
 # nphi = mmax*3
 # grid_typ = shtns.sht_reg_fast | shtns.SHT_THETA_CONTIGUOUS | shtns.SHT_SOUTH_POLE_FIRST
 # polar_opt_threshold = 1.0e-10
-# sh.set_grid(nlat, nphi, grid_type, polar_opt_threshold)
+# sh.set_grid(nlat, nphi, flags=grid_typ, polar_opt=polar_opt_threshold)
 
-ylm = numpy.zeros(sh.nlm, dtype=complex)		# a spherical harmonic spectral array
-
-vr = numpy.zeros((sh.nlat, sh.nphi))			# a spatial array matching the default grid (with SHT_PHI_CONTIGUOUS by default) 
-#vr = numpy.zeros((sh.nphi, sh.nlat))			# a spatial array matching the grid with SHT_THETA_CONTIGUOUS
-
+ylm = sh.spec_array()		# a spherical harmonic spectral array, same as numpy.zeros(sh.nlm, dtype=complex)
+vr = sh.spat_array()		# a spatial array, same as numpy.zeros(sh.spat_shape)
 
 ylm[sh.idx(1,0)] = 1.0		# set sh coefficient l=1, m=0 to value 1
 
 ylm = ylm * l2				# multiply by l(l+1)
 
-sh.SH_to_spat(ylm, vr)		# transform sh description ylm into spatial representation vr (vr is overwritten)
+y = sh.synth(ylm)		# transform sh description ylm into spatial representation y (scalar transform)
 
-print(vr)		# display spatial field
+print(y)				# display spatial field
+
+i_theta = sh.nlat/2
+i_phi = 1
+print(y[i_theta, i_phi])	# spatial element of coordinate i_theta, i_phi
 
 
-zlm = numpy.zeros(sh.nlm, dtype=complex)		# a spherical harmonic spectral array
-sh.spat_to_SH(vr, zlm)							# transform the spatial field back to spectral
-
+zlm = sh.analys(y)		# transform the spatial field back to spectral
 print(zlm)
+
+### vector transforms :
+#slm, tlm = sh.analys(v_theta,v_phi)		# with two arguments, sh.analys() performs a 2D vector transform (spherical coordinates without radial)
+#qlm, slm, tlm = sh.analys(v_r,v_theta,v_phi)	# with three arguments, sh.alanys() performs a 3D vector tansform (spherical coordinates)
+#
+#v_theta, v_phi = sh.synth(slm, tlm)	# same hold for synthesis, using spheroidal/toroidal vector spherical harmonics.
+#v_r = sh.synth(qlm)
+

@@ -130,10 +130,11 @@ class sht(_object):
     __swig_destroy__ = _shtns.delete_sht
     __del__ = lambda self : None;
     def set_grid(self, *args, **kwargs):
-        """set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double eps=1.0e-8, int nl_order=1)"""
+        """set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double polar_opt=1.0e-8, int nl_order=1)"""
         val = _shtns.sht_set_grid(self, *args, **kwargs)
         self.cos_theta = self.__ct()
         self.cos_theta.flags.writeable = False
+        self.spat_shape = tuple(self.__spat_shape())
 
 
         return val
@@ -162,12 +163,16 @@ class sht(_object):
         """__ct(sht self) -> PyObject *"""
         return _shtns.sht___ct(self)
 
+    def __spat_shape(self):
+        """__spat_shape(sht self)"""
+        return _shtns.sht___spat_shape(self)
+
     def spec_array(self):
     	return np.zeros(self.nlm, dtype=complex)
 
     def spat_array(self):
-        """spat_array(sht self) -> PyObject *"""
-        return _shtns.sht_spat_array(self)
+    	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+    	return np.zeros(self.spat_shape, dtype=double)
 
     def idx(self, *args):
         """idx(sht self, unsigned int l, unsigned int m) -> int"""
@@ -204,6 +209,56 @@ class sht(_object):
     def SHqst_to_spat(self, *args):
         """SHqst_to_spat(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp)"""
         return _shtns.sht_SHqst_to_spat(self, *args)
+
+    def synth(self,*arg):
+    	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+    	n = len(arg)
+    	if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
+    	q = list(arg)
+    	for i in range(0,n):
+    		if q[i].size != self.nlm: raise RuntimeError("spectral array has wrong size.")
+    		if q[i].dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
+    		if q[i].flags.contiguous == False: q[i] = q[i].copy()		# contiguous array required.
+    	if n==1:
+    		vr = np.empty(self.spat_shape)
+    		self.SH_to_spat(q[0],vr)
+    		return vr
+    	elif n==2:
+    		vt = np.empty(self.spat_shape)
+    		vp = np.empty(self.spat_shape)
+    		self.SHsphtor_to_spat(q[0],q[1],vt,vp)
+    		return vt,vp
+    	else:
+    		vr = np.empty(self.spat_shape)
+    		vt = np.empty(self.spat_shape)
+    		vp = np.empty(self.spat_shape)
+    		self.SHqst_to_spat(q[0],q[1],q[2],vr,vt,vp)
+    		return vr,vt,vp
+
+    def analys(self,*arg):
+    	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+    	n = len(arg)
+    	if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
+    	v = list(arg)
+    	for i in range(0,n):
+    		if v[i].shape != self.spat_shape: raise RuntimeError("spatial array has wrong shape.")
+    		if v[i].dtype.num != np.dtype('float64').num: raise RuntimeError("spatial array should be dtype=float64.")
+    		if v[i].flags.contiguous == False: v[i] = v[i].copy()		# contiguous array required.
+    	if n==1:
+    		q = np.empty(self.nlm, dtype=complex)
+    		self.spat_to_SH(v[0],q)
+    		return q
+    	elif n==2:
+    		s = np.empty(self.nlm, dtype=complex)
+    		t = np.empty(self.nlm, dtype=complex)
+    		self.spat_to_SHsphtor(v[0],v[1],s,t)
+    		return s,t
+    	else:
+    		q = np.empty(self.nlm, dtype=complex)
+    		s = np.empty(self.nlm, dtype=complex)
+    		t = np.empty(self.nlm, dtype=complex)
+    		self.spat_to_SHqst(v[0],v[1],v[2],q,s,t)
+    		return q,s,t
 
     def SH_to_point(self, *args):
         """SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"""

@@ -44,6 +44,10 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
+  tip
+	- better Python interface: using synth() and analys() methods.
+	- bugfix in build system: can now compile python extension without openmp.
+
   v2.2.1  (21 May 2012)
 	- slightly faster parallel transforms.
 	- better Python interface: decent error handling and keyword argument support.

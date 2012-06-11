@@ -17,7 +17,7 @@ if [ "$1" == "-fortran" ]; then
 fi
 
 if [ "$1" == "-python" ]; then
-  cmtstart="#!/usr/bin/python2\n#"
+  cmtstart="#!/usr/bin/python\n#"
   cmt='#  '
   cmtend=''
   shift
