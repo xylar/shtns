@@ -21,8 +21,8 @@ shtns_module = Extension('_shtns', sources=['shtns_numpy_wrap.c'],
 	libraries=libslist,
 	include_dirs=[numpy_inc])
 
-setup(name='SHTns',
-	version='2.2',
+setup(name='@PACKAGE_NAME@',
+	version='@PACKAGE_VERSION@',
 	description='High performance Spherical Harmonic Transform',
 	license='CeCILL',
 	author='Nathanael Schaeffer',
