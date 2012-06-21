@@ -51,7 +51,9 @@ On modern x86 processors, we recommend using GCC 4.0 or later as it produces the
 
 First run \code ./configure --help \endcode to see the available configure options.
 Then, for example run \code ./configure --prefix=$HOME --enable-openmp \endcode
-if you want to install the multi-threaded transform library to $HOME/lib and the headers to $HOME/include
+if you want to install the multi-threaded transform library to $HOME/lib and the headers to $HOME/include.
+
+To install the Python extension, see \ref python.
 
 The configure script will detect your FFTW library capabilities and other system dependant features.
 You may optionally adapt the resulting \c Makefile and \c sht_config.h to your architecture and compiler.
@@ -512,18 +514,20 @@ When your program is ready, compile it adding these options to the compiler (gfo
 SHTns provides a Python interface that uses <a href="http://numpy.scipy.org/">NumPy</a> arrays to perform Spherical Harmonic Transforms.
 The Python interface has been generated using <a href="http://www.swig.org/">SWIG</a> (but you don't need it to compile the the Python package).
 
-\li Compile using 
+\li Compile using (see also \ref compil)
 \code ./configure --enable-python
-make \endcode
-Optionally you can give indicate an alternate pyhton interpreter to \c ./configure using PYTHON=<my-python> (see ./configure --help)
+make
+make install \endcode
+Optionally you can indicate an alternate pyhton interpreter to \c ./configure using PYTHON=<my-python> (see ./configure --help)
 
-\li Use within a python script or shell in the same directory \code import shtns \endcode (automatic install not supported yet)
+\li Use within a python script or shell \code import shtns \endcode
 
 To start using SHTns you must then create an sht object, from which you can call the transform functions and more.
 The arrays should be created using <a href="http://numpy.scipy.org/">NumPy</a>.
 \see See the \link SHT_example.py Python example \endlink to get started.
 
-<i>In case of segfaults, you may have alignment problems. Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a> or contact the author.</i>
+<i>In case of segfaults, you may have alignment problems (should not occur on 64 bit systems).
+Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a> or contact the author.</i>
 
 \example SHT_example.py
   \brief A Python example using NumPy and SHTns that performs backward and forward Spherical Harmonic Transforms.
