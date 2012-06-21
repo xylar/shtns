@@ -44,7 +44,7 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
-  tip
+  v2.2.2  (21 Jun 2012)
 	- better Python interface: using synth() and analys() methods.
 	- bugfix in build system: can now compile python extension without openmp.
 
