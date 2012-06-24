@@ -270,6 +270,10 @@ static int check_spectral(int i, PyObject *a, int size) {
 
 	%pythoncode %{
 		def synth(self,*arg):
+			"""spectral to spatial transform, for scalar or vector data.
+			v = synth(qlm) : compute the spatial representation of the scalar qlm
+			vtheta,vphi = synth(slm,tlm) : compute the 2D spatial vector from its spectral spheroidal/toroidal scalars (slm,tlm)
+			vr,vtheta,vphi = synth(qlm,slm,tlm) : compute the 3D spatial vector from its spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm)"""
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
 			n = len(arg)
 			if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
@@ -278,23 +282,27 @@ static int check_spectral(int i, PyObject *a, int size) {
 				if q[i].size != self.nlm: raise RuntimeError("spectral array has wrong size.")
 				if q[i].dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
 				if q[i].flags.contiguous == False: q[i] = q[i].copy()		# contiguous array required.
-			if n==1:
+			if n==1:	#scalar transform
 				vr = np.empty(self.spat_shape)
 				self.SH_to_spat(q[0],vr)
 				return vr
-			elif n==2:
-				vt = np.empty(self.spat_shape)
-				vp = np.empty(self.spat_shape)
+			elif n==2:	# 2D vector transform
+				vt = np.empty(self.spat_shape)		# v_theta
+				vp = np.empty(self.spat_shape)		# v_phi
 				self.SHsphtor_to_spat(q[0],q[1],vt,vp)
 				return vt,vp
-			else:
-				vr = np.empty(self.spat_shape)
-				vt = np.empty(self.spat_shape)
-				vp = np.empty(self.spat_shape)
+			else:		# 3D vector transform
+				vr = np.empty(self.spat_shape)		# v_r
+				vt = np.empty(self.spat_shape)		# v_theta
+				vp = np.empty(self.spat_shape)		# v_phi
 				self.SHqst_to_spat(q[0],q[1],q[2],vr,vt,vp)
 				return vr,vt,vp
 
 		def analys(self,*arg):
+			"""spatial to spectral transform, for scalar or vector data.
+			qlm = analys(q) : compute the spherical harmonic representation of the scalar q
+			slm,tlm = analys(vtheta,vphi) : compute the spectral spheroidal/toroidal scalars (slm,tlm) from 2D vector components (vtheta, vphi)
+			qlm,slm,tlm = synth(vr,vtheta,vphi) : compute the spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm) from 3D vector components (vr,vtheta,vphi)"""
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
 			n = len(arg)
 			if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
@@ -318,6 +326,17 @@ static int check_spectral(int i, PyObject *a, int size) {
 				t = np.empty(self.nlm, dtype=complex)
 				self.spat_to_SHqst(v[0],v[1],v[2],q,s,t)
 				return q,s,t
+
+		def synth_grad(self,slm):
+			"""(vtheta,vphi) = synth_grad(sht self, slm) : compute the spatial representation of the gradient of slm"""
+			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+			if slm.size != self.nlm: raise RuntimeError("spectral array has wrong size.")
+			if slm.dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
+			if slm.flags.contiguous == False: slm = slm.copy()		# contiguous array required.
+			vt = np.empty(self.spat_shape)
+			vp = np.empty(self.spat_shape)
+			self.SHsph_to_spat(slm,vt,vp)
+			return vt,vp
 	%}
 
 	/* local evaluations */
