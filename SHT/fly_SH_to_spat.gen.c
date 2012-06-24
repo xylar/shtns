@@ -76,6 +76,10 @@ VX		BpF = BtF + nv/2;
 3		BrF = (v2d*) VMALLOC( 3*nv * sizeof(double) );
 3		BtF = BrF + nv/2;		BpF = BrF + nv;
 	}
+	  #ifdef SHT_GRAD
+S		k=0; do { ((s2d*)BpF)[k]=vdup(0.0); } while(++k<NLAT_2);
+T		k=0; do { ((s2d*)BtF)[k]=vdup(0.0); } while(++k<NLAT_2);
+	  #endif
 	#else
 	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
 QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
@@ -84,6 +88,10 @@ VX		BpF = BtF + shtns->ncplx_fft;
 3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
+	  #ifdef SHT_GRAD
+S		k=0; do { ((v2d*)BpF)[k]=vdup(0.0); } while(++k<NLAT);
+T		k=0; do { ((v2d*)BtF)[k]=vdup(0.0); } while(++k<NLAT);
+	  #endif
 	#endif
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
@@ -277,11 +285,11 @@ Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
 			}
 			for (int j=0; j<NWAY; ++j) {
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
-S				por[j] = vall(0.0);		tei[j] = vall(0.0);
-T				tor[j] = vall(0.0);		pei[j] = vall(0.0);
+V				por[j] = vall(0.0);		tei[j] = vall(0.0);
+V				tor[j] = vall(0.0);		pei[j] = vall(0.0);
 V				dy1[j] = (vall(al[1])*y0[j]) *(cost[j]*cost[j] + st2[j]);		//	dy1[j] = vall(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]);
-S				poi[j] = vall(0.0);		ter[j] = vall(0.0);
-T				toi[j] = vall(0.0);		per[j] = vall(0.0);
+V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
+V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0

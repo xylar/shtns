@@ -172,7 +172,7 @@ class sht(_object):
 
     def spat_array(self):
     	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
-    	return np.zeros(self.spat_shape, dtype=double)
+    	return np.zeros(self.spat_shape)
 
     def idx(self, *args):
         """idx(sht self, unsigned int l, unsigned int m) -> int"""

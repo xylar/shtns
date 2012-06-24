@@ -214,7 +214,7 @@ static int check_spectral(int i, PyObject *a, int size) {
 		
 		def spat_array(self):
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
-			return np.zeros(self.spat_shape, dtype=double)
+			return np.zeros(self.spat_shape)
 	%}
 
 	// returns the index in a spectral array of (l,m) coefficient.

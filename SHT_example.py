@@ -48,6 +48,9 @@ vr = sh.spat_array()		# a spatial array, same as numpy.zeros(sh.spat_shape)
 
 ylm[sh.idx(1,0)] = 1.0		# set sh coefficient l=1, m=0 to value 1
 
+print(ylm[sh.l == 1])			# print all l=1 coefficients
+print(ylm[sh.m == 1])			# print all m=1 coefficients
+
 ylm = ylm * l2				# multiply by l(l+1)
 
 y = sh.synth(ylm)		# transform sh description ylm into spatial representation y (scalar transform)

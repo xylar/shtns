@@ -30,7 +30,7 @@ INSTALL:
 	configure, build, and install this package. `./configure --help' will list
 	available options. However, in order to get the best performance, it is highly
 	recommended to compile and install the FFTW library yourself, because many
-	distribution include a non-optimized FFTW library.
+	distributions include a non-optimized FFTW library.
 
 
 DOCUMENTATION:
@@ -43,6 +43,10 @@ DOCUMENTATION:
 
 
 CHANGE LOG:
+
+  v2.2.3  (24 Jun 2012)
+	- critical bugfix: SHtor_to_spat() and SHsph_to_spat() gave wrong results for mmax>0 with on-the-fly transoforms.
+	- minor bugfix in Python interface.
 
   v2.2.2  (21 Jun 2012)
 	- better Python interface: using synth() and analys() methods.

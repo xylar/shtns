@@ -664,9 +664,12 @@ int main(int argc, char *argv[])
 	SH_to_spat(shtns, Slm,Sh);
 	write_mx("spat",Sh,NPHI,NLAT);
 	if (vector) {
-		SHsphtor_to_spat(shtns, Slm,Tlm,Sh,Th);
+		SHtor_to_spat(shtns, Slm,Sh,Th);
 		write_mx("spatt",Sh,NPHI,NLAT);
 		write_mx("spatp",Th,NPHI,NLAT);
+		SHtor_to_spat_l(shtns, Slm,Sh,Th,LMAX/2);
+		write_mx("spatt_l",Sh,NPHI,NLAT);
+		write_mx("spatp_l",Th,NPHI,NLAT);
 	}
 
 //	SHqst_to_lat(Slm,Slm,Tlm,ct[0],Sh,Th,Th,NPHI/2,LMAX,MMAX);
