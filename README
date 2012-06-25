@@ -44,6 +44,9 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
+  v2.2.4  (25 Jun 2012)
+	- the previous critical bugfix had not been applied to parallel OpenMP transforms.
+
   v2.2.3  (24 Jun 2012)
 	- critical bugfix: SHtor_to_spat() and SHsph_to_spat() gave wrong results for mmax>0 with on-the-fly transoforms.
 	- minor bugfix in Python interface.
