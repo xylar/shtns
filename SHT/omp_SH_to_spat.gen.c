@@ -459,6 +459,37 @@ VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
 S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
 T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
 	#endif
+
+  #ifndef SHT_AXISYM
+V	#ifndef HAVE_LIBFFTW3_OMP
+V	  #pragma omp barrier
+V	  #if _GCC_VEC_
+V		if (shtns->fftc_mode == 0) {
+3			#pragma omp single nowait
+3			fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
+V			#pragma omp single nowait
+V			fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
+V			#pragma omp single nowait
+V			fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
+V		} else if (shtns->fftc_mode > 0) {		// split dft
+3			#pragma omp single nowait
+3			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
+V			#pragma omp single nowait
+V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
+V			#pragma omp single nowait
+V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
+V		}
+V	  #else
+3		#pragma omp single nowait
+3		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
+V		#pragma omp single nowait
+V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
+V		#pragma omp single nowait
+V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
+V	  #endif
+V	#endif
+  #endif
+
   }
 
   #ifndef SHT_AXISYM
@@ -466,28 +497,32 @@ T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
 	#if _GCC_VEC_
   	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode == 0) {
+V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
 V			fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
 V			fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
+V		  #endif
 		} else {		// split dft
+V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-Q			VFREE(BrF);
-VX			VFREE(BtF);		// this frees also BpF.
+V		  #endif
 		}
 	}
 	#else
 	if (shtns->ncplx_fft >= 0) {
+V	  #ifdef HAVE_LIBFFTW3_OMP
 Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
-		if (shtns->ncplx_fft > 0) {		// free memory
-Q			VFREE(BrF);
-VX			VFREE(BtF);		// this frees also BpF.
-		}
+V	  #endif
 	}
 	#endif
+	if (shtns->ncplx_fft > 0) {		// free memory
+Q		VFREE(BrF);
+VX		VFREE(BtF);		// this frees also BpF.
+	}
   #endif
 
   }

@@ -478,9 +478,11 @@ V	BtF = (s2d *) Vt;	BpF = (s2d *) Vp;
 	#endif
 	if (shtns->fftc_mode >= 0) {
 	    if (shtns->fftc_mode == 0) {	// in-place
+V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
 V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
 V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
+V		  #endif
 		} else {	// alloc memory for the transpose FFT
 			unsigned long nv = shtns->nspat /VSIZE;
 QX			BrF = (s2d*) VMALLOC( nv * sizeof(s2d) );
@@ -488,9 +490,11 @@ VX			BtF = (s2d*) VMALLOC( 2*nv * sizeof(s2d) );
 VX			BpF = BtF + nv;
 3			BrF = (s2d*) VMALLOC( 3*nv * sizeof(s2d) );
 3			BtF = BrF + nv;		BpF = BtF + nv;
+V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, ((double*)BrF)+1, ((double*)BrF));
 V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, ((double*)BtF)+1, ((double*)BtF));
 V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*)BpF));
+V		  #endif
 	    }
 	}
   #endif
@@ -499,6 +503,26 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
   //omp_set_num_threads(shtns->nthreads);
   #pragma omp parallel num_threads(shtns->nthreads)
   {
+	#ifndef SHT_AXISYM
+V	#ifndef HAVE_LIBFFTW3_OMP
+V		if (shtns->fftc_mode == 0) {	// in-place
+3			#pragma omp single nowait
+3			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
+V			#pragma omp single nowait
+V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
+V			#pragma omp single nowait
+V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
+V		} else if (shtns->fftc_mode > 0) {	// split out-of-place
+3			#pragma omp single nowait
+3			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, ((double*)BrF)+1, ((double*)BrF));
+V			#pragma omp single nowait
+V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, ((double*)BtF)+1, ((double*)BtF));
+V			#pragma omp single nowait
+V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*)BpF));
+V		}
+V		#pragma omp barrier
+V	#endif
+	#endif
 QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
 VX	GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
 3	GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
