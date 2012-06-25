@@ -96,7 +96,7 @@ SHT_fort_ex : SHT_example.f libshtns.a Makefile shtns.f
 
 #documentation :
 docs :
-	doxygen doxygen.conf
+	( cat doc/doxygen.conf ; echo "PROJECT_NUMBER=@PACKAGE_VERSION@" ) | doxygen -
 
 clean :
 	$(MAKE) clean -C SHT
