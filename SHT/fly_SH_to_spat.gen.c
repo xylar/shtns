@@ -77,8 +77,8 @@ VX		BpF = BtF + nv/2;
 3		BtF = BrF + nv/2;		BpF = BrF + nv;
 	}
 	  #ifdef SHT_GRAD
-S		k=0; do { ((s2d*)BpF)[k]=vdup(0.0); } while(++k<NLAT_2);
-T		k=0; do { ((s2d*)BtF)[k]=vdup(0.0); } while(++k<NLAT_2);
+S		k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2);
+T		k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2);
 	  #endif
 	#else
 	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
@@ -89,8 +89,8 @@ VX		BpF = BtF + shtns->ncplx_fft;
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
 	  #ifdef SHT_GRAD
-S		k=0; do { ((v2d*)BpF)[k]=vdup(0.0); } while(++k<NLAT);
-T		k=0; do { ((v2d*)BtF)[k]=vdup(0.0); } while(++k<NLAT);
+S		k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT);
+T		k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT);
 	  #endif
 	#endif
 	imlim = MTR;

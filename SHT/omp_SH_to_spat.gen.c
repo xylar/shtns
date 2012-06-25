@@ -80,6 +80,20 @@ T	double Tl0[llim];
 		if (m0 == 0)
 	#endif
 	{	//	im=0;
+		#ifdef SHT_GRAD
+		  #ifndef SHT_AXISYM
+			#ifdef _GCC_VEC_
+S				k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2);
+T				k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2);
+			#else
+S				k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT);
+T				k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT);
+			#endif
+		  #else
+S			if (BpF != NULL) { int k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2); }
+T			if (BtF != NULL) { int k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2); }
+		  #endif
+		#endif
  		l=1;
 		alm = shtns->alm[0];
 Q		Ql0[0] = (double) Qlm[0];		// l=0
@@ -255,11 +269,11 @@ Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
 			}
 			for (int j=0; j<NWAY; ++j) {
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
-S				por[j] = vall(0.0);		tei[j] = vall(0.0);
-T				tor[j] = vall(0.0);		pei[j] = vall(0.0);
+V				por[j] = vall(0.0);		tei[j] = vall(0.0);
+V				tor[j] = vall(0.0);		pei[j] = vall(0.0);
 V				dy1[j] = (vall(al[1])*y0[j]) *(cost[j]*cost[j] + st2[j]);		//	dy1[j] = vall(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]);
-S				poi[j] = vall(0.0);		ter[j] = vall(0.0);
-T				toi[j] = vall(0.0);		per[j] = vall(0.0);
+V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
+V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
@@ -430,11 +444,6 @@ VX		BpF = BtF + shtns->ncplx_fft;
 3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
-	#endif
-  #else
-	#ifdef SHT_GRAD
-S		if (Vp != NULL) { int k=0; do { ((v2d*)Vp)[k]=vdup(0.0); } while(++k<NLAT_2); BpF = NULL; }
-T		if (Vt != NULL) { int k=0; do { ((v2d*)Vt)[k]=vdup(0.0); } while(++k<NLAT_2); BtF = NULL; }
 	#endif
   #endif
 	imlim += 1;
