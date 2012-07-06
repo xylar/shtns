@@ -19,6 +19,10 @@
  \brief shtns.h is the definition file for SHTns : include this file in your source code to use SHTns.
 **/
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 typedef struct shtns_info* shtns_cfg;
 
 /// different Spherical Harmonic normalizations.
@@ -226,3 +230,7 @@ void SHqst_to_lat(shtns_cfg, complex double *Qlm, complex double *Slm, complex d
 //@}
 
 #endif
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
