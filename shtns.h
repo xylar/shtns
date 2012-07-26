@@ -133,10 +133,13 @@ void shtns_print_cfg(shtns_cfg);	///< print information about given config to st
 
 /// \name special values
 //@{
-double sh00_1(shtns_cfg);	///< returns the spherical harmonic representation of 1 (l=0,m=0)
-double sh10_ct(shtns_cfg);	///< returns the spherical harmonic representation of cos(theta) (l=1,m=0)
-double sh11_st(shtns_cfg);	///< returns the spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
-double shlm_e1(shtns_cfg, int l, int m);		///< returns the l,m SH coefficient corresponding to unit energy.
+double sh00_1(shtns_cfg);	///< return the spherical harmonic representation of 1 (l=0,m=0)
+double sh10_ct(shtns_cfg);	///< return the spherical harmonic representation of cos(theta) (l=1,m=0)
+double sh11_st(shtns_cfg);	///< return the spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
+double shlm_e1(shtns_cfg, int l, int m);		///< return the l,m SH coefficient corresponding to unit energy.
+/// fill the given array with Gauss weights. returns the number of weights written (0 if not a Gauss grid).
+int shtns_gauss_wts(shtns_cfg, double *wts);
+
 //@}
 
 /// \name Rotation functions

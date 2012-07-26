@@ -2473,6 +2473,22 @@ int shtns_use_threads(int num_threads)
 	return omp_threads;
 }
 
+/// fill the given array with Gauss weights. returns the number of weights written, which
+/// may be zero if the grid is not a Gauss grid.
+int shtns_gauss_wts(shtns_cfg shtns, double *wts)
+{
+	int i = 0;
+	if (shtns->wg) {
+		double rescale = 2*NPHI;		// weights are stored with a rescaling that depends on SHT_NORM.
+		if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  rescale *= 0.25/M_PI;
+
+		do {
+			wts[i] = shtns->wg[i] * rescale;
+		} while(++i < shtns->nlat_2);
+	}
+	return i;
+}
+
 //@}
 
 
@@ -2568,10 +2584,21 @@ void shtns_lmidx_(int *lm, int *l, int *m)
 }
 
 /// fills the given array with the cosine of the co-latitude angle (NLAT real*8)
+/// if no grid has been set, the first element will be set to zero.
 void shtns_cos_array_(double *costh)
 {
-	for (int i=0; i<sht_data->nlat; i++)
-		costh[i] = sht_data->ct[i];
+	if (sht_data->ct) {
+		for (int i=0; i<sht_data->nlat; i++)
+			costh[i] = sht_data->ct[i];
+	} else costh[0] = 0.0;	// mark as invalid.
+}
+
+/// fills the given array with the gaussian quadrature weights ((NLAT+1)/2 real*8).
+/// when there is no gaussian grid, the first element is set to zero.
+void shtns_gauss_wts_(double *wts)
+{
+	int i = shtns_gauss_wts(sht_data, wts);
+	if (i==0) wts[0] = 0;	// mark as invalid.
 }
 
 /** \name Point evaluation of Spherical Harmonics
