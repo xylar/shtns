@@ -1233,7 +1233,7 @@ static void init_SH_dct_m(shtns_cfg shtns, double* is1, fftw_plan dct, fftw_plan
 {
 	double *yk, *yk0, *dyk0, *yg;		// temp storage
 	struct DtDp *dyg, *dyk;
-	long int it,im,m,l;
+	int it,im,m,l;
 	double Z[2*NLAT_2] SSE;
 	double dZt[2*NLAT_2] SSE;
 	double dZp[2*NLAT_2] SSE;		// equally spaced theta points.

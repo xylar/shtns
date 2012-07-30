@@ -134,7 +134,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0, complex double *Tlm0, int ltr)
 {
 	long int jj,i;
-	double tmax,t,n2;
+	double tmax0, tmax,t,n2;
 
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
@@ -153,6 +153,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
 		else printf("\n");
 //	write_vect("Slm",Slm,NLM*2);
+	tmax0 = tmax;
 
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
@@ -171,6 +172,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
 		else printf("\n");
 //	write_vect("Tlm",Tlm,NLM*2);
+	return(tmax > tmax0 ? tmax : tmax0);
 }
 
 void test_SHT()

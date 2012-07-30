@@ -29,7 +29,7 @@
 	#else
 	static
 	#endif
-QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, complex double *Qlm, const long const int llim, const int imlim) {
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, complex double *Qlm, const long int llim, const int imlim) {
 VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BtF, s2d *BpF, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
 3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, s2d *BtF, s2d *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
 
