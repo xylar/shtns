@@ -282,6 +282,95 @@ void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 
 //@}
 
+/** \addtogroup operators Special operators
+ * Apply special operators in spectral space: multiplication by cos(theta), sin(theta).d/dtheta.
+*/
+//@{
+
+/// fill mx with the coefficients for multiplication by cos(theta)
+/// \param mx : an array of 2*NLM double that will be filled with the matrix coefficients.
+/// xq[lm] = mx[2*lm] * q[lm-1] + mx[2*lm+1] * q[lm+1];
+void mul_ct_matrix(shtns_cfg shtns, double* mx)
+{
+	long int im,m,l,lm;
+	double a_1;
+
+	if (SHT_NORM == sht_schmidt) {
+		lm=0;
+		for (im=0; im<=MMAX; im++) {
+			double* al = shtns->alm[im];
+			l=im*MRES;
+			mx[2*lm] = 0.0;
+			a_1 = 1.0 / al[1];
+			while(++l < LMAX) {
+				al+=2;				
+				mx[2*lm+2] = a_1;
+				a_1 = 1.0 / al[1];
+				mx[2*lm+1] = -a_1*al[0];        // = -al[2*(lm+1)] / al[2*(lm+1)+1];
+				lm++;
+			}
+			if (l == LMAX) {	// the last one needs to be computed.
+				mx[2*lm+2] = a_1;
+				mx[2*lm+1] = sqrt((l+m)*(l-m))/(2*l+1);
+				lm++;
+			}
+			mx[2*lm +1] = 0.0;
+			lm++;
+		}
+	} else {
+		lm=0;
+		for (im=0; im<=MMAX; im++) {
+			double* al = shtns->alm[im];
+			l=im*MRES;
+			mx[2*lm] = 0.0;
+			while(++l <= LMAX) {
+				a_1 = 1.0 / al[1];
+				mx[2*lm+1] = a_1;		// specific to orthonormal.
+				mx[2*lm+2] = a_1;
+				lm++;	al+=2;
+			}
+			mx[2*lm +1] = 0.0;
+			lm++;
+		}
+	}
+}
+
+/// fill mx with the coefficients of operator sin(theta).d/dtheta
+/// \param mx : an array of 2*NLM double that will be filled with the matrix coefficients.
+/// stdq[lm] = mx[2*lm] * q[lm-1] + mx[2*lm+1] * q[lm+1];
+void st_dt_matrix(shtns_cfg shtns, double* mx)
+{
+	mul_ct_matrix(shtns, mx);
+	for (int lm=0; lm<NLM; lm++) {
+		mx[2*lm]   *=   shtns->li[lm] - 1;
+		mx[2*lm+1] *= -(shtns->li[lm] + 2); 
+	}
+}
+
+/// Multiplication of Qlm by a matrix involving l+1 and l-1 only.
+/// The result is stored in Rlm, which MUST be different from Qlm.
+/// mx is an array of 2*NLM values as returned by \ref mul_ct_matrix or \ref st_dt_matrix
+/// compute: Rlm[lm] = mx[2*lm] * Qlm[lm-1] + mx[2*lm+1] * Qlm[lm+1];
+void SH_mul_mx(shtns_cfg shtns, double* mx, complex double *Qlm, complex double *Rlm)
+{
+	long int nlmlim, lm;
+	v2d* vq = (v2d*) Qlm;
+	v2d* vr = (v2d*) Rlm;
+	nlmlim = NLM-1;
+	lm = 0;
+		s2d mxu = vdup(mx[1]);
+		vr[0] = mxu*vq[1];
+	for (lm=1; lm<nlmlim; lm++) {
+		s2d mxl = vdup(mx[2*lm]);		s2d mxu = vdup(mx[2*lm+1]);
+		vr[lm] = mxl*vq[lm-1] + mxu*vq[lm+1];
+	}
+	lm=nlmlim;
+		s2d mxl = vdup(mx[2*lm]);
+		vr[lm] = mxl*vq[lm-1];
+}
+
+//@}
+
 // truncation at LMAX and MMAX
 #define LTR LMAX
 #define MTR MMAX
@@ -2104,11 +2193,12 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	if (larrays_ok == 0) {
 		// alloc spectral arrays
 		shtns->li = (unsigned short *) malloc( NLM*sizeof(unsigned short) );	// NLM defined at runtime.
-		for (im=0, lm=0; im<=MMAX; im++) {		// init l-related arrays.
+		for (im=0, lm=0; im<=MMAX; im++) {	// init l-related arrays.
 			m = im*MRES;
 			shtns->lmidx[im] = lm -m;		// virtual pointer for l=0
 			for (l=im*MRES;l<=LMAX;l++) {
-				shtns->li[lm] = l;		lm++;
+				shtns->li[lm] = l;
+				lm++;
 			}
 		}
 		if (lm != NLM) shtns_runerr("unexpected error");
@@ -2571,16 +2661,23 @@ void shtns_reset_() {
 
 /// returns nlm, the number of complex*16 elements in an SH array.
 /// call from fortran using \code call shtns_calc_nlm(nlm, lmax, mmax, mres) \endcode
-void shtns_calc_nlm_(int *nlm, int *lmax, int *mmax, int *mres)
+void shtns_calc_nlm_(int *nlm, const int *const lmax, const int *const mmax, const int *const mres)
 {
     *nlm = nlm_calc(*lmax, *mmax, *mres);
 }
 
 /// returns lm, the index in an SH array of mode (l,m).
 /// call from fortran using \code call shtns_lmidx(lm, l, m) \endcode
-void shtns_lmidx_(int *lm, int *l, int *m)
+void shtns_lmidx_(int *lm, const int *const l, const int *const m)
 {
-    *lm = LM(sht_data, *l, *m) + 1;
+	unsigned im = *m;
+	unsigned mres = sht_data->mres;
+	if (mres > 1) {
+		unsigned k = im % mres;
+		im = im / mres;
+		if (k) printf("wrong m");
+	}
+    *lm = LiM(sht_data, *l, im) + 1;	// convert to fortran convention index.
 }
 
 /// fills the given array with the cosine of the co-latitude angle (NLAT real*8)

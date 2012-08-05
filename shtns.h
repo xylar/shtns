@@ -63,7 +63,7 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 	const unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
 	const unsigned short nlat_2;	///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
 	const int *const lmidx;			///< (virtual) index in SH array of given im (size mmax+1) : LiM(l,im) = lmidx[im] + l
-	const unsigned short *const li;	///< degree l for given mode number (size nlm) : li[lm] 
+	const unsigned short *const li;	///< degree l for given mode index (size nlm) : li[lm]
 	const double *const ct;			///< cos(theta) array (size nlat)
 	const double *const st;			///< sin(theta) array (size nlat)
 	const unsigned int nspat;		///< number of real numbers that must be allocated in a spatial field.
@@ -154,6 +154,18 @@ void SH_Yrotate(shtns_cfg, complex double *Qlm, double alpha, complex double *Rl
 void SH_Yrotate90(shtns_cfg, complex double *Qlm, complex double *Rlm);
 /// Rotate SH representation around X axis by 90 degrees.
 void SH_Xrotate90(shtns_cfg, complex double *Qlm, complex double *Rlm);
+//@}
+
+/// \name Special operator functions
+//@{
+/// compute the matrix (stored in mx, a double array of size 2*NLM) required
+/// to multiply an SH representation by cos(theta) using \ref SH_mul_mx.
+void mul_ct_matrix(shtns_cfg, double* mx);
+/// compute the matrix (stored in mx, a double array of size 2*NLM) required
+/// to apply sin(theta)*d/dtheta to an SH representation using \ref SH_mul_mx.
+void st_dt_matrix(shtns_cfg, double* mx);
+/// Apply a matrix involving l+1 and l-1 to an SH representation Qlm. Result stored in Rlm (must be different from Qlm).
+void SH_mul_mx(shtns_cfg, double* mx, complex double *Qlm, complex double *Rlm);
 //@}
 
 /** \addtogroup sht Spherical Harmonic transform functions.
