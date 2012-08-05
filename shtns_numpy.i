@@ -92,6 +92,12 @@ inline PyObject* SpecArray_New(int size) {
 	return PyArray_New(&PyArray_Type, 1, &dims, PyArray_CDOUBLE, &strides, NULL, strides, 0, NULL);	
 }
 
+inline PyObject* SpatArray_New(int size) {
+	npy_intp dims = size;
+	npy_intp strides = sizeof(double);
+	return PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);	
+}
+
 %}
 
 // main object is renamed to sht.
@@ -194,28 +200,35 @@ inline PyObject* SpecArray_New(int size) {
 	/* returns useful data */
 	PyObject* __ct() {		// grid must have been initialized.
 		int i;
-		npy_intp dims = $self->nlat;
-		npy_intp strides = sizeof(double);
-		if (dims == 0) {	// no grid
+		if ($self->nlat == 0) {	// no grid
 			throw_exception(SWIG_RuntimeError,0,msg_grid_err);
 			return NULL;
 		}
-		PyObject *obj = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		PyObject *obj = SpatArray_New($self->nlat);
 		double *ct = (double*) PyArray_DATA(obj);
 		for (i=0; i<$self->nlat; i++)		ct[i] = $self->ct[i];		// copy
 		return obj;
 	}
+	PyObject* gauss_wts() {		// gauss grid must have been initialized.
+		if ($self->nlat == 0) {	// no grid
+			throw_exception(SWIG_RuntimeError,0,msg_grid_err);
+			return NULL;
+		}
+		if ($self->wg == NULL) {
+			throw_exception(SWIG_RuntimeError,0,"not a gauss grid");
+			return NULL;
+		}
+		PyObject *obj = SpatArray_New($self->nlat_2);
+		shtns_gauss_wts($self, PyArray_DATA(obj));
+		return obj;
+	}
 	PyObject* mul_ct_matrix() {
-		npy_intp dims = 2*$self->nlm;
-		npy_intp strides = sizeof(double);
-		PyObject *mx = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		PyObject *mx = SpatArray_New(2*$self->nlm);
 		mul_ct_matrix($self, PyArray_DATA(mx));
 		return mx;
 	}
 	PyObject* st_dt_matrix() {
-		npy_intp dims = 2*$self->nlm;
-		npy_intp strides = sizeof(double);
-		PyObject *mx = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		PyObject *mx = SpatArray_New(2*$self->nlm);
 		st_dt_matrix($self, PyArray_DATA(mx));
 		return mx;
 	}

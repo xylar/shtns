@@ -2275,8 +2275,18 @@ shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 	return(shtns);
 }
 
+/// release all resources allocated by a grid.
+void shtns_unset_grid(shtns_cfg shtns)
+{
+	if (ref_count(shtns, &shtns->wg) == 1)	VFREE(shtns->wg);
+	shtns->wg = NULL;
+	free_SH_dct(shtns);
+	free_SHTarrays(shtns);
+	shtns->nlat = 0;	shtns->nlat_2 = 0;
+	shtns->nphi = 0;	shtns->nspat = 0;
+}
 
-/// release all resources allocated by a given shtns_cfg
+/// release all resources allocated by a given shtns_cfg.
 void shtns_destroy(shtns_cfg shtns)
 {
 	free_unused(shtns, &shtns->l_2);
@@ -2284,10 +2294,8 @@ void shtns_destroy(shtns_cfg shtns)
 		free_unused(shtns, &shtns->blm);
 	free_unused(shtns, &shtns->alm);
 	free_unused(shtns, &shtns->li);
-	if (ref_count(shtns, &shtns->wg) == 1)	VFREE(shtns->wg);
 
-	free_SH_dct(shtns);
-	free_SHTarrays(shtns);
+	shtns_unset_grid(shtns);
 
 	if (sht_data == shtns) {
 		sht_data = shtns->next;		// forget shtns
@@ -2338,6 +2346,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#if _GCC_VEC_
 		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
 	#endif
+	shtns_unset_grid(shtns);		// release grid if previously allocated.
 	if (nl_order <= 0) nl_order = SHT_DEFAULT_NL_ORDER;
 /*	shtns.lshift = 0;
 	if (nl_order == 0) nl_order = SHT_DEFAULT_NL_ORDER;

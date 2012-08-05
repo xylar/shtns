@@ -3031,6 +3031,12 @@ inline PyObject* SpecArray_New(int size) {
 	return PyArray_New(&PyArray_Type, 1, &dims, PyArray_CDOUBLE, &strides, NULL, strides, 0, NULL);	
 }
 
+inline PyObject* SpatArray_New(int size) {
+	npy_intp dims = size;
+	npy_intp strides = sizeof(double);
+	return PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);	
+}
+
 
 
 SWIGINTERNINLINE PyObject*
@@ -3323,28 +3329,35 @@ SWIGINTERN double shtns_info_shlm_e1(struct shtns_info *self,unsigned int l,unsi
 	}
 SWIGINTERN PyObject *shtns_info___ct(struct shtns_info *self){		// grid must have been initialized.
 		int i;
-		npy_intp dims = self->nlat;
-		npy_intp strides = sizeof(double);
-		if (dims == 0) {	// no grid
+		if (self->nlat == 0) {	// no grid
 			throw_exception(SWIG_RuntimeError,0,msg_grid_err);
 			return NULL;
 		}
-		PyObject *obj = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		PyObject *obj = SpatArray_New(self->nlat);
 		double *ct = (double*) PyArray_DATA(obj);
 		for (i=0; i<self->nlat; i++)		ct[i] = self->ct[i];		// copy
 		return obj;
 	}
+SWIGINTERN PyObject *shtns_info_gauss_wts(struct shtns_info *self){		// gauss grid must have been initialized.
+		if (self->nlat == 0) {	// no grid
+			throw_exception(SWIG_RuntimeError,0,msg_grid_err);
+			return NULL;
+		}
+		if (self->wg == NULL) {
+			throw_exception(SWIG_RuntimeError,0,"not a gauss grid");
+			return NULL;
+		}
+		PyObject *obj = SpatArray_New(self->nlat_2);
+		shtns_gauss_wts(self, PyArray_DATA(obj));
+		return obj;
+	}
 SWIGINTERN PyObject *shtns_info_mul_ct_matrix(struct shtns_info *self){
-		npy_intp dims = 2*self->nlm;
-		npy_intp strides = sizeof(double);
-		PyObject *mx = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		PyObject *mx = SpatArray_New(2*self->nlm);
 		mul_ct_matrix(self, PyArray_DATA(mx));
 		return mx;
 	}
 SWIGINTERN PyObject *shtns_info_st_dt_matrix(struct shtns_info *self){
-		npy_intp dims = 2*self->nlm;
-		npy_intp strides = sizeof(double);
-		PyObject *mx = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		PyObject *mx = SpatArray_New(2*self->nlm);
 		st_dt_matrix(self, PyArray_DATA(mx));
 		return mx;
 	}
@@ -3995,6 +4008,35 @@ SWIGINTERN PyObject *_wrap_sht___ct(PyObject *SWIGUNUSEDPARM(self), PyObject *ar
   {
     shtns_error = 0;	// clear exception
     result = (PyObject *)shtns_info___ct(arg1);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = result;
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_sht_gauss_wts(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:sht_gauss_wts",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_gauss_wts" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  {
+    shtns_error = 0;	// clear exception
+    result = (PyObject *)shtns_info_gauss_wts(arg1);
     if (shtns_error) {
       // test for exception
       SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
@@ -4858,6 +4900,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_sh11_st", _wrap_sht_sh11_st, METH_VARARGS, (char *)"sht_sh11_st(sht self) -> double"},
 	 { (char *)"sht_shlm_e1", _wrap_sht_shlm_e1, METH_VARARGS, (char *)"sht_shlm_e1(sht self, unsigned int l, unsigned int m) -> double"},
 	 { (char *)"sht___ct", _wrap_sht___ct, METH_VARARGS, (char *)"sht___ct(sht self) -> PyObject *"},
+	 { (char *)"sht_gauss_wts", _wrap_sht_gauss_wts, METH_VARARGS, (char *)"sht_gauss_wts(sht self) -> PyObject *"},
 	 { (char *)"sht_mul_ct_matrix", _wrap_sht_mul_ct_matrix, METH_VARARGS, (char *)"sht_mul_ct_matrix(sht self) -> PyObject *"},
 	 { (char *)"sht_st_dt_matrix", _wrap_sht_st_dt_matrix, METH_VARARGS, (char *)"sht_st_dt_matrix(sht self) -> PyObject *"},
 	 { (char *)"sht___spat_shape", _wrap_sht___spat_shape, METH_VARARGS, (char *)"sht___spat_shape(sht self)"},

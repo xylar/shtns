@@ -163,6 +163,10 @@ class sht(_object):
         """__ct(sht self) -> PyObject *"""
         return _shtns.sht___ct(self)
 
+    def gauss_wts(self):
+        """gauss_wts(sht self) -> PyObject *"""
+        return _shtns.sht_gauss_wts(self)
+
     def mul_ct_matrix(self):
         """mul_ct_matrix(sht self) -> PyObject *"""
         return _shtns.sht_mul_ct_matrix(self)
