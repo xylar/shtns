@@ -64,6 +64,7 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 	const unsigned short nlat_2;	///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
 	const int *const lmidx;			///< (virtual) index in SH array of given im (size mmax+1) : LiM(l,im) = lmidx[im] + l
 	const unsigned short *const li;	///< degree l for given mode index (size nlm) : li[lm]
+	const unsigned short *const mi;	///< order m for given mode index (size nlm) : mi[lm]
 	const double *const ct;			///< cos(theta) array (size nlat)
 	const double *const st;			///< sin(theta) array (size nlat)
 	const unsigned int nspat;		///< number of real numbers that must be allocated in a spatial field.

@@ -100,6 +100,7 @@ inline PyObject* SpecArray_New(int size) {
 %ignore nlat_2;
 %ignore lmidx;
 %ignore li;
+%ignore mi;
 %ignore ct;
 %ignore st;
 

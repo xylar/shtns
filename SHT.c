@@ -282,6 +282,7 @@ void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 
 //@}
 
+
 /** \addtogroup operators Special operators
  * Apply special operators in spectral space: multiplication by cos(theta), sin(theta).d/dtheta.
 */
@@ -2175,7 +2176,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	while(s2 != NULL) {
 		if ((s2->mmax >= mmax) && (s2->mres == mres)) {
 			if (s2->lmax == lmax) {		// we can reuse the l-related arrays (li + copy lmidx)
-				shtns->li = s2->li;
+				shtns->li = s2->li;		shtns->mi = s2->mi;
 				for (im=0; im<=mmax; im++)	shtns->lmidx[im] = s2->lmidx[im];
 				larrays_ok = 1;
 			}
@@ -2192,12 +2193,13 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	}
 	if (larrays_ok == 0) {
 		// alloc spectral arrays
-		shtns->li = (unsigned short *) malloc( NLM*sizeof(unsigned short) );	// NLM defined at runtime.
+		shtns->li = (unsigned short *) malloc( 2*NLM*sizeof(unsigned short) );	// NLM defined at runtime.
+		shtns->mi = shtns->li + NLM;
 		for (im=0, lm=0; im<=MMAX; im++) {	// init l-related arrays.
 			m = im*MRES;
 			shtns->lmidx[im] = lm -m;		// virtual pointer for l=0
 			for (l=im*MRES;l<=LMAX;l++) {
-				shtns->li[lm] = l;
+				shtns->li[lm] = l;		shtns->mi[lm] = m;
 				lm++;
 			}
 		}
@@ -2678,6 +2680,14 @@ void shtns_lmidx_(int *lm, const int *const l, const int *const m)
 		if (k) printf("wrong m");
 	}
     *lm = LiM(sht_data, *l, im) + 1;	// convert to fortran convention index.
+}
+
+/// returns l and m, degree and order of an index in SH array lm.
+/// call from fortran using \code call shtns_l_m(l, m, lm) \endcode
+void shtns_l_m_(int *l, int *m, const int *const lm)
+{
+	*l = sht_data->li[*lm -1];	// convert from fortran convention index.
+	*m = sht_data->mi[*lm -1];
 }
 
 /// fills the given array with the cosine of the co-latitude angle (NLAT real*8)
