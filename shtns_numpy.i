@@ -29,7 +29,7 @@
 }
 
 %{
-	
+
 #include <numpy/arrayobject.h>
 #include "sht_private.h"
 
@@ -59,7 +59,7 @@ static int check_spatial(int i, PyObject *a, int size) {
 		throw_exception(SWIG_TypeError,i,msg_numpy_arr);		return 0;
 	}
 	if (PyArray_TYPE(a) != PyArray_DOUBLE) {
-		throw_exception(SWIG_TypeError,i,"spatial array must consist of float");		return 0;
+		throw_exception(SWIG_TypeError,i,"spatial array must consist of float.");		return 0;
 	}
 	if (!PyArray_ISCONTIGUOUS(a)) {
 		throw_exception(SWIG_RuntimeError,i,"spatial array not contiguous. Use 'b=a.copy()' to copy a to a contiguous array b.");		return 0;
@@ -75,7 +75,7 @@ static int check_spectral(int i, PyObject *a, int size) {
 		throw_exception(SWIG_RuntimeError,i,msg_numpy_arr);		return 0;
 	}
 	if (PyArray_TYPE(a) != PyArray_CDOUBLE) {
-		throw_exception(SWIG_RuntimeError,i,"spectral array must consist of complex float. Create with: 'numpy.zeros(sh.nlm, dtype=complex)'");		return 0;
+		throw_exception(SWIG_RuntimeError,i,"spectral array must consist of complex float. Create with: 'sh.spec_array()'");		return 0;
 	}
 	if (!PyArray_ISCONTIGUOUS(a)) {
 		throw_exception(SWIG_RuntimeError,i,"spactral array not contiguous. Use .copy() to copy to a contiguous array.");		return 0;
@@ -84,6 +84,12 @@ static int check_spectral(int i, PyObject *a, int size) {
 		throw_exception(SWIG_RuntimeError,i,"spectral array has wrong size");		return 0;
 	}
 	return 1;
+}
+
+inline PyObject* SpecArray_New(int size) {
+	npy_intp dims = size;
+	npy_intp strides = sizeof(complex double);
+	return PyArray_New(&PyArray_Type, 1, &dims, PyArray_CDOUBLE, &strides, NULL, strides, 0, NULL);	
 }
 
 %}
@@ -142,7 +148,7 @@ static int check_spectral(int i, PyObject *a, int size) {
 	~shtns_info() {
 		shtns_destroy($self);		// free memory.
 	}
-	
+
 	%pythonappend set_grid %{
 		self.cos_theta = self.__ct()
 		self.cos_theta.flags.writeable = False
@@ -197,6 +203,20 @@ static int check_spectral(int i, PyObject *a, int size) {
 		double *ct = (double*) PyArray_DATA(obj);
 		for (i=0; i<$self->nlat; i++)		ct[i] = $self->ct[i];		// copy
 		return obj;
+	}
+	PyObject* mul_ct_matrix() {
+		npy_intp dims = 2*$self->nlm;
+		npy_intp strides = sizeof(double);
+		PyObject *mx = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		mul_ct_matrix($self, PyArray_DATA(mx));
+		return mx;
+	}
+	PyObject* st_dt_matrix() {
+		npy_intp dims = 2*$self->nlm;
+		npy_intp strides = sizeof(double);
+		PyObject *mx = PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);
+		st_dt_matrix($self, PyArray_DATA(mx));
+		return mx;
 	}
 
 	%apply int *OUTPUT { int *dim0 };
@@ -357,30 +377,51 @@ static int check_spectral(int i, PyObject *a, int size) {
 	%clear double *vp;
 
 	/* rotation of SH representations (experimental) */
-	void SH_Zrotate(PyObject *Qlm, double alpha, PyObject *Rlm) {
-		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(3,Rlm, $self->nlm))
+	PyObject* Zrotate(PyObject *Qlm, double alpha) {
+		if (check_spectral(1,Qlm, $self->nlm)) {
+			PyObject *Rlm = SpecArray_New($self->nlm);
 			SH_Zrotate($self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
+			return Rlm;
+		}
 	}
-	void SH_Yrotate(PyObject *Qlm, double alpha, PyObject *Rlm) {
+	PyObject* Yrotate(PyObject *Qlm, double alpha) {
 		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
 			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
 		}
-		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(3,Rlm, $self->nlm))
+		if (check_spectral(1,Qlm, $self->nlm)) {
+			PyObject *Rlm = SpecArray_New($self->nlm);
 			SH_Yrotate($self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
+			return Rlm;
+		}
 	}
-	void SH_Yrotate90(PyObject *Qlm, PyObject *Rlm) {
+	PyObject* Yrotate90(PyObject *Qlm) {
 		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
 			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
 		}
-		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Rlm, $self->nlm))
+		if (check_spectral(1,Qlm, $self->nlm)) {
+			PyObject *Rlm = SpecArray_New($self->nlm);
 			SH_Yrotate90($self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
+			return Rlm;
+		}
 	}
-	void SH_Xrotate90(PyObject *Qlm, PyObject *Rlm) {
+	PyObject* Xrotate90(PyObject *Qlm) {
 		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
 			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
 		}
-		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Rlm, $self->nlm))
+		if (check_spectral(1,Qlm, $self->nlm)) {
+			PyObject *Rlm = SpecArray_New($self->nlm);
 			SH_Xrotate90($self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
+			return Rlm;
+		}
+	}
+
+	/* multiplication by l+1 l-1 matrix (mul_ct_matrix or st_dt_matrix) */
+	PyObject* SH_mul_mx(PyObject *mx, PyObject *Qlm) {
+		if (check_spectral(2,Qlm, $self->nlm) && check_spatial(1, mx, 2* $self->nlm)) {
+			PyObject *Rlm = SpecArray_New($self->nlm);
+			SH_mul_mx($self, PyArray_DATA(mx), PyArray_DATA(Qlm), PyArray_DATA(Rlm));
+			return Rlm;
+		}
 	}
 
 };

@@ -163,6 +163,14 @@ class sht(_object):
         """__ct(sht self) -> PyObject *"""
         return _shtns.sht___ct(self)
 
+    def mul_ct_matrix(self):
+        """mul_ct_matrix(sht self) -> PyObject *"""
+        return _shtns.sht_mul_ct_matrix(self)
+
+    def st_dt_matrix(self):
+        """st_dt_matrix(sht self) -> PyObject *"""
+        return _shtns.sht_st_dt_matrix(self)
+
     def __spat_shape(self):
         """__spat_shape(sht self)"""
         return _shtns.sht___spat_shape(self)
@@ -287,21 +295,25 @@ class sht(_object):
         """SHqst_to_point(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, double cost, double phi)"""
         return _shtns.sht_SHqst_to_point(self, *args)
 
-    def SH_Zrotate(self, *args):
-        """SH_Zrotate(sht self, PyObject * Qlm, double alpha, PyObject * Rlm)"""
-        return _shtns.sht_SH_Zrotate(self, *args)
+    def Zrotate(self, *args):
+        """Zrotate(sht self, PyObject * Qlm, double alpha) -> PyObject *"""
+        return _shtns.sht_Zrotate(self, *args)
 
-    def SH_Yrotate(self, *args):
-        """SH_Yrotate(sht self, PyObject * Qlm, double alpha, PyObject * Rlm)"""
-        return _shtns.sht_SH_Yrotate(self, *args)
+    def Yrotate(self, *args):
+        """Yrotate(sht self, PyObject * Qlm, double alpha) -> PyObject *"""
+        return _shtns.sht_Yrotate(self, *args)
 
-    def SH_Yrotate90(self, *args):
-        """SH_Yrotate90(sht self, PyObject * Qlm, PyObject * Rlm)"""
-        return _shtns.sht_SH_Yrotate90(self, *args)
+    def Yrotate90(self, *args):
+        """Yrotate90(sht self, PyObject * Qlm) -> PyObject *"""
+        return _shtns.sht_Yrotate90(self, *args)
 
-    def SH_Xrotate90(self, *args):
-        """SH_Xrotate90(sht self, PyObject * Qlm, PyObject * Rlm)"""
-        return _shtns.sht_SH_Xrotate90(self, *args)
+    def Xrotate90(self, *args):
+        """Xrotate90(sht self, PyObject * Qlm) -> PyObject *"""
+        return _shtns.sht_Xrotate90(self, *args)
+
+    def SH_mul_mx(self, *args):
+        """SH_mul_mx(sht self, PyObject * mx, PyObject * Qlm) -> PyObject *"""
+        return _shtns.sht_SH_mul_mx(self, *args)
 
 sht_swigregister = _shtns.sht_swigregister
 sht_swigregister(sht)
