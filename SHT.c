@@ -344,7 +344,7 @@ void st_dt_matrix(shtns_cfg shtns, double* mx)
 	mul_ct_matrix(shtns, mx);
 	for (int lm=0; lm<NLM; lm++) {
 		mx[2*lm]   *=   shtns->li[lm] - 1;
-		mx[2*lm+1] *= -(shtns->li[lm] + 2); 
+		mx[2*lm+1] *= -(shtns->li[lm] + 2);
 	}
 }
 
@@ -387,29 +387,42 @@ void SH_mul_mx(shtns_cfg shtns, double* mx, complex double *Qlm, complex double 
 double SH_to_point(shtns_cfg shtns, complex double *Qlm, double cost, double phi)
 {
 	double yl[LMAX+1];
-	double vr;
-	complex double *Ql;
+	double vr0, vr1;
 	long int l,m,im;
 
-	vr = 0.0;
+	vr0 = 0.0;		vr1 = 0.0;
 	m=0;	im=0;
 		legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
-		for (l=m; l<=LTR; ++l)
-			vr += yl[l] * creal( Qlm[l] );
+		for (l=m; l<LTR; l+=2) {
+			vr0 += yl[l] * creal( Qlm[l] );
+			vr1 += yl[l+1] * creal( Qlm[l+1] );
+		}
+		if (l==LTR) {
+			vr0 += yl[l] * creal( Qlm[l] );
+		}
+		vr0 += vr1;
 	if (MTR>0) {
 		complex double eip, eimp;
 		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
-		for (im=1; im<=MTR; ++im) {
+		im = 1;  do {
 			m = im*MRES;
 			legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
+			v2d* Ql = (v2d*) &Qlm[LiM(shtns, 0,im)];	// virtual pointer for l=0 and im
+			v2d vrm0 = vdup(0.0);		v2d vrm1 = vdup(0.0);
+			for (l=m; l<LTR; l+=2) {
+				vrm0 += vdup(yl[l]) * Ql[l];
+				vrm1 += vdup(yl[l+1]) * Ql[l+1];
+			}
 //			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 			eimp *= eip;			// not so accurate, but it should be enough for rendering uses.
-			Ql = &Qlm[LiM(shtns, 0,im)];	// virtual pointer for l=0 and im
-			for (l=m; l<=LTR; ++l)
-				vr += yl[l] * creal( Ql[l]*eimp );
-		}
+			vrm0 += vrm1;
+			if (l==LTR) {
+				vrm0 += vdup(yl[l]) * Ql[l];
+			}
+			vr0 += vcplx_real(vrm0)*creal(eimp) - vcplx_imag(vrm0)*cimag(eimp);
+		} while(++im <= MTR);
 	}
-	return vr;
+	return vr0;
 }
 
 /// Evaluate vector SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
@@ -418,43 +431,50 @@ void SHqst_to_point(shtns_cfg shtns, complex double *Qlm, complex double *Slm, c
 {
 	double yl[LMAX+1];
 	double dtyl[LMAX+1];
-	double vst, vtt, vsp, vtp, vr0, vrm;
-	complex double *Ql, *Sl, *Tl;
+	double vtt, vpp, vr0, vrm;
 	long int l,m,im;
 
 	const double sint = sqrt((1.-cost)*(1.+cost));
-	vst = 0.; vtt = 0.; vsp = 0.; vtp =0.; vr0 = 0.; vrm = 0.;
+	vtt = 0.;  vpp = 0.;  vr0 = 0.;  vrm = 0.;
 	m=0;	im=0;
 		legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
 		for (l=m; l<=LTR; ++l) {
 			vr0 += yl[l] * creal( Qlm[l] );
-			vst += dtyl[l] * creal( Slm[l] );
-			vtt += dtyl[l] * creal( Tlm[l] );
+			vtt += dtyl[l] * creal( Slm[l] );
+			vpp -= dtyl[l] * creal( Tlm[l] );
 		}
 	if (MTR>0) {
 		complex double eip, eimp, imeimp;
 		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
-		for (im=1; im<=MTR; ++im) {
+		im=1;  do {
 			m = im*MRES;
 			legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
 //			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 			eimp *= eip;		// not so accurate, but it should be enough for rendering uses.
-			imeimp = I*m*eimp;
+			imeimp = eimp*m*I;
 			l = LiM(shtns, 0,im);
-			Ql = &Qlm[l];	Sl = &Slm[l];	Tl = &Tlm[l];
+			v2d* Ql = (v2d*) &Qlm[l];	v2d* Sl = (v2d*) &Slm[l];	v2d* Tl = (v2d*) &Tlm[l];
+			v2d qm = vdup(0.0);
+			v2d dsdt = vdup(0.0);		v2d dtdt = vdup(0.0);
+			v2d dsdp = vdup(0.0);		v2d dtdp = vdup(0.0);
 			for (l=m; l<=LTR; ++l) {
-				vrm += yl[l] * creal( Ql[l]*eimp );
-				vst += dtyl[l] * creal(Sl[l]*eimp);
-				vtt += dtyl[l] * creal(Tl[l]*eimp);
-				vsp += yl[l] * creal(Sl[l]*imeimp);
-				vtp += yl[l] * creal(Tl[l]*imeimp);
+				qm += vdup(yl[l]) * Ql[l];
+				dsdt += vdup(dtyl[l]) * Sl[l];
+				dtdt += vdup(dtyl[l]) * Tl[l];
+				dsdp += vdup(yl[l]) * Sl[l];
+				dtdp += vdup(yl[l]) * Tl[l];
 			}
-		}
-		vrm *= sint;
+			vrm += vcplx_real(qm)*creal(eimp) - vcplx_imag(qm)*cimag(eimp);
+			vtt += (vcplx_real(dtdp)*creal(imeimp) - vcplx_imag(dtdp)*cimag(imeimp))	// + I.m/sint *T
+					+ (vcplx_real(dsdt)*creal(eimp) - vcplx_imag(dsdt)*cimag(eimp));	// + dS/dt
+			vpp += (vcplx_real(dsdp)*creal(imeimp) - vcplx_imag(dsdp)*cimag(imeimp))	// + I.m/sint *S
+					- (vcplx_real(dtdt)*creal(eimp) - vcplx_imag(dtdt)*cimag(eimp));	// - dT/dt
+		} while (++im <= MTR);
+		vr0 += vrm*sint;
 	}
-	*vr = vr0 + vrm;
-	*vt = vtp + vst;	// Bt = I.m/sint *T  + dS/dt
-	*vp = vsp - vtt;	// Bp = I.m/sint *S  - dT/dt
+	*vr = vr0;
+	*vt = vtt;	// Bt = I.m/sint *T  + dS/dt
+	*vp = vpp;	// Bp = I.m/sint *S  - dT/dt
 }
 //@}
 	

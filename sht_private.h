@@ -262,6 +262,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vxchg(a) _mm_shuffle_pd(a,a,1)
 	#define vlo_to_cplx(a) _mm_unpacklo_pd(a, vdup(0.0))
 	#define vhi_to_cplx(a) _mm_unpackhi_pd(a, vdup(0.0))
+	#define vcplx_real(a) vlo_to_dbl(a)
+	#define vcplx_imag(a) vhi_to_dbl(a)
 	#ifdef __clang__
 		// allow to compile with clang (llvm)
 		#define vlo(a) (a)[0]
@@ -297,6 +299,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define addi(a,b) ((a) + I*(b))
 	#define vlo_to_dbl(a) (a)
 	#define vhi_to_dbl(a) (a)
+	#define vcplx_real(a) creal(a)
+	#define vcplx_imag(a) cimag(a)
 
 	// allocate memory aligned for FFTW. In 64 bit system, malloc should be 16 bytes aligned.
 	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
