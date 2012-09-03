@@ -175,6 +175,34 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 	return(tmax > tmax0 ? tmax : tmax0);
 }
 
+void test_SH_point()
+{
+	long int jj,i;
+	double ts2, ta2;
+	struct timespec t1, t2;
+
+	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
+
+	clock_gettime(CLOCK_REALTIME, &t1);
+	for (jj=0; jj< SHT_ITER; jj++) {
+		ta2 = SH_to_point(shtns, Slm, 0.8, 0.76);
+	}
+	clock_gettime(CLOCK_REALTIME, &t2);
+	ts2 = tdiff(&t1, &t2);
+	
+	clock_gettime(CLOCK_REALTIME, &t1);
+	for (jj=1; jj< SHT_ITER; jj++) {
+		double vr, vt, vp;
+		SHqst_to_point(shtns, Slm, Slm0, Tlm0, 0.8, 0.76, &vr, &vt, &vp);
+	}
+	clock_gettime(CLOCK_REALTIME, &t2);
+	ta2 = tdiff(&t1, &t2);
+
+	printf("   SHT_to_point time = %f ms [scalar], %f ms [3D vector]\n", ts2, ta2);
+	return;
+}
+
+
 void test_SHT()
 {
 	long int jj,i;
@@ -559,6 +587,7 @@ int main(int argc, char *argv[])
 	enum shtns_norm shtnorm = sht_orthonormal;		// default to "orthonormal" SH.
 	int layout = SHT_NATIVE_LAYOUT;
 	int nlorder = 0;
+	int point = 0;
 	int vector = 1;
 	char name[20];
 	FILE* fw;
@@ -601,6 +630,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
 		if (strcmp(name,"nlorder") == 0) nlorder = t;
 		if (strcmp(name,"scalar") == 0) vector = 0;
+		if (strcmp(name,"point") == 0) point = 1;
 	}
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
@@ -714,6 +744,12 @@ int main(int argc, char *argv[])
 		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 		Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 	}
+	
+	if (point) {
+		test_SH_point();
+		exit(0);
+	}
+
 
 //	printf("** performing %d scalar SHT with NL evaluation\n", SHT_ITER);
 	printf("** performing %d scalar SHT\n", SHT_ITER);
