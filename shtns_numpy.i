@@ -125,8 +125,10 @@ inline PyObject* SpatArray_New(int size) {
 	}
 
 	%pythonappend shtns_info %{
-		self.m = np.zeros(self.nlm, dtype=np.int32)
+		## array giving the degree of spherical harmonic coefficients.
 		self.l = np.zeros(self.nlm, dtype=np.int32)
+		## array giving the order of spherical harmonic coefficients.
+		self.m = np.zeros(self.nlm, dtype=np.int32)
 		for mloop in range(0, self.mmax*self.mres+1, self.mres):
 			for lloop in range(mloop, self.lmax+1):
 				ii = self.idx(lloop,mloop)
@@ -157,8 +159,10 @@ inline PyObject* SpatArray_New(int size) {
 	}
 
 	%pythonappend set_grid %{
+		## array giving the cosine of the colatitude for the grid.
 		self.cos_theta = self.__ct()
 		self.cos_theta.flags.writeable = False
+		## shape of a spatial array for the grid (tuple of 2 values).
 		self.spat_shape = tuple(self.__spat_shape())
 	%}
 	%apply int *OUTPUT { int *nlat_out };
@@ -244,9 +248,11 @@ inline PyObject* SpatArray_New(int size) {
 
 	%pythoncode %{
 		def spec_array(self):
+			"""return a numpy array of spherical harmonic coefficients (complex). Adress coefficients with index sh.idx(l,m)"""
 			return np.zeros(self.nlm, dtype=complex)
 		
 		def spat_array(self):
+			"""return a numpy array of 2D spatial field."""
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
 			return np.zeros(self.spat_shape)
 	%}
@@ -304,10 +310,12 @@ inline PyObject* SpatArray_New(int size) {
 
 	%pythoncode %{
 		def synth(self,*arg):
-			"""spectral to spatial transform, for scalar or vector data.
+			"""
+			spectral to spatial transform, for scalar or vector data.
 			v = synth(qlm) : compute the spatial representation of the scalar qlm
 			vtheta,vphi = synth(slm,tlm) : compute the 2D spatial vector from its spectral spheroidal/toroidal scalars (slm,tlm)
-			vr,vtheta,vphi = synth(qlm,slm,tlm) : compute the 3D spatial vector from its spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm)"""
+			vr,vtheta,vphi = synth(qlm,slm,tlm) : compute the 3D spatial vector from its spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm)
+			"""
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
 			n = len(arg)
 			if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
@@ -333,10 +341,12 @@ inline PyObject* SpatArray_New(int size) {
 				return vr,vt,vp
 
 		def analys(self,*arg):
-			"""spatial to spectral transform, for scalar or vector data.
+			"""
+			spatial to spectral transform, for scalar or vector data.
 			qlm = analys(q) : compute the spherical harmonic representation of the scalar q
 			slm,tlm = analys(vtheta,vphi) : compute the spectral spheroidal/toroidal scalars (slm,tlm) from 2D vector components (vtheta, vphi)
-			qlm,slm,tlm = synth(vr,vtheta,vphi) : compute the spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm) from 3D vector components (vr,vtheta,vphi)"""
+			qlm,slm,tlm = synth(vr,vtheta,vphi) : compute the spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm) from 3D vector components (vr,vtheta,vphi)
+			"""
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
 			n = len(arg)
 			if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
