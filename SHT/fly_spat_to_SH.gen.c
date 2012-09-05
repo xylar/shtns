@@ -205,10 +205,7 @@ V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 
   #ifndef SHT_AXISYM
 	#if _GCC_VEC_
-		sgn_mask = vdup(0.0);		// build mask to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
-		sgn_mask = (s2d) _mm_cmpeq_epi16((__m128i) sgn_mask, (__m128i) sgn_mask);
-		sgn_mask = (s2d) _mm_slli_epi64((__m128i) sgn_mask, 63);		// (-0,-0)
-		sgn_mask = _mm_unpackhi_pd(vdup(0.0), sgn_mask);	// (0, -0)
+		sgn_mask = SIGN_MASK_HI;		// build mask to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
 	#endif
 	for (k=nk*(VSIZE2/VSIZE); k<(nk+NWAY)*(VSIZE2/VSIZE)-1; ++k) {		// never written, so this is now done for all m's (real parts already zero)
 Q		rei[k] = vdup(0.0);		roi[k] = vdup(0.0);

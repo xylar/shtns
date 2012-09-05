@@ -253,6 +253,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define CFFT_TO_2REAL(nr, ni, sr, si ,smsk) { \
 		s2d tn = ni;	ni = _mm_xor_pd( vxchg(nr-ni), smsk);	nr = nr+tn; \
 		s2d ts = sr;	sr = vxchg(sr+si);		si = _mm_xor_pd( si-ts, smsk );  }
+	// build mask (-0, -0) to change sign of both hi and lo values using xorpd
+	#define SIGN_MASK_2  ((s2d) _mm_slli_epi64(_mm_cmpeq_epi16(_mm_set1_epi64x(0), _mm_set1_epi64x(0)), 63))
+	// build mask (0, -0) to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
+	#define SIGN_MASK_HI  _mm_unpackhi_pd(vdup(0.0), SIGN_MASK_2 )
+	// build mask (-0, 0) to change sign of lo value using xorpd
+	#define SIGN_MASK_LO  _mm_unpackhi_pd(SIGN_MASK_2, vdup(0.0) )
 
 	// vset(lo, hi) takes two doubles and pack them in a vector
 	#define vset(lo, hi) _mm_set_pd(hi, lo)

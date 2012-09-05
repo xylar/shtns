@@ -210,10 +210,7 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 Q	BrF += m0*vnlat;
 V	BtF += m0*vnlat;	BpF += m0*vnlat;
 	#if _GCC_VEC_
-		sgn_mask = vdup(0.0);		// build mask to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
-		sgn_mask = (s2d) _mm_cmpeq_epi16((__m128i) sgn_mask, (__m128i) sgn_mask);
-		sgn_mask = (s2d) _mm_slli_epi64((__m128i) sgn_mask, 63);		// (-0,-0)
-		sgn_mask = _mm_unpackhi_pd(vdup(0.0), sgn_mask);	// (0, -0)
+		sgn_mask = SIGN_MASK_HI;	// build mask to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
 	#endif
 	for (im=m0; im<imlim; im+=mstep) {
 		l = shtns->tm[im] / VSIZE2;
