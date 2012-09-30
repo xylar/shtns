@@ -508,6 +508,8 @@ Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPH
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
 V		  #endif
+Q			VFREE(BrF);
+VX			VFREE(BtF);		// this frees also BpF.
 		}
 	}
 	#else
@@ -517,12 +519,12 @@ Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
 V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
 V	  #endif
+		if (shtns->ncplx_fft > 0) {		// free memory
+Q			VFREE(BrF);
+VX			VFREE(BtF);		// this frees also BpF.
+		}
 	}
 	#endif
-	if (shtns->ncplx_fft > 0) {		// free memory
-Q		VFREE(BrF);
-VX		VFREE(BtF);		// this frees also BpF.
-	}
   #endif
 
   }
