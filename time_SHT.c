@@ -233,9 +233,9 @@ void test_SHT()
 	ta = tcpu / (1000.*SHT_ITER);
 	ta2 = tdiff(&t1, &t2);
   #ifdef _OPENMP
-	printf("   SHT time : \t synthesis = %f ms [cpu %f] \t analysis = %f ms [cpu %f] \n", ts2, ts, ta2, ta);
+	printf("   SHT time (lmax=%d): \t synthesis = %f ms [cpu %f] \t analysis = %f ms [cpu %f] \n", LMAX, ts2, ts, ta2, ta);
   #else
-	printf("   SHT time : \t synthesis = %f ms \t analysis = %f ms \n", ts2, ta2);
+	printf("   SHT time (lmax=%d): \t synthesis = %f ms \t analysis = %f ms \n", LMAX, ts2, ta2);
   #endif
 	scal_error(Slm, Slm0, LMAX);
 	return;
@@ -357,7 +357,7 @@ void test_SHT_vect()
 	}
 	clock_gettime(CLOCK_REALTIME, &t2);
 	ta = tdiff(&t1, &t2);
-	printf("   vector SHT time : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
+	printf("   vector SHT time (lmax=%d) : \t synthesis %f ms \t analysis %f ms\n", LMAX, ts, ta);
 
 	fftw_free(T2);	fftw_free(S2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
@@ -428,7 +428,7 @@ void test_SHT_vect3d()
 	}
 	clock_gettime(CLOCK_REALTIME, &t2);
 	ta = tdiff(&t1, &t2);
-	printf("   3D vector SHT time : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
+	printf("   3D vector SHT time (lmax=%d): \t synthesis %f ms \t analysis %f ms\n", LMAX, ts, ta);
 
 	fftw_free(T2);	fftw_free(S2);	fftw_free(Q2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
