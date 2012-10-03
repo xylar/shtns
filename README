@@ -53,7 +53,7 @@ CHANGE LOG:
 	- better python interface for rotations.
 	- performance improvement for OpenMP code without fftw3_omp.
 	- slightly faster SH_to_point() [5%] and SHqst_to_point() [20%].
-	- bugfix: in some rare cases, OpenMP code freed unallocate memory.
+	- bugfix: in some rare cases, OpenMP code freed unallocated memory.
 	- bugfix: fixed python interface compilation with clang.
   v2.2.4  (25 Jun 2012)
 	- the previous critical bugfix had not been applied to parallel OpenMP transforms.

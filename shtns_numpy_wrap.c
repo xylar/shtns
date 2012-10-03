@@ -3230,7 +3230,6 @@ SWIGINTERN struct shtns_info *new_shtns_info(int lmax,int mmax,int mres,int norm
 		if (mmax*mres > lmax) {
 			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres invalid");	return NULL;
 		}
-		import_array();		// required by NumPy
 		shtns_use_threads(nthreads);		// use nthreads openmp threads if available (0 means auto)
 		return shtns_create(lmax, mmax, mres, norm);
 	}
@@ -5736,6 +5735,9 @@ SWIG_init(void) {
 #endif
   
   SWIG_InstallConstants(d,swig_const_table);
+  
+  
+  import_array();		// required by NumPy
   
   SWIG_Python_SetConstant(d, "sht_orthonormal",SWIG_From_int((int)(sht_orthonormal)));
   SWIG_Python_SetConstant(d, "sht_fourpi",SWIG_From_int((int)(sht_fourpi)));

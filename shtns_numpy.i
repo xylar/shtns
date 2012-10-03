@@ -24,6 +24,10 @@
 
 %module (docstring="Python/NumPy interface to the SHTns spherical harmonic transform library") shtns
 
+%init{
+	import_array();		// required by NumPy
+}
+
 %pythoncode{
 	import numpy as np
 }
@@ -149,7 +153,6 @@ inline PyObject* SpatArray_New(int size) {
 		if (mmax*mres > lmax) {
 			throw_exception(SWIG_ValueError,1,"lmax < mmax*mres invalid");	return NULL;
 		}
-		import_array();		// required by NumPy
 		shtns_use_threads(nthreads);		// use nthreads openmp threads if available (0 means auto)
 		return shtns_create(lmax, mmax, mres, norm);
 	}
