@@ -305,6 +305,10 @@ class sht(_object):
         """SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"""
         return _shtns.sht_SH_to_point(self, *args)
 
+    def SH_to_grad_point(self, *args):
+        """SH_to_grad_point(sht self, PyObject * DrSlm, PyObject * Slm, double cost, double phi)"""
+        return _shtns.sht_SH_to_grad_point(self, *args)
+
     def SHqst_to_point(self, *args):
         """SHqst_to_point(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, double cost, double phi)"""
         return _shtns.sht_SHqst_to_point(self, *args)

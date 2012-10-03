@@ -3418,6 +3418,10 @@ SWIGINTERN double shtns_info_SH_to_point(struct shtns_info *self,PyObject *Qlm,d
 		if (check_spectral(1,Qlm, self->nlm))	return SH_to_point(self, PyArray_DATA(Qlm), cost, phi);
 		return 0.0;
 	}
+SWIGINTERN void shtns_info_SH_to_grad_point(struct shtns_info *self,PyObject *DrSlm,PyObject *Slm,double cost,double phi,double *vr,double *vt,double *vp){
+		if (check_spectral(1,DrSlm, self->nlm) && check_spectral(2,Slm, self->nlm))
+			SH_to_grad_point(self, PyArray_DATA(DrSlm), PyArray_DATA(Slm), cost, phi, vr, vt, vp);
+	}
 SWIGINTERN void shtns_info_SHqst_to_point(struct shtns_info *self,PyObject *Qlm,PyObject *Slm,PyObject *Tlm,double cost,double phi,double *vr,double *vt,double *vp){
 		if (check_spectral(1,Qlm, self->nlm) && check_spectral(2,Slm, self->nlm) && check_spectral(3,Tlm, self->nlm))
 			SHqst_to_point(self, PyArray_DATA(Qlm), PyArray_DATA(Slm), PyArray_DATA(Tlm), cost, phi, vr, vt, vp);
@@ -4575,6 +4579,88 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_sht_SH_to_grad_point(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  PyObject *arg2 = (PyObject *) 0 ;
+  PyObject *arg3 = (PyObject *) 0 ;
+  double arg4 ;
+  double arg5 ;
+  double *arg6 = (double *) 0 ;
+  double *arg7 = (double *) 0 ;
+  double *arg8 = (double *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  double val4 ;
+  int ecode4 = 0 ;
+  double val5 ;
+  int ecode5 = 0 ;
+  double temp6 ;
+  int res6 = SWIG_TMPOBJ ;
+  double temp7 ;
+  int res7 = SWIG_TMPOBJ ;
+  double temp8 ;
+  int res8 = SWIG_TMPOBJ ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  PyObject * obj4 = 0 ;
+  
+  arg6 = &temp6;
+  arg7 = &temp7;
+  arg8 = &temp8;
+  if (!PyArg_ParseTuple(args,(char *)"OOOOO:sht_SH_to_grad_point",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_SH_to_grad_point" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  arg2 = obj1;
+  arg3 = obj2;
+  ecode4 = SWIG_AsVal_double(obj3, &val4);
+  if (!SWIG_IsOK(ecode4)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "sht_SH_to_grad_point" "', argument " "4"" of type '" "double""'");
+  } 
+  arg4 = (double)(val4);
+  ecode5 = SWIG_AsVal_double(obj4, &val5);
+  if (!SWIG_IsOK(ecode5)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode5), "in method '" "sht_SH_to_grad_point" "', argument " "5"" of type '" "double""'");
+  } 
+  arg5 = (double)(val5);
+  {
+    shtns_error = 0;	// clear exception
+    shtns_info_SH_to_grad_point(arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  if (SWIG_IsTmpObj(res6)) {
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_double((*arg6)));
+  } else {
+    int new_flags = SWIG_IsNewObj(res6) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg6), SWIGTYPE_p_double, new_flags));
+  }
+  if (SWIG_IsTmpObj(res7)) {
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_double((*arg7)));
+  } else {
+    int new_flags = SWIG_IsNewObj(res7) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg7), SWIGTYPE_p_double, new_flags));
+  }
+  if (SWIG_IsTmpObj(res8)) {
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_From_double((*arg8)));
+  } else {
+    int new_flags = SWIG_IsNewObj(res8) ? (SWIG_POINTER_OWN |  0 ) :  0 ;
+    resultobj = SWIG_Python_AppendOutput(resultobj, SWIG_NewPointerObj((void*)(arg8), SWIGTYPE_p_double, new_flags));
+  }
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_sht_SHqst_to_point(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
@@ -4929,6 +5015,7 @@ static PyMethodDef SwigMethods[] = {
 		"    PyObject * Vp)\n"
 		""},
 	 { (char *)"sht_SH_to_point", _wrap_sht_SH_to_point, METH_VARARGS, (char *)"sht_SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"},
+	 { (char *)"sht_SH_to_grad_point", _wrap_sht_SH_to_grad_point, METH_VARARGS, (char *)"sht_SH_to_grad_point(sht self, PyObject * DrSlm, PyObject * Slm, double cost, double phi)"},
 	 { (char *)"sht_SHqst_to_point", _wrap_sht_SHqst_to_point, METH_VARARGS, (char *)"sht_SHqst_to_point(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, double cost, double phi)"},
 	 { (char *)"sht_Zrotate", _wrap_sht_Zrotate, METH_VARARGS, (char *)"sht_Zrotate(sht self, PyObject * Qlm, double alpha) -> PyObject *"},
 	 { (char *)"sht_Yrotate", _wrap_sht_Yrotate, METH_VARARGS, (char *)"sht_Yrotate(sht self, PyObject * Qlm, double alpha) -> PyObject *"},

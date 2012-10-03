@@ -425,6 +425,51 @@ double SH_to_point(shtns_cfg shtns, complex double *Qlm, double cost, double phi
 	return vr0;
 }
 
+void SH_to_grad_point(shtns_cfg shtns, complex double *DrSlm, complex double *Slm, double cost, double phi,
+					   double *gr, double *gt, double *gp)
+{
+	double yl[LMAX+1];
+	double dtyl[LMAX+1];
+	double vtt, vpp, vr0, vrm;
+	long int l,m,im;
+
+	const double sint = sqrt((1.-cost)*(1.+cost));
+	vtt = 0.;  vpp = 0.;  vr0 = 0.;  vrm = 0.;
+	m=0;	im=0;
+		legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
+		for (l=m; l<=LTR; ++l) {
+			vr0 += yl[l] * creal( DrSlm[l] );
+			vtt += dtyl[l] * creal( Slm[l] );
+		}
+	if (MTR>0) {
+		complex double eip, eimp, imeimp;
+		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
+		im=1;  do {
+			m = im*MRES;
+			legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
+//			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
+			eimp *= eip;		// not so accurate, but it should be enough for rendering uses.
+			imeimp = eimp*m*I;
+			l = LiM(shtns, 0,im);
+			v2d* Ql = (v2d*) &DrSlm[l];		v2d* Sl = (v2d*) &Slm[l];
+			v2d qm = vdup(0.0);
+			v2d dsdt = vdup(0.0);		v2d dsdp = vdup(0.0);
+			for (l=m; l<=LTR; ++l) {
+				qm += vdup(yl[l]) * Ql[l];
+				dsdt += vdup(dtyl[l]) * Sl[l];
+				dsdp += vdup(yl[l]) * Sl[l];
+			}
+			vrm += vcplx_real(qm)*creal(eimp) - vcplx_imag(qm)*cimag(eimp);			// dS/dr
+			vtt += vcplx_real(dsdt)*creal(eimp) - vcplx_imag(dsdt)*cimag(eimp);		// dS/dt
+			vpp += vcplx_real(dsdp)*creal(imeimp) - vcplx_imag(dsdp)*cimag(imeimp);	// + I.m/sint *S
+		} while (++im <= MTR);
+		vr0 += vrm*sint;
+	}
+	*gr = vr0;	// Gr = dS/dr
+	*gt = vtt;	// Gt = dS/dt
+	*gp = vpp;	// Gp = I.m/sint *S
+}
+
 /// Evaluate vector SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
 void SHqst_to_point(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double cost, double phi,
 					   double *vr, double *vt, double *vp)

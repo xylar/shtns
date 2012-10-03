@@ -4,9 +4,9 @@
  * SHTns is a high performance library for Spherical Harmonic Transform written in C, aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.\n
  *
  * Main features :
- * - <b>blazingly fast</b>
+ * - <b>\link bench blazingly fast\endlink</b>
  * - distributed under the open source \link license CeCILL License\endlink (GPL compatible)
- * - both <b>scalar and vector transforms</b>
+ * - both <b>scalar and \link vsh vector transforms\endlink</b>
  * - backward and forward (synthesis and analysis) functions
  * - flexible truncation
  * - spatial data can be stored in latitude-major or longitude-major order arrays.
@@ -20,7 +20,8 @@
  * - ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
  * - <b>on-the-fly transforms</b> : saving memory and bandwidth, and can even be faster depending on architecture.
  * - accurate up to spherical harmonic degree l=8000 (at least).
- * - rotation functions to rotate spherical harmonics (beta).
+ * - \link rotation rotation functions\endlink to rotate spherical harmonics (beta).
+ * - \link operator special spectal operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
  *
  * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *

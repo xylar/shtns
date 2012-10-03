@@ -239,6 +239,8 @@ void SHqst_to_spat_l(shtns_cfg, complex double *Qlm, complex double *Slm, comple
 /// Does not require a call to \ref shtns_set_grid_auto
 //@{
 double SH_to_point(shtns_cfg, complex double *Qlm, double cost, double phi);
+void SH_to_grad_point(shtns_cfg, complex double *DrSlm, complex double *Slm,
+					double cost, double phi, double *vr, double *vt, double *vp);
 void SHqst_to_point(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm,
 					double cost, double phi, double *vr, double *vt, double *vp);
 

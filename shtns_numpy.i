@@ -391,6 +391,10 @@ inline PyObject* SpatArray_New(int size) {
 	%apply double *OUTPUT { double *vr };
 	%apply double *OUTPUT { double *vt };
 	%apply double *OUTPUT { double *vp };
+	void SH_to_grad_point(PyObject *DrSlm, PyObject *Slm, double cost, double phi, double *vr, double *vt, double *vp) {
+		if (check_spectral(1,DrSlm, $self->nlm) && check_spectral(2,Slm, $self->nlm))
+			SH_to_grad_point($self, PyArray_DATA(DrSlm), PyArray_DATA(Slm), cost, phi, vr, vt, vp);
+	}
 	void SHqst_to_point(PyObject *Qlm, PyObject *Slm, PyObject *Tlm,
 					double cost, double phi, double *vr, double *vt, double *vp) {
 		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Slm, $self->nlm) && check_spectral(3,Tlm, $self->nlm))
