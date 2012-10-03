@@ -407,36 +407,40 @@ inline PyObject* SpatArray_New(int size) {
 			SH_Zrotate($self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 	PyObject* Yrotate(PyObject *Qlm, double alpha) {
 		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
-			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return NULL;
 		}
 		if (check_spectral(1,Qlm, $self->nlm)) {
 			PyObject *Rlm = SpecArray_New($self->nlm);
 			SH_Yrotate($self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 	PyObject* Yrotate90(PyObject *Qlm) {
 		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
-			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return NULL;
 		}
 		if (check_spectral(1,Qlm, $self->nlm)) {
 			PyObject *Rlm = SpecArray_New($self->nlm);
 			SH_Yrotate90($self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 	PyObject* Xrotate90(PyObject *Qlm) {
 		if (($self->mres != 1)||($self->mmax != $self->lmax)) {
-			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return NULL;
 		}
 		if (check_spectral(1,Qlm, $self->nlm)) {
 			PyObject *Rlm = SpecArray_New($self->nlm);
 			SH_Xrotate90($self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 
 	/* multiplication by l+1 l-1 matrix (mul_ct_matrix or st_dt_matrix) */
@@ -446,6 +450,7 @@ inline PyObject* SpatArray_New(int size) {
 			SH_mul_mx($self, PyArray_DATA(mx), PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 
 };

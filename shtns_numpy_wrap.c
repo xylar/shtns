@@ -3428,36 +3428,40 @@ SWIGINTERN PyObject *shtns_info_Zrotate(struct shtns_info *self,PyObject *Qlm,do
 			SH_Zrotate(self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 SWIGINTERN PyObject *shtns_info_Yrotate(struct shtns_info *self,PyObject *Qlm,double alpha){
 		if ((self->mres != 1)||(self->mmax != self->lmax)) {
-			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return NULL;
 		}
 		if (check_spectral(1,Qlm, self->nlm)) {
 			PyObject *Rlm = SpecArray_New(self->nlm);
 			SH_Yrotate(self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 SWIGINTERN PyObject *shtns_info_Yrotate90(struct shtns_info *self,PyObject *Qlm){
 		if ((self->mres != 1)||(self->mmax != self->lmax)) {
-			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return NULL;
 		}
 		if (check_spectral(1,Qlm, self->nlm)) {
 			PyObject *Rlm = SpecArray_New(self->nlm);
 			SH_Yrotate90(self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 SWIGINTERN PyObject *shtns_info_Xrotate90(struct shtns_info *self,PyObject *Qlm){
 		if ((self->mres != 1)||(self->mmax != self->lmax)) {
-			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return;
+			throw_exception(SWIG_RuntimeError,0,msg_rot_err);	return NULL;
 		}
 		if (check_spectral(1,Qlm, self->nlm)) {
 			PyObject *Rlm = SpecArray_New(self->nlm);
 			SH_Xrotate90(self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 SWIGINTERN PyObject *shtns_info_SH_mul_mx(struct shtns_info *self,PyObject *mx,PyObject *Qlm){
 		if (check_spectral(2,Qlm, self->nlm) && check_spatial(1, mx, 2* self->nlm)) {
@@ -3465,6 +3469,7 @@ SWIGINTERN PyObject *shtns_info_SH_mul_mx(struct shtns_info *self,PyObject *mx,P
 			SH_mul_mx(self, PyArray_DATA(mx), PyArray_DATA(Qlm), PyArray_DATA(Rlm));
 			return Rlm;
 		}
+		return NULL;
 	}
 #ifdef __cplusplus
 extern "C" {
