@@ -10,7 +10,7 @@ PYTHON=@PYTHON@
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(CFLAGS) -pipe -D_GNU_SOURCE $(OMP) -L$(PREFIX)/lib -I$(PREFIX)/include
+go= $(CFLAGS) -D_GNU_SOURCE $(OMP) -L$(PREFIX)/lib -I$(PREFIX)/include
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
