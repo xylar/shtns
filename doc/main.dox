@@ -21,7 +21,7 @@
  * - <b>on-the-fly transforms</b> : saving memory and bandwidth, and can even be faster depending on architecture.
  * - accurate up to spherical harmonic degree l=8000 (at least).
  * - \link rotation rotation functions\endlink to rotate spherical harmonics (beta).
- * - \link operator special spectal operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
+ * - \link operators special spectral operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
  *
  * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *
@@ -419,7 +419,7 @@ show that <b>SHTns performs much faster than any other</b>. Furthermore, even at
 <td>\f$\ell_{max}\f$</td> <td><a href="http://www.ipgp.fr/~wieczor/SHTOOLS/SHTOOLS.html">shtools</a> 2.8 (Gauss)</td>
   <td><a href="http://sourceforge.net/projects/libpsht/">libpsht</a> (1 thread)</td>
   <td><a href="http://www.cs.dartmouth.edu/~geelong/sphere/">SpharmonicKit2</a> 2.7 (fast)</td>
-  <td><b>SHTns 2.1</b> (Gauss)</td> <td>SpharmonicKit2/SHTns</td> </tr><tr>
+  <td><b>SHTns 2.1</b> (1 thread, Gauss)</td> <td>SpharmonicKit2/SHTns</td> </tr><tr>
 <td>63 </td> <td> 1.14 ms</td> <td> 1.05 ms</td> <td>1.1 ms</td>  <td><b>0.09 ms</b></td>  <td>12.2</td> </tr><tr>
 <td>127 </td> <td>3.5 ms</td> <td> 4.7 ms</td> <td>5.5 ms</td>  <td><b>0.60 ms</b></td>  <td>9.2</td> </tr><tr>
 <td>255 </td> <td>28 ms</td> <td> 27 ms</td>  <td>21 ms</td>  <td><b>4.2 ms</b></td>  <td>5.0</td> </tr><tr>
