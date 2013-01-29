@@ -486,6 +486,43 @@ done:
 }
 #endif
 
+/// same as legendre_sphPlm_deriv_array for x=0 and sint=1 (equator)
+static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, const int im, double *yl, double *dyl)
+{
+	double *al;
+	int l,m;
+	double y0, dy1;
+
+	m = im*MRES;
+#ifdef LEG_RANGE_CHECK
+	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
+#endif
+
+	al = shtns->alm[im];
+	yl -= m;	dyl -= m;			// shift pointers
+
+	y0 = al[0];
+	yl[m] = y0; 	dyl[m] = 0.0;		// l=m
+	if (lmax==m) return;		// done.
+
+	dy1 = -al[1]*y0;
+	yl[m+1] = 0.0; 	dyl[m+1] = dy1;		// l=m+1
+	if (lmax==m+1) return;		// done.
+
+	l=m+2;	al+=2;
+	while (l < lmax) {
+		y0 = al[0]*y0;
+		dy1 = al[2]*dy1 - al[3]*y0;
+		yl[l] = y0;		dyl[l] = 0.0;
+		yl[l+1] = 0.0;	dyl[l+1] = dy1;
+		l+=2;	al+=4;
+	}
+	if (l==lmax) {
+		yl[l] = al[0]*y0;
+		dyl[l] = 0.0;
+	}
+}
+
 
 /// \internal Precompute constants for the recursive generation of Legendre associated functions, with given normalization.
 /// this function is called by \ref shtns_set_size, and assumes up-to-date values in \ref shtns.

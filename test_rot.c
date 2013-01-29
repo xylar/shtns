@@ -74,10 +74,10 @@ int main(int argc, char *argv[])
 
 	srand( time(NULL) );	// initialise les nombres.
 	
-	MMAX=LMAX=63;
+	MMAX=LMAX=7;
 	MRES=1;
-	NLAT=64;
-	NPHI=128;
+	NLAT=12;
+	NPHI=16;
 
 	shtns_use_threads(0);
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 	mx[1][2] = creal(Slm[LiM(shtns, 1, 1)]);
 	mx[2][2] = cimag(Slm[LiM(shtns, 1, 1)]);
 
-	printf("rotation matrix :\n");
+	printf("rotation matrix Xrotate90:\n");
 	printf(" %10f %10f %10f\n", mx[0][0], mx[0][1], mx[0][2]);
 	printf(" %10f %10f %10f\n", mx[1][0], mx[1][1], mx[1][2]);
 	printf(" %10f %10f %10f\n", mx[2][0], mx[2][1], mx[2][2]);
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
 	for (l=0; l<NLM; l++) 	{Qlm[l] = 0.0;	Slm[l] = 0.0;}
 //	Qlm[0] = 1000.;
 //	Qlm[LiM(shtns, 2, 0)] = 1.0;
-	Qlm[LiM(shtns, 1, 0)] = 1.0;	//0.1 + I*0.05;
+	Qlm[LiM(shtns, 1, 1)] = I;	//0.1 + I*0.05;
 	
 	SH_to_spat(shtns, Qlm, Sh);
 	write_shell("q0",Sh);
@@ -153,6 +153,7 @@ int main(int argc, char *argv[])
 	write_shell("q0z",Sh);
 
 
+	printf("\n*** rotation along Z by 30 deg.\n");
 	for (l=0; l<=LMAX; l++) {
 		double norm0=0;		double normR=0;
 		for (m=0; m<=l; m++) {
@@ -174,6 +175,7 @@ int main(int argc, char *argv[])
 //	SH_Yrotate90(shtns, Tlm0, Slm);
 	SH_Yrotate90(shtns, Slm, Tlm);
 
+	printf("\n*** rotation along Y by 90 deg.\n");
 	for (l=0; l<=LMAX; l++) {
 		double norm0=0;		double normR=0;
 		for (m=0; m<=l; m++) {

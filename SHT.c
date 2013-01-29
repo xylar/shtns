@@ -136,7 +136,9 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 	fftw_plan fft;
 	complex double *q;
 	double *q0;
-	int k, m, l, lmax, ntheta, nrembed, ncembed;
+	long int k, m, l;
+	int lmax, ntheta;
+	int nrembed, ncembed;
 
 	lmax = shtns->lmax;
 	ntheta = ((lmax+2)>>1)*2;
@@ -170,6 +172,7 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)] = qr;
 				sgnt *= -1.0;
 			}
+		#ifndef _GCC_VEC_
 		double sgnm = 1.0;
 		for (m=1; m<=lmax; ++m) {
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
@@ -190,6 +193,25 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 				sgnt *= -1.0;
 			}
 		}
+		#else
+		s2d sgnm = SIGN_MASK_HI;
+		s2d sgnflip = SIGN_MASK_2;
+		for (m=1; m<=lmax; ++m) {
+			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
+			s2d sgnt = vdup(0.0);
+			s2d m_st = vset(2.0, -2*m*sint_1);		// x2 for m>0
+			sgnm = _mm_xor_pd(sgnm, sgnflip);	// (-1)^m
+			for (l=m; l<=lmax; ++l) {
+				v2d qc = ((v2d*)Qlm)[LiM(shtns, l, m)] * vdup(yl[l]) * m_st;	// (q0, dq0)
+				((v2d*)q0)[k*lmax +(l-1)] += qc;
+				((v2d*)q0)[(ntheta-1-k)*lmax +(l-1)] += _mm_xor_pd(sgnt, qc);
+				qc = _mm_xor_pd(sgnm, qc);
+				((v2d*)q0)[(ntheta+k)*lmax +(l-1)] += _mm_xor_pd( sgnt, qc );
+				((v2d*)q0)[(2*ntheta-1-k)*lmax +(l-1)] += qc;
+				sgnt = _mm_xor_pd(sgnt, sgnflip);	// (-1)^(l+m)
+			}
+		}
+		#endif
 	}
   }
 
@@ -206,7 +228,8 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 
 	double yl[lmax+1];		double dyl[lmax+1];
 	m=0;
-		legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
+		//legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
+		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, yl+m, dyl+m);
 		for (l=1; l<lmax; l+=2) {
 			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*ntheta);
 			Rlm[LiM(shtns, l+1,m)] =  creal(q[m*2*lmax +2*l])/(yl[l+1]*ntheta);
@@ -216,7 +239,8 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 		}
 	dphi1 += M_PI/ntheta;	// shift rotation angle by angle of first synthesis latitude.
 	for (m=1; m<=lmax; ++m) {
-		legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
+		//legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
+		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, yl+m, dyl+m);
 		complex double eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);
 		for (l=m; l<lmax; l+=2) {
 			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./yl[l]);
@@ -614,6 +638,66 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 //	free(ylm_lat);
 }
 
+/// synthesis at a given latitude, on nphi equispaced longitude points.
+/// vr arrays must have nphi+2 doubles allocated (fftw requirement).
+/// It does not require a previous call to shtns_set_grid, but it is NOT thread-safe.
+/// \ingroup local
+void SH_to_lat(shtns_cfg shtns, complex double *Qlm, double cost,
+					double *vr, int nphi, int ltr, int mtr)
+{
+	complex double vrr;
+	complex double *vrc;
+	long int m, l, j;
+
+	if (ltr > LMAX) ltr=LMAX;
+	if (mtr > MMAX) mtr=MMAX;
+	if (mtr*MRES > ltr) mtr=ltr/MRES;
+	if (mtr*2*MRES >= nphi) mtr = (nphi-1)/(2*MRES);
+
+	vrc = (complex double *) vr;
+
+	if ((nphi != nphi_lat)||(ifft_lat == NULL)) {
+		if (ifft_lat != NULL) fftw_destroy_plan(ifft_lat);
+		#ifdef OMP_FFTW
+			fftw_plan_with_nthreads(1);
+		#endif
+		ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, FFTW_ESTIMATE);
+		nphi_lat = nphi;
+	}
+	if (ylm_lat == NULL) {
+		ylm_lat = (double *) malloc(sizeof(double)* NLM*2);
+		dylm_lat = ylm_lat + NLM;
+	}
+	if (cost != ct_lat) {		// don't recompute if same latitude (ie equatorial disc rendering)
+		st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)
+		for (m=0,j=0; m<=mtr; ++m) {
+			legendre_sphPlm_deriv_array(shtns, ltr, m, cost, st_lat, &ylm_lat[j], &dylm_lat[j]);
+			j += LMAX -m*MRES +1;
+		}
+	}
+
+	for (m = 0; m<nphi/2+1; ++m) {	// init with zeros
+		vrc[m] = 0.0;
+	}
+	j=0;
+	m=0;
+		vrr=0;
+		for(l=m; l<=ltr; ++l, ++j) {
+			vrr += ylm_lat[j] * creal(Qlm[j]);
+		}
+		j += (LMAX-ltr);
+		vrc[m] = vrr;
+	for (m=MRES; m<=mtr*MRES; m+=MRES) {
+		vrr=0;
+		for(l=m; l<=ltr; ++l, ++j) {
+			vrr += ylm_lat[j] * Qlm[j];
+		}
+		j+=(LMAX-ltr);
+		vrc[m] = vrr*st_lat;
+	}
+	fftw_execute_dft_c2r(ifft_lat,vrc,vr);
+//	free(ylm_lat);
+}
 
 /*
 	INTERNAL INITIALIZATION FUNCTIONS

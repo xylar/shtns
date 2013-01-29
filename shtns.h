@@ -244,6 +244,8 @@ void SH_to_grad_point(shtns_cfg, complex double *DrSlm, complex double *Slm,
 void SHqst_to_point(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm,
 					double cost, double phi, double *vr, double *vt, double *vp);
 
+void SH_to_lat(shtns_cfg shtns, complex double *Qlm, double cost,
+					double *vr, int nphi, int ltr, int mtr);
 void SHqst_to_lat(shtns_cfg, complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
 //@}
