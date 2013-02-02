@@ -21,10 +21,13 @@ AC_ARG_ENABLE([python],
 	[], [enable_python=no])
 AC_ARG_ENABLE([long-double],
 	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
+AC_ARG_ENABLE([mkl],
+	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (lower performance expected)]))
 AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use SSE2 or AVX extensions]))
+
 
 dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
 dnl generated configure script that the expansion does not occur until
@@ -64,12 +67,23 @@ AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-pointer"])
 AX_CHECK_COMPILE_FLAG([-std=gnu99],[CFLAGS="$CFLAGS -std=gnu99"])
 
-# Checks for libraries.
-AC_CHECK_LIB([m],[cos],,AC_MSG_ERROR([math library not found.]))
-AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.]))
-
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h fftw3.h])
+
+# Checks for libraries.
+AC_CHECK_LIB([m],[cos],,AC_MSG_ERROR([math library not found.]))
+
+# Check for FFTW (FFTW preferred, MKL optional)
+AS_IF([test "x$enable_mkl" = "xyes"], [
+	# optionally use MKL instead of fftw3 (warning: lower performance!)
+	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, 
+		[LIBS="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -WI, --end-group -liomp5 -lpthread $LIBS"],
+		AC_MSG_ERROR("MKL library not found."),
+		[-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread])
+	],[
+	# fftw3
+	AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.]))
+])
 
 # Checks related to OpenMP
 AS_IF([test "x$enable_python" != "xno"], [
