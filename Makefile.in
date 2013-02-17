@@ -34,21 +34,24 @@ libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	@echo " "
 	@cat COPYRIGHT
 
+codelets1 = SHT/SH_to_spat.c SHT/SH_to_spat_fly.c SHT/spat_to_SH.c SHT/spat_to_SH_fly.c SHT/sht_generic.c
+ifeq ($(strip $(OMP)),)
+  codelets = $(codelets1)
+  libname = libshtns.a
+else
+  codelets = $(codelets1) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
+  libname = libshtns_omp.a
+endif
+
 install-lib : libshtns.a
 	@mkdir -p $(PREFIX)/lib/
 	@mkdir -p $(PREFIX)/include/
-	cp libshtns.a $(PREFIX)/lib/
+	cp libshtns.a $(PREFIX)/lib/$(libname)
 	cp shtns.h $(PREFIX)/include/
 	cp shtns.f $(PREFIX)/include/
 	@echo " "
 	@cat COPYRIGHT
 
-codelets1 = SHT/SH_to_spat.c SHT/SH_to_spat_fly.c SHT/spat_to_SH.c SHT/spat_to_SH_fly.c SHT/sht_generic.c
-ifeq ($(strip $(OMP)),)
-  codelets = $(codelets1)
-else
-  codelets = $(codelets1) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
-endif
 
 # codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c
@@ -64,23 +67,16 @@ SHT/SH_to_spat_omp.c : SHT/omp_SH_to_spat.gen.c
 SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp SED=$(SED)
 
+
 # objects :
 SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
 	$(cc) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
 	@echo "DONE SHT.o"
 
-sht_std.o : sht_std.c Makefile $(hfiles) $(codelets)
-	$(shtcc) -c sht_std.c -o sht_std.o
-	@echo "DONE sht_std"
-sht_ltr.o : sht_ltr.c Makefile $(hfiles) $(codelets)
-	$(shtcc) -c sht_ltr.c -o sht_ltr.o
-	@echo "DONE sht_ltr"
-sht_m0.o : sht_m0.c Makefile $(hfiles) $(codelets)
-	$(shtcc) -c sht_m0.c -o sht_m0.o
-	@echo "DONE sht_m0"
-sht_m0ltr.o : sht_m0ltr.c Makefile $(hfiles) $(codelets)
-	$(shtcc) -c sht_m0ltr.c -o sht_m0ltr.o
-	@echo "DONE sht_m0ltr"
+sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
+	$(shtcc) -c $< -o $@
+	@echo "DONE $@"
+
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile
