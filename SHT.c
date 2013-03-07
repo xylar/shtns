@@ -113,10 +113,8 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 		l=0;	do { Rlm[l] = Qlm[l]; } while(++l <= lmax);
 	}
 	if (mmax > 0) {
-		complex double eia = cos(mres*alpha) - I*sin(mres*alpha);		// rotate reference frame by angle -alpha
-		complex double eima = 1.0;
 		im=1; do {
-			eima *= eia;
+			complex double eima = cos(im*mres*alpha) - I*sin(im*mres*alpha);		// rotate reference frame by angle -alpha
 			for (l=im*mres; l<=lmax; ++l)	Rlm[LiM(shtns, l, im)] = Qlm[LiM(shtns, l, im)] * eima;
 		} while(++im <= mmax);
 	}
@@ -389,7 +387,7 @@ void SH_mul_mx(shtns_cfg shtns, double* mx, complex double *Qlm, complex double 
 		s2d mxl = vdup(mx[2*lm]);		s2d mxu = vdup(mx[2*lm+1]);
 		vr[lm] = mxl*vq[lm-1] + mxu*vq[lm+1];
 	}
-	lm=nlmlim;
+	lm = nlmlim;
 		s2d mxl = vdup(mx[2*lm]);
 		vr[lm] = mxl*vq[lm-1];
 }
