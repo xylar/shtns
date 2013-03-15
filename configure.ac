@@ -72,6 +72,8 @@ AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h fftw3.h])
 
 # Checks for libraries.
 AC_CHECK_LIB([m],[cos],,AC_MSG_ERROR([math library not found.]))
+# this library is used by time_SHT only (and not required at all on MacOSX)
+AC_CHECK_LIB([rt],[clock_gettime],,)
 
 # Check for FFTW (FFTW preferred, MKL optional)
 AS_IF([test "x$enable_mkl" = "xyes"], [

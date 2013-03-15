@@ -80,7 +80,7 @@ sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a Makefile
-	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -lrt -o time_SHT
+	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o time_SHT
 test_rot : shtns.h test_rot.c libshtns.a Makefile
 	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o test_rot
 
