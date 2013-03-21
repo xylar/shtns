@@ -64,6 +64,12 @@ int clock_gettime(int ignored, struct timespec* t) {
 #endif
 
 
+void runerr(const char * error_text)
+{
+	printf("%s\n",error_text);
+	exit(1);
+}
+
 void write_vect(char *fn, double *vec, int N)
 {
 	FILE *fp;
@@ -578,7 +584,7 @@ void usage()
 	printf(" -gauss : force gauss grid\n");
 	printf(" -fly : force gauss grid with on-the-fly computations only\n");
 	printf(" -quickinit : force gauss grid and fast initialiation time (but suboptimal fourier transforms)\n");
-	printf(" -scalar : use only scalar transforms (disable vector)\n");
+	printf(" -vector : time and test also vector transforms (2D and 3D)\n");
 	printf(" -reg : force regular grid\n");
 	printf(" -oop : force out-of-place transform\n");
 	printf(" -transpose : force transpose data (ie phi varies fastest)\n");
@@ -605,7 +611,7 @@ int main(int argc, char *argv[])
 	int layout = SHT_NATIVE_LAYOUT;
 	int nlorder = 0;
 	int point = 0;
-	int vector = 1;
+	int vector = 0;
 	char name[20];
 	FILE* fw;
 
@@ -646,7 +652,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"oop") == 0) layout = SHT_THETA_CONTIGUOUS;
 		if (strcmp(name,"transpose") == 0) layout = SHT_PHI_CONTIGUOUS;
 		if (strcmp(name,"nlorder") == 0) nlorder = t;
-		if (strcmp(name,"scalar") == 0) vector = 0;
+		if (strcmp(name,"vector") == 0) vector = 1;
 		if (strcmp(name,"point") == 0) point = 1;
 	}
 
@@ -678,18 +684,26 @@ int main(int argc, char *argv[])
 //	write_vect("cost",ct,NLAT);
 //	write_vect("sint",st,NLAT);
 
-	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
+	ShF = (complex double *) fftw_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
 	Sh = (double *) ShF;
-	ThF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
-	Th = (double *) ThF;
-	NLF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
-	NL = (double *) NLF;
+	if (ShF == NULL) runerr("memory allocation 1 failed");
+	if (vector) {
+		ThF = (complex double *) fftw_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
+		Th = (double *) ThF;
+		NLF = (complex double *) fftw_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
+		NL = (double *) NLF;
+		if ((ThF == NULL)||(NLF == NULL)) runerr("memory allocation 2 failed");
+	}
 
-	Tlm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Slm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	Qlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	if ((Slm0 == NULL)||(Slm == NULL)||(Tlm == NULL)) runerr("memory allocation 3 failed");
+	if (vector) {
+		Tlm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+		Qlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+		if ((Tlm0 == NULL)||(Qlm == NULL)) runerr("memory allocation 4 failed");
+	}
 
 // perform fft tests.
 //	init_fft_tests();
@@ -699,7 +713,8 @@ int main(int argc, char *argv[])
   if (NLM < 10000) {
 // SH_to_spat
 	for (i=0;i<NLM;i++) {
-		Slm[i] = 0.0;	Tlm[i] = 0.0;
+		Slm[i] = 0.0;
+		if (vector) Tlm[i] = 0.0;
 	}
 	for (im=0;im<NPHI;im++) {
 		for (i=0;i<NLAT;i++) {
@@ -759,7 +774,7 @@ int main(int argc, char *argv[])
 	t = 1.0 / (RAND_MAX/2);
 	for (i=0;i<NLM;i++) {
 		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
-		Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		if (vector) Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 	}
 	
 	if (point) {
@@ -803,9 +818,12 @@ int main(int argc, char *argv[])
 //	shtns_create_with_grid(shtns, MMAX/2, 1);
 
 // free memory and resources (to track memory leaks)
-	fftw_free(Qlm);		fftw_free(Tlm);		fftw_free(Slm);
-	fftw_free(Slm0);	fftw_free(Tlm0);
-	fftw_free(NLF);		fftw_free(ThF);		fftw_free(ShF);
+	fftw_free(Slm);		fftw_free(ShF);
+	if (vector) {
+		fftw_free(Qlm);		fftw_free(Tlm);		
+		fftw_free(Slm0);	fftw_free(Tlm0);
+		fftw_free(NLF);		fftw_free(ThF);
+	}
 
 	shtns_reset();
 	fftw_cleanup();
