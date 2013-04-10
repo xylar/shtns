@@ -58,6 +58,7 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
+  v2.3.1  (10 Apr 2013)
 	- time_SHT can be compiled on MacOSX and uses less memory.
 	- OpenMP library is now installed as libshtns_omp.a.
 	- new configure option --enable-mkl to use the FFT of the MKL

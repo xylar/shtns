@@ -315,16 +315,17 @@ void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 /// xq[lm] = mx[2*lm] * q[lm-1] + mx[2*lm+1] * q[lm+1];
 void mul_ct_matrix(shtns_cfg shtns, double* mx)
 {
-	long int im,m,l,lm;
+	long int im,l,lm;
 	double a_1;
 
 	if (SHT_NORM == sht_schmidt) {
 		lm=0;
 		for (im=0; im<=MMAX; im++) {
 			double* al = shtns->alm[im];
-			l=im*MRES;
+			long int m=im*MRES;
 			mx[2*lm] = 0.0;
 			a_1 = 1.0 / al[1];
+			l=m;
 			while(++l < LMAX) {
 				al+=2;				
 				mx[2*lm+2] = a_1;
