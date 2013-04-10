@@ -3915,6 +3915,7 @@ $as_echo "$ac_cv_prog_c_openmp" >&6; }
   fi
 
 
+	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_init_threads in -lfftw3_omp" >&5
 $as_echo_n "checking for fftw_init_threads in -lfftw3_omp... " >&6; }
 if ${ac_cv_lib_fftw3_omp_fftw_init_threads+:} false; then :

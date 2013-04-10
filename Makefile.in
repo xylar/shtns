@@ -2,7 +2,6 @@
 PREFIX=@prefix@
 SED=@SED@
 CC=@CC@
-OMP=@OPENMP_CFLAGS@
 CFLAGS=@CFLAGS@
 LIBS=@LIBS@
 PYTHON=@PYTHON@
@@ -10,7 +9,7 @@ PYTHON=@PYTHON@
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(CFLAGS) -D_GNU_SOURCE $(OMP) -L$(PREFIX)/lib -I$(PREFIX)/include
+go= $(CFLAGS) -D_GNU_SOURCE -L$(PREFIX)/lib -I$(PREFIX)/include
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
@@ -35,7 +34,7 @@ libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	@cat COPYRIGHT
 
 codelets1 = SHT/SH_to_spat.c SHT/SH_to_spat_fly.c SHT/spat_to_SH.c SHT/spat_to_SH_fly.c SHT/sht_generic.c
-ifeq ($(strip $(OMP)),)
+ifeq ("@OPENMP_CFLAGS@","")
   codelets = $(codelets1)
   libname = libshtns.a
 else

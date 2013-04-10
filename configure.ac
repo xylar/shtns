@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.59])
+AC_PREREQ([2.62])
 AC_INIT([SHTns],[2.3],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([SHT.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -93,6 +93,7 @@ AS_IF([test "x$enable_python" != "xno"], [
 ])
 AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
+	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 	AC_CHECK_LIB([fftw3_omp], [fftw_init_threads])
 	dnl AC_CHECK_HEADERS([omp.h])
 ])

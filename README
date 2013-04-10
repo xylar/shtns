@@ -1,7 +1,7 @@
 SHTns is a high performance library for Spherical Harmonic Transform written in C,
 aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.
 
-Copyright (c) 2010-2012 Centre National de la Recherche Scientifique.
+Copyright (c) 2010-2013 Centre National de la Recherche Scientifique.
 written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
 SHTns is distributed under the open source CeCILL License (GPL compatible)
 located in the LICENSE file.
@@ -30,25 +30,39 @@ FEATURES:
 	  (multiply by cos(theta)...).
 
 INSTALL:
+
 	Briefly, the shell commands `./configure; make; make install' should
 	configure, build, and install this package. `./configure --help' will
-	list available options. However, in order to get the best performance,
-	it is highly recommended to compile and install the FFTW library yourself,
-	because many distributions include a non-optimized FFTW library.
-
+	list available options (among which --enable-openmp and --enable-python).
+	However, in order to get the best performance, it is highly recommended to
+	compile and install the FFTW library yourself, because many distributions
+	include a non-optimized FFTW library.
 
 DOCUMENTATION:
 
 	- On-line doc is available: http://users.isterre.fr/nschaeff/SHTns/
 	- You can build it locally: Run "make docs" to generate documentation
-	  with doxygen. 
+	  (requires doxygen). 
 	  Then browse the html documentation starting with doc/html/index.html
-	- A related research paper can be found on arXiv:
-	  http://arxiv.org/abs/1202.6522
-	  If you use SHTns for research work, please cite this paper.
-
+	- A related research paper has been published and is also available on
+	  ArXiV: http://arxiv.org/abs/1202.6522
+	  If you use SHTns for research work, please cite this paper:
+	  @article {shtns,
+		author = {Schaeffer, Nathanael},
+		title = {Efficient spherical harmonic transforms aimed at
+			pseudospectral numerical simulations},
+		journal = {Geochemistry, Geophysics, Geosystems},
+		doi = {10.1002/ggge.20071},
+		year = {2013},
+	  }
 
 CHANGE LOG:
+
+	- time_SHT can be compiled on MacOSX and uses less memory.
+	- OpenMP library is now installed as libshtns_omp.a.
+	- new configure option --enable-mkl to use the FFT of the MKL
+	  library instead of FFTW.
+	- fix detection of OpenMP mutlithreaded FFTW.
 
   v2.3  (3 Oct 2012)
 	- added mi member in shtns_info structure (ABI change).
