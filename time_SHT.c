@@ -42,7 +42,7 @@ int NLAT = 0;
 int NPHI = 0;
 
 // number of SH iterations
-long int SHT_ITER = 50;		// do 50 iterations by default
+int SHT_ITER = 50;		// do 50 iterations by default
 
 
 #ifdef __MACH__		// Mac OSX : clock_gettime is not implemented
@@ -119,7 +119,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
-		if ((isNaN(creal(Slm[i]))) || (isNaN(cimag(Slm[i])))) printf("NaN @ lm=%d (l=%d)\n",i,shtns->li[i]);
+		if ((isNaN(creal(Slm[i]))) || (isNaN(cimag(Slm[i])))) printf("NaN @ lm=%ld (l=%d)\n",i,shtns->li[i]);
 		if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
 			if (shtns->li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
@@ -130,7 +130,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("   => max error = %g (l=%d,lm=%d)   rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
+	printf("   => max error = %g (l=%d,lm=%ld)   rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) {
 		if (NLM < 15) {
 			printf("\n orig:");
@@ -172,7 +172,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("   Spheroidal => max error = %g (l=%d,lm=%d)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
+	printf("   Spheroidal => max error = %g (l=%d,lm=%ld)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
 		else printf("\n");
 //	write_vect("Slm",Slm,NLM*2);
@@ -191,7 +191,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		n2 += t*t;
 		if (t>tmax) { tmax = t; jj = i; }
 	}
-	printf("   Toroidal => max error = %g (l=%d,lm=%d)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
+	printf("   Toroidal => max error = %g (l=%d,lm=%ld)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
 		else printf("\n");
 //	write_vect("Tlm",Tlm,NLM*2);

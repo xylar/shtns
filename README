@@ -59,11 +59,13 @@ DOCUMENTATION:
 CHANGE LOG:
 
   v2.3.1  (10 Apr 2013)
-	- time_SHT can be compiled on MacOSX and uses less memory.
 	- OpenMP library is now installed as libshtns_omp.a.
+	- fix detection of OpenMP mutlithreaded FFTW.
 	- new configure option --enable-mkl to use the FFT of the MKL
 	  library instead of FFTW.
-	- fix detection of OpenMP mutlithreaded FFTW.
+	- time_SHT can be compiled on MacOSX and uses less memory.
+	- new SH_to_lat() function.
+	- a few other minor improvements and fixes.
 
   v2.3  (3 Oct 2012)
 	- added mi member in shtns_info structure (ABI change).
