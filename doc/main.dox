@@ -27,7 +27,8 @@
  *
  * It requires the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms.
  *
- * If you use SHTns for research work, please <b>cite the paper</b>: <a href="http://arxiv.org/abs/1202.6522">Efficient Spherical Harmonic Transforms aimed at pseudo-spectral numerical simulations</a>.
+ * If you use SHTns for research work, please <b>cite the paper</b>: <a href="http://dx.doi.org/10.1002/ggge.20071">Efficient Spherical Harmonic Transforms aimed at pseudo-spectral numerical simulations</a>,
+ * also <a href="http://arxiv.org/abs/1202.6522">available from arXiv</a>.
  *
  * If you accept the open source \link license CeCILL License\endlink (GPL compatible french License), you can <a href="https://bitbucket.org/nschaeff/shtns/downloads">download SHTns</a>.
  *

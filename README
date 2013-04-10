@@ -44,8 +44,8 @@ DOCUMENTATION:
 	- You can build it locally: Run "make docs" to generate documentation
 	  (requires doxygen). 
 	  Then browse the html documentation starting with doc/html/index.html
-	- A related research paper has been published and is also available on
-	  ArXiV: http://arxiv.org/abs/1202.6522
+	- A related research paper has been published and is also available from
+	  arXiv: http://arxiv.org/abs/1202.6522
 	  If you use SHTns for research work, please cite this paper:
 	  @article {shtns,
 		author = {Schaeffer, Nathanael},
