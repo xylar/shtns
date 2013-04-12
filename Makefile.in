@@ -28,8 +28,8 @@ default : @target@
 
 install : @install@
 
-libshtns.a : Makefile SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
-	ar rcs libshtns.a SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+libshtns.a : Makefile sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+	ar rcs libshtns.a sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	@echo " "
 	@cat COPYRIGHT
 
@@ -68,9 +68,9 @@ SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 
 
 # objects :
-SHT.o : SHT.c Makefile sht_legendre.c $(hfiles) cycle.h
-	$(cc) -D_HGID_="\"$(HGID)\"" -c SHT.c -o SHT.o
-	@echo "DONE SHT.o"
+sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c $(hfiles) cycle.h
+	$(cc) -D_HGID_="\"$(HGID)\"" -c $< -o $@
+	@echo "DONE $@"
 
 sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c $< -o $@
@@ -103,7 +103,7 @@ clean :
 
 # build a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
-_shtns.so : shtns_numpy_wrap.c Makefile $(hfiles) SHT.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+_shtns.so : shtns_numpy_wrap.c Makefile $(hfiles) sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	$(PYTHON) setup.py build
 
 # generate python and c glue code with SWIG.

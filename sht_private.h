@@ -190,7 +190,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 /// align pointer on MIN_ALIGNMENT (must be a power of 2)
 #define PTR_ALIGN(p) ((((size_t)(p)) + (MIN_ALIGNMENT-1)) & (~((size_t)(MIN_ALIGNMENT-1))))
 
-#define SSE __attribute__((aligned (16)))
+#define SSE __attribute__((aligned (MIN_ALIGNMENT)))
 
 #ifdef __INTEL_COMPILER
 	#undef _GCC_VEC_
@@ -287,7 +287,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#endif
 
 	// Allocate memory aligned on 16 bytes for SSE2 (fftw_malloc works only if fftw was compiled with --enable-sse2)
-	// in 64 bit system, malloc should be 16 bytes aligned anyway.
+	// in 64 bit systems, malloc should be 16 bytes aligned anyway.
 	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : _mm_malloc(s, MIN_ALIGNMENT) )
 	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : _mm_free(s) )
 #else
@@ -308,7 +308,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vcplx_real(a) creal(a)
 	#define vcplx_imag(a) cimag(a)
 
-	// allocate memory aligned for FFTW. In 64 bit system, malloc should be 16 bytes aligned.
+	// allocate memory aligned for FFTW. In 64 bit systems, malloc should be 16 bytes aligned.
 	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
 	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
 #endif

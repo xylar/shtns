@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.62])
 AC_INIT([SHTns],[2.3.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
-AC_CONFIG_SRCDIR([SHT.c])
+AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
 target="libshtns.a"		# by default, build the library.
 install="install-lib"	# by default, install the library.
