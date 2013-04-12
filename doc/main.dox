@@ -19,7 +19,7 @@
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
  * - ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
  * - <b>on-the-fly transforms</b> : saving memory and bandwidth, and can even be faster depending on architecture.
- * - accurate up to spherical harmonic degree l=8000 (at least).
+ * - accurate up to spherical harmonic degree l=16383 (at least).
  * - \link rotation rotation functions\endlink to rotate spherical harmonics (beta).
  * - \link operators special spectral operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
  *

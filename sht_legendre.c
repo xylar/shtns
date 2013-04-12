@@ -556,6 +556,7 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 		blm = (double **) malloc( im + (2*NLM)*sizeof(double) );
 		bl0 = (double *) PTR_ALIGN( blm + (MMAX+1) );
 	}
+	if ((alm==0) || (blm==0)) shtns_runerr("not enough memory.");
 
 /// - Precompute the factors alm and blm of the recurrence relation :
   if (norm == sht_schmidt) {

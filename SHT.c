@@ -1949,19 +1949,23 @@ static void grid_equal_polar(shtns_cfg shtns, double latdir)
 /// this function is used to internally measure the accuracy.
 double SHT_error(shtns_cfg shtns, int vector)
 {
-	complex double *Tlm0, *Slm0, *Tlm, *Slm;
-	double *Sh, *Th;
+	complex double *Tlm0=0, *Slm0=0, *Tlm=0, *Slm=0;
+	double *Sh=0, *Th=0;
 	double t, tmax, n2,  err;
 	long int i, jj, nlm_cplx;
 	
 	srand( time(NULL) );	// init random numbers.
 	
-	Tlm0 = (complex double *) VMALLOC(sizeof(complex double)* NLM);
 	Slm0 = (complex double *) VMALLOC(sizeof(complex double)* NLM);
 	Slm = (complex double *) VMALLOC(sizeof(complex double)* NLM);
-	Tlm = (complex double *) VMALLOC(sizeof(complex double)* NLM);
 	Sh = (double *) VMALLOC( NSPAT_ALLOC(shtns) * sizeof(double) );
-	Th = (double *) VMALLOC( NSPAT_ALLOC(shtns) * sizeof(double) );
+	if ((Sh==0) || (Slm==0) || (Slm0==0)) shtns_runerr("not enough memory.");
+	if (vector) {
+		Tlm0 = (complex double *) VMALLOC(sizeof(complex double)* NLM);
+		Tlm = (complex double *) VMALLOC(sizeof(complex double)* NLM);
+		Th = (double *) VMALLOC( NSPAT_ALLOC(shtns) * sizeof(double) );
+		if ((Th==0) || (Tlm==0) || (Tlm0==0)) vector=0;
+	}
 
 // m = nphi/2 is also real if nphi is even.
 	nlm_cplx = ( MMAX*2 == NPHI ) ? LiM(shtns, MRES*MMAX,MMAX) : NLM;
@@ -1969,10 +1973,10 @@ double SHT_error(shtns_cfg shtns, int vector)
 	for (i=0; i<NLM; i++) {
 		if ((i<=LMAX)||(i>=nlm_cplx)) {		// m=0 or m*2=nphi : real random data
 			Slm0[i] = t*((double) (rand() - RAND_MAX/2));
-			Tlm0[i] = t*((double) (rand() - RAND_MAX/2));
+			if (vector) Tlm0[i] = t*((double) (rand() - RAND_MAX/2));
 		} else {							// m>0 : complex random data
 			Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
-			Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+			if (vector) Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 		}
 	}
 
@@ -2012,7 +2016,8 @@ double SHT_error(shtns_cfg shtns, int vector)
 	#endif
 	}
 
-	VFREE(Th);  VFREE(Sh);  VFREE(Tlm);  VFREE(Slm);  VFREE(Slm0);  VFREE(Tlm0);
+	if (Th) VFREE(Th);    if (Tlm) VFREE(Tlm);    if (Tlm0) VFREE(Tlm0);
+	VFREE(Sh);  VFREE(Slm);  VFREE(Slm0);
 	return(err);		// return max error.
 }
 
@@ -2061,8 +2066,8 @@ static double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *f
 /// returns time without dct / best time with dct (or 0 if no dct available).
 static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 {
-	complex double *Qlm, *Slm, *Tlm;
-	double *Qh, *Sh, *Th;
+	complex double *Qlm=0, *Slm=0, *Tlm=0;
+	double *Qh=0, *Sh=0, *Th=0;
 	int m, i, i0, minc, nloop, alg_end;
 	int typ_lim = SHT_NTYP;		// time every type.
 	double t0, t, tt, r;
@@ -2074,16 +2079,24 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 	if (NLAT < VSIZE2*4) return(0.0);			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow) and DCT not efficient for low NLAT.
 	if ((dct_mtr != 0) && (shtns->ykm_dct == NULL)) return(0.0);		// no dct available : do nothing.
 
-	m = 2*(NPHI/2+1) * NLAT * sizeof(double);
-	i = sizeof(complex double)* NLM;
-	if (i>m) m=i;
-	Qh = (double *) VMALLOC(m);		Sh = (double *) VMALLOC(m);		Th = (double *) VMALLOC(m);
-	Qlm = (complex double *) VMALLOC(m);	Slm = (complex double *) VMALLOC(m);	Tlm = (complex double *) VMALLOC(m);
+	size_t nspat = sizeof(double) * NSPAT_ALLOC(shtns);
+	size_t nspec = sizeof(complex double)* NLM;
+	if (nspec>nspat) nspat=nspec;
+	Sh = (double *) VMALLOC(nspat);		Slm = (complex double *) VMALLOC(nspec);
+	if ((Sh==0) || (Slm==0)) shtns_runerr("not enough memory.");
+	if (vector) {
+		Th = (double *) VMALLOC(nspat);				Qh = (double *) VMALLOC(nspat);
+		Tlm = (complex double *) VMALLOC(nspec);	Qlm = (complex double *) VMALLOC(nspec);
+		if ( (Th==0) || (Qh==0) || (Tlm==0) || (Qlm==0) ) vector = 0;
+	}
 
 	for (i=0;i<NLM;i++) {
 		int l = shtns->li[i];
 		Slm[i] = shtns->l_2[l] + 0.5*I*shtns->l_2[l];
-		Tlm[i] = 0.5*shtns->l_2[l] + I*shtns->l_2[l];
+		if (vector) {
+			Tlm[i] = 0.5*shtns->l_2[l] + I*shtns->l_2[l];
+			Qlm[i] = 3*shtns->l_2[l] + 2*I*shtns->l_2[l];
+		}
 	}
 
 	#if SHT_VERBOSE > 0
@@ -2177,7 +2190,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		minc = MMAX/20 + 1;             // don't test every single m.
 		m = -1;		i = -1;		t0 = 0.0;		// reference = no dct.
 		if (sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT] != NULL)
-			t0 += get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
+			t0 += get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 		if ( (sht_func[SHT_STD][SHT_TYP_VSY][SHT_DCT] != NULL) && (vector) )
 			t0 += get_time(shtns, nloop, 4, "v", shtns->fptr[SHT_STD][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 		tnodct = t0;
@@ -2186,7 +2199,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 				printf("\n\tm=%d :",m);
 			#endif
 			Set_MTR_DCT(shtns, m);
-			t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT], Qlm, Slm, Tlm, Qh, Sh, Th, LMAX);
+			t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			if (vector)
 				t += get_time(shtns, nloop, 4, "vdct", sht_func[SHT_STD][SHT_TYP_VSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
@@ -2203,7 +2216,9 @@ done:
 	#if SHT_VERBOSE > 0
 		printf("\n");
 	#endif
-	VFREE(Tlm);	VFREE(Slm);	VFREE(Qlm);	VFREE(Th);	VFREE(Sh);	VFREE(Qh);
+	if (Qlm) VFREE(Qlm);		if (Tlm) VFREE(Tlm);
+	if (Qh)  VFREE(Qh);			if (Th)  VFREE(Th);
+	if (Slm) VFREE(Slm);	 	if (Sh)  VFREE(Sh);
 	if (dct_mtr > 0) {
 		return(tnodct/tdct);
 	} else	return(0.0);

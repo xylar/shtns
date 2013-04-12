@@ -17,14 +17,14 @@ FEATURES:
 	- can be used from Fortran, c/c++, and Python programs
 	- a highly efficient Gauss algorithm working with Gauss nodes (based on
 	  Gauss-Legendre quadrature)
-	- support for SSE2, SSE3 and AVX vectorization with gcc.
+	- support for SSE2, SSE3 and AVX vectorization with gcc and clang.
 	- parallel transforms with OpenMP (for Gauss grid only).
 	- an algorithm using DCT for regular nodes (generalized Fejer quadrature)
 	- synthesis (inverse transform) at any coordinate (not constrained to a grid)
 	- ability to choose the optimal spatial sizes for a given spectral truncation.
 	- on-the-fly transforms : saving memory and bandwidth, and can even
 	  be faster depending on architecture.
-	- accurate up to spherical harmonic degree l=8000 (at least).
+	- accurate up to spherical harmonic degree l=16383 (at least).
 	- rotation functions to rotate spherical harmonics (beta).
 	- special spectral operator functions that do not require a transform
 	  (multiply by cos(theta)...).
@@ -62,7 +62,7 @@ CHANGE LOG:
 	- OpenMP library is now installed as libshtns_omp.a.
 	- fix detection of OpenMP mutlithreaded FFTW.
 	- new configure option --enable-mkl to use the FFT of the MKL
-	  library instead of FFTW.
+	  library instead of FFTW (lower performance expected).
 	- time_SHT can be compiled on MacOSX and uses less memory.
 	- new SH_to_lat() function.
 	- a few other minor improvements and fixes.
