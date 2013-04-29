@@ -129,7 +129,8 @@ void shtns_reset(void);				///< destroy all configs, free memory, and go back to
 void shtns_destroy(shtns_cfg);		///< free memory of given config, which cannot be used afterwards.
 void shtns_unset_grid(shtns_cfg);	///< unset the grid.
 
-void shtns_print_version(void);			///< print version information to stdout.
+void shtns_silent(void);			///< no output to stdout during initialization.
+void shtns_print_version(void);		///< print version information to stdout.
 void shtns_print_cfg(shtns_cfg);	///< print information about given config to stdout.
 //@}
 

@@ -542,8 +542,10 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 	test_long_double();
 #endif
 #if SHT_VERBOSE > 1
-	printf("        > Condon-Shortley phase = %d, normalization = %d\n", with_cs_phase, norm);
-	if (long_double_caps == 3) printf("        > long double has extended precision and large exponent\n");
+	if (verbose) {
+		printf("        > Condon-Shortley phase = %d, normalization = %d\n", with_cs_phase, norm);
+		if (long_double_caps == 3) printf("        > long double has extended precision and large exponent\n");
+	}
 #endif
 
 	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
@@ -702,15 +704,17 @@ static void gauss_nodes(real *x, real *w, int n)
 
 #if SHT_VERBOSE > 1
 // test integral to compute :
-	z = 0;
-	for (i=0;i<m;++i) {
-		z += w[i]*x[i]*x[i];
+	if (verbose) {
+		z = 0;
+		for (i=0;i<m;++i) {
+			z += w[i]*x[i]*x[i];
+		}
+		#ifndef HAVE_LONG_DOUBLE_WIDER
+			printf("          Gauss quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*3.,z*3.-1.0);
+		#else
+			printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);
+		#endif
 	}
-	#ifndef HAVE_LONG_DOUBLE_WIDER
-		printf("          Gauss quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*3.,z*3.-1.0);
-	#else
-		printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);
-	#endif
 #endif
 
 // as we started with initial guesses, we should check if the gauss points are actually unique.
