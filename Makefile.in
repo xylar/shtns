@@ -70,11 +70,9 @@ SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 # objects :
 sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c $(hfiles) cycle.h
 	$(cc) -D_HGID_="\"$(HGID)\"" -c $< -o $@
-	@echo "DONE $@"
 
 sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c $< -o $@
-	@echo "DONE $@"
 
 
 # programs :

@@ -1660,7 +1660,7 @@ done:
 #endif
 
 void shtns_print_version() {
-	printf("[" PACKAGE_STRING "] build " __DATE__ ", " __TIME__ ", id: " _HGID_ "\n");
+	printf("[" PACKAGE_STRING "] built " __DATE__ ", " __TIME__ ", id: " _HGID_ " " _SIMD_NAME_ "\n");
 }
 
 void shtns_print_cfg(shtns_cfg shtns)

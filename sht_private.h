@@ -194,6 +194,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 #ifdef __INTEL_COMPILER
 	#undef _GCC_VEC_
+	#warning "no vector extension with icc ! use gcc 4+ for best performance."
 #endif
 
 #if _GCC_VEC_ && __SSE2__
@@ -203,7 +204,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#ifdef __AVX__
 		#define VSIZE2 4
 		#include <immintrin.h>
-		#warning "using GCC vector extensions (avx)"
+		#define _SIMD_NAME_ "avx"
 		#define vall(x) _mm256_set1_pd(x)
 		#define vread(mem, idx) _mm256_loadu_pd( ((double*)mem) + (idx)*4 )
 		#define S2D_STORE(mem, idx, ev, od) \
@@ -224,10 +225,10 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define VSIZE2 2
 		#ifdef __SSE3__
 			#include <pmmintrin.h>
-			#warning "using GCC vector extensions (sse3)"
+			#define _SIMD_NAME_ "sse3"
 		#else
 			#include <emmintrin.h>
-			#warning "using GCC vector extensions (sse2)"
+			#define _SIMD_NAME_ "sse2"
 		#endif
 		#define vall(x) _mm_set1_pd(x)
 		#define vread(mem, idx) ((s2d*)mem)[idx]
@@ -294,6 +295,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#undef _GCC_VEC_
 	#define VSIZE 1
 	#define VSIZE2 1
+	#define _SIMD_NAME_ "scalar"
 	typedef double s2d;
 	typedef complex double v2d;
 	typedef double rnd;
