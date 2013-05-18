@@ -78,9 +78,10 @@ AC_CHECK_LIB([rt],[clock_gettime],,)
 # Check for FFTW (FFTW preferred, MKL optional)
 AS_IF([test "x$enable_mkl" = "xyes"], [
 	# optionally use MKL instead of fftw3 (warning: lower performance!)
-	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, 
-		[LIBS="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -WI, --end-group -liomp5 -lpthread $LIBS"],
-		AC_MSG_ERROR("MKL library not found."),
+	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [
+		  LIBS="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread $LIBS"
+		  AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
+		], AC_MSG_ERROR("MKL library not found."),
 		[-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread])
 	],[
 	# fftw3
@@ -94,6 +95,7 @@ AS_IF([test "x$enable_python" != "xno"], [
 AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
+	#it is not necessary to check for this library when MKL is used.
 	AC_CHECK_LIB([fftw3_omp], [fftw_init_threads])
 	dnl AC_CHECK_HEADERS([omp.h])
 ])

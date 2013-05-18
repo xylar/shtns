@@ -3780,7 +3780,12 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&5
 $as_echo "$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&6; }
 if test "x$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" = xyes; then :
-  LIBS="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -WI, --end-group -liomp5 -lpthread $LIBS"
+
+		  LIBS="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread $LIBS"
+
+$as_echo "#define HAVE_LIBFFTW3_OMP 1" >>confdefs.h
+
+
 else
   as_fn_error $? "\"MKL library not found.\"" "$LINENO" 5
 fi
@@ -3916,6 +3921,7 @@ $as_echo "$ac_cv_prog_c_openmp" >&6; }
 
 
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
+	#it is not necessary to check for this library when MKL is used.
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_init_threads in -lfftw3_omp" >&5
 $as_echo_n "checking for fftw_init_threads in -lfftw3_omp... " >&6; }
 if ${ac_cv_lib_fftw3_omp_fftw_init_threads+:} false; then :
