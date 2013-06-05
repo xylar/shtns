@@ -109,6 +109,9 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* include DCT support (Fejer quadrature on regular grids) */
+#undef SHTNS_DCT
+
 /* Compile the Fortran API */
 #undef SHT_F77_API
 

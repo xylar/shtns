@@ -47,12 +47,14 @@
 //@{
 
 /* Scalar Spherical Harmonics Transform : from spherical harmonic representation to a spatial grid (and reverse) */
+#ifdef SHTNS_DCT
 #define ID_NME hyb
 #include "spat_to_SH.c"
 #include "SH_to_spat.c"
 #include "SHst_to_spat.c"
 #include "spat_to_SHst.c"
 #undef ID_NME
+#endif
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
@@ -151,10 +153,12 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 /* GRADIENTS */
 #define SHT_GRAD
 
+#ifdef SHTNS_DCT
 #define ID_NME hyb
 #include "SHs_to_spat.c"
 #include "SHt_to_spat.c"
 #undef ID_NME
+#endif
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
@@ -245,13 +249,15 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 /// This is basically a shortcut to call both spat_to_SH* and spat_to_SHsphtor* but may be significantly faster.
 #define SHT_3COMP
 
+#ifdef SHTNS_DCT
 #define ID_NME hyb
 #include "spat_to_SHqst.c"
-// hybrid SHqst_to_spat possible only of axisymmetric transform
+// hybrid SHqst_to_spat possible only for axisymmetric transform
   #ifdef SHT_AXISYM
   #include "SHqst_to_spat.c"
   #endif
 #undef ID_NME
+#endif
 
 // fly are compiled only once, with SHT_VAR_LTR
 #ifdef SHT_VAR_LTR
@@ -332,11 +338,15 @@ void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex dou
 
 /* FUNCTION POINTER ARRAY */
 void* GEN(sht_array, SUFFIX)[SHT_NALG][SHT_NTYP] = {
+#ifdef SHTNS_DCT
 /* hyb */	{ GEN(SH_to_spat_hyb, SUFFIX), GEN(spat_to_SH_hyb, SUFFIX), GEN(SHsphtor_to_spat_hyb, SUFFIX), GEN(spat_to_SHsphtor_hyb, SUFFIX), 
 #ifdef SHT_AXISYM
 				GEN(SHsph_to_spat_hyb, SUFFIX), GEN(SHtor_to_spat_hyb, SUFFIX), GEN(SHqst_to_spat_hyb, SUFFIX), GEN(spat_to_SHqst_hyb, SUFFIX) },
 #else
 				GEN(SHsph_to_spat_hyb, SUFFIX), GEN(SHtor_to_spat_hyb, SUFFIX), NULL, GEN(spat_to_SHqst_hyb, SUFFIX) },
+#endif
+#else
+/* hyb */	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
 #endif
 /* mem */	{ GEN(SH_to_spat_mem, SUFFIX), GEN(spat_to_SH_mem, SUFFIX), GEN(SHsphtor_to_spat_mem, SUFFIX), GEN(spat_to_SHsphtor_mem, SUFFIX), 
 				GEN(SHsph_to_spat_mem, SUFFIX), GEN(SHtor_to_spat_mem, SUFFIX), GEN(SHqst_to_spat_mem, SUFFIX), GEN(spat_to_SHqst_mem, SUFFIX) },

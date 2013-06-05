@@ -574,6 +574,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
 }
 
+#ifdef SHTNS_DCT
 /// \internal initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
 static int planDCT(shtns_cfg shtns)
 {
@@ -647,6 +648,7 @@ static int Set_MTR_DCT(shtns_cfg shtns, int m)
 static int Get_MTR_DCT(shtns_cfg shtns) {
 	return MTR_DCT;
 }
+#endif		/* SHTNS_DCT */
 
 
 /// \internal Sets the value tm[im] used for polar optimiation on-the-fly.
@@ -886,6 +888,8 @@ static void init_SH_gauss(shtns_cfg shtns)
 		}
 	}
 }
+
+#ifdef SHTNS_DCT
 
 static void init_SH_dct_m(shtns_cfg shtns, double* is1, fftw_plan dct, fftw_plan idct, int analysis, const int m0, const int mstep)
 {
@@ -1251,6 +1255,7 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
 
+#endif		/* SHTNS_DCT */
 
 /// \internal Generate a gauss grid (including weights)
 static void grid_gauss(shtns_cfg shtns, double latdir)
@@ -1306,6 +1311,7 @@ static void grid_gauss(shtns_cfg shtns, double latdir)
 #endif
 }
 
+#ifdef SHTNS_DCT
 /// \internal Generate an equi-spaced theta grid (Chebychev points, excluding poles) for Féjer-DCT SHT.
 static void grid_dct(shtns_cfg shtns, double latdir)
 {
@@ -1348,6 +1354,7 @@ static void grid_dct(shtns_cfg shtns, double latdir)
 	}
 #endif
 }
+#endif		/* SHTNS_DCT */
 
 /// \internal Generate an equi-spaced theta grid including the poles, for synthesis only.
 static void grid_equal_polar(shtns_cfg shtns, double latdir)
@@ -1613,6 +1620,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		if (ityp == 4) ityp++;		// skip second gradient
 	} while(++ityp < typ_lim);
 
+  #ifdef SHTNS_DCT
 	if (dct_mtr != 0) {		// find the best DCT timings...
  		#if SHT_VERBOSE > 1
 			if (verbose) {  printf("finding best mtr_dct ...");	fflush(stdout);  }
@@ -1642,6 +1650,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 			if (verbose) printf(" mtr_dct=%d  (%.1f%% performance gain)", MTR_DCT*MRES, 100.*(tnodct/tdct-1.));
 		#endif
 	}
+  #endif
 
 done:
 	#if SHT_VERBOSE > 0
@@ -1850,10 +1859,12 @@ shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 			shtns->lmidx[im] = base->lmidx[im];
 			shtns->tm[im] = base->tm[im];
 		}
+		#ifdef SHTNS_DCT
 		if (mmax < shtns->mtr_dct) {
 			shtns->idct = NULL;		// do not destroy the plan of the source.
 			Set_MTR_DCT(shtns, mmax);		// adjut mtr_dct if required.
 		}
+		#endif
 		if (mmax == 0) {
 			// TODO we may disable fft and replace with a phi-averaging function ...
 			// ... then switch to axisymmetric functions :
@@ -1955,6 +1966,11 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	flags = flags & 255;	// clear higher bits.
 
 	switch (flags) {
+	  #ifndef SHTNS_DCT
+		case sht_auto :		flags = sht_gauss;	break;		// only gauss available.
+		case sht_reg_fast:
+		case sht_reg_dct:	shtns_runerr("regular grid not available (DCT required).");		break;
+	  #endif
 		case sht_gauss_fly :  flags = sht_gauss;  on_the_fly = 1;  break;
 		case sht_quick_init : flags = sht_gauss;  quick_init = 1;  break;
 		case sht_reg_poles :  analys = 0;         quick_init = 1;  break;
@@ -2019,6 +2035,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	shtns->zlm_dct0 = NULL;		// used as a flag.
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
 
+  #ifdef SHTNS_DCT
 	if (flags == sht_reg_dct) {		// pure dct.
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
 		grid_dct(shtns, latdir);		init_SH_dct(shtns, 1);
@@ -2069,6 +2086,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			}
 		}
 	}
+  #endif		/* SHTNS_DCT */
 	if (flags == sht_gauss)
 	{
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays

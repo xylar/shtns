@@ -27,7 +27,8 @@ AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use SSE2 or AVX extensions]))
-
+AC_ARG_ENABLE([dct],
+	AS_HELP_STRING([--disable-dct], [Do not use DCT, removes support for regular grids.]))
 
 dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
 dnl generated configure script that the expansion does not occur until
@@ -81,6 +82,7 @@ AS_IF([test "x$enable_mkl" = "xyes"], [
 	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [
 		  LIBS="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread $LIBS"
 		  AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
+		  enable_dct=no		# MKL does not support dct (june 2013).
 		], AC_MSG_ERROR("MKL library not found."),
 		[-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread])
 	],[
@@ -143,6 +145,11 @@ AS_IF([test "x$enable_f77" != "xno"], [
 # Disable SIMD ?
 AS_IF([test "x$enable_simd" != "xno"], [
 	AC_DEFINE([_GCC_VEC_],[1],[I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 or AVX is supported) !])
+])
+
+# Disable DCT ?
+AS_IF([test "x$enable_dct" != "xno"], [
+	AC_DEFINE([SHTNS_DCT],[1],[include DCT support (Fejer quadrature on regular grids)])
 ])
 
 

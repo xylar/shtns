@@ -686,6 +686,7 @@ enable_long_double
 enable_mkl
 enable_f77
 enable_simd
+enable_dct
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1317,6 +1318,7 @@ Optional Features:
   --disable-f77           Do not include F77 wrapper to call SHTns library
                           from Fortran
   --disable-simd          Do not use SSE2 or AVX extensions
+  --disable-dct           Do not use DCT, removes support for regular grids.
   --disable-openmp        do not use OpenMP
 
 Some influential environment variables:
@@ -2214,6 +2216,10 @@ if test "${enable_simd+set}" = set; then :
   enableval=$enable_simd;
 fi
 
+# Check whether --enable-dct was given.
+if test "${enable_dct+set}" = set; then :
+  enableval=$enable_dct;
+fi
 
 
 if test "$prefix" = "NONE"; then :
@@ -3785,6 +3791,7 @@ if test "x$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" = xyes; then :
 
 $as_echo "#define HAVE_LIBFFTW3_OMP 1" >>confdefs.h
 
+		  enable_dct=no		# MKL does not support dct (june 2013).
 
 else
   as_fn_error $? "\"MKL library not found.\"" "$LINENO" 5
@@ -4088,6 +4095,15 @@ if test "x$enable_simd" != "xno"; then :
 
 
 $as_echo "#define _GCC_VEC_ 1" >>confdefs.h
+
+
+fi
+
+# Disable DCT ?
+if test "x$enable_dct" != "xno"; then :
+
+
+$as_echo "#define SHTNS_DCT 1" >>confdefs.h
 
 
 fi
