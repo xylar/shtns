@@ -575,7 +575,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 }
 
 /// \internal initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
-static void planDCT(shtns_cfg shtns)
+static int planDCT(shtns_cfg shtns)
 {
 	double *Sh;
 	int ndct = NLAT;
@@ -595,8 +595,7 @@ static void planDCT(shtns_cfg shtns)
 		int stride = (NPHI>1) ? 2 : 1;
 		r2r_kind = FFTW_REDFT10;		// out-of-place.
 		shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, stride, stride*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
-		if (shtns->dct_m0 == NULL)
-			shtns_runerr("[FFTW] dct_m0 planning failed !");
+		if (shtns->dct_m0 == NULL) return 0;		// dct_m0 planning failed.
 	#if SHT_VERBOSE > 2
 	if (verbose) {
 		printf(" *** dct_m0 plan :\n");		fftw_print_plan(shtns->dct_m0);	printf("\n");
@@ -620,26 +619,28 @@ static void planDCT(shtns_cfg shtns)
 	}
 
 	VFREE(Sh);
-	if (shtns->idct == NULL)  shtns_runerr("[FFTW] idct planning failed !");
+	if (shtns->idct == NULL) return 0;		// idct planning failed.
 	#if SHT_VERBOSE > 2
 	if (verbose) {
 		printf(" *** idct plan :\n");	fftw_print_plan(shtns->idct);	printf("\n");
 	}
 	#endif
-
+	return 1;	// success.
 }
 
 /// \internal SET MTR_DCT and updates fftw_plan for DCT's
-static void Set_MTR_DCT(shtns_cfg shtns, int m)
+static int Set_MTR_DCT(shtns_cfg shtns, int m)
 {
-	if ((shtns->zlm_dct0 == NULL)||(m == MTR_DCT)) return;
+	if ((shtns->zlm_dct0 == NULL)||(m == MTR_DCT)) return MTR_DCT;
 	if ( m < 0 ) {	// don't use dct
 		shtns->mtr_dct = -1;
 	} else {
 		if (m>MMAX) m=MMAX;
 		shtns->mtr_dct = m;
-		planDCT(shtns);
+		if (planDCT(shtns) == 0)
+			shtns->mtr_dct = -1;	// failure
 	}
+	return MTR_DCT;
 }
 
 /// \internal returns the m-truncation of DCT part of synthesis
@@ -1627,12 +1628,13 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 			#if SHT_VERBOSE > 1
 				if (verbose) printf("\n\tm=%d :",m);
 			#endif
-			Set_MTR_DCT(shtns, m);
-			t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-			if (vector)
-				t += get_time(shtns, nloop, 4, "vdct", sht_func[SHT_STD][SHT_TYP_VSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-			if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
-			PRINT_DOT
+			if (Set_MTR_DCT(shtns, m) >= 0) {
+				t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+				if (vector)
+					t += get_time(shtns, nloop, 4, "vdct", sht_func[SHT_STD][SHT_TYP_VSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+				if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
+				PRINT_DOT
+			}
 		}
 		tdct = t0;
 		Set_MTR_DCT(shtns, i);		// the best DCT is chosen.
@@ -2022,6 +2024,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		grid_dct(shtns, latdir);		init_SH_dct(shtns, 1);
 		OptimizeMatrices(shtns, eps);
 		Set_MTR_DCT(shtns, MMAX);
+		if (MTR_DCT != MMAX) shtns_runerr("DCT planning failed.");
 	}
 	if ((flags == sht_auto)||(flags == sht_reg_fast))
 	{
