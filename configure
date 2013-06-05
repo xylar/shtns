@@ -1313,8 +1313,8 @@ Optional Features:
   --enable-python         Build Python interface
   --enable-long-double    Use long double during initialization for (maybe)
                           slightly better precision
-  --enable-mkl            Try to link with intel MKL instead of FFTW (lower
-                          performance expected)
+  --enable-mkl            Try to link with intel MKL instead of FFTW (can be
+                          slightly faster with avx)
   --disable-f77           Do not include F77 wrapper to call SHTns library
                           from Fortran
   --disable-simd          Do not use SSE2 or AVX extensions
@@ -3745,113 +3745,7 @@ _ACEOF
 fi
 
 
-# Check for FFTW (FFTW preferred, MKL optional)
-if test "x$enable_mkl" = "xyes"; then :
-
-	# optionally use MKL instead of fftw3 (warning: lower performance!)
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_plan_many_dft in -lmkl_intel_lp64" >&5
-$as_echo_n "checking for fftw_plan_many_dft in -lmkl_intel_lp64... " >&6; }
-if ${ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lmkl_intel_lp64 -Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char fftw_plan_many_dft ();
-int
-main ()
-{
-return fftw_plan_many_dft ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft=yes
-else
-  ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&5
-$as_echo "$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&6; }
-if test "x$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" = xyes; then :
-
-		  LIBS="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread $LIBS"
-
-$as_echo "#define HAVE_LIBFFTW3_OMP 1" >>confdefs.h
-
-		  enable_dct=no		# MKL does not support dct (june 2013).
-
-else
-  as_fn_error $? "\"MKL library not found.\"" "$LINENO" 5
-fi
-
-
-else
-
-	# fftw3
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_plan_many_dft in -lfftw3" >&5
-$as_echo_n "checking for fftw_plan_many_dft in -lfftw3... " >&6; }
-if ${ac_cv_lib_fftw3_fftw_plan_many_dft+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lfftw3  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char fftw_plan_many_dft ();
-int
-main ()
-{
-return fftw_plan_many_dft ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_fftw3_fftw_plan_many_dft=yes
-else
-  ac_cv_lib_fftw3_fftw_plan_many_dft=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_fftw3_fftw_plan_many_dft" >&5
-$as_echo "$ac_cv_lib_fftw3_fftw_plan_many_dft" >&6; }
-if test "x$ac_cv_lib_fftw3_fftw_plan_many_dft" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBFFTW3 1
-_ACEOF
-
-  LIBS="-lfftw3 $LIBS"
-
-else
-  as_fn_error $? "FFTW3 library required." "$LINENO" 5
-fi
-
-
-fi
-
-# Checks related to OpenMP
+# With Python, enable openmp by default.
 if test "x$enable_python" != "xno"; then :
 
 	if test "x$enable_openmp" = "xdefault"; then :
@@ -3859,6 +3753,7 @@ if test "x$enable_python" != "xno"; then :
 fi
 
 fi
+
 if test "x$enable_openmp" = "xyes"; then :
 
 
@@ -3928,8 +3823,130 @@ $as_echo "$ac_cv_prog_c_openmp" >&6; }
 
 
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
-	#it is not necessary to check for this library when MKL is used.
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_init_threads in -lfftw3_omp" >&5
+
+fi
+
+
+# Check for FFTW (FFTW preferred, MKL optional)
+if test "x$enable_mkl" = "xyes"; then :
+
+	# optionally use MKL instead of fftw3
+	if test "x$enable_openmp" = "xyes"; then :
+
+		# multi-threaded MKL libs
+		#mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread"
+		mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -Wl,--end-group"
+
+$as_echo "#define HAVE_LIBFFTW3_OMP 1" >>confdefs.h
+
+
+else
+
+		# sequential MKL libs
+		mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
+
+fi
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_plan_many_dft in -lmkl_intel_lp64" >&5
+$as_echo_n "checking for fftw_plan_many_dft in -lmkl_intel_lp64... " >&6; }
+if ${ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lmkl_intel_lp64 "$mkl_libs" $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char fftw_plan_many_dft ();
+int
+main ()
+{
+return fftw_plan_many_dft ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft=yes
+else
+  ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&5
+$as_echo "$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&6; }
+if test "x$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" = xyes; then :
+
+		LIBS="$mkl_libs $LIBS"
+		enable_dct=no		# MKL does not support dct (june 2013).
+
+else
+  as_fn_error $? "\"FFTW interface not found in MKL libraries ($mkl_libs).\"" "$LINENO" 5
+fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: \"FFTW interface found in MKL, link with $mkl_libs\"" >&5
+$as_echo "$as_me: \"FFTW interface found in MKL, link with $mkl_libs\"" >&6;}
+
+else
+
+	# fftw3
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_plan_many_dft in -lfftw3" >&5
+$as_echo_n "checking for fftw_plan_many_dft in -lfftw3... " >&6; }
+if ${ac_cv_lib_fftw3_fftw_plan_many_dft+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lfftw3  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char fftw_plan_many_dft ();
+int
+main ()
+{
+return fftw_plan_many_dft ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_fftw3_fftw_plan_many_dft=yes
+else
+  ac_cv_lib_fftw3_fftw_plan_many_dft=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_fftw3_fftw_plan_many_dft" >&5
+$as_echo "$ac_cv_lib_fftw3_fftw_plan_many_dft" >&6; }
+if test "x$ac_cv_lib_fftw3_fftw_plan_many_dft" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBFFTW3 1
+_ACEOF
+
+  LIBS="-lfftw3 $LIBS"
+
+else
+  as_fn_error $? "FFTW3 library required." "$LINENO" 5
+fi
+
+	if test "x$enable_openmp" = "xyes"; then :
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_init_threads in -lfftw3_omp" >&5
 $as_echo_n "checking for fftw_init_threads in -lfftw3_omp... " >&6; }
 if ${ac_cv_lib_fftw3_omp_fftw_init_threads+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -3972,10 +3989,16 @@ _ACEOF
 
   LIBS="-lfftw3_omp $LIBS"
 
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: FFTW3 does not support OpenMP. Bad multi-threaded performance expected." >&5
+$as_echo "$as_me: WARNING: FFTW3 does not support OpenMP. Bad multi-threaded performance expected." >&2;}
 fi
 
 
 fi
+
+fi
+
 
 # Checks related to Python and NumPy paths:
 if test "x$enable_python" != "xno"; then :

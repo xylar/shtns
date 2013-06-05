@@ -22,7 +22,7 @@ AC_ARG_ENABLE([python],
 AC_ARG_ENABLE([long-double],
 	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
 AC_ARG_ENABLE([mkl],
-	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (lower performance expected)]))
+	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (can be slightly faster with avx)]))
 AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],
@@ -76,31 +76,44 @@ AC_CHECK_LIB([m],[cos],,AC_MSG_ERROR([math library not found.]))
 # this library is used by time_SHT only (and not required at all on MacOSX)
 AC_CHECK_LIB([rt],[clock_gettime],,)
 
-# Check for FFTW (FFTW preferred, MKL optional)
-AS_IF([test "x$enable_mkl" = "xyes"], [
-	# optionally use MKL instead of fftw3 (warning: lower performance!)
-	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [
-		  LIBS="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread $LIBS"
-		  AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
-		  enable_dct=no		# MKL does not support dct (june 2013).
-		], AC_MSG_ERROR("MKL library not found."),
-		[-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread])
-	],[
-	# fftw3
-	AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.]))
-])
-
-# Checks related to OpenMP
+# With Python, enable openmp by default.
 AS_IF([test "x$enable_python" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
+
 AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
-	#it is not necessary to check for this library when MKL is used.
-	AC_CHECK_LIB([fftw3_omp], [fftw_init_threads])
 	dnl AC_CHECK_HEADERS([omp.h])
 ])
+
+
+# Check for FFTW (FFTW preferred, MKL optional)
+AS_IF([test "x$enable_mkl" = "xyes"], [
+	# optionally use MKL instead of fftw3
+	AS_IF([test "x$enable_openmp" = "xyes"], [
+		# multi-threaded MKL libs
+		#mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread"
+		mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -Wl,--end-group"
+		AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
+	],[
+		# sequential MKL libs
+		mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
+	])
+	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [
+		LIBS="$mkl_libs $LIBS"
+		enable_dct=no		# MKL does not support dct (june 2013).
+	], AC_MSG_ERROR(["FFTW interface not found in MKL libraries ($mkl_libs)."]),
+	["$mkl_libs"])
+	AC_MSG_NOTICE(["FFTW interface found in MKL, link with $mkl_libs"])
+],[
+	# fftw3
+	AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.]))
+	AS_IF([test "x$enable_openmp" = "xyes"], [
+		AC_CHECK_LIB([fftw3_omp], [fftw_init_threads],,AC_MSG_WARN([FFTW3 does not support OpenMP. Bad multi-threaded performance expected.]))
+	])
+])
+
 
 # Checks related to Python and NumPy paths:
 AS_IF([test "x$enable_python" != "xno"], [
