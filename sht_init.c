@@ -409,7 +409,7 @@ static void free_SHTarrays(shtns_cfg shtns)
 }
 
 #ifndef HAVE_FFTW_COST
-	// substitute undefined symbol in fftw older than 3.3
+	// substitute undefined symbol in mkl and fftw older than 3.3
 	#define fftw_cost(a) 0.0
 #endif
 
@@ -425,7 +425,11 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	fftw_plan fft2, ifft2, fft, ifft;
 	int nfft, ncplx, nreal;
 	int theta_inc, phi_inc, phi_embed;
-	int in_place = 1;		// try to use in-place fft.
+  #ifdef HAVE_FFTW_COST
+	int in_place = 1;		// try to use in-place real fft.
+  #else
+	int in_place = 0;		// do not try to use in-place real fft if no timing data available.
+  #endif
 
 	if (NPHI <= 2*MMAX) shtns_runerr("the sampling condition Nphi > 2*Mmax is not met.");
 
