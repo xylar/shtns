@@ -2,7 +2,7 @@
 PREFIX=@prefix@
 SED=@SED@
 CC=@CC@
-CFLAGS=@CFLAGS@
+CFLAGS=@CFLAGS@ @LDFLAGS@
 LIBS=@LIBS@
 PYTHON=@PYTHON@
 
@@ -32,6 +32,8 @@ libshtns.a : Makefile sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	ar rcs libshtns.a sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
 	@echo " "
 	@cat COPYRIGHT
+	@echo " "
+	@echo "**** link with : @LDFLAGS@ @LIBS@"
 
 codelets1 = SHT/SH_to_spat.c SHT/SH_to_spat_fly.c SHT/spat_to_SH.c SHT/spat_to_SH_fly.c SHT/sht_generic.c
 ifeq ("@OPENMP_CFLAGS@","")
@@ -50,6 +52,8 @@ install-lib : libshtns.a
 	cp shtns.f $(PREFIX)/include/
 	@echo " "
 	@cat COPYRIGHT
+	@echo " "
+	@echo "**** link with : -L$(PREFIX)/lib @LDFLAGS@ @LIBS@"
 
 
 # codelets :
