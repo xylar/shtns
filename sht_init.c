@@ -1424,7 +1424,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 	}
 	err = tmax;
 #if SHT_VERBOSE > 1
-	if (verbose) printf("        scalar SH - poloidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%d\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
+	if (verbose) printf("        scalar SH - poloidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
 #endif
 
 	if (vector) {
@@ -1438,7 +1438,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 		}
 		if (tmax > err) err = tmax;
 	#if SHT_VERBOSE > 1
-		if (verbose) printf("        vector SH - spheroidal rms error = %.3g  max error = %.3g for l=%hu,lm=%d\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
+		if (verbose) printf("        vector SH - spheroidal rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
 	#endif
 		for (i=0, tmax=0., n2=0., jj=0; i<NLM; i++) {		// compute error
 			t = cabs(Tlm[i] - Tlm0[i]);
@@ -1447,7 +1447,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 		}
 		if (tmax > err) err = tmax;
 	#if SHT_VERBOSE > 1
-		if (verbose) printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%d\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
+		if (verbose) printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
 	#endif
 	}
 
