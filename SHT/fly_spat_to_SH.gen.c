@@ -176,21 +176,9 @@ V					tt[l-1] -= dy1[j] * perk[j];
 		} while (k < nk);
 		for (l=1; l<=llim; ++l) {
 			#if _GCC_VEC_
-			  #ifdef __AVX__
-Q			    s2d qa = _mm256_castpd256_pd128(qq[l-1]) + _mm256_extractf128_pd(qq[l-1],1);
-Q				Qlm[l] = vlo_to_dbl(qa) + vhi_to_dbl(qa);
-V				rnd a = _mm256_hadd_pd(ss[l-1], tt[l-1]);
-V				s2d b = (_mm256_castpd256_pd128(a) + _mm256_extractf128_pd(a,1)) * vdup(l_2[l]);
-V				Slm[l] = vlo_to_dbl(b);		Tlm[l] = vhi_to_dbl(b);
-			  #elif defined __SSE3__
-Q				Qlm[l] = vlo_to_dbl(qq[l-1]) + vhi_to_dbl(qq[l-1]);
-V				s2d a = _mm_hadd_pd(ss[l-1], tt[l-1]) * vdup(l_2[l]);
-V				Slm[l] = vlo_to_dbl(a);		Tlm[l] = vhi_to_dbl(a);
-			  #else
-Q				Qlm[l] = vlo_to_dbl(qq[l-1]) + vhi_to_dbl(qq[l-1]);
-V				Slm[l] = (vlo_to_dbl(ss[l-1]) + vhi_to_dbl(ss[l-1]))*l_2[l];
-V				Tlm[l] = (vlo_to_dbl(tt[l-1]) + vhi_to_dbl(tt[l-1]))*l_2[l];
-			  #endif
+Q				((v2d*)Qlm)[l] = v2d_reduce(qq[l-1], vall(0));
+V				((v2d*)Slm)[l] = v2d_reduce(ss[l-1], vall(0)) * vdup(l_2[l]);
+V				((v2d*)Tlm)[l] = v2d_reduce(tt[l-1], vall(0)) * vdup(l_2[l]);
 			#else
 Q				Qlm[l] = qq[l-1];
 V				Slm[l] = ss[l-1]*l_2[l];		Tlm[l] = tt[l-1]*l_2[l];
@@ -418,27 +406,10 @@ V		v2d *Sl = (v2d*) &Slm[l];
 V		v2d *Tl = (v2d*) &Tlm[l];
 		#if _GCC_VEC_
 			for (l=0; l<=llim-m; ++l) {
-			#ifdef __AVX__
-Q				rnd qa = _mm256_hadd_pd(qq[2*l], qq[2*l+1]);
-QX				Ql[l] = _mm256_castpd256_pd128(qa) + _mm256_extractf128_pd(qa,1);
-3				Ql[l] = (_mm256_castpd256_pd128(qa) + _mm256_extractf128_pd(qa,1)) * vdup(m_1);
-V				rnd sa = _mm256_hadd_pd(ss[2*l], ss[2*l+1]);		rnd ta = _mm256_hadd_pd(tt[2*l], tt[2*l+1]);
-V				sa = (_mm256_permute2f128_pd(sa, ta, 0x02) + _mm256_permute2f128_pd(sa, ta, 0x13)) * vall(l_2[l+m]);
-V				Sl[l] = _mm256_extractf128_pd(sa,1);	Tl[l] = _mm256_castpd256_pd128(sa);
-			#elif defined __SSE3__
-QX				Ql[l] = _mm_hadd_pd(qq[2*l], qq[2*l+1]);
-3				Ql[l] = _mm_hadd_pd(qq[2*l], qq[2*l+1]) * vdup(m_1);
-V				Sl[l] = _mm_hadd_pd(ss[2*l], ss[2*l+1]) * vdup(l_2[l+m]);
-V				Tl[l] = _mm_hadd_pd(tt[2*l], tt[2*l+1]) * vdup(l_2[l+m]);
-			#else
-Q				s2d qa = _mm_unpacklo_pd(qq[2*l], qq[2*l+1]);		s2d qb = _mm_unpackhi_pd(qq[2*l], qq[2*l+1]);
-QX				Ql[l] = qa + qb;
-3				Ql[l] = (qa + qb)*vdup(m_1);
-V				s2d sa = _mm_unpacklo_pd(ss[2*l], ss[2*l+1]);		s2d sb = _mm_unpackhi_pd(ss[2*l], ss[2*l+1]);
-V				s2d ta = _mm_unpacklo_pd(tt[2*l], tt[2*l+1]);		s2d tb = _mm_unpackhi_pd(tt[2*l], tt[2*l+1]);
-V				Sl[l] = (sa + sb)*vdup(l_2[l+m]);
-V				Tl[l] = (ta + tb)*vdup(l_2[l+m]);
-			#endif
+QX				Ql[l] = v2d_reduce(qq[2*l], qq[2*l+1]);
+3				Ql[l] = v2d_reduce(qq[2*l], qq[2*l+1]) * vdup(m_1);
+V				Sl[l] = v2d_reduce(ss[2*l], ss[2*l+1]) * vdup(l_2[l+m]);
+V				Tl[l] = v2d_reduce(tt[2*l], tt[2*l+1]) * vdup(l_2[l+m]);
 			}
 		#else
 V			for (l=0; l<=llim-m; ++l) {
