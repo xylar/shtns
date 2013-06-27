@@ -132,9 +132,9 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 			for (l=m; l<=lmax; ++l) {
 				v2d qc = ((v2d*)Qlm)[LiM(shtns, l, m)] * vdup(yl[l]) * m_st;	// (q0, dq0)
 				((v2d*)q0)[k*lmax +(l-1)] += qc;
-				((v2d*)q0)[(ntheta-1-k)*lmax +(l-1)] += _mm_xor_pd(sgnt, qc);
+				((v2d*)q0)[(ntheta-1-k)*lmax +(l-1)] += (v2d)_mm_xor_pd(sgnt, qc);
 				qc = _mm_xor_pd(sgnm, qc);
-				((v2d*)q0)[(ntheta+k)*lmax +(l-1)] += _mm_xor_pd( sgnt, qc );
+				((v2d*)q0)[(ntheta+k)*lmax +(l-1)] += (v2d)_mm_xor_pd( sgnt, qc );
 				((v2d*)q0)[(2*ntheta-1-k)*lmax +(l-1)] += qc;
 				sgnt = _mm_xor_pd(sgnt, sgnflip);	// (-1)^(l+m)
 			}
