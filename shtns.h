@@ -191,6 +191,16 @@ void spat_to_SH(shtns_cfg shtns, double *Vr, complex double *Qlm);
 /// \param[in] Qlm = spherical harmonics coefficients : complex double array of size shtns->nlm.
 /// \param[out] Vr = spatial scalar field : double array of size shtns->nspat.
 void SH_to_spat(shtns_cfg shtns, complex double *Qlm, double *Vr);
+/// complex scalar synthesis.
+/// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by \ref shtns_set_grid or \ref shtns_set_grid_auto
+/// \param[in] alm[l*(l+1)+m] is the SH coefficient of order l and degree m (with -l <= m <= l) [total of (LMAX+1)^2 coefficients]
+/// \param[out] z = complex spatial field
+void SH_to_spat_cplx(shtns_cfg shtns, complex double *alm, complex double *z);
+/// complex scalar analysis.
+/// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by \ref shtns_set_grid or \ref shtns_set_grid_auto
+/// \param[in] z = complex spatial field
+/// \param[out] alm[l*(l+1)+m] is the SH coefficient of order l and degree m (with -l <= m <= l) [total of (LMAX+1)^2 coefficients]
+void spat_cplx_to_SH(shtns_cfg shtns, complex double *z, complex double *alm);
 //@}
 
 /// \name 2D vector transforms

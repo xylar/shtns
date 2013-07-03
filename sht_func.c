@@ -633,3 +633,103 @@ void SH_to_lat(shtns_cfg shtns, complex double *Qlm, double cost,
 //	free(ylm_lat);
 }
 
+
+/// complex scalar transform.
+/// in: complex spatial field.
+/// out: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
+/// for a total of (LMAX+1)^2 coefficients.
+void spat_cplx_to_SH(shtns_cfg shtns, complex double *z, complex double *alm)
+{
+	long int nspat = shtns->nspat;
+	double *re, *im;
+	complex double *rlm, *ilm;
+
+	if (MRES != 1) shtns_runerr("complex SH: only mres=1 supported."); 
+
+	// alloc temporary fields
+	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
+	im = re + nspat;
+	rlm = (complex double*) (re + 2*nspat);
+	ilm = rlm + NLM;
+
+	// split z into real and imag parts.
+	for (int k=0; k<nspat; k++) {
+		re[k] = creal(z[k]);		im[k] = cimag(z[k]);
+	}
+
+	// perform two real transforms:
+	spat_to_SH(shtns, re, rlm);
+	spat_to_SH(shtns, im, ilm);
+
+	// combine into complex coefficients
+	int ll = 0;
+	int lm = 0;
+	for (int l=0; l<=LMAX; l++) {
+		ll += 2*l;		// ll = l*(l+1)
+		alm[ll] = creal(rlm[lm]) + I*creal(ilm[lm]);		// m=0
+		lm++;
+	}
+	for (int m=1; m<=MMAX; m++) {
+		ll = (m-1)*m;
+		for (int l=m; l<=LMAX; l++) {
+			ll += 2*l;		// ll = l*(l+1)
+			complex double rr = rlm[lm];
+			complex double ii = ilm[lm];
+			alm[ll+m] = rr + I*ii;					// m>0
+			alm[ll-m] = conj(rr) + I*conj(ii);		// m<0
+			lm++;
+		}
+	}
+
+	VFREE(re);
+}
+
+/// complex scalar transform.
+/// in: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
+/// for a total of (LMAX+1)^2 coefficients.
+/// out: complex spatial field.
+void SH_to_spat_cplx(shtns_cfg shtns, complex double *alm, complex double *z)
+{
+	long int nspat = shtns->nspat;
+	double *re, *im;
+	complex double *rlm, *ilm;
+
+	if (MRES != 1) shtns_runerr("complex SH: only mres=1 supported."); 
+
+	// alloc temporary fields
+	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
+	im = re + nspat;
+	rlm = (complex double*) (re + 2*nspat);
+	ilm = rlm + NLM;
+
+	// extract complex coefficients corresponding to real and imag
+	int ll = 0;
+	int lm = 0;
+	for (int l=0; l<=LMAX; l++) {
+		ll += 2*l;		// ll = l*(l+1)
+		rlm[lm] = creal(alm[ll]);		// m=0
+		ilm[lm] = cimag(alm[ll]);
+		lm++;
+	}
+	for (int m=1; m<=MMAX; m++) {
+		ll = (m-1)*m;
+		for (int l=m; l<=LMAX; l++) {
+			ll += 2*l;		// ll = l*(l+1)
+			complex double b = alm[ll-m];
+			complex double a = alm[ll+m];
+			rlm[lm] = (conj(b) + a)*0.5;		// real part
+			ilm[lm] = (conj(b) - a)*I*0.5;		// imag part
+			lm++;
+		}
+	}
+
+	// perform two real transforms:
+	SH_to_spat(shtns, rlm, re);
+	SH_to_spat(shtns, ilm, im);
+
+	// combine into z
+	for (int k=0; k<nspat; k++)
+		z[k] = re[k] + I*im[k];
+
+	VFREE(re);
+}
