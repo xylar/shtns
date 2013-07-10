@@ -83,6 +83,21 @@ make install \endcode
 
 That's it, FFTW is now installed and ready for use.
 
+\subsection mkl Using MKL instead of FFTW
+
+SHTns can use MKL instead of FFTW. To do this, pass \c --enable-mkl to the configure script.
+Performance can be slightly better, but there is no DCT support, so only gauss grid is available.
+
+\note Currently the call of MKL through the fftw wrappers is not thread safe.
+The user is responsible for working around this MKL problem as <a href=http://software.intel.com/sites/products/documentation/hpc/mkl/mklman/GUID-D17B3AB4-BD4E-4652-94A7-BAD4130CCB4A.htm>indicated by intel</a>.
+If you want to call SHT function from multiple threads, you must tell MKL how many threads you will use BEFORE initializing shtns :
+\code
+#include "fftw3_mkl.h"
+fftw3_mkl.number_of_user_threads = 4;
+sht = shtns_create(...);
+...
+\endcode
+
 \section makefile Preparing the Makefile
 
 Run \c ./configure in the SHTns directory.
@@ -459,7 +474,7 @@ When compared to libpsht (parallelized with OpenMP too), SHTns is faster especia
 
 We claim that the accuracy of SHTns is as good as it can be with double precision floating point math.
 Rescaling is performed for large transform where the recurrence relation would otherwise underflow the double precision numbers.
-SHTns has been tested on x86 architecture with SSE2 double precision floating point math (64 bit) to be <b>accurate up to l=8191</b>.
+SHTns has been tested on x86 architecture with SSE2 double precision floating point math (64 bit) to be <b>accurate up to l=16383</b> at least.
 The measured error for a back and forth scalar transform using a Gauss-Legendre algorithm for various truncation levels \c lmax is plotted below.
 
 \image html accuracy.png

@@ -44,12 +44,11 @@ shtns_cfg sht_data = NULL;
   #define omp_threads 1
 #endif
 
-int verbose = 1;		// runtime verbosity control.
-
-/// no output to stdout during initialization.
-void shtns_silent() {
-	verbose = 0;
+static int verbose = 0;		// runtime verbosity control: 0 no output, 1 output, 2 debug (if compiled in)
+void shtns_verbose(int v) {
+	verbose = v;
 }
+
 
 /// \internal Abort program with error message.
 static void shtns_runerr(const char * error_text)
@@ -275,7 +274,7 @@ static void free_unused_matrices(shtns_cfg shtns)
 			}
 		}
 		#if SHT_VERBOSE > 1
-			if (verbose) printf(" %d ",count[it]);
+			if (verbose>1) printf(" %d ",count[it]);
 		#endif
 	}
 
@@ -369,7 +368,7 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 		}
 	}
 	#if SHT_VERBOSE > 1
-		if (verbose) printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
+		if (verbose>1) printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
 	#endif
 }
 
@@ -484,7 +483,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2;
 			shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
 			#if SHT_VERBOSE > 1
-			if (verbose) {
+			if (verbose>1) {
 				printf("          fftw cost ifftc=%lg,  fftc=%lg  ",fftw_cost(shtns->ifftc), fftw_cost(shtns->fftc));	fflush(stdout);
 			}
 			#endif
@@ -493,7 +492,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 			shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
 			#if SHT_VERBOSE > 1
-			if (verbose) {
+			if (verbose>1) {
 				printf("          fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
 			}
 			#endif
@@ -508,14 +507,14 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		if (in_place) {		// in-place FFT (if allowed)
 			ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 			#if SHT_VERBOSE > 1
-			if (verbose) {
+			if (verbose>1) {
 				printf("          in-place cost : ifft=%lg  ",fftw_cost(ifft2));	fflush(stdout);
 			}
 			#endif
 			if (ifft2 != NULL) {
 				fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 				#if SHT_VERBOSE > 1
-				if (verbose) {
+				if (verbose>1) {
 					printf("fft=%lg\n",fftw_cost(fft2));	fflush(stdout);
 				}
 				#endif
@@ -528,12 +527,12 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		{		// out-of-place FFT
 			ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
 			#if SHT_VERBOSE > 1
-				if (verbose) {  printf("          oop cost : ifft=%lg  ",fftw_cost(ifft));	fflush(stdout);  }
+				if (verbose>1) {  printf("          oop cost : ifft=%lg  ",fftw_cost(ifft));	fflush(stdout);  }
 			#endif
 			if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
 			fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
 			#if SHT_VERBOSE > 1
-				if (verbose) {  printf("fft=%lg\n",fftw_cost(fft));	fflush(stdout);  }
+				if (verbose>1) {  printf("fft=%lg\n",fftw_cost(fft));	fflush(stdout);  }
 			#endif
 			if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
 			cost_fft_oop = fftw_cost(fft);		cost_ifft_oop = fftw_cost(ifft);
@@ -556,7 +555,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			shtns->ncplx_fft = ncplx * NLAT;		// fft is done out-of-place, store allocation size.
 			phi_embed = NPHI;
 			#if SHT_VERBOSE > 1
-				if (verbose) printf("        ** out-of-place fft **\n");
+				if (verbose>1) printf("        ** out-of-place fft **\n");
 			#endif
 		}
 		shtns->fft = fft;		shtns->ifft = ifft;
@@ -565,7 +564,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		VFREE(Sh);		VFREE(ShF);
 
 		#if SHT_VERBOSE > 2
-		if (verbose) {
+		if (verbose>2) {
 			printf(" *** fft plan :\n");
 			fftw_print_plan(fft);
 			printf("\n *** ifft plan :\n");
@@ -602,7 +601,7 @@ static int planDCT(shtns_cfg shtns)
 		shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, stride, stride*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
 		if (shtns->dct_m0 == NULL) return 0;		// dct_m0 planning failed.
 	#if SHT_VERBOSE > 2
-	if (verbose) {
+	if (verbose>2) {
 		printf(" *** dct_m0 plan :\n");		fftw_print_plan(shtns->dct_m0);	printf("\n");
 	}
 	#endif
@@ -626,7 +625,7 @@ static int planDCT(shtns_cfg shtns)
 	VFREE(Sh);
 	if (shtns->idct == NULL) return 0;		// idct planning failed.
 	#if SHT_VERBOSE > 2
-	if (verbose) {
+	if (verbose>2) {
 		printf(" *** idct plan :\n");	fftw_print_plan(shtns->idct);	printf("\n");
 	}
 	#endif
@@ -683,7 +682,7 @@ static void PolarOptimize(shtns_cfg shtns, double eps)
 		if (verbose) printf("        + polar optimization threshold = %.1e\n",eps);
 	#endif
 	#if SHT_VERBOSE > 1
-	if (verbose) {
+	if (verbose>1) {
 		printf("          tm[im]=");
 		for (im=0;im<=MMAX;im++)
 			printf(" %d",shtns->tm[im]);
@@ -723,7 +722,7 @@ static void OptimizeMatrices(shtns_cfg shtns, double eps)
 		if (verbose) printf("        + polar optimization threshold = %.1e\n",eps);
 #endif
 #if SHT_VERBOSE > 1
-		if (verbose) {
+		if (verbose>1) {
 			printf("          tm[im]=");
 			for (im=0;im<=MMAX;im++)
 				printf(" %d",tm[im]);
@@ -967,7 +966,7 @@ static void init_SH_dct_m(shtns_cfg shtns, double* is1, fftw_plan dct, fftw_plan
 			fftw_execute_r2r(dct, dZt, dZt);
 			fftw_execute_r2r(dct, dZp, dZp);
 #if SHT_VERBOSE > 1
-			if ((LMAX <= 12) && (verbose))
+			if ((LMAX <= 12) && (verbose>1))
 			#pragma omp critical
 			{
 				printf("\nl=%d, m=%d ::\t", l,m);
@@ -1023,7 +1022,7 @@ static void init_SH_dct_m(shtns_cfg shtns, double* is1, fftw_plan dct, fftw_plan
 				}
 			}
 #if SHT_VERBOSE > 1
-		if ((LMAX <= 12)&&(verbose))
+		if ((LMAX <= 12)&&(verbose>1))
 		#pragma omp critical
 		{
 			printf("\nl=%d, m=%d ::\t",l,m);
@@ -1197,7 +1196,7 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 		im += (2*NLAT_2 -l+1);
 
 #if SHT_VERBOSE > 1
-	if (verbose) printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
+	if (verbose>1) printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
 #endif
 	shtns->ykm_dct = (double **) malloc( marray_size + sizeof(double)*sk );
 	shtns->ykm_dct[0] = (double *) PTR_ALIGN( shtns->ykm_dct + (MMAX+1) );
@@ -1254,7 +1253,7 @@ static void init_SH_dct(shtns_cfg shtns, int analysis)
 
 #if SHT_VERBOSE > 1
 	tik1 = getticks();
-	if (verbose) printf("\n    ticks : %.3f\n", elapsed(tik1,tik0)/(NLM*NLAT*(MMAX+1)));
+	if (verbose>1) printf("\n    ticks : %.3f\n", elapsed(tik1,tik0)/(NLM*NLAT*(MMAX+1)));
 #endif
 	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
 }
@@ -1295,7 +1294,7 @@ static void grid_gauss(shtns_cfg shtns, double latdir)
 	for (it=NLAT_2; it < NLAT_2 +overflow; it++) shtns->wg[it] = 0.0;		// padding for multi-way algorithm.
 
 #if SHT_VERBOSE > 1
-	if (verbose) {
+	if (verbose>1) {
 		printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
 	// TEST if gauss points are ok.
 		double tmax = 0.0;
@@ -1340,7 +1339,7 @@ static void grid_dct(shtns_cfg shtns, double latdir)
 	}
 
 #if SHT_VERBOSE > 1
-	if (verbose) {
+	if (verbose>1) {
 		printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
 		double tmax = 0.0;
 		for (it=0;it<NLAT_2; it++) {
@@ -1428,7 +1427,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 	}
 	err = tmax;
 #if SHT_VERBOSE > 1
-	if (verbose) printf("        scalar SH - poloidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
+	if (verbose>1) printf("        scalar SH - poloidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
 #endif
 
 	if (vector) {
@@ -1442,7 +1441,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 		}
 		if (tmax > err) err = tmax;
 	#if SHT_VERBOSE > 1
-		if (verbose) printf("        vector SH - spheroidal rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
+		if (verbose>1) printf("        vector SH - spheroidal rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
 	#endif
 		for (i=0, tmax=0., n2=0., jj=0; i<NLM; i++) {		// compute error
 			t = cabs(Tlm[i] - Tlm0[i]);
@@ -1451,7 +1450,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 		}
 		if (tmax > err) err = tmax;
 	#if SHT_VERBOSE > 1
-		if (verbose) printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
+		if (verbose>1) printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
 	#endif
 	}
 
@@ -1462,7 +1461,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 
 
 #if SHT_VERBOSE == 1
-  #define PRINT_DOT 	if (verbose) {	printf(".");	fflush(stdout);	}
+  #define PRINT_DOT 	if (verbose==1) {	printf(".");	fflush(stdout);	}
 #else
   #define PRINT_DOT (0);
 #endif
@@ -1493,7 +1492,7 @@ static double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *f
 		t = elapsed(tik1, tik0)/(nloop-1);		// discard first iteration.
 	}
 	#if SHT_VERBOSE > 1
-	if (verbose) {  printf("  t(%s) = %.3g",name,t);	fflush(stdout);  }
+	if (verbose>1) {  printf("  t(%s) = %.3g",name,t);	fflush(stdout);  }
 	#endif
 	return t;
 }
@@ -1561,7 +1560,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 			t = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_TYP_SSY][SHT_FLY2], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			r = fabs(2.0*(t-t0)/(t+t0));
 			#if SHT_VERBOSE > 1
-				if (verbose) printf(", nloop=%d, r=%g, m=%d (real time = %g s)\n",nloop,r,m,tt);
+				if (verbose>1) printf(", nloop=%d, r=%g, m=%d (real time = %g s)\n",nloop,r,m,tt);
 				if (tt >= 0.01) break;		// faster timing in debug mode.
 			#endif
 			PRINT_DOT
@@ -1571,7 +1570,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		nloop = *nlp;
 	}
 	#if SHT_VERBOSE > 1
-		if (verbose) printf(" => nloop=%d (takes %g s)\n",nloop, tt);
+		if (verbose>1) printf(" => nloop=%d (takes %g s)\n",nloop, tt);
 	#endif
 	if (vector == 0)	typ_lim = SHT_TYP_VSY;		// time only scalar transforms.
 //	if (tt > 3.0)		typ_lim = SHT_TYP_VSY;		// time only scalar transforms.
@@ -1592,7 +1591,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		}
 		if (m >= 2) {		// don't time if there is only 1 algo !
 			#if SHT_VERBOSE > 1
-			if (verbose) {  printf("finding best %s ...",sht_type[ityp]);	fflush(stdout);  }
+			if (verbose>1) {  printf("finding best %s ...",sht_type[ityp]);	fflush(stdout);  }
 			#endif
 			i = i0-1;		i0 = -1;
 			while (++i < alg_end) {
@@ -1617,7 +1616,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 				}
 				PRINT_DOT
 				#if SHT_VERBOSE > 1
-					if (verbose) printf(" => %s\n",sht_name[i0]);
+					if (verbose>1) printf(" => %s\n",sht_name[i0]);
 				#endif
 			}
 		}
@@ -1627,7 +1626,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
   #ifdef SHTNS_DCT
 	if (dct_mtr != 0) {		// find the best DCT timings...
  		#if SHT_VERBOSE > 1
-			if (verbose) {  printf("finding best mtr_dct ...");	fflush(stdout);  }
+			if (verbose>1) {  printf("finding best mtr_dct ...");	fflush(stdout);  }
 		#endif
 		minc = MMAX/20 + 1;             // don't test every single m.
 		m = -1;		i = -1;		t0 = 0.0;		// reference = no dct.
@@ -1638,7 +1637,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		tnodct = t0;
 		for (m=0; m<=MMAX; m+=minc) {
 			#if SHT_VERBOSE > 1
-				if (verbose) printf("\n\tm=%d :",m);
+				if (verbose>1) printf("\n\tm=%d :",m);
 			#endif
 			if (Set_MTR_DCT(shtns, m) >= 0) {
 				t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
@@ -1996,7 +1995,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	mem = sht_mem_size(shtns->lmax, shtns->mmax, shtns->mres, *nlat);
 	t=mem;	if (analys) t*=2;		if (vector) t*=3;
 	#if SHT_VERBOSE > 1
-		if (verbose) printf("Memory required for precomputed matrices (estimate) : %.3f Mb\n",t);
+		if (verbose>1) printf("Memory required for precomputed matrices (estimate) : %.3f Mb\n",t);
 	#endif
 	if ( t > SHTNS_MAX_MEMORY ) {		// huge transform has been requested
 		on_the_fly = 1;
@@ -2132,7 +2131,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 //	set_sht_fly(shtns, SHT_TYP_VAN);
   #if SHT_VERBOSE > 1
-	if ((omp_threads > 1)&&(verbose)) printf(" nthreads = %d\n",shtns->nthreads);
+	if ((omp_threads > 1)&&(verbose>1)) printf(" nthreads = %d\n",shtns->nthreads);
   #endif
   #if SHT_VERBOSE > 0
 	if (verbose) printf("        => " PACKAGE_NAME " is ready.\n");

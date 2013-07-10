@@ -616,6 +616,7 @@ int main(int argc, char *argv[])
 	FILE* fw;
 
 	srand( time(NULL) );	// initialise les nombres.
+	shtns_verbose(1);		// output some diagnostics.
 
 	printf("time_SHT performs some spherical harmonic transforms, and displays timings and accuracy.\n");
 	if (argc < 2) {
