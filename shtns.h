@@ -21,10 +21,17 @@
 
 
 #ifdef __cplusplus
+	#include <complex>
+	typedef std::complex<double> cplx;
+#else
+	typedef complex double cplx;
+#endif
+
+
+#ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-typedef complex double cplx;
 typedef struct shtns_info* shtns_cfg;
 
 /// different Spherical Harmonic normalizations.
