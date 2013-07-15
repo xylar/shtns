@@ -29,19 +29,18 @@
 	#else
 	static
 	#endif
-QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, complex double *Qlm, const long int llim, const int imlim) {
-VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BtF, s2d *BpF, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
-3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, s2d *BtF, s2d *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, complex double *Qlm, const long int llim, const int imlim) {
+VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
+3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
 
 	double *alm, *al;
-	s2d *wg, *ct, *st;
+	double *wg, *ct, *st;
 V	double *l_2;
 	long int nk, k, vnlat, l,m;
 	unsigned m0, mstep;
   #ifndef SHT_AXISYM
 	unsigned im;
 V	double m_1;
-    s2d sgn_mask;
   #endif
   #if _GCC_VEC_
 Q	rnd qq[2*llim];
@@ -53,37 +52,36 @@ V	double ss[llim];
 V	double tt[llim];
   #endif
 
-Q	s2d rer[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-Q	s2d ror[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-V	s2d ter[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-V	s2d tor[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-V	s2d per[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-V	s2d por[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+Q	double rer[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+Q	double ror[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double ter[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double tor[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double per[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double por[NLAT_2 + NWAY*VSIZE2 -1] SSE;
   #ifndef SHT_AXISYM
-Q	s2d rei[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-Q	s2d roi[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-V	s2d tei[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-V	s2d toi[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-V	s2d pei[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
-V	s2d poi[(NLAT_2+VSIZE-1)/VSIZE+NWAY*(VSIZE2/VSIZE)-1];
+Q	double rei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+Q	double roi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double tei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double toi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double pei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double poi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
   #endif
-
 
 	nk = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
 	#if _GCC_VEC_
 	  nk = ((unsigned) nk+(VSIZE2-1))/VSIZE2;
 	#endif
-	wg = (s2d*) shtns->wg;		ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
+	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
 V	l_2 = shtns->l_2;
-	vnlat = ((unsigned) NLAT)/VSIZE;		// vector size.
-	for (k=nk*(VSIZE2/VSIZE); k<(nk+NWAY)*(VSIZE2/VSIZE)-1; ++k) {		// never written, so this is now done for all m's
-Q		rer[k] = vdup(0.0);		ror[k] = vdup(0.0);
-V		ter[k] = vdup(0.0);		tor[k] = vdup(0.0);
-V		per[k] = vdup(0.0);		por[k] = vdup(0.0);
+	vnlat = NLAT;
+	for (k=nk*VSIZE2; k<(nk+NWAY)*VSIZE2-1; ++k) {		// never written, so this is now done for all m's
+Q		rer[k] = 0.0;		ror[k] = 0.0;
+V		ter[k] = 0.0;		tor[k] = 0.0;
+V		per[k] = 0.0;		por[k] = 0.0;
 	  #ifndef SHT_AXISYM
-Q		rei[k] = vdup(0.0);		roi[k] = vdup(0.0);
-V		tei[k] = vdup(0.0);		toi[k] = vdup(0.0);
-V		pei[k] = vdup(0.0);		poi[k] = vdup(0.0);
+Q		rei[k] = 0.0;		roi[k] = 0.0;
+V		tei[k] = 0.0;		toi[k] = 0.0;
+V		pei[k] = 0.0;		poi[k] = 0.0;
 	  #endif
 	}
 
@@ -97,21 +95,17 @@ V		pei[k] = vdup(0.0);		poi[k] = vdup(0.0);
 	{		// im=0 : dzl.p = 0.0 and evrything is REAL
 		k=0;
 		alm = shtns->blm[0];
-Q		s2d r0 = vdup(0.0);
+Q		double r0 = 0.0;
 		do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-Q			s2d a = BrF[k];		s2d b = vxchg(BrF[vnlat-1-k]);
-Q			rer[k] = a+b;		ror[k] = a-b;
+Q			double a = BrF[k];		double b = BrF[NLAT-1-k];
+Q			rer[k] = a+b;			ror[k] = a-b;
 Q			r0 += (a+b)*wg[k];
-V			s2d c = BtF[k];		s2d d = vxchg(BtF[vnlat-1-k]);
-V			ter[k] = c+d;		tor[k] = c-d;
-V			s2d e = BpF[k];		s2d f = vxchg(BpF[vnlat-1-k]);
+V			double c = BtF[k];		double d = BtF[NLAT-1-k];
+V			ter[k] = c+d;			tor[k] = c-d;
+V			double e = BpF[k];		double f = BpF[NLAT-1-k];
 V			per[k] = e+f;		por[k] = e-f;
-		} while(++k < nk*(VSIZE2/VSIZE));
-		#if _GCC_VEC_
-Q			Qlm[0] = (vlo_to_dbl(r0) + vhi_to_dbl(r0)) * alm[0];					// l=0 is done.
-		#else
-Q			Qlm[0] = r0 * alm[0];				// l=0 is done.
-		#endif
+		} while(++k < nk*VSIZE2);
+Q		Qlm[0] = r0 * alm[0];				// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
 		for (l=0;l<llim;++l) {
@@ -197,38 +191,13 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
   #ifndef SHT_AXISYM
 Q	BrF += m0*vnlat;
 V	BtF += m0*vnlat;	BpF += m0*vnlat;
-	#if _GCC_VEC_
-		sgn_mask = SIGN_MASK_HI;	// build mask to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
-	#endif
 	for (im=m0; im<imlim; im+=mstep) {
 		l = shtns->tm[im] / VSIZE2;
 		alm = shtns->blm[im];
 		m = im*MRES;
- 	#if _GCC_VEC_
- 		k=(VSIZE2/VSIZE)*l;
-		do {	// compute symmetric and antisymmetric parts, and reorganize data.
-			s2d nr, ni, sr, si, tn, ts;
-3			s2d sin = st[k];
-Q			ni = BrF[k];				nr = BrF[(NPHI-2*im)*vnlat + k];
-Q			si = BrF[vnlat-1 - k];		sr = BrF[(NPHI-2*im)*vnlat +vnlat-1-k];
-Q			CFFT_TO_2REAL(nr, ni, sr, si, sgn_mask)
-QX			rer[k] = nr+sr;		ror[k] = nr-sr;		rei[k] = ni+si;		roi[k] = ni-si;
-3			rer[k] = (nr+sr)*sin;		ror[k] = (nr-sr)*sin;		rei[k] = (ni+si)*sin;		roi[k] = (ni-si)*sin;
-
-V			ni = BtF[k];				nr = BtF[(NPHI-2*im)*vnlat + k];
-V			si = BtF[vnlat-1 - k];		sr = BtF[(NPHI-2*im)*vnlat +vnlat-1-k];
-V			CFFT_TO_2REAL(nr, ni, sr, si, sgn_mask)
-V			ter[k] = nr+sr;		tor[k] = nr-sr;		tei[k] = ni+si;		toi[k] = ni-si;
-
-V			ni = BpF[k];				nr = BpF[(NPHI-2*im)*vnlat + k];
-V			si = BpF[vnlat-1 - k];		sr = BpF[(NPHI-2*im)*vnlat +vnlat-1-k];
-V			CFFT_TO_2REAL(nr, ni, sr, si, sgn_mask)
-V			per[k] = nr+sr;		por[k] = nr-sr;		pei[k] = ni+si;		poi[k] = ni-si;
-		} while(++k < nk*(VSIZE2/VSIZE));
-	#else
-		k = (l>>1)*2;		// k must be even here.
-		do {	// compute symmetric and antisymmetric parts, and reorganize data.
-			double an, bn, ani, bni, bs, as, bsi, asi, t;
+Q		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
+Q		do {	// compute symmetric and antisymmetric parts, and reorganize data.
+Q			double an, bn, ani, bni, bs, as, bsi, asi, t;
 3			double sina = st[k];	double sinb = st[k+1];
 Q			ani = BrF[k];		bni = BrF[k+1];		// north
 Q			an = BrF[(NPHI-2*im)*vnlat + k];	bn = BrF[(NPHI-2*im)*vnlat + k+1];
@@ -240,7 +209,11 @@ Q			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
 3			as *= sina;		asi*= sina;		bs *= sinb;		bsi *= sinb;
 Q			rer[k] = an+as;		rei[k] = ani+asi;		rer[k+1] = bn+bs;		rei[k+1] = bni+bsi;
 Q			ror[k] = an-as;		roi[k] = ani-asi;		ror[k+1] = bn-bs;		roi[k+1] = bni-bsi;
-
+Q			k+=2;
+Q 		} while (k<nk*VSIZE2);
+V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
+V		do {	// compute symmetric and antisymmetric parts, and reorganize data.
+V			double an, bn, ani, bni, bs, as, bsi, asi, t;
 V			ani = BtF[k];		bni = BtF[k+1];		// north
 V			an = BtF[(NPHI-2*im)*vnlat + k];	bn = BtF[(NPHI-2*im)*vnlat + k+1];
 V			t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
@@ -249,7 +222,11 @@ V			bs = BtF[(NPHI-2*im)*vnlat +vnlat-2-k];		as = BtF[(NPHI-2*im)*vnlat +vnlat-1
 V			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
 V			ter[k] = an+as;		tei[k] = ani+asi;		ter[k+1] = bn+bs;		tei[k+1] = bni+bsi;
 V			tor[k] = an-as;		toi[k] = ani-asi;		tor[k+1] = bn-bs;		toi[k+1] = bni-bsi;
-
+V			k+=2;
+V 		} while (k<nk*VSIZE2);
+V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
+V		do {	// compute symmetric and antisymmetric parts, and reorganize data.
+V			double an, bn, ani, bni, bs, as, bsi, asi, t;
 V			ani = BpF[k];		bni = BpF[k+1];		// north
 V			an = BpF[(NPHI-2*im)*vnlat + k];	bn = BpF[(NPHI-2*im)*vnlat + k+1];
 V			t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
@@ -258,9 +235,8 @@ V			bs = BpF[(NPHI-2*im)*vnlat +vnlat-2-k];		as = BpF[(NPHI-2*im)*vnlat +vnlat-1
 V			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
 V			per[k] = an+as;		pei[k] = ani+asi;		per[k+1] = bn+bs;		pei[k+1] = bni+bsi;
 V			por[k] = an-as;		poi[k] = ani-asi;		por[k+1] = bn-bs;		poi[k+1] = bni-bsi;
-			k+=2;
- 		} while (k<nk);
-	#endif
+V			k+=2;
+V		} while (k<nk*VSIZE2);
 V		m_1 = 1.0/m;
 		k=l;
 		#if _GCC_VEC_
@@ -433,12 +409,12 @@ QX	static void GEN3(spat_to_SH_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, com
 VX	static void GEN3(spat_to_SHsphtor_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
 3	static void GEN3(spat_to_SHqst_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
 
-Q	s2d *BrF;		// contains the Fourier transformed data
-V	s2d *BtF, *BpF;	// contains the Fourier transformed data
+Q	double *BrF;		// contains the Fourier transformed data
+V	double *BtF, *BpF;	// contains the Fourier transformed data
 	unsigned imlim=0;
 
-Q	BrF = (s2d *) Vr;
-V	BtF = (s2d *) Vt;	BpF = (s2d *) Vp;
+Q	BrF = Vr;
+V	BtF = Vt;	BpF = Vp;
   #ifndef SHT_AXISYM
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
@@ -452,16 +428,16 @@ V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
 V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
 V		  #endif
 		} else {	// alloc memory for the transpose FFT
-			unsigned long nv = shtns->nspat /VSIZE;
-QX			BrF = (s2d*) VMALLOC( nv * sizeof(s2d) );
-VX			BtF = (s2d*) VMALLOC( 2*nv * sizeof(s2d) );
+			unsigned long nv = shtns->nspat;
+QX			BrF = (double*) VMALLOC( nv * sizeof(double) );
+VX			BtF = (double*) VMALLOC( 2*nv * sizeof(double) );
 VX			BpF = BtF + nv;
-3			BrF = (s2d*) VMALLOC( 3*nv * sizeof(s2d) );
+3			BrF = (double*) VMALLOC( 3*nv * sizeof(double) );
 3			BtF = BrF + nv;		BpF = BtF + nv;
 V		  #ifdef HAVE_LIBFFTW3_OMP
-Q			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, ((double*)BrF)+1, ((double*)BrF));
-V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, ((double*)BtF)+1, ((double*)BtF));
-V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*)BpF));
+Q			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, BrF+1, BrF);
+V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, BtF+1, BtF);
+V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
 V		  #endif
 	    }
 	}
@@ -482,11 +458,11 @@ V			#pragma omp single nowait
 V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
 V		} else if (shtns->fftc_mode > 0) {	// split out-of-place
 3			#pragma omp single nowait
-3			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, ((double*)BrF)+1, ((double*)BrF));
+3			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, BrF+1, BrF);
 V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, ((double*)BtF)+1, ((double*)BtF));
+V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, BtF+1, BtF);
 V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*)BpF));
+V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
 V		}
 V		#pragma omp barrier
 V	#endif
