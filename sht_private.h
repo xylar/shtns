@@ -184,16 +184,14 @@ struct shtns_info {		// MUST start with "int nlm;"
 //#define SHT_SCALE_FACTOR 2.0370359763344860863e+90
 
 
-/* for vectorization (SSE2) */
-
-#define MIN_ALIGNMENT 16
-/// align pointer on MIN_ALIGNMENT (must be a power of 2)
-#define PTR_ALIGN(p) ((((size_t)(p)) + (MIN_ALIGNMENT-1)) & (~((size_t)(MIN_ALIGNMENT-1))))
-
-#define SSE __attribute__((aligned (MIN_ALIGNMENT)))
-
+#if _GCC_VEC_ == 0
+	#undef _GCC_VEC_
+#endif
 
 /* are there vector extensions available ? */
+#if !(defined __SSE2__ || defined __MIC__)
+	#undef _GCC_VEC_
+#endif
 #ifdef __INTEL_COMPILER
 	#if __INTEL_COMPILER < 1400
 		#undef _GCC_VEC_
@@ -207,7 +205,14 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#endif
 #endif
 
+#if _GCC_VEC_ && __MIC__
+	#undef _GCC_VEC_
+	#warning "mic not supported"
+#endif
+
+
 #if _GCC_VEC_ && __SSE2__
+	#define MIN_ALIGNMENT 16
 	#define VSIZE 2
 	typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
 	typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
@@ -218,6 +223,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 		typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 4 doubles.
 		#define vall(x) ((rnd) _mm256_set1_pd(x))
 		#define vread(mem, idx) ((rnd)_mm256_loadu_pd( ((double*)mem) + (idx)*4 ))
+		#define vstor(mem, idx, v) _mm256_storeu_pd( ((double*)mem) + (idx)*4 , v)
 		inline static v2d v2d_reduce(rnd a, rnd b) {
 			a = _mm256_hadd_pd(a, b);
 			return (v2d)_mm256_castpd256_pd128(a) + (v2d)_mm256_extractf128_pd(a,1);
@@ -254,6 +260,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#endif
 		#define vall(x) ((rnd) _mm_set1_pd(x))
 		#define vread(mem, idx) ((s2d*)mem)[idx]
+		#define vstor(mem, idx, v) ((s2d*)mem)[idx] = v
 		#define S2D_STORE(mem, idx, ev, od)		((s2d*)mem)[idx] = ev+od;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(ev-od);
 		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
 			rnd aa = vxchg(ei + oi) + (er + or);		rnd bb = (er + or) - vxchg(ei + oi);	\
@@ -312,15 +319,20 @@ struct shtns_info {		// MUST start with "int nlm;"
 	// in 64 bit systems, malloc should be 16 bytes aligned anyway.
 	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : _mm_malloc(s, MIN_ALIGNMENT) )
 	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : _mm_free(s) )
-#else
-	#undef _GCC_VEC_
+#endif
+
+
+
+#ifndef _GCC_VEC_
+	#define MIN_ALIGNMENT 16
 	#define VSIZE 1
 	#define VSIZE2 1
 	#define _SIMD_NAME_ "scalar"
 	typedef double s2d;
 	typedef complex double v2d;
 	typedef double rnd;
-	#define vread(mem, idx) ((s2d*)mem)[idx]
+	#define vread(mem, idx) ((double*)mem)[idx]
+	#define vstor(mem, idx, v) ((double*)mem)[idx] = v;
 	#define vlo(a) (a)
 	#define vall(x) (x)
 	#define vdup(x) (x)
@@ -335,6 +347,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
 	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
 #endif
+
+
+#define SSE __attribute__((aligned (MIN_ALIGNMENT)))
+
+/// align pointer on MIN_ALIGNMENT (must be a power of 2)
+#define PTR_ALIGN(p) ((((size_t)(p)) + (MIN_ALIGNMENT-1)) & (~((size_t)(MIN_ALIGNMENT-1))))
 
 
 struct DtDp {		// theta and phi derivatives stored together.
