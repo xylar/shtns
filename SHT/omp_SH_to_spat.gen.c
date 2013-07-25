@@ -32,13 +32,13 @@
 	#else
 	static
 	#endif
-3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, complex double *BrF, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
-QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *BrF, const long int llim, const int imlim) {
+3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, complex double *BrF, complex double *BtF, complex double *BpF, const long int llim, const int im) {
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *BrF, const long int llim, const int im) {
   #ifndef SHT_GRAD
-VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
+VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int im) {
   #else
-S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
-T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
+S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *BtF, complex double *BpF, const long int llim, const int im) {
+T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int im) {
   #endif
 
   #ifndef SHT_AXISYM
@@ -52,13 +52,11 @@ S	#define si(l) vall(cimag(Sl[l]))
 T	#define tr(l) vall(creal(Tl[l]))
 T	#define ti(l) vall(cimag(Tl[l]))
 V	double m_1;
-	unsigned im;
   #else
 Q	#define BR0(i) ((double *)BrF)[i]
 S	#define BT0(i) ((double *)BtF)[i]
 T	#define BP0(i) ((double *)BpF)[i]
   #endif
-	unsigned m0, mstep;
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
@@ -86,13 +84,12 @@ V	double ppoi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
 	nk = NLAT_2;
 	nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
 
-	#ifndef _OPENMP
-		m0 = 0;		mstep = 1;
-	#else
-		m0 = omp_get_thread_num();
-		mstep = omp_get_num_threads();
-		if (m0 == 0)
-	#endif
+
+Q	BrF += im*NLAT_2;
+V	BtF += im*NLAT_2;	BpF += im*NLAT_2;
+
+
+	if (im==0)
 	{	//	im=0;
 		#ifdef SHT_GRAD
 		  #ifndef SHT_AXISYM
@@ -190,13 +187,23 @@ T			BpF[NLAT_2-1 - k/2] = pper[k+1]-ppor[k+1] + I*(pper[k]-ppor[k]);
 			k+=2;
 		} while(k < NLAT_2);
 
-		m0=mstep;
+	#ifndef SHT_AXISYM
+		// padding for high m's
+		unsigned imlim = MTR;
+		#ifdef SHT_VAR_LTR
+			if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+		#endif
+Q		BrF += NLAT_2*(imlim+1);	// shift original pointer
+V		BtF += NLAT_2*(imlim+1);	BpF += NLAT_2*(imlim+1);
+		for (k=0; k < NLAT_2*(NPHI-1-2*imlim); ++k) {	// padding for high m's
+Q			((v2d*)BrF)[k] = vdup(0.0);
+V			((v2d*)BtF)[k] = vdup(0.0);	((v2d*)BpF)[k] = vdup(0.0);
+		}
+	#endif
 	}
-
   #ifndef SHT_AXISYM
-Q	BrF += m0*NLAT_2;
-V	BtF += m0*NLAT_2;	BpF += m0*NLAT_2;
-	for (im=m0; im<imlim; im+=mstep) {
+	else
+	if (im <= shtns->mmax) {
 		m = im*MRES;
 		l = LiM(shtns, 0,im);
 V		m_1 = 1.0/m;
@@ -373,19 +380,6 @@ V			BpF[(NPHI+1-2*im)*NLAT_2 -1 - k/2] = (pper[k+1]-ppor[k+1]+ppei[k]-ppoi[k]) +
 			k+=2;
 		} while(k < NLAT_2);
 
-Q		BrF += mstep*NLAT_2;
-V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
-	}
-
-	while(im <= NPHI-imlim) {	// padding for high m's
-		k=0;
-		do {
-Q			BrF[k] = 0.0;
-V			BtF[k] = 0.0;		BpF[k] = 0.0;
-		} while (++k < NLAT_2);
-Q		BrF += mstep*NLAT_2;
-V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
-	  im+=mstep;
 	}
   #endif
 }
@@ -410,15 +404,15 @@ T	static void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex doubl
   #endif
 
 	int k;
-	unsigned imlim = 0;
 Q	complex double* BrF = (complex double*) Vr;
 V	complex double* BtF = (complex double*) Vt;	complex double* BpF = (complex double*) Vp;
 
-  #ifndef SHT_AXISYM
-	imlim = MTR;
+	unsigned imlim = MTR;
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
+
+  #ifndef SHT_AXISYM
 	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
 		unsigned long nv = shtns->nspat;
 QX		BrF = (complex double*) VMALLOC( nv * sizeof(double) );
@@ -428,58 +422,36 @@ VX		BpF = BtF + nv/2;
 3		BtF = BrF + nv/2;		BpF = BrF + nv;
 	}
   #endif
-	imlim += 1;
-  
+
   //omp_set_num_threads(shtns->nthreads);
-  #pragma omp parallel num_threads(shtns->nthreads)
-  {
-3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim);
-QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim);
+  #pragma omp parallel for num_threads(shtns->nthreads)
+  for (int im=0; im<=imlim/2; im++) {
+3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im);
+3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim-im);
+QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im);
+QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim-im);
 	#ifndef SHT_GRAD
-VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
+VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im);
+VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim-im);
 	#else
-S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
-T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
+S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im);
+T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im);
+S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim-im);
+T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim-im);
 	#endif
-
-  #ifndef SHT_AXISYM
-V	#ifndef HAVE_LIBFFTW3_OMP
-V	  #pragma omp barrier
-V		if (shtns->fftc_mode == 0) {
-3			#pragma omp single nowait
-3			fftw_execute_dft(shtns->ifftc, BrF, (complex double *) Vr);
-V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->ifftc, BtF, (complex double *) Vt);
-V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->ifftc, BpF, (complex double *) Vp);
-V		} else if (shtns->fftc_mode > 0) {		// split dft
-3			#pragma omp single nowait
-3			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
-V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
-V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-V		}
-V	#endif
-  #endif
-
   }
 
   #ifndef SHT_AXISYM
     // NPHI > 1 as SHT_AXISYM is not defined.
   	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode == 0) {
-V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
 V			fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
 V			fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
-V		  #endif
 		} else {		// split dft
-V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-V		  #endif
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.
 		}

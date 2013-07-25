@@ -29,17 +29,15 @@
 	#else
 	static
 	#endif
-QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, complex double *Qlm, const long int llim, const int imlim) {
-VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
-3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, complex double *Qlm, const long int llim, const int im) {
+VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, complex double *Slm, complex double *Tlm, const long int llim, const int im) {
+3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, const long int llim, const int im) {
 
 	double *alm, *al;
 	double *wg, *ct, *st;
 V	double *l_2;
 	long int nk, k, vnlat, l,m;
-	unsigned m0, mstep;
   #ifndef SHT_AXISYM
-	unsigned im;
 V	double m_1;
   #endif
   #if _GCC_VEC_
@@ -85,13 +83,10 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 	  #endif
 	}
 
-	#ifndef _OPENMP
-		m0 = 0;		mstep = 1;
-	#else
-		m0 = omp_get_thread_num();
-		mstep = omp_get_num_threads();
-		if (m0 == 0)
-	#endif
+Q	BrF += im*vnlat;
+V	BtF += im*vnlat;	BpF += im*vnlat;
+
+	if (im == 0)
 	{		// im=0 : dzl.p = 0.0 and evrything is REAL
 		k=0;
 		alm = shtns->blm[0];
@@ -175,23 +170,20 @@ V				Slm[l] = ss[l-1]*l_2[l];		Tlm[l] = tt[l-1]*l_2[l];
 Q				((v2d*)Qlm)[l] = vdup(0.0);
 V				((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 			}
-			#ifndef SHT_AXISYM
-			if (imlim <= MMAX) {		// zero out m >= imlim
-				l = LiM(shtns, imlim*MRES, imlim);
+		  #ifndef SHT_AXISYM
+			if (MTR*MRES > (unsigned) llim) {		// zero out m >= imlim
+				unsigned imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+				unsigned l = LiM(shtns, (imlim+1)*MRES, imlim+1);
 				do {
 Q					((v2d*)Qlm)[l] = vdup(0.0);
 V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 				} while(++l < shtns->nlm);
 			}
-			#endif
+		  #endif
 		#endif
-		m0=mstep;
 	}
-
   #ifndef SHT_AXISYM
-Q	BrF += m0*vnlat;
-V	BtF += m0*vnlat;	BpF += m0*vnlat;
-	for (im=m0; im<imlim; im+=mstep) {
+	else {
 		l = shtns->tm[im] / VSIZE2;
 		alm = shtns->blm[im];
 		m = im*MRES;
@@ -398,8 +390,6 @@ Q				Ql[l] = vdup(0.0);
 V				Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
 			}
 		#endif
-Q		BrF += mstep*vnlat;
-V		BtF += mstep*vnlat;	BpF += mstep*vnlat;
 	}
   #endif
 }
@@ -411,22 +401,20 @@ VX	static void GEN3(spat_to_SHsphtor_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *V
 
 Q	double *BrF;		// contains the Fourier transformed data
 V	double *BtF, *BpF;	// contains the Fourier transformed data
-	unsigned imlim=0;
+
+	unsigned imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
 
 Q	BrF = Vr;
 V	BtF = Vt;	BpF = Vp;
   #ifndef SHT_AXISYM
-	imlim = MTR;
-	#ifdef SHT_VAR_LTR
-		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
-	#endif
 	if (shtns->fftc_mode >= 0) {
 	    if (shtns->fftc_mode == 0) {	// in-place
-V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
 V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
 V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
-V		  #endif
 		} else {	// alloc memory for the transpose FFT
 			unsigned long nv = shtns->nspat;
 QX			BrF = (double*) VMALLOC( nv * sizeof(double) );
@@ -434,49 +422,29 @@ VX			BtF = (double*) VMALLOC( 2*nv * sizeof(double) );
 VX			BpF = BtF + nv;
 3			BrF = (double*) VMALLOC( 3*nv * sizeof(double) );
 3			BtF = BrF + nv;		BpF = BtF + nv;
-V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, BrF+1, BrF);
 V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, BtF+1, BtF);
 V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
-V		  #endif
 	    }
 	}
   #endif
-	imlim += 1;
 
   //omp_set_num_threads(shtns->nthreads);
-  #pragma omp parallel num_threads(shtns->nthreads)
-  {
-	#ifndef SHT_AXISYM
-V	#ifndef HAVE_LIBFFTW3_OMP
-V		if (shtns->fftc_mode == 0) {	// in-place
-3			#pragma omp single nowait
-3			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
-V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
-V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
-V		} else if (shtns->fftc_mode > 0) {	// split out-of-place
-3			#pragma omp single nowait
-3			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, BrF+1, BrF);
-V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, BtF+1, BtF);
-V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
-V		}
-V		#pragma omp barrier
-V	#endif
-	#endif
-QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
-VX	GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
-3	GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
+  #pragma omp parallel for num_threads(shtns->nthreads)
+  for (int im=0; im<=imlim/2; im++) {
+QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, im);
+QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim-im);
+VX	GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, im);
+VX	GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim-im);
+3	GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+3	GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim-im);
   }
 
-  #ifndef SHT_AXISYM
+	#ifndef SHT_AXISYM
   	if (shtns->fftc_mode > 0) {		// free memory
 Q	    VFREE(BrF);
 VX	    VFREE(BtF);	// this frees also BpF.
 	}
-  #endif
+	#endif
 
   }
