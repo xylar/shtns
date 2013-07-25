@@ -581,14 +581,18 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
 
 <style type="text/css">
      h1.title {color: #008080; font-size: 200%; text-align: center}
-     h2 {color: #008080; font-size: 150%}
-     h3 {color: #008080; font-size: 140%}
-     h4 {color: #008080; font-size: 120%}
-     h5 {color: #008080; font-size: 100%}
+     h2 {color: #008080; font-size: 140%}
+     h3 {color: #008080; font-size: 100%} 
+     h4 {color: #008080; font-size: 100%} 
+     h5 {color: #008080; font-size: 100%} 
      span.numbering {color: #008080}
      span.definition {font-weight: bold}
+     div.version-subtitle {color: #008080; font-size: 100%; text-align: center}
      div.version {font-style: italic}
-     div.footnote {font-size: 80%}
+     div.footnote {font-size: 80%; 
+                   border-top-style : solid; 
+                   border-top-width : 1px;
+                   margin-top : 2em} 
      ins {text-decoration: underline; background: #AAFFA4}
      div.added {text-decoration: underline; background: #AAFFA4}
      del {text-decoration:line-through; background: #8F8F8F}
@@ -596,6 +600,10 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
   </style>
 
   <h1 class="title">CeCILL FREE SOFTWARE LICENSE AGREEMENT</h1>
+
+  <div class="version-subtitle">
+    Version 2.1 dated 2013-06-21
+  </div>
 
   <div class="notice">
     <h2>Notice</h2>
@@ -616,15 +624,16 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
 
     <p>The authors of the CeCILL<sup><a href="#footnote1">1</a></sup> license are:</p>
 
-    <p>Commissariat &agrave; l'Energie Atomique - CEA, a public scientific, technical and
-    industrial research establishment, having its principal place of business at 25 rue
-    Leblanc, immeuble Le Ponant D, 75015 Paris, France.</p>
+    <p>Commissariat &agrave; l'&eacute;nergie atomique et aux &eacute;nergies
+    alternatives - CEA, a public scientific, technical and industrial research
+    establishment, having its principal place of business at 25 rue Leblanc, immeuble Le
+    Ponant D, 75015 Paris, France.</p>
 
     <p>Centre National de la Recherche Scientifique - CNRS, a public scientific and
     technological establishment, having its principal place of business at 3 rue
     Michel-Ange, 75794 Paris cedex 16, France.</p>
 
-    <p>Institut National de Recherche en Informatique et en Automatique - INRIA, a public
+    <p>Institut National de Recherche en Informatique et en Automatique - Inria, a public
     scientific and technological establishment, having its principal place of business at
     Domaine de Voluceau, Rocquencourt, BP 105, 78153 Le Chesnay cedex, France.</p>
   </div>
@@ -636,8 +645,8 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
     modify and redistribute the software governed by this license within the framework of
     an open source distribution model.</p>
 
-    <p>The exercising of these rights is conditional upon certain obligations for users
-    so as to preserve this status for all subsequent redistributions.</p>
+    <p>The exercising of this right is conditional upon certain obligations for users so
+    as to preserve this status for all subsequent redistributions.</p>
 
     <p>In consideration of access to the source code and the rights to copy, modify and
     redistribute granted by the license, users are provided only with a limited warranty
@@ -657,6 +666,11 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
 
     <p>This Agreement may apply to any or all software for which the holder of the
     economic rights decides to submit the use thereof to its provisions.</p>
+
+    <p>Frequently asked questions can be found on the official website of the CeCILL
+    licenses family (<a href=
+    "http://www.cecill.info/index.en.html"><tt>http://www.cecill.info/index.en.html</tt></a>)
+    for any necessary clarification.</p>
   </div>
 
   <div class="article">
@@ -720,6 +734,14 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
     <p class="definition"><span class="definition">GNU GPL</span>: means the GNU General
     Public License version 2 or any subsequent version, as published by the Free Software
     Foundation Inc.</p>
+
+    <p class="definition"><span class="definition">GNU Affero GPL</span>: means the GNU
+    Affero General Public License version 3 or any subsequent version, as published by
+    the Free Software Foundation Inc.</p>
+
+    <p class="definition"><span class="definition">EUPL</span>: means the European Union
+    Public License version 1.1 or any subsequent version, as published by the European
+    Commission.</p>
 
     <p class="definition"><span class="definition">Parties</span>: mean both the Licensee
     and the Licensor.</p>
@@ -868,10 +890,10 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
         </ol>
 
         <p>and that, in the event that only the Object Code of the Software is
-        redistributed, the Licensee allows future Licensees unhindered access to the full
-        Source Code of the Software by indicating how to access it, it being understood
-        that the additional cost of acquiring the Source Code shall not exceed the cost
-        of transferring the data.</p>
+        redistributed, the Licensee allows effective access to the full Source Code of
+        the Software for a period of at least three years from the distribution of the
+        Software, it being understood that the additional acquisition cost of the Source
+        Code shall not exceed the cost of the data transfer.</p>
       </div>
 
       <div class="subclause">
@@ -896,11 +918,18 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
           </li>
         </ol>
 
-        <p>and that, in the event that only the object code of the Modified Software is
-        redistributed, the Licensee allows future Licensees unhindered access to the full
-        source code of the Modified Software by indicating how to access it, it being
-        understood that the additional cost of acquiring the source code shall not exceed
-        the cost of transferring the data.</p>
+        <p>and, in the event that only the object code of the Modified Software is
+        redistributed,</p>
+
+        <ol start="3">
+          <li>
+            <p>a note stating the conditions of effective access to the full source code
+            of the Modified Software for a period of at least three years from the
+            distribution of the Modified Software, it being understood that the
+            additional acquisition cost of the source code shall not exceed the cost of
+            the data transfer.</p>
+          </li>
+        </ol>
       </div>
 
       <div class="subclause">
@@ -913,16 +942,17 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
 
       <div class="subclause">
         <h4><a name="compatibility" id="compatibility"></a><span class=
-        "numbering">5.3.4</span> COMPATIBILITY WITH THE GNU GPL</h4>
+        "numbering">5.3.4</span> COMPATIBILITY WITH OTHER LICENSES</h4>
 
         <p>The Licensee can include a code that is subject to the provisions of one of
-        the versions of the GNU GPL in the Modified or unmodified Software, and
-        distribute that entire code under the terms of the same version of the GNU
-        GPL.</p>
+        the versions of the GNU GPL, GNU Affero GPL and/or EUPL in the Modified or
+        unmodified Software, and distribute that entire code under the terms of the same
+        version of the GNU GPL, GNU Affero GPL and/or EUPL.</p>
 
         <p>The Licensee can include the Modified or unmodified Software in a code that is
-        subject to the provisions of one of the versions of the GNU GPL, and distribute
-        that entire code under the terms of the same version of the GNU GPL.</p>
+        subject to the provisions of one of the versions of the GNU GPL, GNU Affero GPL
+        and/or EUPL and distribute that entire code under the terms of the same version
+        of the GNU GPL, GNU Affero GPL and/or EUPL.</p>
       </div>
     </div>
   </div>
@@ -980,7 +1010,7 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
 
       <div class="subclause">
         <p>The Licensee undertakes not to directly or indirectly infringe the
-        intellectual property rights of the Holder and/or Contributors on the Software
+        intellectual property rights on the Software of the Holder and/or Contributors,
         and to take, where applicable, vis-&agrave;-vis its staff, any and all measures
         required to ensure respect of said intellectual property rights of the Holder
         and/or Contributors.</p>
@@ -1081,8 +1111,8 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
       arising out of any or all proceedings for infringement that may be instituted in
       respect of the use, modification and redistribution of the Software. Nevertheless,
       should such proceedings be instituted against the Licensee, the Licensor shall
-      provide it with technical and legal assistance for its defense. Such technical and
-      legal assistance shall be decided on a case-by-case basis between the relevant
+      provide it with technical and legal expertise for its defense. Such technical and
+      legal expertise shall be decided on a case-by-case basis between the relevant
       Licensor and the Licensee pursuant to a memorandum of understanding. The Licensor
       disclaims any and all liability as regards the Licensee's use of the name of the
       Software. No warranty is given as regards the existence of prior rights over the
@@ -1201,10 +1231,6 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
   <div class="footnote">
     <p><a name="footnote1" id="footnote1">1 CeCILL stands for Ce(a) C(nrs) I(nria)
     L(ogiciel) L(ibre)</a></p>
-  </div>
-
-  <div class="version">
-    Version 2.0 dated 2006-09-05.
   </div>
 
 \endhtmlonly
