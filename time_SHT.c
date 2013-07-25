@@ -119,7 +119,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
 	for (i=0;i<NLM;i++) {
-		if ((isNaN(creal(Slm[i]))) || (isNaN(cimag(Slm[i])))) printf("NaN @ lm=%ld (l=%d)\n",i,shtns->li[i]);
+		//if ((isNaN(creal(Slm[i]))) || (isNaN(cimag(Slm[i])))) printf("NaN @ lm=%ld (l=%d)\n",i,shtns->li[i]);
 		if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
 			if (shtns->li[i] <= ltr)	Slm[i] = creal(Slm[i]-Slm0[i]);
 			t = fabs(creal(Slm[i]));
@@ -232,6 +232,7 @@ void test_SHT()
 	clock_t tcpu;
 	double ts, ta, ts2, ta2;
 	struct timespec t1, t2;
+	double gflop = 1e-6 * (NLAT*(NLM*4 +(MMAX+1)*2 + MMAX*log2(MMAX) + 5*NPHI*log2(NPHI)));		// Million floating point ops
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
@@ -256,9 +257,9 @@ void test_SHT()
 	ta = tcpu / (1000.*SHT_ITER);
 	ta2 = tdiff(&t1, &t2);
   #ifdef _OPENMP
-	printf("   SHT time (lmax=%d): \t synthesis = %f ms [cpu %f] \t analysis = %f ms [cpu %f] \n", LMAX, ts2, ts, ta2, ta);
+	printf("   SHT time (lmax=%d): \t synthesis = %.5f ms [cpu %.3f] [%.3f Gflops] \t analysis = %.5f ms [cpu %.3f] [%.3f Gflops] \n", LMAX, ts2, ts, gflop/ts2, ta2, ta, gflop/ta2);
   #else
-	printf("   SHT time (lmax=%d): \t synthesis = %f ms \t analysis = %f ms \n", LMAX, ts2, ta2);
+	printf("   SHT time (lmax=%d): \t synthesis = %f ms [%f Gflops] \t analysis = %f ms [%f Gflops] \n", LMAX, ts2, gflop/ts2, ta2, gflop/ta2);
   #endif
 	scal_error(Slm, Slm0, LMAX);
 	return;
