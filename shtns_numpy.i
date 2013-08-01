@@ -92,7 +92,7 @@ static int check_spectral(int i, PyObject *a, int size) {
 
 inline PyObject* SpecArray_New(int size) {
 	npy_intp dims = size;
-	npy_intp strides = sizeof(complex double);
+	npy_intp strides = sizeof(cplx);
 	return PyArray_New(&PyArray_Type, 1, &dims, PyArray_CDOUBLE, &strides, NULL, strides, 0, NULL);	
 }
 
@@ -280,6 +280,17 @@ inline PyObject* SpatArray_New(int size) {
 		if (check_spatial(2,Vr, $self->nspat) && check_spectral(1,Qlm, $self->nlm))
 			SH_to_spat($self, PyArray_DATA(Qlm), PyArray_DATA(Vr));
 	}
+	/* complex transforms */
+	void spat_cplx_to_SH(PyObject *z, PyObject *alm) {
+		int n = $self->lmax + 1;
+		if (check_spectral(1,z, $self->nspat) && check_spectral(2,alm, n*n))
+			spat_cplx_to_SH($self, PyArray_DATA(z), PyArray_DATA(alm));
+	}
+	void SH_to_spat_cplx(PyObject *alm, PyObject *z) {
+		int n = $self->lmax + 1;
+		if (check_spectral(2,z, $self->nspat) && check_spectral(1,alm, n*n))
+			SH_to_spat_cplx($self, PyArray_DATA(alm), PyArray_DATA(z));
+	}
 
 	/* 2D vectors */
 	void spat_to_SHsphtor(PyObject *Vt, PyObject *Vp, PyObject *Slm, PyObject *Tlm) {
@@ -384,6 +395,32 @@ inline PyObject* SpatArray_New(int size) {
 			vp = np.empty(self.spat_shape)
 			self.SHsph_to_spat(slm,vt,vp)
 			return vt,vp
+
+		def synth_cplx(self,alm):
+			"""
+			spectral to spatial transform, for complex valued scalar data.
+			z = synth(alm) : compute the spatial representation of the scalar alm
+			"""
+			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+			if alm.size != (self.lmax+1)**2: raise RuntimeError("spectral array has wrong size.")
+			if alm.dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
+			if alm.flags.contiguous == False: alm = alm.copy()		# contiguous array required.
+			z = np.empty(self.spat_shape, dtype=complex)
+			self.SH_to_spat_cplx(alm,z)
+			return z
+
+		def analys_cplx(self,z):
+			"""
+			spatial to spectral transform, for complex valued scalar data.
+			alm = analys(z) : compute the spherical harmonic representation of the complex scalar z
+			"""
+			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+			if z.shape != self.spat_shape: raise RuntimeError("spatial array has wrong shape.")
+			if z.dtype.num != np.dtype('complex128').num: raise RuntimeError("spatial array should be dtype=complex128.")
+			if z.flags.contiguous == False: z = z.copy()		# contiguous array required.
+			alm = np.empty((self.lmax+1)**2, dtype=complex)
+			self.spat_cplx_to_SH(z,alm)
+			return alm
 	%}
 
 	/* local evaluations */

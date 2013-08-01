@@ -33,6 +33,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
+/// pointer to data structure describing an SHT, returned by shtns_init() or shtns_create().
 typedef struct shtns_info* shtns_cfg;
 
 /// different Spherical Harmonic normalizations.
