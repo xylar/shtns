@@ -2221,6 +2221,12 @@ int shtns_gauss_wts(shtns_cfg shtns, double *wts)
 */
 //@{
 
+/// Set verbosity level
+void shtns_verbose_(int *v)
+{
+	shtns_verbose(*v);
+}
+
 /// Enable threads
 void shtns_use_threads_(int *num_threads)
 {

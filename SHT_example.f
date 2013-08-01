@@ -44,6 +44,9 @@
       call shtns_calc_nlm(nlm, lmax, mmax, mres)
       print*,'NLM=',nlm
 
+! displays information during initialization
+      call shtns_verbose(1)
+
 ! enable multi-threaded transform (OpenMP) if supported.
       call shtns_use_threads(0)
 

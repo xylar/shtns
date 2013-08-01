@@ -24,6 +24,7 @@
 	#include <complex>
 	typedef std::complex<double> cplx;
 #else
+	/// double precision complex number data type
 	typedef complex double cplx;
 #endif
 
