@@ -27,13 +27,13 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
-3	static void GEN3(SHqst_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	static void GEN3(SH_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
+3	static void GEN3(SHqst_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	static void GEN3(SH_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	static void GEN3(SHsphtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+VX	static void GEN3(SHsphtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-S	static void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
-T	static void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+S	static void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
+T	static void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 Q	v2d *BrF;
@@ -82,10 +82,10 @@ T		k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2);
 	  #endif
 	#else
 	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
-QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
-VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(complex double) );
+QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(cplx) );
+VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(cplx) );
 VX		BpF = BtF + shtns->ncplx_fft;
-3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
+3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(cplx) );
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
 	  #ifdef SHT_GRAD
@@ -212,9 +212,9 @@ V		BtF += NLAT;	BpF += NLAT;
 		l = LiM(shtns, 0,im);
 V		m_1 = 1.0/m;
 		alm = shtns->alm[im];
-Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
-S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
-T		complex double* Tl = &Tlm[l];
+Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
+S		cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
+T		cplx* Tl = &Tlm[l];
 		k=0;	l=shtns->tm[im];
 	#if _GCC_VEC_
 		l>>=1;		// stay on a 16 byte boundary
@@ -407,9 +407,9 @@ V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
 	#if _GCC_VEC_
   	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode == 0) {
-Q			fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
-V			fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
-V			fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
+Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
+V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
+V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
 		} else {		// split dft
 Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
@@ -420,9 +420,9 @@ VX			VFREE(BtF);		// this frees also BpF.
 	}
 	#else
 	if (shtns->ncplx_fft >= 0) {
-Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
-V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
-V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
+Q		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BrF, Vr);
+V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BtF, Vt);
+V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BpF, Vp);
 		if (shtns->ncplx_fft > 0) {		// free memory
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.

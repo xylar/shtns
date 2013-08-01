@@ -419,7 +419,7 @@ static void free_SHTarrays(shtns_cfg shtns)
 static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 {
 	double cost_fft_ip, cost_fft_oop, cost_ifft_ip, cost_ifft_oop;
-	complex double *ShF;
+	cplx *ShF;
 	double *Sh;
 	fftw_plan fft2, ifft2, fft, ifft;
 	int nfft, ncplx, nreal;
@@ -468,8 +468,8 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		#endif
 
 	// Allocate dummy Spatial Fields.
-		ShF = (complex double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
-		Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
+		ShF = (cplx *) VMALLOC(ncplx * NLAT * sizeof(cplx));
+		Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(cplx));
 		fft = NULL;		ifft = NULL;	fft2 = NULL;	ifft2 = NULL;
 
 	// complex fft for fly transform is a bit different.
@@ -1387,20 +1387,20 @@ static void grid_equal_polar(shtns_cfg shtns, double latdir)
 /// this function is used to internally measure the accuracy.
 double SHT_error(shtns_cfg shtns, int vector)
 {
-	complex double *Tlm0=0, *Slm0=0, *Tlm=0, *Slm=0;
+	cplx *Tlm0=0, *Slm0=0, *Tlm=0, *Slm=0;
 	double *Sh=0, *Th=0;
 	double t, tmax, n2,  err;
 	long int i, jj, nlm_cplx;
 	
 	srand( time(NULL) );	// init random numbers.
 	
-	Slm0 = (complex double *) VMALLOC(sizeof(complex double)* NLM);
-	Slm = (complex double *) VMALLOC(sizeof(complex double)* NLM);
+	Slm0 = (cplx *) VMALLOC(sizeof(cplx)* NLM);
+	Slm = (cplx *) VMALLOC(sizeof(cplx)* NLM);
 	Sh = (double *) VMALLOC( NSPAT_ALLOC(shtns) * sizeof(double) );
 	if ((Sh==0) || (Slm==0) || (Slm0==0)) shtns_runerr("not enough memory.");
 	if (vector) {
-		Tlm0 = (complex double *) VMALLOC(sizeof(complex double)* NLM);
-		Tlm = (complex double *) VMALLOC(sizeof(complex double)* NLM);
+		Tlm0 = (cplx *) VMALLOC(sizeof(cplx)* NLM);
+		Tlm = (cplx *) VMALLOC(sizeof(cplx)* NLM);
 		Th = (double *) VMALLOC( NSPAT_ALLOC(shtns) * sizeof(double) );
 		if ((Th==0) || (Tlm==0) || (Tlm0==0)) vector=0;
 	}
@@ -1504,7 +1504,7 @@ static double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *f
 /// returns time without dct / best time with dct (or 0 if no dct available).
 static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
 {
-	complex double *Qlm=0, *Slm=0, *Tlm=0;
+	cplx *Qlm=0, *Slm=0, *Tlm=0;
 	double *Qh=0, *Sh=0, *Th=0;
 	int m, i, i0, minc, nloop, alg_end;
 	int typ_lim = SHT_NTYP;		// time every type.
@@ -1518,13 +1518,13 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 	if ((dct_mtr != 0) && (shtns->ykm_dct == NULL)) return(0.0);		// no dct available : do nothing.
 
 	size_t nspat = sizeof(double) * NSPAT_ALLOC(shtns);
-	size_t nspec = sizeof(complex double)* NLM;
+	size_t nspec = sizeof(cplx)* NLM;
 	if (nspec>nspat) nspat=nspec;
-	Sh = (double *) VMALLOC(nspat);		Slm = (complex double *) VMALLOC(nspec);
+	Sh = (double *) VMALLOC(nspat);		Slm = (cplx *) VMALLOC(nspec);
 	if ((Sh==0) || (Slm==0)) shtns_runerr("not enough memory.");
 	if (vector) {
 		Th = (double *) VMALLOC(nspat);				Qh = (double *) VMALLOC(nspat);
-		Tlm = (complex double *) VMALLOC(nspec);	Qlm = (complex double *) VMALLOC(nspec);
+		Tlm = (cplx *) VMALLOC(nspec);	Qlm = (cplx *) VMALLOC(nspec);
 		if ( (Th==0) || (Qh==0) || (Tlm==0) || (Qlm==0) ) vector = 0;
 	}
 
@@ -2341,14 +2341,14 @@ Evaluate at a given point (\f$cos(\theta)\f$ and \f$\phi\f$) a spherical harmoni
 */
 //@{
 /// \see SH_to_point for argument description
-void shtns_sh_to_point_(double *spat, complex double *Qlm, double *cost, double *phi)
+void shtns_sh_to_point_(double *spat, cplx *Qlm, double *cost, double *phi)
 {
 	*spat = SH_to_point(sht_data, Qlm, *cost, *phi);
 }
 
 /// \see SHqst_to_point for argument description
 void shtns_qst_to_point_(double *vr, double *vt, double *vp,
-		complex double *Qlm, complex double *Slm, complex double *Tlm, double *cost, double *phi)
+		cplx *Qlm, cplx *Slm, cplx *Tlm, double *cost, double *phi)
 {
 	SHqst_to_point(sht_data, Qlm, Slm, Tlm, *cost, *phi, vr, vt, vp);
 }

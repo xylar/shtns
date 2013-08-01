@@ -32,13 +32,13 @@
 	#else
 	static
 	#endif
-3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
-QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, v2d *BrF, const long int llim, const int imlim) {
+3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, v2d *BrF, const long int llim, const int imlim) {
   #ifndef SHT_GRAD
-VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
   #else
-S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
-T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
   #endif
 
   #ifndef SHT_AXISYM
@@ -196,9 +196,9 @@ V		BtF += m0*NLAT;		BpF += m0*NLAT;
 		l = LiM(shtns, 0,im);
 V		m_1 = 1.0/m;
 		alm = shtns->alm[im];
-Q		complex double* Ql = &Qlm[l];	// virtual pointer for l=0 and im
-S		complex double* Sl = &Slm[l];	// virtual pointer for l=0 and im
-T		complex double* Tl = &Tlm[l];
+Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
+S		cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
+T		cplx* Tl = &Tlm[l];
 		k=0;	l=shtns->tm[im];
 	#if _GCC_VEC_
 		l>>=1;		// stay on a 16 byte boundary
@@ -408,13 +408,13 @@ S	#undef si
 T	#undef tr
 T	#undef ti
 
-3	static void GEN3(SHqst_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	static void GEN3(SH_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
+3	static void GEN3(SHqst_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	static void GEN3(SH_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	static void GEN3(SHsphtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+VX	static void GEN3(SHsphtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-S	static void GEN3(SHsph_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
-T	static void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+S	static void GEN3(SHsph_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
+T	static void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 	int k;
@@ -438,10 +438,10 @@ VX		BpF = BtF + nv/2;
 	}
 	#else
 	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
-QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
-VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(complex double) );
+QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(cplx) );
+VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(cplx) );
 VX		BpF = BtF + shtns->ncplx_fft;
-3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
+3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(cplx) );
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
 	#endif
@@ -466,11 +466,11 @@ V	  #pragma omp barrier
 V	  #if _GCC_VEC_
 V		if (shtns->fftc_mode == 0) {
 3			#pragma omp single nowait
-3			fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
+3			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
 V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
+V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
 V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
+V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
 V		} else if (shtns->fftc_mode > 0) {		// split dft
 3			#pragma omp single nowait
 3			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
@@ -481,11 +481,11 @@ V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPH
 V		}
 V	  #else
 3		#pragma omp single nowait
-3		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
+3		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BrF, Vr);
 V		#pragma omp single nowait
-V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
+V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BtF, Vt);
 V		#pragma omp single nowait
-V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
+V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BpF, Vp);
 V	  #endif
 V	#endif
   #endif
@@ -498,9 +498,9 @@ V	#endif
   	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode == 0) {
 V		  #ifdef HAVE_LIBFFTW3_OMP
-Q			fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr);
-V			fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
-V			fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
+Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
+V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
+V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
 V		  #endif
 		} else {		// split dft
 V		  #ifdef HAVE_LIBFFTW3_OMP
@@ -515,9 +515,9 @@ VX			VFREE(BtF);		// this frees also BpF.
 	#else
 	if (shtns->ncplx_fft >= 0) {
 V	  #ifdef HAVE_LIBFFTW3_OMP
-Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
-V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
-V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
+Q		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BrF, Vr);
+V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BtF, Vt);
+V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BpF, Vp);
 V	  #endif
 		if (shtns->ncplx_fft > 0) {		// free memory
 Q			VFREE(BrF);

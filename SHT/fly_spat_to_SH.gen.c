@@ -24,9 +24,9 @@
 #
 //////////////////////////////////////////////////
 
-QX	static void GEN3(spat_to_SH_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
-VX	static void GEN3(spat_to_SHsphtor_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
-3	static void GEN3(spat_to_SHqst_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
+QX	static void GEN3(spat_to_SH_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, cplx *Qlm, long int llim) {
+VX	static void GEN3(spat_to_SHsphtor_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, long int llim) {
+3	static void GEN3(spat_to_SHqst_fly,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, long int llim) {
 
 Q	s2d *BrF;		// contains the Fourier transformed data
 V	s2d *BtF, *BpF;	// contains the Fourier transformed data
@@ -69,9 +69,9 @@ V	BtF = (s2d *) Vt;	BpF = (s2d *) Vp;
   #ifndef SHT_AXISYM
 	if (shtns->fftc_mode >= 0) {
 	    if (shtns->fftc_mode == 0) {	// in-place
-Q			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
-V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
-V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
+Q			fftw_execute_dft(shtns->fftc,(cplx*)BrF, (cplx*)BrF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)BtF, (cplx*)BtF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)BpF, (cplx*)BpF);
 		} else {	// alloc memory for the transpose FFT
 			unsigned long nv = shtns->nspat /VSIZE;
 QX			BrF = (s2d*) VMALLOC( nv * sizeof(s2d) );

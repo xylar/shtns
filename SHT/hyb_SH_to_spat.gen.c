@@ -57,13 +57,13 @@ T/// \param[out] Vp = phi-component of spatial vector : double array.
 //            0 => dct for m=0 only
 //            m => dct up to m, (!!! MTR_DCT <= MTR !!!)
 
-3	static void GEN3(SHqst_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	static void GEN3(SH_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
+3	static void GEN3(SHqst_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	static void GEN3(SH_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	static void GEN3(SHsphtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+VX	static void GEN3(SHsphtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-S	static void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
-T	static void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+S	static void GEN3(SHsph_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
+T	static void GEN3(SHtor_to_spat_,ID_NME,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 Q	v2d *BrF;
@@ -72,9 +72,9 @@ Q	v2d *BrF;
 3	#define SHT_NO_DCT
 V	v2d *BtF, *BpF;
 V	struct DtDp *dyl;
-Q	complex double re,ro;
-V	complex double te,to, pe,po;
-V	complex double dte,dto, dpe,dpo;
+Q	cplx re,ro;
+V	cplx te,to, pe,po;
+V	cplx dte,dto, dpe,dpo;
 Q	#define BR0(i) ((double *)BrF)[2*(i)]
 V	#define BT0(i) ((double *)BtF)[2*(i)]
 V	#define BP0(i) ((double *)BpF)[2*(i)]
@@ -102,10 +102,10 @@ T	s2d Tl0[(llim+2)>>1];
 Q	BrF = (v2d *) Vr;
 V	BtF = (v2d *) Vt;	BpF = (v2d *) Vp;
 	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
-QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
-VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(complex double) );
+QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(cplx) );
+VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(cplx) );
 VX		BpF = BtF + shtns->ncplx_fft;
-3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
+3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(cplx) );
 3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	}
 	imlim = MTR;
@@ -547,9 +547,9 @@ V				} while(k<NLAT);
 V			}
     #endif
 	if (shtns->ncplx_fft >= 0) {
-Q		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BrF, Vr);
-V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BtF, Vt);
-V		fftw_execute_dft_c2r(shtns->ifft, (complex double *) BpF, Vp);
+Q		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BrF, Vr);
+V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BtF, Vt);
+V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BpF, Vp);
 		if (shtns->ncplx_fft > 0) {		// free memory
 Q			VFREE(BrF);
 VX			VFREE(BtF);	// this frees also BpF.

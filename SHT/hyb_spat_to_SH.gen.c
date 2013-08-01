@@ -39,13 +39,13 @@ V/// complex double arrays of size shtns->nlm.
 /// \param[in] llim = specify maximum degree of spherical harmonic. llim must be at most shtns->lmax, and all spherical harmonic degree higher than llim are set to zero. 
   #endif
 
-QX	static void GEN3(spat_to_SH_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
-3	static void GEN3(spat_to_SHqst_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
+QX	static void GEN3(spat_to_SH_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, cplx *Qlm, long int llim) {
+3	static void GEN3(spat_to_SHqst_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, long int llim) {
   #ifndef SHT_GRAD
-VX	static void GEN3(spat_to_SHsphtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
+VX	static void GEN3(spat_to_SHsphtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, long int llim) {
   #else
-S	static void GEN3(spat_to_SHsph_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, complex double *Slm, long int llim) {
-T	static void GEN3(spat_to_SHtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vp, complex double *Tlm, long int llim) {
+S	static void GEN3(spat_to_SHsph_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vt, cplx *Slm, long int llim) {
+T	static void GEN3(spat_to_SHtor_,ID_NME,SUFFIX)(shtns_cfg shtns, double *Vp, cplx *Tlm, long int llim) {
   #endif
 
 Q	double *zl;
@@ -54,8 +54,8 @@ V	struct DtDp *dzl;
 	long int i,i0, ni,l;
   #ifndef SHT_AXISYM
 	unsigned im, imlim;
-Q	complex double *BrF;		// contains the Fourier transformed data
-V	complex double *BtF, *BpF;	// contains the Fourier transformed data
+Q	cplx *BrF;		// contains the Fourier transformed data
+V	cplx *BtF, *BpF;	// contains the Fourier transformed data
 Q	v2d reo[2*NLAT_2];	// symmetric (even) and anti-symmetric (odd) parts, interleaved.
 V	v2d tpeo[4*NLAT_2];	// theta and phi even and odd parts
 Q	#define reo0 ((double*)reo)
@@ -92,15 +92,15 @@ Q	#define re0(i)	reo0[2*(i)+1]
 Q	#define ro0(i)	reo0[2*(i)]
 
   #ifndef SHT_AXISYM
-Q	BrF = (complex double *) Vr;
-S	BtF = (complex double *) Vt;
-T	BpF = (complex double *) Vp;
+Q	BrF = (cplx *) Vr;
+S	BtF = (cplx *) Vt;
+T	BpF = (cplx *) Vp;
 	if (shtns->ncplx_fft >= 0) {
 	    if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
-QX	    	BrF = VMALLOC( shtns->ncplx_fft * sizeof(complex double) );
-VX	    	BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(complex double) );
+QX	    	BrF = VMALLOC( shtns->ncplx_fft * sizeof(cplx) );
+VX	    	BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(cplx) );
 VX	    	BpF = BtF + shtns->ncplx_fft;
-3	    	BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(complex double) );
+3	    	BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(cplx) );
 3	    	BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
 	    }
 Q	    fftw_execute_dft_r2c(shtns->fft,Vr, BrF);
@@ -159,8 +159,8 @@ T		v2d* Tl = (v2d*) Tlm;
 Q		zl = shtns->zlm_dct0;
 V		dzl0 = shtns->dzlm_dct0;
 V	#ifndef _GCC_VEC_
-S		complex double s1 = 0.0;		// l=0 : Sl = 0
-T		complex double t1 = 0.0;		// l=0 : Tl = 0
+S		cplx s1 = 0.0;		// l=0 : Sl = 0
+T		cplx t1 = 0.0;		// l=0 : Tl = 0
 V	#else
 S		v2d s = vdup(0.0);		// l=0 : Sl = 0
 T		v2d t = vdup(0.0);		// l=0 : Tl = 0
@@ -175,9 +175,9 @@ QX		BR0[klim] = 0;		BR0[klim+1] = 0;		// allow some overflow.
 	  #ifndef _GCC_VEC_
 S			Sl[l] = s1;
 T			Tl[l] = t1;
-Q			complex double q0 = 0.0;	complex double q1 = 0.0;
-S			complex double s0 = 0.0;	s1 = 0.0;
-T			complex double t0 = 0.0;	t1 = 0.0;
+Q			cplx q0 = 0.0;	cplx q1 = 0.0;
+S			cplx s0 = 0.0;	s1 = 0.0;
+T			cplx t0 = 0.0;	t1 = 0.0;
 			do {
 Q				q0 += BR0[i]   * zl[i];
 Q				q1 += BR0[i+1] * zl[i+1];
@@ -227,13 +227,13 @@ V	#else
 S			((v2d*) Sl)[l] = vhi_to_cplx(s);
 T			((v2d*) Tl)[l] = vhi_to_cplx(t);
 V	#endif
-Q			complex double q0 = 0.0;
+Q			cplx q0 = 0.0;
 Q			i=l;	// l < klim
 Q			do {
 Q				q0 += BR0[i] * zl[i];
 Q				i+=2;
 Q			} while(i<klim);
-Q			((complex double *) Ql)[l] = q0;
+Q			((cplx *) Ql)[l] = q0;
 			++l;
 		}
 Q	#undef BR0
@@ -381,9 +381,9 @@ QX				zl += lstride;
 QX				++i;
 			} while(i<ni);
 QX			q0 += q1;
-Q			((complex double *)Ql)[l] = q0;
-S			((complex double *)Sl)[l] = s0;
-T			((complex double *)Tl)[l] = t0;
+Q			((cplx *)Ql)[l] = q0;
+S			((cplx *)Sl)[l] = s0;
+T			((cplx *)Tl)[l] = t0;
 	  #ifdef SHT_VAR_LTR
 	  		++l;
 		}

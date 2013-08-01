@@ -33,7 +33,7 @@ These functions do only require a call to \ref shtns_create, but not to \ref sht
 /// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
 /// which is the same as rotating the reference frame by angle -alpha.
 /// Result is stored in Rlm (which can be the same array as Qlm).
-void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
+void SH_Zrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
 {
 	int im, l, lmax, mmax, mres;
 
@@ -44,7 +44,7 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
 	}
 	if (mmax > 0) {
 		im=1; do {
-			complex double eima = cos(im*mres*alpha) - I*sin(im*mres*alpha);		// rotate reference frame by angle -alpha
+			cplx eima = cos(im*mres*alpha) - I*sin(im*mres*alpha);		// rotate reference frame by angle -alpha
 			for (l=im*mres; l<=lmax; ++l)	Rlm[LiM(shtns, l, im)] = Qlm[LiM(shtns, l, im)] * eima;
 		} while(++im <= mmax);
 	}
@@ -59,10 +59,10 @@ void SH_Zrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex doub
  - Fourier ananlyze as data on the equator to recover the m in the 90 degrees rotated frame.
  - rotate around new Z by angle dphi1.
  [1] Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" Journal of Computational Physics. **/
-static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm, double dphi0, double dphi1)
+static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, double dphi1)
 {
 	fftw_plan fft;
-	complex double *q;
+	cplx *q;
 	double *q0;
 	long int k, m, l;
 	int lmax, ntheta;
@@ -148,7 +148,7 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 		k = (lmax < 63) ? 1 : shtns->nthreads;
 		fftw_plan_with_nthreads(k);
 	#endif
-	q = (complex double*) q0;
+	q = (cplx*) q0;
 	ntheta*=2;		nrembed = ntheta+2;		ncembed = nrembed/2;
 	fft = fftw_plan_many_dft_r2c(1, &ntheta, 2*lmax, q0, &nrembed, 2*lmax, 1, q, &ncembed, 2*lmax, 1, FFTW_ESTIMATE);
 	fftw_execute_dft_r2c(fft, q0, q);
@@ -169,7 +169,7 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 	for (m=1; m<=lmax; ++m) {
 		//legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
 		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, yl+m, dyl+m);
-		complex double eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);
+		cplx eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);
 		for (l=m; l<lmax; l+=2) {
 			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./yl[l]);
 			Rlm[LiM(shtns, l+1,m)] =  eimdp*q[m*2*lmax +2*l+1]*(-1./dyl[l+1]);
@@ -187,7 +187,7 @@ static void SH_rotK90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm,
 
 /// rotate Qlm by 90 degrees around X axis and store the result in Rlm.
 /// shtns->mres MUST be 1, and lmax=mmax.
-void SH_Xrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
+void SH_Xrotate90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm)
 {
 	int lmax= shtns->lmax;
 	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature makes rotation not closed.");
@@ -206,7 +206,7 @@ void SH_Xrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 
 /// rotate Qlm by 90 degrees around Y axis and store the result in Rlm.
 /// shtns->mres MUST be 1, and lmax=mmax.
-void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
+void SH_Yrotate90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm)
 {
 	int lmax= shtns->lmax;
 	if ((shtns->mres != 1) || (shtns->mmax < lmax)) shtns_runerr("truncature makes rotation not closed.");
@@ -224,7 +224,7 @@ void SH_Yrotate90(shtns_cfg shtns, complex double *Qlm, complex double *Rlm)
 }
 
 /// rotate Qlm around Y axis by arbitrary angle, using composition of rotations. Store the result in Rlm.
-void SH_Yrotate(shtns_cfg shtns, complex double *Qlm, double alpha, complex double *Rlm)
+void SH_Yrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
 {
 	if ((shtns->mres != 1) || (shtns->mmax < shtns->lmax)) shtns_runerr("truncature makes rotation not closed.");
 
@@ -309,7 +309,7 @@ void st_dt_matrix(shtns_cfg shtns, double* mx)
 /// The result is stored in Rlm, which MUST be different from Qlm.
 /// mx is an array of 2*NLM values as returned by \ref mul_ct_matrix or \ref st_dt_matrix
 /// compute: Rlm[lm] = mx[2*lm] * Qlm[lm-1] + mx[2*lm+1] * Qlm[lm+1];
-void SH_mul_mx(shtns_cfg shtns, double* mx, complex double *Qlm, complex double *Rlm)
+void SH_mul_mx(shtns_cfg shtns, double* mx, cplx *Qlm, cplx *Rlm)
 {
 	long int nlmlim, lm;
 	v2d* vq = (v2d*) Qlm;
@@ -341,7 +341,7 @@ void SH_mul_mx(shtns_cfg shtns, double* mx, complex double *Qlm, complex double 
 //@{
 
 /// Evaluate scalar SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
-double SH_to_point(shtns_cfg shtns, complex double *Qlm, double cost, double phi)
+double SH_to_point(shtns_cfg shtns, cplx *Qlm, double cost, double phi)
 {
 	double yl[LMAX+1];
 	double vr0, vr1;
@@ -359,7 +359,7 @@ double SH_to_point(shtns_cfg shtns, complex double *Qlm, double cost, double phi
 		}
 		vr0 += vr1;
 	if (MTR>0) {
-		complex double eip, eimp;
+		cplx eip, eimp;
 		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
 		im = 1;  do {
 			m = im*MRES;
@@ -382,7 +382,7 @@ double SH_to_point(shtns_cfg shtns, complex double *Qlm, double cost, double phi
 	return vr0;
 }
 
-void SH_to_grad_point(shtns_cfg shtns, complex double *DrSlm, complex double *Slm, double cost, double phi,
+void SH_to_grad_point(shtns_cfg shtns, cplx *DrSlm, cplx *Slm, double cost, double phi,
 					   double *gr, double *gt, double *gp)
 {
 	double yl[LMAX+1];
@@ -399,7 +399,7 @@ void SH_to_grad_point(shtns_cfg shtns, complex double *DrSlm, complex double *Sl
 			vtt += dtyl[l] * creal( Slm[l] );
 		}
 	if (MTR>0) {
-		complex double eip, eimp, imeimp;
+		cplx eip, eimp, imeimp;
 		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
 		im=1;  do {
 			m = im*MRES;
@@ -428,7 +428,7 @@ void SH_to_grad_point(shtns_cfg shtns, complex double *DrSlm, complex double *Sl
 }
 
 /// Evaluate vector SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
-void SHqst_to_point(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double cost, double phi,
+void SHqst_to_point(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double cost, double phi,
 					   double *vr, double *vt, double *vp)
 {
 	double yl[LMAX+1];
@@ -446,7 +446,7 @@ void SHqst_to_point(shtns_cfg shtns, complex double *Qlm, complex double *Slm, c
 			vpp -= dtyl[l] * creal( Tlm[l] );
 		}
 	if (MTR>0) {
-		complex double eip, eimp, imeimp;
+		cplx eip, eimp, imeimp;
 		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
 		im=1;  do {
 			m = im*MRES;
@@ -501,11 +501,11 @@ double st_lat;
 /// vr, vt, and vp arrays must have nphi+2 doubles allocated (fftw requirement).
 /// It does not require a previous call to shtns_set_grid, but it is NOT thread-safe.
 /// \ingroup local
-void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double cost,
+void SHqst_to_lat(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr)
 {
-	complex double vst, vtt, vsp, vtp, vrr;
-	complex double *vrc, *vtc, *vpc;
+	cplx vst, vtt, vsp, vtp, vrr;
+	cplx *vrc, *vtc, *vpc;
 	long int m, l, j;
 
 	if (ltr > LMAX) ltr=LMAX;
@@ -513,9 +513,9 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 	if (mtr*MRES > ltr) mtr=ltr/MRES;
 	if (mtr*2*MRES >= nphi) mtr = (nphi-1)/(2*MRES);
 
-	vrc = (complex double *) vr;
-	vtc = (complex double *) vt;
-	vpc = (complex double *) vp;
+	vrc = (cplx *) vr;
+	vtc = (cplx *) vt;
+	vpc = (cplx *) vp;
 
 	if ((nphi != nphi_lat)||(ifft_lat == NULL)) {
 		if (ifft_lat != NULL) fftw_destroy_plan(ifft_lat);
@@ -576,11 +576,11 @@ void SHqst_to_lat(shtns_cfg shtns, complex double *Qlm, complex double *Slm, com
 /// vr arrays must have nphi+2 doubles allocated (fftw requirement).
 /// It does not require a previous call to shtns_set_grid, but it is NOT thread-safe.
 /// \ingroup local
-void SH_to_lat(shtns_cfg shtns, complex double *Qlm, double cost,
+void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 					double *vr, int nphi, int ltr, int mtr)
 {
-	complex double vrr;
-	complex double *vrc;
+	cplx vrr;
+	cplx *vrc;
 	long int m, l, j;
 
 	if (ltr > LMAX) ltr=LMAX;
@@ -588,7 +588,7 @@ void SH_to_lat(shtns_cfg shtns, complex double *Qlm, double cost,
 	if (mtr*MRES > ltr) mtr=ltr/MRES;
 	if (mtr*2*MRES >= nphi) mtr = (nphi-1)/(2*MRES);
 
-	vrc = (complex double *) vr;
+	vrc = (cplx *) vr;
 
 	if ((nphi != nphi_lat)||(ifft_lat == NULL)) {
 		if (ifft_lat != NULL) fftw_destroy_plan(ifft_lat);
@@ -638,18 +638,18 @@ void SH_to_lat(shtns_cfg shtns, complex double *Qlm, double cost,
 /// in: complex spatial field.
 /// out: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
 /// for a total of (LMAX+1)^2 coefficients.
-void spat_cplx_to_SH(shtns_cfg shtns, complex double *z, complex double *alm)
+void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 {
 	long int nspat = shtns->nspat;
 	double *re, *im;
-	complex double *rlm, *ilm;
+	cplx *rlm, *ilm;
 
 	if (MRES != 1) shtns_runerr("complex SH: only mres=1 supported."); 
 
 	// alloc temporary fields
 	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
 	im = re + nspat;
-	rlm = (complex double*) (re + 2*nspat);
+	rlm = (cplx*) (re + 2*nspat);
 	ilm = rlm + NLM;
 
 	// split z into real and imag parts.
@@ -673,8 +673,8 @@ void spat_cplx_to_SH(shtns_cfg shtns, complex double *z, complex double *alm)
 		ll = (m-1)*m;
 		for (int l=m; l<=LMAX; l++) {
 			ll += 2*l;		// ll = l*(l+1)
-			complex double rr = rlm[lm];
-			complex double ii = ilm[lm];
+			cplx rr = rlm[lm];
+			cplx ii = ilm[lm];
 			alm[ll+m] = rr + I*ii;					// m>0
 			alm[ll-m] = conj(rr) + I*conj(ii);		// m<0
 			lm++;
@@ -688,18 +688,18 @@ void spat_cplx_to_SH(shtns_cfg shtns, complex double *z, complex double *alm)
 /// in: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
 /// for a total of (LMAX+1)^2 coefficients.
 /// out: complex spatial field.
-void SH_to_spat_cplx(shtns_cfg shtns, complex double *alm, complex double *z)
+void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 {
 	long int nspat = shtns->nspat;
 	double *re, *im;
-	complex double *rlm, *ilm;
+	cplx *rlm, *ilm;
 
 	if (MRES != 1) shtns_runerr("complex SH: only mres=1 supported."); 
 
 	// alloc temporary fields
 	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
 	im = re + nspat;
-	rlm = (complex double*) (re + 2*nspat);
+	rlm = (cplx*) (re + 2*nspat);
 	ilm = rlm + NLM;
 
 	// extract complex coefficients corresponding to real and imag
@@ -715,8 +715,8 @@ void SH_to_spat_cplx(shtns_cfg shtns, complex double *alm, complex double *z)
 		ll = (m-1)*m;
 		for (int l=m; l<=LMAX; l++) {
 			ll += 2*l;		// ll = l*(l+1)
-			complex double b = alm[ll-m];
-			complex double a = alm[ll+m];
+			cplx b = alm[ll-m];
+			cplx a = alm[ll+m];
 			rlm[lm] = (conj(b) + a)*0.5;		// real part
 			ilm[lm] = (conj(b) - a)*I*0.5;		// imag part
 			lm++;

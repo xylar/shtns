@@ -120,27 +120,27 @@
 
 #ifdef IVAR
 /// Backward \b Scalar Spherical Harmonic Transform (synthesis).
-void GEN(SH_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr SUPARG)
+void GEN(SH_to_spat,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr SUPARG)
 {
 	((pf2l) shtns->fptr[IVAR][SHT_TYP_SSY])(shtns, Qlm, Vr SUPARG2);
 	return;
 }
 
-void GEN(spat_to_SH,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm SUPARG)
+void GEN(spat_to_SH,SUFFIX)(shtns_cfg shtns, double *Vr, cplx *Qlm SUPARG)
 {
 	((pf2l) shtns->fptr[IVAR][SHT_TYP_SAN])(shtns, Vr, Qlm SUPARG2);
 	return;
 }
 
 /// Backward \b Vector Spherical Harmonic Transform (synthesis).
-void GEN(SHsphtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARG)
+void GEN(SHsphtor_to_spat,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp SUPARG)
 {
 	((pf4l) shtns->fptr[IVAR][SHT_TYP_VSY])(shtns, Slm, Tlm, Vt, Vp SUPARG2);
 	return;
 }
 
 /// \b Vector Spherical Harmonics Transform (analysis) : convert a spatial vector field (theta,phi components) to its spheroidal/toroidal spherical harmonic representation.
-void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARG)
+void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cplx *Tlm SUPARG)
 {
 	((pf4l) shtns->fptr[IVAR][SHT_TYP_VAN])(shtns, Vt, Vp, Slm, Tlm SUPARG2);
 	return;
@@ -203,28 +203,28 @@ void GEN(spat_to_SHsphtor,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, compl
 #ifdef IVAR
 #ifndef SHT_AXISYM
 /// Spheroidal only synthesis.
-void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp SUPARG)
+void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp SUPARG)
 {
 	((pf3l) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt, Vp SUPARG2);
 	return;
 }
 
 /// Toroidal only synthesis.
-void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp SUPARG)
+void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp SUPARG)
 {
 	((pf3l) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, Vt, Vp SUPARG2);
 	return;
 }
 #else
 /// Spheroidal m=0 only synthesis (results in theta component only).
-void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt SUPARG)
+void GEN(SHsph_to_spat,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt SUPARG)
 {
 	((pf3l) shtns->fptr[IVAR][SHT_TYP_GSP])(shtns, Slm, Vt, NULL SUPARG2);
 	return;
 }
 
 /// Toroidal m=0 only synthesis (results in phi component only).
-void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp SUPARG)
+void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vp SUPARG)
 {
 	((pf3l) shtns->fptr[IVAR][SHT_TYP_GTO])(shtns, Tlm, NULL, Vp SUPARG2);
 	return;
@@ -292,24 +292,24 @@ void GEN(SHtor_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vp 
 
 #ifdef IVAR
 // combining vector and scalar.
-void GEN(SHqst_to_spat_2,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
+void GEN(SHqst_to_spat_2,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
 	((pf2l) shtns->fptr[IVAR][SHT_TYP_SSY])(shtns, Qlm, Vr SUPARG2);
 	((pf4l) shtns->fptr[IVAR][SHT_TYP_VSY])(shtns, Slm, Tlm, Vt, Vp SUPARG2);
 }
-void GEN(spat_to_SHqst_2,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
+void GEN(spat_to_SHqst_2,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm SUPARG)
 {
 	((pf2l) shtns->fptr[IVAR][SHT_TYP_SAN])(shtns, Vr, Qlm SUPARG2);
 	((pf4l) shtns->fptr[IVAR][SHT_TYP_VAN])(shtns, Vt, Vp, Slm, Tlm SUPARG2);
 }
 
-void GEN(spat_to_SHqst,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARG)
+void GEN(spat_to_SHqst,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm SUPARG)
 {
 	((pf6l) shtns->fptr[IVAR][SHT_TYP_3AN])(shtns, Vr, Vt, Vp, Qlm, Slm, Tlm SUPARG2);
 	return;
 }
 
-void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
+void GEN(SHqst_to_spat,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp SUPARG)
 {
 	((pf6l) shtns->fptr[IVAR][SHT_TYP_3SY])(shtns, Qlm, Slm, Tlm, Vr, Vt, Vp SUPARG2);
 	return;
@@ -419,55 +419,55 @@ extern shtns_cfg sht_data;
 #endif
 
 /// \ingroup fortapi
-void GENF(spat_to_sh,SUFFIX)(double *Vr, complex double *Qlm SUPARGF) {
+void GENF(spat_to_sh,SUFFIX)(double *Vr, cplx *Qlm SUPARGF) {
 	GEN(spat_to_SH,SUFFIX)(sht_data, Vr, Qlm SUPARGF2);
 }
 
 /// \ingroup fortapi
-void GENF(sh_to_spat,SUFFIX)(complex double *Qlm, double *Vr SUPARGF) {
+void GENF(sh_to_spat,SUFFIX)(cplx *Qlm, double *Vr SUPARGF) {
 	GEN(SH_to_spat,SUFFIX)(sht_data, Qlm, Vr SUPARGF2);
 }
 
 /// \ingroup fortapi
-void GENF(sphtor_to_spat,SUFFIX)(complex double *Slm, complex double *Tlm, double *Vt, double *Vp SUPARGF) {
+void GENF(sphtor_to_spat,SUFFIX)(cplx *Slm, cplx *Tlm, double *Vt, double *Vp SUPARGF) {
 	GEN(SHsphtor_to_spat,SUFFIX)(sht_data, Slm, Tlm, Vt, Vp SUPARGF2);
 }
 
 #ifndef SHT_AXISYM
 /// \ingroup fortapi
-void GENF(sph_to_spat,SUFFIX)(complex double *Slm, double *Vt, double *Vp SUPARGF) {
+void GENF(sph_to_spat,SUFFIX)(cplx *Slm, double *Vt, double *Vp SUPARGF) {
 	GEN(SHsph_to_spat,SUFFIX)(sht_data, Slm, Vt, Vp SUPARGF2);
 }
 
 /// \ingroup fortapi
-void GENF(tor_to_spat,SUFFIX)(complex double *Tlm, double *Vt, double *Vp SUPARGF) {
+void GENF(tor_to_spat,SUFFIX)(cplx *Tlm, double *Vt, double *Vp SUPARGF) {
 	GEN(SHtor_to_spat,SUFFIX)(sht_data, Tlm, Vt, Vp SUPARGF2);
 }
 #else
 /// \ingroup fortapi
-void GENF(sph_to_spat,SUFFIX)(complex double *Slm, double *Vt SUPARGF) {
+void GENF(sph_to_spat,SUFFIX)(cplx *Slm, double *Vt SUPARGF) {
 	GEN(SHsph_to_spat,SUFFIX)(sht_data, Slm, Vt SUPARGF2);
 }
 
 /// \ingroup fortapi
-void GENF(tor_to_spat,SUFFIX)(complex double *Tlm, double *Vp SUPARGF) {
+void GENF(tor_to_spat,SUFFIX)(cplx *Tlm, double *Vp SUPARGF) {
 	GEN(SHtor_to_spat,SUFFIX)(sht_data, Tlm, Vp SUPARGF2);
 }
 #endif
 
 /// \ingroup fortapi
-void GENF(qst_to_spat,SUFFIX)(complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp SUPARGF)
+void GENF(qst_to_spat,SUFFIX)(cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp SUPARGF)
 {
 	GEN(SHqst_to_spat,SUFFIX)(sht_data, Qlm, Slm, Tlm, Vr, Vt, Vp SUPARGF2);
 }
 
 /// \ingroup fortapi
-void GENF(spat_to_sphtor,SUFFIX)(double *Vt, double *Vp, complex double *Slm, complex double *Tlm SUPARGF) {
+void GENF(spat_to_sphtor,SUFFIX)(double *Vt, double *Vp, cplx *Slm, cplx *Tlm SUPARGF) {
 	GEN(spat_to_SHsphtor,SUFFIX)(sht_data, Vt, Vp, Slm, Tlm SUPARGF2);
 }
 
 /// \ingroup fortapi
-void GENF(spat_to_qst,SUFFIX)(double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm SUPARGF)
+void GENF(spat_to_qst,SUFFIX)(double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm SUPARGF)
 {
 	GEN(spat_to_SHqst,SUFFIX)(sht_data, Vr, Vt, Vp, Qlm, Slm, Tlm SUPARGF2);
 }

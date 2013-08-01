@@ -29,9 +29,9 @@
 	#else
 	static
 	#endif
-QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, complex double *Qlm, const long int llim, const int imlim) {
-VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BtF, s2d *BpF, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
-3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, s2d *BtF, s2d *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, cplx *Qlm, const long int llim, const int imlim) {
+VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BtF, s2d *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim) {
+3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, s2d *BrF, s2d *BtF, s2d *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim) {
 
 	double *alm, *al;
 	s2d *wg, *ct, *st;
@@ -429,9 +429,9 @@ V		BtF += mstep*vnlat;	BpF += mstep*vnlat;
 }
 
 
-QX	static void GEN3(spat_to_SH_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
-VX	static void GEN3(spat_to_SHsphtor_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, complex double *Slm, complex double *Tlm, long int llim) {
-3	static void GEN3(spat_to_SHqst_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, complex double *Qlm, complex double *Slm, complex double *Tlm, long int llim) {
+QX	static void GEN3(spat_to_SH_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, cplx *Qlm, long int llim) {
+VX	static void GEN3(spat_to_SHsphtor_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, long int llim) {
+3	static void GEN3(spat_to_SHqst_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, long int llim) {
 
 Q	s2d *BrF;		// contains the Fourier transformed data
 V	s2d *BtF, *BpF;	// contains the Fourier transformed data
@@ -447,9 +447,9 @@ V	BtF = (s2d *) Vt;	BpF = (s2d *) Vp;
 	if (shtns->fftc_mode >= 0) {
 	    if (shtns->fftc_mode == 0) {	// in-place
 V		  #ifdef HAVE_LIBFFTW3_OMP
-Q			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
-V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
-V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
+Q			fftw_execute_dft(shtns->fftc,(cplx*)BrF, (cplx*)BrF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)BtF, (cplx*)BtF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)BpF, (cplx*)BpF);
 V		  #endif
 		} else {	// alloc memory for the transpose FFT
 			unsigned long nv = shtns->nspat /VSIZE;
@@ -475,11 +475,11 @@ V		  #endif
 V	#ifndef HAVE_LIBFFTW3_OMP
 V		if (shtns->fftc_mode == 0) {	// in-place
 3			#pragma omp single nowait
-3			fftw_execute_dft(shtns->fftc,(complex double*)BrF, (complex double*)BrF);
+3			fftw_execute_dft(shtns->fftc,(cplx*)BrF, (cplx*)BrF);
 V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->fftc,(complex double*)BtF, (complex double*)BtF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)BtF, (cplx*)BtF);
 V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->fftc,(complex double*)BpF, (complex double*)BpF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)BpF, (cplx*)BpF);
 V		} else if (shtns->fftc_mode > 0) {	// split out-of-place
 3			#pragma omp single nowait
 3			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, ((double*)BrF)+1, ((double*)BrF));
