@@ -411,9 +411,15 @@ Q			fftw_execute_dft(shtns->ifftc, (complex double *) BrF, (complex double *) Vr
 V			fftw_execute_dft(shtns->ifftc, (complex double *) BtF, (complex double *) Vt);
 V			fftw_execute_dft(shtns->ifftc, (complex double *) BpF, (complex double *) Vp);
 		} else {		// split dft
+			if (shtns->fftc_mode==2) {
+Q				fftv_execute(shtns->fftv, (complex double *) BrF, (complex double *) Vr);
+V				fftv_execute(shtns->fftv, (complex double *) BtF, (complex double *) Vt);
+V				fftv_execute(shtns->fftv, (complex double *) BpF, (complex double *) Vp);
+			} else {
 Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
+			}
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.
 		}

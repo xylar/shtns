@@ -79,9 +79,15 @@ VX			BtF = (s2d*) VMALLOC( 2*nv * sizeof(s2d) );
 VX			BpF = BtF + nv;
 3			BrF = (s2d*) VMALLOC( 3*nv * sizeof(s2d) );
 3			BtF = BrF + nv;		BpF = BtF + nv;
+			if (shtns->fftc_mode==2) {
+Q				fftv_execute(shtns->fftv, (complex double *) Vr, (complex double *) BrF);
+V				fftv_execute(shtns->fftv, (complex double *) Vt, (complex double *) BtF);
+V				fftv_execute(shtns->fftv, (complex double *) Vp, (complex double *) BpF);
+			} else {
 Q			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, ((double*)BrF)+1, ((double*)BrF));
 V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, ((double*)BtF)+1, ((double*)BtF));
 V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*)BpF));
+			}
 	    }
 	}
 	imlim = MTR;
