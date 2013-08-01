@@ -85,11 +85,11 @@ time_SHT : shtns.h time_SHT.c libshtns.a Makefile
 test_rot : shtns.h test_rot.c libshtns.a Makefile
 	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o test_rot
 
-SHT_example : SHT_example.c libshtns.a Makefile shtns.h
-	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c ./libshtns.a $(LIBS) -o SHT_example
+SHT_example : examples/SHT_example.c libshtns.a Makefile shtns.h
+	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib examples/SHT_example.c ./libshtns.a $(LIBS) -o SHT_example
 
-SHT_fort_ex : SHT_example.f libshtns.a Makefile shtns.f
-	gfortran -fdefault-real-8 -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.f -lshtns $(LIBS) -lc -o SHT_fort_ex
+SHT_fort_ex : examples/SHT_example.f libshtns.a Makefile shtns.f
+	gfortran $(CFLAGS) -fdefault-real-8 -I$(PREFIX)/include -L$(PREFIX)/lib examples/SHT_example.f ./libshtns.a $(LIBS) -lc -o SHT_fort_ex
 
 #documentation :
 docs :
@@ -135,11 +135,11 @@ updatecpy : COPYRIGHT
 	./update-copyright.sh SHT/omp_SH_to_spat.gen.c
 	./update-copyright.sh SHT/omp_spat_to_SH.gen.c
 	./update-copyright.sh time_SHT.c
-	./update-copyright.sh SHT_example.c
-	./update-copyright.sh -fortran SHT_example.f
+	./update-copyright.sh examples/SHT_example.c
+	./update-copyright.sh -fortran examples/SHT_example.f
 	./update-copyright.sh -fortran shtns.f
 	./update-copyright.sh shtns_numpy.i
-	./update-copyright.sh -python SHT_example.py
+	./update-copyright.sh -python examples/SHT_example.py
 
 .PHONY : updatecpy install install-py install-lib clean docs
 

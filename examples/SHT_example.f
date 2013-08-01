@@ -20,7 +20,7 @@
 
       IMPLICIT NONE
 ! import useful parameters for shtns initialization
-      include 'shtns.f'
+      include '../shtns.f'
 
       integer*4 lmax, mmax, mres
       integer*4 nlat, nphi
