@@ -514,6 +514,11 @@ When your program is ready, compile it adding these options to the compiler (gcc
 -L/path/to/lib/ -I/path/to/include/ -lshtns -lfftw3 -lm
 \endcode
 
+\example SHT_example.c
+  \brief A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
+
+  Compile using: \code make SHT_example \endcode
+
 */
 
 
@@ -564,13 +569,17 @@ Optionally you can indicate an alternate pyhton interpreter to \c ./configure us
 
 To start using SHTns you must then create an sht object, from which you can call the transform functions and more.
 The arrays should be created using <a href="http://numpy.scipy.org/">NumPy</a>.
-\see See the \link SHT_example.py Python example \endlink to get started.
+\see See the \link SHT_example.py Python example \endlink to get started,
+and the full working example \link shallow_water.py \endlink that solves the non-linear shallow water equations.
 
 <i>In case of segfaults, you may have alignment problems (should not occur on 64 bit systems).
 Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a> or contact the author.</i>
 
 \example SHT_example.py
   \brief A Python example using NumPy and SHTns that performs backward and forward Spherical Harmonic Transforms.
+
+\example shallow_water.py
+  \brief Solves the non-linear barotropically unstable shallow water test case in Python.
 
 */
 
