@@ -232,7 +232,7 @@ void test_SHT()
 	clock_t tcpu;
 	double ts, ta, ts2, ta2;
 	struct timespec t1, t2;
-	double gflop = 1e-6 * (NLAT*(NLM*4 +(MMAX+1)*2 + MMAX*log2(MMAX) + 5*NPHI*log2(NPHI)));		// Million floating point ops
+	double gflop = 1e-6 * (NLAT*(NLM*4 +(MMAX+1)*2 + MMAX*log2(MMAX+1) + 5*NPHI*log2(NPHI)));		// Million floating point ops
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
@@ -287,9 +287,8 @@ void test_SHT_m0()
 	}
 	clock_gettime(CLOCK_MONOTONIC, &t2);
 	ta = tdiff(&t1, &t2);
-	printf("   SHT time : \t synthesis = %f ms \t analysis = %f ms\n", ts, ta);
+	printf("   SHT time : \t spheroidal = %f ms \t torodial = %f ms\n", ts, ta);
 
-	scal_error(Slm, Slm0, LMAX);
 	return;
 }
 
@@ -808,13 +807,14 @@ int main(int argc, char *argv[])
 		test_SHT_vect3d();
 		printf(":: LTR\n");
 		test_SHT_vect3d_l(LMAX/2);
+
+		if (NPHI == 1) {		// test the special m=0 transforms
+			printf("** performing %d m=0 gradient SHT\n", SHT_ITER);
+			printf(":: STD\n");
+			test_SHT_m0();
+		}
 	}
 
-	if (NPHI == 1) {		// test the special m=0 transforms
-		printf("** performing %d m=0 gradient SHT\n", SHT_ITER);
-		printf(":: STD\n");
-		test_SHT_m0();
-	}
 
 	shtns_create(LMAX, MMAX, MRES, shtnorm);		// test memory allocation and management.
 //	shtns_create_with_grid(shtns, MMAX/2, 1);

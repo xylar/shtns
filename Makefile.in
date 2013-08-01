@@ -115,33 +115,7 @@ shtns_numpy_wrap.c : shtns_numpy.i sht_private.h shtns.h
 install-py : _shtns.so
 	$(PYTHON) setup.py install
 
-
-# update the copyright notice
-updatecpy : COPYRIGHT
-	./update-copyright.sh shtns.h
-	./update-copyright.sh SHT.c
-	./update-copyright.sh sht_legendre.c
-	./update-copyright.sh sht_config.h
-	./update-copyright.sh sht_private.h
-	./update-copyright.sh sht_std.c
-	./update-copyright.sh sht_ltr.c
-	./update-copyright.sh sht_m0.c
-	./update-copyright.sh sht_m0ltr.c
-	./update-copyright.sh SHT/sht_generic.c
-	./update-copyright.sh SHT/hyb_SH_to_spat.gen.c
-	./update-copyright.sh SHT/hyb_spat_to_SH.gen.c
-	./update-copyright.sh SHT/fly_SH_to_spat.gen.c
-	./update-copyright.sh SHT/fly_spat_to_SH.gen.c
-	./update-copyright.sh SHT/omp_SH_to_spat.gen.c
-	./update-copyright.sh SHT/omp_spat_to_SH.gen.c
-	./update-copyright.sh time_SHT.c
-	./update-copyright.sh examples/SHT_example.c
-	./update-copyright.sh -fortran examples/SHT_example.f
-	./update-copyright.sh -fortran shtns.f
-	./update-copyright.sh shtns_numpy.i
-	./update-copyright.sh -python examples/SHT_example.py
-
-.PHONY : updatecpy install install-py install-lib clean docs
+.PHONY : install install-py install-lib clean docs
 
 
 #fftw compiling options :
