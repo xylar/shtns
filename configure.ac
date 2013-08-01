@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[2.3.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[2.4],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
 target="libshtns.a"		# by default, build the library.
@@ -22,7 +22,7 @@ AC_ARG_ENABLE([python],
 AC_ARG_ENABLE([long-double],
 	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
 AC_ARG_ENABLE([mkl],
-	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (can be slightly faster with avx)]))
+	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (can be slightly faster, but NOT THREAD SAFE)]))
 AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],

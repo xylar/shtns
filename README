@@ -28,6 +28,7 @@ FEATURES:
 	- rotation functions to rotate spherical harmonics (beta).
 	- special spectral operator functions that do not require a transform
 	  (multiply by cos(theta)...).
+	- scalar transforms for complex spatial fields.
 
 INSTALL:
 
@@ -58,6 +59,16 @@ DOCUMENTATION:
 	  }
 
 CHANGE LOG:
+
+  v2.4  (1 Aug 2013)
+	- new scalar transforms for complex spatial fields: SH_to_spat_cplx()
+	  and spat_cplx_to_SH().
+	- new shtns_verbose() function to control output during initialization.
+	- better MKL support (including multi-thread). Warning: MKL's FFTW
+	  interface is not thread safe, SHTns can't be called from multiple
+	  threads if compiled with MKL.
+	- fix compatibility with c++ std::complex.
+	- new shallow water simulation example in examples/
 
   v2.3.1  (10 Apr 2013)
 	- OpenMP library is now installed as libshtns_omp.a.
