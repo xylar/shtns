@@ -27,18 +27,14 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
-	#ifndef _OPENMP
-	inline
-	#else
 	static
-	#endif
-3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, complex double *BrF, complex double *BtF, complex double *BpF, const long int llim, const int im) {
-QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *BrF, const long int llim, const int im) {
+3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, complex double *BrF, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *BrF, const long int llim, const int imlim) {
   #ifndef SHT_GRAD
-VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int im) {
+VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
   #else
-S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *BtF, complex double *BpF, const long int llim, const int im) {
-T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int im) {
+S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
+T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
   #endif
 
   #ifndef SHT_AXISYM
@@ -52,11 +48,13 @@ S	#define si(l) vall(cimag(Sl[l]))
 T	#define tr(l) vall(creal(Tl[l]))
 T	#define ti(l) vall(cimag(Tl[l]))
 V	double m_1;
+	unsigned im;
   #else
 Q	#define BR0(i) ((double *)BrF)[i]
 S	#define BT0(i) ((double *)BtF)[i]
 T	#define BP0(i) ((double *)BpF)[i]
   #endif
+	unsigned m0, mstep;
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
@@ -84,12 +82,13 @@ V	double ppoi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
 	nk = NLAT_2;
 	nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
 
-
-Q	BrF += im*NLAT_2;
-V	BtF += im*NLAT_2;	BpF += im*NLAT_2;
-
-
-	if (im==0)
+	#ifndef _OPENMP
+		m0 = 0;		mstep = 1;
+	#else
+		m0 = omp_get_thread_num();
+		mstep = omp_get_num_threads();
+		if (m0 == 0)
+	#endif
 	{	//	im=0;
 		#ifdef SHT_GRAD
 		  #ifndef SHT_AXISYM
@@ -187,23 +186,13 @@ T			BpF[NLAT_2-1 - k/2] = pper[k+1]-ppor[k+1] + I*(pper[k]-ppor[k]);
 			k+=2;
 		} while(k < NLAT_2);
 
-	#ifndef SHT_AXISYM
-		// padding for high m's
-		unsigned imlim = MTR;
-		#ifdef SHT_VAR_LTR
-			if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
-		#endif
-Q		BrF += NLAT_2*(imlim+1);	// shift original pointer
-V		BtF += NLAT_2*(imlim+1);	BpF += NLAT_2*(imlim+1);
-		for (k=0; k < NLAT_2*(NPHI-1-2*imlim); ++k) {	// padding for high m's
-Q			((v2d*)BrF)[k] = vdup(0.0);
-V			((v2d*)BtF)[k] = vdup(0.0);	((v2d*)BpF)[k] = vdup(0.0);
-		}
-	#endif
+		m0=mstep;
 	}
+
   #ifndef SHT_AXISYM
-	else
-	if (im <= shtns->mmax) {
+Q	BrF += m0*NLAT_2;
+V	BtF += m0*NLAT_2;	BpF += m0*NLAT_2;
+	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 		l = LiM(shtns, 0,im);
 V		m_1 = 1.0/m;
@@ -380,6 +369,19 @@ V			BpF[(NPHI+1-2*im)*NLAT_2 -1 - k/2] = (pper[k+1]-ppor[k+1]+ppei[k]-ppoi[k]) +
 			k+=2;
 		} while(k < NLAT_2);
 
+Q		BrF += mstep*NLAT_2;
+V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
+	}
+
+	while(im <= NPHI-imlim) {	// padding for high m's
+		k=0;
+		do {
+Q			BrF[k] = 0.0;
+V			BtF[k] = 0.0;		BpF[k] = 0.0;
+		} while (++k < NLAT_2);
+Q		BrF += mstep*NLAT_2;
+V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
+	  im+=mstep;
 	}
   #endif
 }
@@ -394,25 +396,26 @@ S	#undef si
 T	#undef tr
 T	#undef ti
 
-3	static void GEN3(SHqst_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	static void GEN3(SH_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
+	static
+3	void GEN3(SHqst_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	void GEN3(SH_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	static void GEN3(SHsphtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+VX	void GEN3(SHsphtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-S	static void GEN3(SHsph_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
-T	static void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
+S	void GEN3(SHsph_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, double *Vt, double *Vp, long int llim) {
+T	void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 	int k;
+	unsigned imlim = 0;
 Q	complex double* BrF = (complex double*) Vr;
 V	complex double* BtF = (complex double*) Vt;	complex double* BpF = (complex double*) Vp;
 
-	unsigned imlim = MTR;
+  #ifndef SHT_AXISYM
+	imlim = MTR;
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
-
-  #ifndef SHT_AXISYM
 	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
 		unsigned long nv = shtns->nspat;
 QX		BrF = (complex double*) VMALLOC( nv * sizeof(double) );
@@ -422,22 +425,18 @@ VX		BpF = BtF + nv/2;
 3		BtF = BrF + nv/2;		BpF = BrF + nv;
 	}
   #endif
-
+	imlim += 1;
+  
   //omp_set_num_threads(shtns->nthreads);
-  #pragma omp parallel for num_threads(shtns->nthreads)
-  for (int im=0; im<=imlim/2; im++) {
-3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im);
-3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim-im);
-QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im);
-QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim-im);
+  #pragma omp parallel num_threads(shtns->nthreads)
+  {
+3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim);
+QX	GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim);
 	#ifndef SHT_GRAD
-VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im);
-VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim-im);
+VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
 	#else
-S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im);
-T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im);
-S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim-im);
-T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim-im);
+S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
+T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
 	#endif
   }
 
@@ -454,9 +453,9 @@ Q				fftv_execute(shtns->fftv, (complex double *) BrF, (complex double *) Vr);
 V				fftv_execute(shtns->fftv, (complex double *) BtF, (complex double *) Vt);
 V				fftv_execute(shtns->fftv, (complex double *) BpF, (complex double *) Vp);
 			} else {
-Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
+Q				fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
+V				fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
+V				fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
 			}
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.

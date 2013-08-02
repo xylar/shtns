@@ -80,15 +80,15 @@ sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
 
 
 # programs :
-time_SHT : shtns.h time_SHT.c libshtns.a Makefile
-	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o time_SHT
-test_rot : shtns.h test_rot.c libshtns.a Makefile
+time_SHT : shtns.h time_SHT.c libshtns.a
+	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a fftv/fftv.o $(LIBS) -o time_SHT
+test_rot : shtns.h test_rot.c libshtns.a
 	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o test_rot
 
-SHT_example : SHT_example.c libshtns.a Makefile shtns.h
+SHT_example : SHT_example.c libshtns.a shtns.h
 	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.c ./libshtns.a $(LIBS) -o SHT_example
 
-SHT_fort_ex : SHT_example.f libshtns.a Makefile shtns.f
+SHT_fort_ex : SHT_example.f libshtns.a shtns.f
 	gfortran -fdefault-real-8 -I$(PREFIX)/include -L$(PREFIX)/lib SHT_example.f -lshtns $(LIBS) -lc -o SHT_fort_ex
 
 #documentation :
