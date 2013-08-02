@@ -225,6 +225,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 		t = (rnd)_mm512_loadunpackhi_pd( t, (mem) + (idx)*VSIZE2 + 64 );
 		return t;
 	}
+	#define reduce_add(a) _mm512_reduce_add_pd(a)
 	inline static void vstor(double *mem, int idx, rnd v) {		// unaligned store.
 		_mm512_packstorelo_pd((mem) + (idx)*VSIZE2, v);
 		_mm512_packstorehi_pd((mem) + (idx)*VSIZE2 + 64, v);
@@ -277,6 +278,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define vall(x) ((rnd) _mm256_set1_pd(x))
 		#define vread(mem, idx) ((rnd)_mm256_loadu_pd( ((double*)mem) + (idx)*4 ))
 		#define vstor(mem, idx, v) _mm256_storeu_pd( ((double*)mem) + (idx)*4 , v)
+		#define reduce_add(a) _mm512_reduce_add_pd(a)
+		inline static double reduce_add(rnd a) {
+			v2d t = (v2d)_mm256_castpd256_pd128(a) + (v2d)_mm256_extractf128_pd(a,1);
+			return _mm_cvtsd_f64(t) + _mm_cvtsd_f64(_mm_unpackhi_pd(t,t));
+		}
 		inline static v2d v2d_reduce(rnd a, rnd b) {
 			a = _mm256_hadd_pd(a, b);
 			return (v2d)_mm256_castpd256_pd128(a) + (v2d)_mm256_extractf128_pd(a,1);
@@ -311,6 +317,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 				return b + c;
 			}
 		#endif
+		#define reduce_add(a) ( _mm_cvtsd_f64(a) + _mm_cvtsd_f64(_mm_unpackhi_pd(a,a)) )
 		#define vall(x) ((rnd) _mm_set1_pd(x))
 		#define vread(mem, idx) ((s2d*)mem)[idx]
 		#define vstor(mem, idx, v) ((s2d*)mem)[idx] = v
