@@ -393,6 +393,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	typedef double rnd;
 	#define vread(mem, idx) ((double*)mem)[idx]
 	#define vstor(mem, idx, v) ((double*)mem)[idx] = v;
+	#define reduce_add(a) (a)
+	#define v2d_reduce(a,b) ((a) +I*(b))	
 	#define vlo(a) (a)
 	#define vall(x) (x)
 	#define vdup(x) (x)

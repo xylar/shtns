@@ -40,15 +40,9 @@ V	double *l_2;
 	unsigned im;
 V	double m_1;
   #endif
-  #if _GCC_VEC_
-Q	double qq[2*llim] SSE;
-V	double ss[2*llim] SSE;
-V	double tt[2*llim] SSE;
-  #else
-Q	double qq[llim];
-V	double ss[llim];
-V	double tt[llim];
-  #endif
+Q	v2d qq[llim];
+V	v2d ss[llim];
+V	v2d tt[llim];
 
 Q	double rer[NLAT_2 + NW*VSIZE2 -1] SSE;
 Q	double ror[NLAT_2 + NW*VSIZE2 -1] SSE;
@@ -106,9 +100,11 @@ V			per[k] = e+f;		por[k] = e-f;
 Q		Qlm[0] = r0 * alm[0];				// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
+Q		double* q_ = (double*) qq;
+V		double* s_ = (double*) ss;		double* t_ = (double*) tt;
 		for (l=0;l<llim;++l) {
-Q			qq[l] = 0.0;
-V			ss[l] = 0.0;		tt[l] = 0.0;
+Q			q_[l] = 0.0;
+V			s_[l] = 0.0;		t_[l] = 0.0;
 		}
 		do {
 			al = alm;
@@ -141,9 +137,9 @@ Q					q += y1[j] * rork[j];
 V					s += dy1[j] * terk[j];
 V					t += dy1[j] * perk[j];
 				}
-Q				qq[l-1] += reduce_add(q);
-V				ss[l-1] += reduce_add(s);
-V				tt[l-1] -= reduce_add(t);
+Q				q_[l-1] += reduce_add(q);
+V				s_[l-1] += reduce_add(s);
+V				t_[l-1] -= reduce_add(t);
 				for (int j=0; j<NW; ++j) {
 V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*sint[j]) + vall(al[2])*dy1[j];
 					y1[j]  = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
@@ -156,9 +152,9 @@ Q					q += y0[j] * rerk[j];
 V					s += dy0[j] * tork[j];
 V					t += dy0[j] * pork[j];
 				}
-Q				qq[l] += reduce_add(q);
-V				ss[l] += reduce_add(s);
-V				tt[l] -= reduce_add(t);
+Q				q_[l] += reduce_add(q);
+V				s_[l] += reduce_add(s);
+V				t_[l] -= reduce_add(t);
 				al+=4;	l+=2;
 			}
 			if (l==llim) {
@@ -170,15 +166,15 @@ Q					q += y1[j] * rork[j];
 V					s += dy1[j] * terk[j];
 V					t += dy1[j] * perk[j];
 				}
-Q				qq[l-1] += reduce_add(q);
-V				ss[l-1] += reduce_add(s);
-V				tt[l-1] -= reduce_add(t);
+Q				q_[l-1] += reduce_add(q);
+V				s_[l-1] += reduce_add(s);
+V				t_[l-1] -= reduce_add(t);
 			}
 			k+=NW;
 		} while (k < nk);
 		for (l=1; l<=llim; ++l) {
-Q			Qlm[l] = qq[l-1];
-V			Slm[l] = ss[l-1]*l_2[l];		Tlm[l] = tt[l-1]*l_2[l];
+Q			Qlm[l] = q_[l-1];
+V			Slm[l] = s_[l-1]*l_2[l];		Tlm[l] = t_[l-1]*l_2[l];
 		}
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1; l<= LMAX; ++l) {
@@ -249,30 +245,13 @@ V			k+=2;
 V		} while (k<nk*VSIZE2);
 V		m_1 = 1.0/m;
 		k=l;
-		#if _GCC_VEC_
-Q			double* q = qq;
-V			double* s = ss;		double* t = tt;
-		#else
-			l = LiM(shtns, m, im);
-Q			double* q = (double *) &Qlm[l];
-V			double* s = (double *) &Slm[l];
-V			double* t = (double *) &Tlm[l];
-		#endif
-		for (l=llim-m; l>=0; l--) {
-Q			q[0] = 0.0;		q[1] = 0.0;		q+=2;
-V			s[0] = 0.0;		s[1] = 0.0;		s+=2;
-V			t[0] = 0.0;		t[1] = 0.0;		t+=2;
+		for (l=0; l<=llim-m; l++) {
+Q			qq[l] = vdup(0.0);
+V			ss[l] = vdup(0.0);		tt[l] = vdup(0.0);
 		}
 		do {
-		#if _GCC_VEC_
-Q			double* q = qq;
-V			double* s = ss;		double* t = tt;
-		#else
-			l = LiM(shtns, m, im);
-Q			double* q = (double *) &Qlm[l];
-V			double* s = (double *) &Slm[l];
-V			double* t = (double *) &Tlm[l];
-		#endif
+Q			v2d* q = qq;
+V			v2d* s = ss;		v2d* t = tt;
 			al = alm;
 			rnd cost[NW], y0[NW], y1[NW];
 V			rnd st2[NW], dy0[NW], dy1[NW];
@@ -339,8 +318,8 @@ V						dy0[j] *= vall(1.0/SHT_SCALE_FACTOR);		dy1[j] *= vall(1.0/SHT_SCALE_FACTO
 				}
 			}
 		  if (ny == 0) {
-Q			q+=2*(l-m);
-V			s+=2*(l-m);		t+=2*(l-m);
+Q			q+=(l-m);
+V			s+=(l-m);		t+=(l-m);
 			for (int j=0; j<NW; ++j) {	// prefetch
 				y0[j] *= vread(wg, k+j);		y1[j] *= vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
 V				dy0[j] *= vread(wg, k+j);		dy1[j] *= vread(wg, k+j);
@@ -361,9 +340,9 @@ V				for (int j=1; j<NW; ++j)	ss0 += dy0[j] * tork[j]  + y0[j] * peik[j];
 V				for (int j=1; j<NW; ++j)	ss1 += dy0[j] * toik[j]  - y0[j] * perk[j];
 V				for (int j=1; j<NW; ++j)	tt0 += dy0[j] * pork[j]  - y0[j] * teik[j];
 V				for (int j=1; j<NW; ++j)	tt1 += dy0[j] * poik[j]  + y0[j] * terk[j];
-Q				((v2d*)q)[0] += v2d_reduce(qq0, qq1);
-V				((v2d*)s)[0] += v2d_reduce(ss0, ss1);
-V				((v2d*)t)[0] -= v2d_reduce(tt0, tt1);
+Q				q[0] += v2d_reduce(qq0, qq1);
+V				s[0] += v2d_reduce(ss0, ss1);
+V				t[0] -= v2d_reduce(tt0, tt1);
 				for (int j=0; j<NW; ++j) {
 V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
 					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
@@ -380,11 +359,11 @@ V				for (int j=1; j<NW; ++j)	ss0 += dy1[j] * terk[j]  + y1[j] * poik[j];
 V				for (int j=1; j<NW; ++j)	ss1 += dy1[j] * teik[j]  - y1[j] * pork[j];
 V				for (int j=1; j<NW; ++j)	tt0 += dy1[j] * perk[j]  - y1[j] * toik[j];
 V				for (int j=1; j<NW; ++j)	tt1 += dy1[j] * peik[j]  + y1[j] * tork[j];
-Q				((v2d*)q)[1] += v2d_reduce(qq0, qq1);
-V				((v2d*)s)[1] += v2d_reduce(ss0, ss1);
-V				((v2d*)t)[1] -= v2d_reduce(tt0, tt1);
-Q				q+=4;
-V				s+=4;	t+=4;
+Q				q[1] += v2d_reduce(qq0, qq1);
+V				s[1] += v2d_reduce(ss0, ss1);
+V				t[1] -= v2d_reduce(tt0, tt1);
+Q				q+=2;
+V				s+=2;	t+=2;
 				for (int j=0; j<NW; ++j) {
 V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];
 					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
@@ -404,9 +383,9 @@ V				for (int j=1; j<NW; ++j)	ss0 += dy0[j] * tork[j]  + y0[j] * peik[j];
 V				for (int j=1; j<NW; ++j)	ss1 += dy0[j] * toik[j]  - y0[j] * perk[j];
 V				for (int j=1; j<NW; ++j)	tt0 += dy0[j] * pork[j]  - y0[j] * teik[j];
 V				for (int j=1; j<NW; ++j)	tt1 += dy0[j] * poik[j]  + y0[j] * terk[j];
-Q				((v2d*)q)[0] += v2d_reduce(qq0, qq1);
-V				((v2d*)s)[0] += v2d_reduce(ss0, ss1);
-V				((v2d*)t)[0] -= v2d_reduce(tt0, tt1);
+Q				q[0] += v2d_reduce(qq0, qq1);
+V				s[0] += v2d_reduce(ss0, ss1);
+V				t[0] -= v2d_reduce(tt0, tt1);
 			}
 		  }
 			k+=NW;
@@ -415,20 +394,12 @@ V				((v2d*)t)[0] -= v2d_reduce(tt0, tt1);
 Q		v2d *Ql = (v2d*) &Qlm[l];
 V		v2d *Sl = (v2d*) &Slm[l];
 V		v2d *Tl = (v2d*) &Tlm[l];
-		#if _GCC_VEC_
-			for (l=0; l<=llim-m; ++l) {
-QX				Ql[l] = ((v2d*)qq)[l];
-3				Ql[l] = ((v2d*)qq)[l] * vdup(m_1);
-V				Sl[l] = ((v2d*)ss)[l] * vdup(l_2[l+m]);
-V				Tl[l] = ((v2d*)tt)[l] * vdup(l_2[l+m]);
-			}
-		#else
-V			for (l=0; l<=llim-m; ++l) {
-3				Ql[l] *= m_1;
-V				Sl[l] *= l_2[l+m];
-V				Tl[l] *= l_2[l+m];
-V			}
-		#endif
+		for (l=0; l<=llim-m; ++l) {
+QX			Ql[l] = qq[l];
+3			Ql[l] = qq[l] * vdup(m_1);
+V			Sl[l] = ss[l] * vdup(l_2[l+m]);
+V			Tl[l] = tt[l] * vdup(l_2[l+m]);
+		}
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1-m; l<=LMAX-m; ++l) {
 Q				Ql[l] = vdup(0.0);
