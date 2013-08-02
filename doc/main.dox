@@ -22,6 +22,7 @@
  * - accurate up to spherical harmonic degree l=16383 (at least).
  * - \link rotation rotation functions\endlink to rotate spherical harmonics (beta).
  * - \link operators special spectral operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
+ * - scalar transforms for complex spatial fields.
  *
  * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *

@@ -9,7 +9,7 @@ PYTHON=@PYTHON@
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(CFLAGS) -D_GNU_SOURCE -L$(PREFIX)/lib -I$(PREFIX)/include
+go= $(CFLAGS) -D_GNU_SOURCE
 
 # intel compiler may be used for codelets
 #shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
@@ -79,17 +79,18 @@ sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c $< -o $@
 
 
-# programs :
-time_SHT : shtns.h time_SHT.c libshtns.a Makefile
-	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o time_SHT
-test_rot : shtns.h test_rot.c libshtns.a Makefile
-	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o test_rot
+# programs & Examples
+time_SHT : time_SHT.c libshtns.a shtns.h
+	$(cc) time_SHT.c -I. ./libshtns.a $(LIBS) -o time_SHT
 
-SHT_example : examples/SHT_example.c libshtns.a Makefile shtns.h
-	$(cc) -I$(PREFIX)/include -L$(PREFIX)/lib examples/SHT_example.c ./libshtns.a $(LIBS) -o SHT_example
+test_rot : examples/test_rot.c libshtns.a shtns.h
+	$(cc) examples/test_rot.c -I. ./libshtns.a $(LIBS) -o test_rot
 
-SHT_fort_ex : examples/SHT_example.f libshtns.a Makefile shtns.f
-	gfortran $(CFLAGS) -fdefault-real-8 -I$(PREFIX)/include -L$(PREFIX)/lib examples/SHT_example.f ./libshtns.a $(LIBS) -lc -o SHT_fort_ex
+SHT_example : examples/SHT_example.c libshtns.a shtns.h
+	$(cc) examples/SHT_example.c -I. ./libshtns.a $(LIBS) -o SHT_example
+
+SHT_fort_ex : examples/SHT_example.f libshtns.a shtns.f
+	gfortran -L$(PREFIX)/lib -I$(PREFIX)/include -I. -fdefault-real-8 examples/SHT_example.f ./libshtns.a $(LIBS) -lc -o SHT_fort_ex
 
 #documentation :
 docs :

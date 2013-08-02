@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2011 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2013 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@ujf-grenoble.fr
@@ -15,8 +15,8 @@
  * 
  */
 
-/// \file time_SHT.c This program performs some spherical harmonic transforms, and displays timings and accuracy.
-/// \c make \c time_SHT to compile, and then run.
+/// \example test_rot.c
+/// This program test the rotation of spherical harmonics (beta)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,7 +26,7 @@
 #include <time.h>
 #include <fftw3.h>
 
-#include "shtns.h"
+#include <shtns.h>
 
 shtns_cfg shtns;
 

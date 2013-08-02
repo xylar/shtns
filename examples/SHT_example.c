@@ -28,7 +28,7 @@
 #include <math.h>
 #include <fftw3.h>
 
-#include "../shtns.h"
+#include <shtns.h>
 
 /// a simple function that writes a vector to a file
 void write_vect(char *fn, double *vec, int N);
@@ -41,7 +41,7 @@ int main()
 {
 	shtns_cfg shtns;		// handle to a sht transform configuration
 	long int lmax,mmax,nlat,nphi,mres, NLM;
-	complex double *Slm, *Tlm;	// spherical harmonics l,m space
+	complex double *Slm, *Tlm;	// spherical harmonics coefficients (l,m space): complex numbers.
 	double *Sh, *Th;		// real space : theta,phi
 	long int i,im,lm;
 	double t;

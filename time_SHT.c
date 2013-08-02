@@ -29,7 +29,7 @@
 // cycle counter from FFTW
 #include "cycle.h"
 
-#include "shtns.h"
+#include <shtns.h>
 
 shtns_cfg shtns;
 
