@@ -41,9 +41,9 @@ V	double *l_2;
 V	double m_1;
   #endif
   #if _GCC_VEC_
-Q	rnd qq[2*llim];
-V	rnd ss[2*llim];
-V	rnd tt[2*llim];
+Q	double qq[2*llim] SSE;
+V	double ss[2*llim] SSE;
+V	double tt[2*llim] SSE;
   #else
 Q	double qq[llim];
 V	double ss[llim];
@@ -107,8 +107,8 @@ Q		Qlm[0] = r0 * alm[0];				// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
 		for (l=0;l<llim;++l) {
-Q			qq[l] = vall(0.0);
-V			ss[l] = vall(0.0);		tt[l] = vall(0.0);
+Q			qq[l] = 0.0;
+V			ss[l] = 0.0;		tt[l] = 0.0;
 		}
 		do {
 			al = alm;
@@ -133,40 +133,52 @@ V				perk[j] = vread(per, k+j);		pork[j] = vread(por, k+j);
 V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*sint[j]) + vall(al[0])*dy0[j];
 					y0[j]  = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 				}
-				for (int j=0; j<NW; ++j) {
-Q					qq[l-1] += y1[j] * rork[j];
-V					ss[l-1] += dy1[j] * terk[j];
-V					tt[l-1] -= dy1[j] * perk[j];
+Q				rnd q = y1[0] * rork[0];
+V				rnd s = dy1[0] * terk[0];
+V				rnd t = dy1[0] * perk[0];
+				for (int j=1; j<NW; ++j) {
+Q					q += y1[j] * rork[j];
+V					s += dy1[j] * terk[j];
+V					t += dy1[j] * perk[j];
 				}
+Q				qq[l-1] += _mm512_reduce_add_pd(q);
+V				ss[l-1] += _mm512_reduce_add_pd(s);
+V				tt[l-1] -= _mm512_reduce_add_pd(t);
 				for (int j=0; j<NW; ++j) {
 V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*sint[j]) + vall(al[2])*dy1[j];
 					y1[j]  = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
 				}
-				for (int j=0; j<NW; ++j) {
-Q					qq[l] += y0[j] * rerk[j];
-V					ss[l] += dy0[j] * tork[j];
-V					tt[l] -= dy0[j] * pork[j];
+Q				q = y0[0] * rerk[0];
+V				s = dy0[0] * tork[0];
+V				t = dy0[0] * pork[0];
+				for (int j=1; j<NW; ++j) {
+Q					q += y0[j] * rerk[j];
+V					s += dy0[j] * tork[j];
+V					t += dy0[j] * pork[j];
 				}
+Q				qq[l] += _mm512_reduce_add_pd(q);
+V				ss[l] += _mm512_reduce_add_pd(s);
+V				tt[l] -= _mm512_reduce_add_pd(t);
 				al+=4;	l+=2;
 			}
 			if (l==llim) {
-				for (int j=0; j<NW; ++j) {
-Q					qq[l-1] += y1[j] * rork[j];
-V					ss[l-1] += dy1[j] * terk[j];
-V					tt[l-1] -= dy1[j] * perk[j];
+Q				rnd q = y1[0] * rork[0];
+V				rnd s = dy1[0] * terk[0];
+V				rnd t = dy1[0] * perk[0];
+				for (int j=1; j<NW; ++j) {
+Q					q += y1[j] * rork[j];
+V					s += dy1[j] * terk[j];
+V					t += dy1[j] * perk[j];
 				}
+Q				qq[l-1] += _mm512_reduce_add_pd(q);
+V				ss[l-1] += _mm512_reduce_add_pd(s);
+V				tt[l-1] -= _mm512_reduce_add_pd(t);
 			}
 			k+=NW;
 		} while (k < nk);
 		for (l=1; l<=llim; ++l) {
-			#if _GCC_VEC_
-Q				((v2d*)Qlm)[l] = v2d_reduce(qq[l-1], vall(0));
-V				((v2d*)Slm)[l] = v2d_reduce(ss[l-1], vall(0)) * vdup(l_2[l]);
-V				((v2d*)Tlm)[l] = v2d_reduce(tt[l-1], vall(0)) * vdup(l_2[l]);
-			#else
-Q				Qlm[l] = qq[l-1];
-V				Slm[l] = ss[l-1]*l_2[l];		Tlm[l] = tt[l-1]*l_2[l];
-			#endif
+Q			Qlm[l] = qq[l-1];
+V			Slm[l] = ss[l-1]*l_2[l];		Tlm[l] = tt[l-1]*l_2[l];
 		}
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1; l<= LMAX; ++l) {
@@ -238,8 +250,8 @@ V		} while (k<nk*VSIZE2);
 V		m_1 = 1.0/m;
 		k=l;
 		#if _GCC_VEC_
-Q			rnd* q = qq;
-V			rnd* s = ss;		rnd* t = tt;
+Q			double* q = qq;
+V			double* s = ss;		double* t = tt;
 		#else
 			l = LiM(shtns, m, im);
 Q			double* q = (double *) &Qlm[l];
@@ -247,14 +259,14 @@ V			double* s = (double *) &Slm[l];
 V			double* t = (double *) &Tlm[l];
 		#endif
 		for (l=llim-m; l>=0; l--) {
-Q			q[0] = vall(0.0);		q[1] = vall(0.0);		q+=2;
-V			s[0] = vall(0.0);		s[1] = vall(0.0);		s+=2;
-V			t[0] = vall(0.0);		t[1] = vall(0.0);		t+=2;
+Q			q[0] = 0.0;		q[1] = 0.0;		q+=2;
+V			s[0] = 0.0;		s[1] = 0.0;		s+=2;
+V			t[0] = 0.0;		t[1] = 0.0;		t+=2;
 		}
 		do {
 		#if _GCC_VEC_
-Q			rnd* q = qq;
-V			rnd* s = ss;		rnd* t = tt;
+Q			double* q = qq;
+V			double* s = ss;		double* t = tt;
 		#else
 			l = LiM(shtns, m, im);
 Q			double* q = (double *) &Qlm[l];
@@ -337,22 +349,46 @@ V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( 
 V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
 			}
 			while (l<llim) {	// compute even and odd parts
-Q				for (int j=0; j<NW; ++j)	q[0] += y0[j] * rerk[j];		// real even
-Q				for (int j=0; j<NW; ++j)	q[1] += y0[j] * reik[j];		// imag even
-V				for (int j=0; j<NW; ++j)	s[0] += dy0[j] * tork[j]  + y0[j] * peik[j];
-V				for (int j=0; j<NW; ++j)	s[1] += dy0[j] * toik[j]  - y0[j] * perk[j];
-V				for (int j=0; j<NW; ++j)	t[0] -= dy0[j] * pork[j]  - y0[j] * teik[j];
-V				for (int j=0; j<NW; ++j)	t[1] -= dy0[j] * poik[j]  + y0[j] * terk[j];
+Q				rnd qq0 = y0[0] * rerk[0];
+Q				rnd qq1 = y0[0] * reik[0];
+V				rnd ss0 = dy0[0] * tork[0]  + y0[0] * peik[0];
+V				rnd ss1 = dy0[0] * toik[0]  - y0[0] * perk[0];
+V				rnd tt0 = dy0[0] * pork[0]  - y0[0] * teik[0];
+V				rnd tt1 = dy0[0] * poik[0]  + y0[0] * terk[0];
+Q				for (int j=1; j<NW; ++j)	qq0 += y0[j] * rerk[j];		// real even
+Q				for (int j=1; j<NW; ++j)	qq1 += y0[j] * reik[j];		// imag even
+V				for (int j=1; j<NW; ++j)	ss0 += dy0[j] * tork[j]  + y0[j] * peik[j];
+V				for (int j=1; j<NW; ++j)	ss1 += dy0[j] * toik[j]  - y0[j] * perk[j];
+V				for (int j=1; j<NW; ++j)	tt0 += dy0[j] * pork[j]  - y0[j] * teik[j];
+V				for (int j=1; j<NW; ++j)	tt1 += dy0[j] * poik[j]  + y0[j] * terk[j];
+Q				q[0] += _mm512_reduce_add_pd(qq0);
+Q				q[1] += _mm512_reduce_add_pd(qq1);
+V				s[0] += _mm512_reduce_add_pd(ss0);
+V				s[1] += _mm512_reduce_add_pd(ss1);
+V				t[0] -= _mm512_reduce_add_pd(tt0);
+V				t[1] -= _mm512_reduce_add_pd(tt1);
 				for (int j=0; j<NW; ++j) {
 V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
 					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 				}
-Q				for (int j=0; j<NW; ++j)	q[2] += y1[j] * rork[j];		// real odd
-Q				for (int j=0; j<NW; ++j)	q[3] += y1[j] * roik[j];		// imag odd
-V				for (int j=0; j<NW; ++j)	s[2] += dy1[j] * terk[j]  + y1[j] * poik[j];
-V				for (int j=0; j<NW; ++j)	s[3] += dy1[j] * teik[j]  - y1[j] * pork[j];
-V				for (int j=0; j<NW; ++j)	t[2] -= dy1[j] * perk[j]  - y1[j] * toik[j];
-V				for (int j=0; j<NW; ++j)	t[3] -= dy1[j] * peik[j]  + y1[j] * tork[j];
+Q				qq0 = y1[0] * rork[0];
+Q				qq1 = y1[0] * roik[0];
+V				ss0 = dy1[0] * terk[0]  + y1[0] * poik[0];
+V				ss1 = dy1[0] * teik[0]  - y1[0] * pork[0];
+V				tt0 = dy1[0] * perk[0]  - y1[0] * toik[0];
+V				tt1 = dy1[0] * peik[0]  + y1[0] * tork[0];
+Q				for (int j=1; j<NW; ++j)	qq0 += y1[j] * rork[j];		// real odd
+Q				for (int j=1; j<NW; ++j)	qq1 += y1[j] * roik[j];		// imag odd
+V				for (int j=1; j<NW; ++j)	ss0 += dy1[j] * terk[j]  + y1[j] * poik[j];
+V				for (int j=1; j<NW; ++j)	ss1 += dy1[j] * teik[j]  - y1[j] * pork[j];
+V				for (int j=1; j<NW; ++j)	tt0 -= dy1[j] * perk[j]  - y1[j] * toik[j];
+V				for (int j=1; j<NW; ++j)	tt1 -= dy1[j] * peik[j]  + y1[j] * tork[j];
+Q				q[2] += _mm512_reduce_add_pd(qq0);
+Q				q[3] += _mm512_reduce_add_pd(qq1);
+V				s[2] += _mm512_reduce_add_pd(ss0);
+V				s[3] += _mm512_reduce_add_pd(ss1);
+V				t[2] -= _mm512_reduce_add_pd(tt0);
+V				t[3] -= _mm512_reduce_add_pd(tt1);
 Q				q+=4;
 V				s+=4;	t+=4;
 				for (int j=0; j<NW; ++j) {
@@ -362,12 +398,24 @@ V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];
 				l+=2;	al+=4;
 			}
 			if (l==llim) {
-Q				for (int j=0; j<NW; ++j)	q[0] += y0[j] * rerk[j];		// real even
-Q				for (int j=0; j<NW; ++j)	q[1] += y0[j] * reik[j];		// imag even
-V				for (int j=0; j<NW; ++j)	s[0] += dy0[j] * tork[j]  + y0[j] * peik[j];
-V				for (int j=0; j<NW; ++j)	s[1] += dy0[j] * toik[j]  - y0[j] * perk[j];
-V				for (int j=0; j<NW; ++j)	t[0] -= dy0[j] * pork[j]  - y0[j] * teik[j];
-V				for (int j=0; j<NW; ++j)	t[1] -= dy0[j] * poik[j]  + y0[j] * terk[j];
+Q				rnd qq0 = y0[0] * rerk[0];
+Q				rnd qq1 = y0[0] * reik[0];
+V				rnd ss0 = dy0[0] * tork[0]  + y0[0] * peik[0];
+V				rnd ss1 = dy0[0] * toik[0]  - y0[0] * perk[0];
+V				rnd tt0 = dy0[0] * pork[0]  - y0[0] * teik[0];
+V				rnd tt1 = dy0[0] * poik[0]  + y0[0] * terk[0];
+Q				for (int j=1; j<NW; ++j)	qq0 += y0[j] * rerk[j];		// real even
+Q				for (int j=1; j<NW; ++j)	qq1 += y0[j] * reik[j];		// imag even
+V				for (int j=1; j<NW; ++j)	ss0 += dy0[j] * tork[j]  + y0[j] * peik[j];
+V				for (int j=1; j<NW; ++j)	ss1 += dy0[j] * toik[j]  - y0[j] * perk[j];
+V				for (int j=1; j<NW; ++j)	tt0 += dy0[j] * pork[j]  - y0[j] * teik[j];
+V				for (int j=1; j<NW; ++j)	tt1 += dy0[j] * poik[j]  + y0[j] * terk[j];
+Q				q[0] += _mm512_reduce_add_pd(qq0);
+Q				q[1] += _mm512_reduce_add_pd(qq1);
+V				s[0] += _mm512_reduce_add_pd(ss0);
+V				s[1] += _mm512_reduce_add_pd(ss1);
+V				t[0] -= _mm512_reduce_add_pd(tt0);
+V				t[1] -= _mm512_reduce_add_pd(tt1);
 			}
 		  }
 			k+=NW;
@@ -378,10 +426,10 @@ V		v2d *Sl = (v2d*) &Slm[l];
 V		v2d *Tl = (v2d*) &Tlm[l];
 		#if _GCC_VEC_
 			for (l=0; l<=llim-m; ++l) {
-QX				Ql[l] = v2d_reduce(qq[2*l], qq[2*l+1]);
-3				Ql[l] = v2d_reduce(qq[2*l], qq[2*l+1]) * vdup(m_1);
-V				Sl[l] = v2d_reduce(ss[2*l], ss[2*l+1]) * vdup(l_2[l+m]);
-V				Tl[l] = v2d_reduce(tt[2*l], tt[2*l+1]) * vdup(l_2[l+m]);
+QX				Ql[l] = (v2d){qq[2*l], qq[2*l+1]};
+3				Ql[l] = (v2d){qq[2*l], qq[2*l+1]} * vdup(m_1);
+V				Sl[l] = (v2d){ss[2*l], ss[2*l+1]} * vdup(l_2[l+m]);
+V				Tl[l] = (v2d){tt[2*l], tt[2*l+1]} * vdup(l_2[l+m]);
 			}
 		#else
 V			for (l=0; l<=llim-m; ++l) {
