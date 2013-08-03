@@ -488,7 +488,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			}
 			#endif
 		} else {		// use only in-place here, supposed to be faster.
-		/*	shtns->fftc_mode = 0;
+			shtns->fftc_mode = 0;
 			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 			shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
 			#if SHT_VERBOSE > 1
@@ -496,9 +496,9 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 				printf("          fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
 			}
 			#endif
-		*/
+		/*	
 			shtns->fftc_mode = 2;		// fftv out-of-place
-			shtns->fftv = fftv_create(nfft, NLAT/2, FFTV_BACKWARD);
+			shtns->fftv = fftv_create(nfft, NLAT/2, FFTV_BACKWARD);	*/
 		}
 
 	#if _GCC_VEC_
@@ -1958,6 +1958,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 
 	#if _GCC_VEC_
 		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
+		#ifdef __MIC__
+			if (*nlat % VSIZE2) shtns_runerr("Nlat must be a multiple of 8 for the MIC\n");
+		#endif
 	#endif
 	shtns_unset_grid(shtns);		// release grid if previously allocated.
 	if (nl_order <= 0) nl_order = SHT_DEFAULT_NL_ORDER;
@@ -1989,6 +1992,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if (*nlat == 0) {
 		n_gauss = ((nl_order+1)*LMAX)/2 +1;		// required gauss nodes
 		n_gauss += (n_gauss&1);		// even is better.
+		#if _GCC_VEC_ && __MIC__
+			n_gauss = ((n_gauss+(VSIZE2-1))/VSIZE2) * VSIZE2;
+		#endif
 		if (flags != sht_gauss) {
 			m = fft_int(nl_order*LMAX+2, 7);		// required dct nodes
 			*nlat = m + (m&1);		// even is better.

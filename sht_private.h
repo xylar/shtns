@@ -208,10 +208,15 @@ struct shtns_info {		// MUST start with "int nlm;"
 #endif
 
 #if _GCC_VEC_ && __MIC__
+	// these values must be adjusted for the larger vectors of the MIC
+	#undef SHT_L_RESCALE_FLY
+	#undef SHT_ACCURACY
+	#define SHT_L_RESCALE_FLY 1800
+	#define SHT_ACCURACY 1.0e-40
+
 	#define MIN_ALIGNMENT 64
 	#define VSIZE 2
-	typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
-	typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
+	typedef complex double v2d __attribute__((aligned (16)));		// vector that contains a complex number
 	#define VSIZE2 8
 	#include <immintrin.h>
 	#define _SIMD_NAME_ "mic"
@@ -226,12 +231,10 @@ struct shtns_info {		// MUST start with "int nlm;"
 		return t;
 	}
 	#define reduce_add(a) _mm512_reduce_add_pd(a)
+	#define v2d_reduce(a, b) ( _mm512_reduce_add_pd(a) +I* _mm512_reduce_add_pd(b) )
 	inline static void vstor(double *mem, int idx, rnd v) {		// unaligned store.
 		_mm512_packstorelo_pd((mem) + (idx)*VSIZE2, v);
 		_mm512_packstorehi_pd((mem) + (idx)*VSIZE2 + 64, v);
-	}
-	inline static v2d v2d_reduce(rnd a, rnd b) {
-			return (v2d){_mm512_reduce_add_pd(a), _mm512_reduce_add_pd(b)};
 	}
 
 	// could be simplified with scatter
@@ -255,8 +258,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 		_mm512_store_pd( (double*)mem + (NPHI+1-2*im)*NLAT_2-VSIZE2 - (idx)*VSIZE2, \
 				_mm512_castsi512_pd(_mm512_shuffle_epi32(_mm512_permute4f128_epi32(_mm512_castpd_si512(_mm512_mask_mov_pd(bb,170,aa)), _MM_PERM_ABCD),_MM_PERM_BADC))); }
 
-	#define vdup(x) ((s2d){x,x})
-	#define vxchg(a) ((v2d){((vec_rnd)a).v[1], ((vec_rnd)a).v[0]})
+	#define vdup(x) (x)
 
 	#define vlo(a) ((vec_rnd)a).v[0]
 
@@ -278,7 +280,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define vall(x) ((rnd) _mm256_set1_pd(x))
 		#define vread(mem, idx) ((rnd)_mm256_loadu_pd( ((double*)mem) + (idx)*4 ))
 		#define vstor(mem, idx, v) _mm256_storeu_pd( ((double*)mem) + (idx)*4 , v)
-		#define reduce_add(a) _mm512_reduce_add_pd(a)
 		inline static double reduce_add(rnd a) {
 			v2d t = (v2d)_mm256_castpd256_pd128(a) + (v2d)_mm256_extractf128_pd(a,1);
 			return _mm_cvtsd_f64(t) + _mm_cvtsd_f64(_mm_unpackhi_pd(t,t));
