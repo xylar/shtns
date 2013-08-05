@@ -1986,9 +1986,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if (*nlat == 0) {
 		n_gauss = ((nl_order+1)*LMAX)/2 +1;		// required gauss nodes
 		n_gauss += (n_gauss&1);		// even is better.
-		#if _GCC_VEC_
-			n_gauss = ((n_gauss+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
-		#endif
+		n_gauss = ((n_gauss+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
 		if (flags != sht_gauss) {
 			m = fft_int(nl_order*LMAX+2, 7);		// required dct nodes
 			*nlat = m + (m&1);		// even is better.

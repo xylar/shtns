@@ -60,7 +60,7 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
-  v2.4  (1 Aug 2013)
+  v2.4  (5 Aug 2013)
 	- new scalar transforms for complex spatial fields: SH_to_spat_cplx()
 	  and spat_cplx_to_SH().
 	- new shtns_verbose() function to control output during initialization.
