@@ -496,7 +496,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 				printf("          fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
 			}
 			#endif
-		/*	
+		/*
 			shtns->fftc_mode = 2;		// fftv out-of-place
 			shtns->fftv = fftv_create(nfft, NLAT/2, FFTV_BACKWARD);	*/
 		}
@@ -1992,8 +1992,8 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if (*nlat == 0) {
 		n_gauss = ((nl_order+1)*LMAX)/2 +1;		// required gauss nodes
 		n_gauss += (n_gauss&1);		// even is better.
-		#if _GCC_VEC_ && __MIC__
-			n_gauss = ((n_gauss+(VSIZE2-1))/VSIZE2) * VSIZE2;
+		#if _GCC_VEC_
+			n_gauss = ((n_gauss+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
 		#endif
 		if (flags != sht_gauss) {
 			m = fft_int(nl_order*LMAX+2, 7);		// required dct nodes
