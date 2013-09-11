@@ -29,7 +29,7 @@ default : @target@
 install : @install@
 
 libshtns.a : Makefile sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
-	ar rcs libshtns.a sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+	ar rcs libshtns.a sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o fftv.o
 	@echo " "
 	@cat COPYRIGHT
 	@echo " "
@@ -78,10 +78,13 @@ sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c $(hfiles) cycle.h
 sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c $< -o $@
 
+fftv.o : fftv/*.c fftv/fftv.h Makefile
+	$(shtcc) -c fftv/fftv.c
+
 
 # programs :
 time_SHT : shtns.h time_SHT.c libshtns.a
-	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a fftv/fftv.o $(LIBS) -o time_SHT
+	$(cc) time_SHT.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o time_SHT
 test_rot : shtns.h test_rot.c libshtns.a
 	$(cc) test_rot.c -I$(PREFIX)/include -L$(PREFIX)/lib ./libshtns.a $(LIBS) -o test_rot
 
