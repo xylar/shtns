@@ -439,6 +439,12 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		} else fftw_plan_with_nthreads(shtns->nthreads);
 	#endif
 
+	shtns->k_stride = 1;	// default theta-stride
+	shtns->m_stride = NLAT;	// default m-stride
+/*	k_inc = 1;		m_inc = NLAT;	// theta-first (original).
+	k_inc = NPHI;	m_inc = 2;		// complex-based phi-first (fft friendly).
+*/
+
 	shtns->fft = NULL;		shtns->ifft = NULL;
 	if (NPHI==1) 	// no FFT needed.
 	{

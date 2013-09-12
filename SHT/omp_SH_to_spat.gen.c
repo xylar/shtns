@@ -38,9 +38,6 @@ T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, complex dou
   #endif
 
   #ifndef SHT_AXISYM
-Q	#define BR0(i) ((double *)BrF)[2*(i)]
-V	#define BT0(i) ((double *)BtF)[2*(i)]
-V	#define BP0(i) ((double *)BpF)[2*(i)]
 Q	#define qr(l) vall(creal(Ql[l-1]))
 Q	#define qi(l) vall(cimag(Ql[l-1]))
 S	#define sr(l) vall(creal(Sl[l-1]))
@@ -49,13 +46,10 @@ T	#define tr(l) vall(creal(Tl[l-1]))
 T	#define ti(l) vall(cimag(Tl[l-1]))
 V	double m_1;
 	unsigned im;
-  #else
-Q	#define BR0(i) ((double *)BrF)[i]
-S	#define BT0(i) ((double *)BtF)[i]
-T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	unsigned m0, mstep;
 	long int nk,k,l,m;
+	int k_inc, m_inc;
 	double *alm, *al;
 	double *ct, *st;
 Q	complex double Ql[llim+1] SSE;
@@ -81,6 +75,9 @@ V	double ppoi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
 	ct = shtns->ct;		st = shtns->st;
 	nk = NLAT_2;
 	nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
+
+	// ACCESS PATTERN
+	k_inc = shtns->k_stride;		m_inc = shtns->m_stride / 2;
 
 	#ifndef _OPENMP
 		m0 = 0;		mstep = 1;
@@ -172,20 +169,20 @@ T					po[j] -= dy0[j] * vall(Tl0[l-1]);
 			}
 
 			for (int j=0; j<NWAY; ++j) {
-Q				vstor(rrer, j+k, re[j]);		vstor(rror, j+k, ro[j]);
-S				vstor(tter, j+k, te[j]);		vstor(ttor, j+k, to[j]);
-T				vstor(pper, j+k, pe[j]);		vstor(ppor, j+k, po[j]);
+Q				vstor(rrer, j+k, re[j]+ro[j]);		vstor(rror, j+k, re[j]-ro[j]);
+S				vstor(tter, j+k, te[j]+to[j]);		vstor(ttor, j+k, te[j]-to[j]);
+T				vstor(pper, j+k, pe[j]+po[j]);		vstor(ppor, j+k, pe[j]-po[j]);
 			}
 			k+=NWAY;
 		} while (k < nk);
 
 		k=0;  do {	// merge symmetric and antisymmetric parts.
-Q			BrF[k/2]            = rrer[k]+rror[k] + I*(rrer[k+1]+rror[k+1]);
-Q			BrF[NLAT_2-1 - k/2] = rrer[k+1]-rror[k+1] + I*(rrer[k]-rror[k]);
-S			BtF[k/2]            = tter[k]+ttor[k] + I*(tter[k+1]+ttor[k+1]);
-S			BtF[NLAT_2-1 - k/2] = tter[k+1]-ttor[k+1] + I*(tter[k]-ttor[k]);
-T			BpF[k/2]            = pper[k]+ppor[k] + I*(pper[k+1]+ppor[k+1]);
-T			BpF[NLAT_2-1 - k/2] = pper[k+1]-ppor[k+1] + I*(pper[k]-ppor[k]);
+Q			BrF[(k/2)*k_inc]            = rrer[k]   + I*rrer[k+1];
+Q			BrF[(NLAT_2-1 - k/2)*k_inc] = rror[k+1] + I*rror[k];
+S			BtF[(k/2)*k_inc]            = tter[k]   + I*tter[k+1];
+S			BtF[(NLAT_2-1 - k/2)*k_inc] = ttor[k+1] + I*ttor[k];
+T			BpF[(k/2)*k_inc]            = pper[k]   + I*pper[k+1];
+T			BpF[(NLAT_2-1 - k/2)*k_inc] = ppor[k+1] + I*ppor[k];
 			k+=2;
 		} while(k < NLAT_2);
 
@@ -193,8 +190,6 @@ T			BpF[NLAT_2-1 - k/2] = pper[k+1]-ppor[k+1] + I*(pper[k]-ppor[k]);
 	}
 
   #ifndef SHT_AXISYM
-Q	BrF += m0*NLAT_2;
-V	BtF += m0*NLAT_2;	BpF += m0*NLAT_2;
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 V		m_1 = 1.0/m;
@@ -320,76 +315,70 @@ T				for (int j=0; j<NWAY; ++j) {	poi[j] -= dy0[j] * ti(l);		ter[j] -= y0[j] * t
 		  }
 		  
 			for (int j=0; j<NWAY; ++j) {
-Q				vstor(rrer, j+k, rer[j]);		vstor(rror, j+k, ror[j]);
-Q				vstor(rrei, j+k, rei[j]);		vstor(rroi, j+k, roi[j]);
-V				vstor(tter, j+k, ter[j]);		vstor(ttor, j+k, tor[j]);
-V				vstor(ttei, j+k, tei[j]);		vstor(ttoi, j+k, toi[j]);
-V				vstor(pper, j+k, per[j]);		vstor(ppor, j+k, por[j]);
-V				vstor(ppei, j+k, pei[j]);		vstor(ppoi, j+k, poi[j]);
+Q				vstor(rrer, j+k, rer[j]+ror[j]);		vstor(rror, j+k, rer[j]-ror[j]);
+Q				vstor(rrei, j+k, rei[j]+roi[j]);		vstor(rroi, j+k, rei[j]-roi[j]);
+V				vstor(tter, j+k, ter[j]+tor[j]);		vstor(ttor, j+k, ter[j]-tor[j]);
+V				vstor(ttei, j+k, tei[j]+toi[j]);		vstor(ttoi, j+k, tei[j]-toi[j]);
+V				vstor(pper, j+k, per[j]+por[j]);		vstor(ppor, j+k, per[j]-por[j]);
+V				vstor(ppei, j+k, pei[j]+poi[j]);		vstor(ppoi, j+k, pei[j]-poi[j]);
 			}
 			k+=NWAY;
 		} while (k < nk);
 
 		l = shtns->tm[im] >> 1;		// stay on a 16 byte boundary
 Q		k=0;	while (k<l) {	// polar optimization
-Q			BrF[k] = 0.0;				BrF[(NPHI-2*im)*NLAT_2 + k] = 0.0;
-Q			BrF[NLAT_2-l+k] = 0.0;	BrF[(NPHI+1-2*im)*NLAT_2 -l+k] = 0.0;
+Q			BrF[im*m_inc + k*k_inc] = 0.0;				BrF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
+Q			BrF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BrF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
 Q			++k;
 Q		}
 Q		k*=2;	do {
-Q			BrF[k/2] = (rrer[k]+rror[k]-rrei[k+1]-rroi[k+1]) + I*(rrer[k+1]+rror[k+1]+rrei[k]+rroi[k]);
-Q			BrF[(NPHI-2*im)*NLAT_2 + k/2] = (rrer[k]+rror[k]+rrei[k+1]+rroi[k+1]) + I*(rrer[k+1]+rror[k+1]-rrei[k]-rroi[k]);
-Q			BrF[NLAT_2-1-k/2] = (rrer[k+1]-rror[k+1]-rrei[k]+rroi[k]) + I*(rrer[k]-rror[k]+rrei[k+1]-rroi[k+1]);
-Q			BrF[(NPHI+1-2*im)*NLAT_2 -1 - k/2] = (rrer[k+1]-rror[k+1]+rrei[k]-rroi[k]) + I*(rrer[k]-rror[k]-rrei[k+1]+rroi[k+1]);
+Q			BrF[im*m_inc + (k/2)*k_inc] = (rrer[k]-rrei[k+1]) + I*(rrer[k+1]+rrei[k]);
+Q			BrF[(NPHI-im)*m_inc + (k/2)*k_inc] = (rrer[k]+rrei[k+1]) + I*(rrer[k+1]-rrei[k]);
+Q			BrF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (rror[k+1]-rroi[k]) + I*(rror[k]+rroi[k+1]);
+Q			BrF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (rror[k+1]+rroi[k]) + I*(rror[k]-rroi[k+1]);
 Q			k+=2;
 Q		} while(k < NLAT_2);
 
 V		k=0;	while (k<l) {	// polar optimization
-V			BtF[k] = 0.0;				BtF[(NPHI-2*im)*NLAT_2 + k] = 0.0;
-V			BtF[NLAT_2-l+k] = 0.0;	BtF[(NPHI+1-2*im)*NLAT_2 -l+k] = 0.0;
+V			BtF[im*m_inc + k*k_inc] = 0.0;				BtF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
+V			BtF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BtF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
 V			++k;
 V		}
 V		k*=2;	do {
-V			BtF[k/2] = (tter[k]+ttor[k]-ttei[k+1]-ttoi[k+1]) + I*(tter[k+1]+ttor[k+1]+ttei[k]+ttoi[k]);
-V			BtF[(NPHI-2*im)*NLAT_2 + k/2] = (tter[k]+ttor[k]+ttei[k+1]+ttoi[k+1]) + I*(tter[k+1]+ttor[k+1]-ttei[k]-ttoi[k]);
-V			BtF[NLAT_2-1-k/2] = (tter[k+1]-ttor[k+1]-ttei[k]+ttoi[k]) + I*(tter[k]-ttor[k]+ttei[k+1]-ttoi[k+1]);
-V			BtF[(NPHI+1-2*im)*NLAT_2 -1 - k/2] = (tter[k+1]-ttor[k+1]+ttei[k]-ttoi[k]) + I*(tter[k]-ttor[k]-ttei[k+1]+ttoi[k+1]);
+V			BtF[im*m_inc + (k/2)*k_inc] = (tter[k]-ttei[k+1]) + I*(tter[k+1]+ttei[k]);
+V			BtF[(NPHI-im)*m_inc + (k/2)*k_inc] = (tter[k]+ttei[k+1]) + I*(tter[k+1]-ttei[k]);
+V			BtF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (ttor[k+1]-ttoi[k]) + I*(ttor[k]+ttoi[k+1]);
+V			BtF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (ttor[k+1]+ttoi[k]) + I*(ttor[k]-ttoi[k+1]);
 V			k+=2;
 V		} while(k < NLAT_2);
 
 V		k=0;	while (k<l) {	// polar optimization
-V			BpF[k] = 0.0;				BpF[(NPHI-2*im)*NLAT_2 + k] = 0.0;
-V			BpF[NLAT_2-l+k] = 0.0;	BpF[(NPHI+1-2*im)*NLAT_2 -l+k] = 0.0;
+V			BpF[im*m_inc + k*k_inc] = 0.0;				BpF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
+V			BpF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BpF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
 V			++k;
 V		}
 V		k*=2;	do {
-V			BpF[k/2] = (pper[k]+ppor[k]-ppei[k+1]-ppoi[k+1]) + I*(pper[k+1]+ppor[k+1]+ppei[k]+ppoi[k]);
-V			BpF[(NPHI-2*im)*NLAT_2 + k/2] = (pper[k]+ppor[k]+ppei[k+1]+ppoi[k+1]) + I*(pper[k+1]+ppor[k+1]-ppei[k]-ppoi[k]);
-V			BpF[NLAT_2-1-k/2] = (pper[k+1]-ppor[k+1]-ppei[k]+ppoi[k]) + I*(pper[k]-ppor[k]+ppei[k+1]-ppoi[k+1]);
-V			BpF[(NPHI+1-2*im)*NLAT_2 -1 - k/2] = (pper[k+1]-ppor[k+1]+ppei[k]-ppoi[k]) + I*(pper[k]-ppor[k]-ppei[k+1]+ppoi[k+1]);
+V			BpF[im*m_inc + (k/2)*k_inc] = (pper[k]-ppei[k+1]) + I*(pper[k+1]+ppei[k]);
+V			BpF[(NPHI-im)*m_inc + (k/2)*k_inc] = (pper[k]+ppei[k+1]) + I*(pper[k+1]-ppei[k]);
+V			BpF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (ppor[k+1]-ppoi[k]) + I*(ppor[k]+ppoi[k+1]);
+V			BpF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (ppor[k+1]+ppoi[k]) + I*(ppor[k]-ppoi[k+1]);
 V			k+=2;
 V		} while(k < NLAT_2);
 
-Q		BrF += mstep*NLAT_2;
-V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
 	}
 
 	while(im <= NPHI-imlim) {	// padding for high m's
 		k=0;
 		do {
-Q			BrF[k] = 0.0;
-V			BtF[k] = 0.0;		BpF[k] = 0.0;
+Q			BrF[im*m_inc + k*k_inc] = 0.0;
+V			BtF[im*m_inc + k*k_inc] = 0.0;
+V			BpF[im*m_inc + k*k_inc] = 0.0;
 		} while (++k < NLAT_2);
-Q		BrF += mstep*NLAT_2;
-V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
 	  im+=mstep;
 	}
   #endif
 }
 
-Q	#undef BR0
-V	#undef BT0
-V	#undef BP0
 Q	#undef qr
 Q	#undef qi
 S	#undef sr

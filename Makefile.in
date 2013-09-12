@@ -28,7 +28,7 @@ default : @target@
 
 install : @install@
 
-libshtns.a : Makefile sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+libshtns.a : Makefile sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o fftv.o
 	ar rcs libshtns.a sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o fftv.o
 	@echo " "
 	@cat COPYRIGHT
