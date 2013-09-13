@@ -28,15 +28,15 @@
 # T : line for vector transform, toroidal component.
 
 	static
-3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, complex double *BrF, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
-QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *BrF, const long int llim, const int imlim) {
+3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *Slm, complex double *Tlm, complex double *BrF, complex double *BtF, complex double *BpF, const long int llim, const int imlim)
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Qlm, complex double *BrF, const long int llim, const int imlim)
   #ifndef SHT_GRAD
-VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
+VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int imlim)
   #else
-S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
-T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int imlim) {
+S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Slm, complex double *BtF, complex double *BpF, const long int llim, const int imlim)
+T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, complex double *Tlm, complex double *BtF, complex double *BpF, const long int llim, const int imlim)
   #endif
-
+  {
   #ifndef SHT_AXISYM
 Q	#define qr(l) vall(creal(Ql[l-1]))
 Q	#define qi(l) vall(cimag(Ql[l-1]))
@@ -377,7 +377,7 @@ V			BpF[im*m_inc + k*k_inc] = 0.0;
 	  im+=mstep;
 	}
   #endif
-}
+  }
 
 Q	#undef qr
 Q	#undef qi

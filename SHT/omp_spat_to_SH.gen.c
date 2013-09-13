@@ -25,10 +25,10 @@
 //////////////////////////////////////////////////
 
 	static
-QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, complex double *Qlm, const long int llim, const int imlim) {
-VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
-3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, const long int llim, const int imlim) {
-
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, complex double *Qlm, const long int llim, const int imlim)
+VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, complex double *Slm, complex double *Tlm, const long int llim, const int imlim)
+3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, complex double *Qlm, complex double *Slm, complex double *Tlm, const long int llim, const int imlim)
+  {
 	#define NW (NWAY*2)
 
 	double *alm, *al;
@@ -421,7 +421,7 @@ V				Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
 		#endif
 	}
   #endif
-}
+  }
 
 	static
 QX	void GEN3(spat_to_SH_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, complex double *Qlm, long int llim) {
