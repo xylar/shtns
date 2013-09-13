@@ -78,7 +78,7 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 	}
 
 	// ACCESS PATTERN
-	k_inc = shtns->k_stride;		m_inc = shtns->m_stride;
+	k_inc = shtns->k_stride_a;		m_inc = shtns->m_stride_a;
 
 	#ifndef _OPENMP
 		m0 = 0;		mstep = 1;

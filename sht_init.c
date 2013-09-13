@@ -321,10 +321,11 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 	long int im, l0;
 	long int size, marray_size, lstride;
 
-	l0 = ((NLAT+1)>>1)*2;		// round up to even
+	im = (VSIZE2 > 2) ? VSIZE2 : 2;
+	l0 = ((NLAT+im-1)/im)*im;		// align on vector
 	shtns->ct = (double *) VMALLOC( sizeof(double) * l0*3 );			/// ct[] (including st and st_1)
 	shtns->st = shtns->ct + l0;		shtns->st_1 = shtns->ct + 2*l0;
-	
+
 	shtns->ylm = NULL;		shtns->dylm = NULL;			// synthesis
 	shtns->zlm = NULL;		shtns->dzlm = NULL;			// analysis
 
@@ -439,13 +440,12 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		} else fftw_plan_with_nthreads(shtns->nthreads);
 	#endif
 
-	shtns->k_stride = 1;	// default theta-stride
-	shtns->m_stride = NLAT;	// default m-stride
-/*	k_inc = 1;		m_inc = NLAT;	// theta-first (original).
-	k_inc = NPHI;	m_inc = 2;		// complex-based phi-first (fft friendly).
-*/
+	shtns->k_stride_s = 1;		shtns->m_stride_s = NLAT;		// default strides
+	shtns->k_stride_a = 1;		shtns->m_stride_a = NLAT;
 
 	shtns->fft = NULL;		shtns->ifft = NULL;
+	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
+
 	if (NPHI==1) 	// no FFT needed.
 	{
 		shtns->fftc_mode = -1;		// no FFT
@@ -454,136 +454,159 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		#endif
 		shtns->nspat = NLAT;
 		shtns->ncplx_fft = -1;	// no fft.
+		return;
 	}
-	else	/* NPHI > 1 */
-	{
-		theta_inc=1;  phi_inc=NLAT;  phi_embed=2*(NPHI/2+1);	// SHT_NATIVE_LAYOUT is the default.
-		if (layout & SHT_THETA_CONTIGUOUS) {	theta_inc=1;  phi_inc=NLAT;  phi_embed=NPHI;	}
-		if (layout & SHT_PHI_CONTIGUOUS)   {	phi_inc=1;  theta_inc=NPHI;  phi_embed=NPHI;	}
-		nfft = NPHI;
-		ncplx = NPHI/2 +1;
-		nreal = phi_embed;
-		if ((theta_inc != 1)||(phi_inc != NLAT)||(nreal < 2*ncplx))  in_place = 0;		// we need to do the fft out-of-place.
 
-		#if SHT_VERBOSE > 0
-		if (verbose) {
-			printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc,phi_embed);
-			if (NPHI <= (SHT_NL_ORDER+1)*MMAX)	printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
-			if (NPHI != fft_int(NPHI,7))		printf("     !! Warning : Nphi is not optimal for FFTW !\n");
-		}
-		#endif
+	/* NPHI > 1 */
+	theta_inc=1;  phi_inc=NLAT;  phi_embed=2*(NPHI/2+1);	// SHT_NATIVE_LAYOUT is the default.
+	if (layout & SHT_THETA_CONTIGUOUS) {	theta_inc=1;  phi_inc=NLAT;  phi_embed=NPHI;	}
+	if (layout & SHT_PHI_CONTIGUOUS)   {	phi_inc=1;  theta_inc=NPHI;  phi_embed=NPHI;	}
+	nfft = NPHI;
+	ncplx = NPHI/2 +1;
+	nreal = phi_embed;
+	if ((theta_inc != 1)||(phi_inc != NLAT)||(nreal < 2*ncplx))  in_place = 0;		// we need to do the fft out-of-place.
 
-	// Allocate dummy Spatial Fields.
-		ShF = (complex double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
-		Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
-		fft = NULL;		ifft = NULL;	fft2 = NULL;	ifft2 = NULL;
-
-	// complex fft for fly transform is a bit different.
-		if (layout & SHT_PHI_CONTIGUOUS) {		// out-of-place split dft
-			fftw_iodim dim, many;
-			shtns->fftc_mode = 1;
-			dim.n = NPHI;    	dim.os = 1;			dim.is = NLAT;		// complex transpose
-			many.n = NLAT/2;	many.os = 2*NPHI;	many.is = 2;
-			shtns->ifftc = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
-			dim.n = NPHI;    	dim.is = 1;			dim.os = NLAT;		// complex transpose
-			many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2;
-			shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
-			#if SHT_VERBOSE > 1
-			if (verbose>1) {
-				printf("          fftw cost ifftc=%lg,  fftc=%lg  ",fftw_cost(shtns->ifftc), fftw_cost(shtns->fftc));	fflush(stdout);
-			}
-			#endif
-		} else {		// use only in-place here, supposed to be faster.
-			shtns->fftc_mode = 0;
-			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
-			shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
-			#if SHT_VERBOSE > 1
-			if (verbose>1) {
-				printf("          fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
-			}
-			#endif
-		/*
-			shtns->fftc_mode = 2;		// fftv out-of-place
-			shtns->fftv = fftv_create(nfft, NLAT/2, FFTV_BACKWARD);	*/
-		}
-
-	#if _GCC_VEC_
-	  if (on_the_fly == 0)
+	#if SHT_VERBOSE > 0
+	if (verbose) {
+		printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc,phi_embed);
+		if (NPHI <= (SHT_NL_ORDER+1)*MMAX)	printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
+		if (NPHI != fft_int(NPHI,7))		printf("     !! Warning : Nphi is not optimal for FFTW !\n");
+	}
 	#endif
-	  {		// the real ffts are required if _GCC_VEC_ == 0 or if on_the_fly is zero.
-	// IFFT : unnormalized.  FFT : must be normalized.
-		cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
-		if (in_place) {		// in-place FFT (if allowed)
-			ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
-			#if SHT_VERBOSE > 1
-			if (verbose>1) {
-				printf("          in-place cost : ifft=%lg  ",fftw_cost(ifft2));	fflush(stdout);
-			}
-			#endif
-			if (ifft2 != NULL) {
-				fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
-				#if SHT_VERBOSE > 1
-				if (verbose>1) {
-					printf("fft=%lg\n",fftw_cost(fft2));	fflush(stdout);
-				}
-				#endif
-				if (fft2 != NULL) {
-					cost_fft_ip = fftw_cost(fft2);		cost_ifft_ip = fftw_cost(ifft2);
-				}
-			}
-		}
-		if ( (in_place == 0) || (cost_fft_ip * cost_ifft_ip > 0.0) )
-		{		// out-of-place FFT
-			ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
-			#if SHT_VERBOSE > 1
-				if (verbose>1) {  printf("          oop cost : ifft=%lg  ",fftw_cost(ifft));	fflush(stdout);  }
-			#endif
-			if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
-			fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
-			#if SHT_VERBOSE > 1
-				if (verbose>1) {  printf("fft=%lg\n",fftw_cost(fft));	fflush(stdout);  }
-			#endif
-			if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
-			cost_fft_oop = fftw_cost(fft);		cost_ifft_oop = fftw_cost(ifft);
-		}
-		if ( (cost_fft_ip * cost_ifft_ip > 0.0) && (cost_fft_oop * cost_ifft_oop > 0.0) ) {		// both have been succesfully timed.
-			if ( cost_fft_oop + SHT_NL_ORDER*cost_ifft_oop < cost_fft_ip + SHT_NL_ORDER*cost_ifft_ip )
-				in_place = 0;		// disable in-place, because out-of-place is faster.
-		}
 
-		if (in_place) {
-			/* IN-PLACE FFT */
-			if (fft != NULL)  fftw_destroy_plan(fft);
-			if (ifft != NULL) fftw_destroy_plan(ifft);
-			fft = fft2;		ifft = ifft2;
-			shtns->ncplx_fft = 0;		// fft is done in-place, no allocation needed.
-		} else {
-			/* OUT-OF-PLACE FFT */
-			if (fft2 != NULL)  fftw_destroy_plan(fft2);		// use OUT-OF-PLACE FFT
-			if (ifft2 != NULL) fftw_destroy_plan(ifft2);
-			shtns->ncplx_fft = ncplx * NLAT;		// fft is done out-of-place, store allocation size.
-			phi_embed = NPHI;
-			#if SHT_VERBOSE > 1
-				if (verbose>1) printf("        ** out-of-place fft **\n");
-			#endif
-		}
-		shtns->fft = fft;		shtns->ifft = ifft;
-	  }
-		shtns->nspat = phi_embed * NLAT;
-		VFREE(Sh);		VFREE(ShF);
+// Allocate dummy Spatial Fields.
+	ShF = (complex double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
+	Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(complex double));
+	fft = NULL;		ifft = NULL;	fft2 = NULL;	ifft2 = NULL;
 
-		#if SHT_VERBOSE > 2
-		if (verbose>2) {
-			printf(" *** fft plan :\n");
-			fftw_print_plan(fft);
-			printf("\n *** ifft plan :\n");
-			fftw_print_plan(ifft);
-			printf("\n");
+// complex fft for fly transform is a bit different.
+	if (layout & SHT_PHI_CONTIGUOUS) {		// out-of-place split dft
+		fftw_iodim dim, many;
+		shtns->fftc_mode = 1;
+		//default internal
+		dim.n = NPHI;    	dim.os = 1;			dim.is = NLAT;		// complex transpose
+		many.n = NLAT/2;	many.os = 2*NPHI;	many.is = 2;
+		shtns->ifftc = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
+		dim.n = NPHI;    	dim.is = 1;			dim.os = NLAT;		// complex transpose
+		many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2;
+		shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
+	
+		// new internal
+	/*	dim.n = NPHI;    	dim.os = 1;			dim.is = 2;		// split complex
+		many.n = NLAT/2;	many.os = 2*NPHI;	many.is = 2*NPHI;
+		shtns->ifftc = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
+		shtns->k_stride_s = NPHI;		shtns->m_stride_s = 2;
+		dim.n = NPHI;    	dim.is = 1;			dim.os = 2;		// split complex
+		many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2*NPHI;
+		shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);		
+		shtns->k_stride_a = NPHI;		shtns->m_stride_a = 2;
+	*/
+		#if SHT_VERBOSE > 1
+		if (verbose>1) {
+			printf("          fftw cost ifftc=%lg,  fftc=%lg  ",fftw_cost(shtns->ifftc), fftw_cost(shtns->fftc));	fflush(stdout);
 		}
 		#endif
+	} else {	//if (layout & SHT_THETA_CONTIGUOUS) {		// use only in-place here, supposed to be faster.
+		shtns->fftc_mode = 0;
+		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+		shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
+		#if SHT_VERBOSE > 1
+		if (verbose>1) {
+			printf("          fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
+		}
+		#endif
+	/*
+		shtns->fftc_mode = 2;		// fftv out-of-place
+		fftv_use_threads(shtns->nthreads);
+		shtns->fftv = fftv_create(nfft, NLAT/2, FFTV_BACKWARD);
+	*/
+/*	} else {		// native format (interleaved coordinates)
+		shtns->fftc_mode = 0;
+		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, 1, nfft, ShF, &nfft, 1, nfft, FFTW_BACKWARD, shtns->fftw_plan_mode);
+		shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
+		shtns->k_stride_s = NPHI;		shtns->m_stride_s = 2;
+		shtns->k_stride_a = NPHI;		shtns->m_stride_a = 2;
+		#if SHT_VERBOSE > 1
+		if (verbose>1) {
+			printf("          fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
+		}
+		#endif	*/
 	}
 
-	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
+#if _GCC_VEC_
+  if (on_the_fly == 0)
+#endif
+  {		// the real ffts are required if _GCC_VEC_ == 0 or if on_the_fly is zero.
+// IFFT : unnormalized.  FFT : must be normalized.
+	cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
+	if (in_place) {		// in-place FFT (if allowed)
+		ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
+		#if SHT_VERBOSE > 1
+		if (verbose>1) {
+			printf("          in-place cost : ifft=%lg  ",fftw_cost(ifft2));	fflush(stdout);
+		}
+		#endif
+		if (ifft2 != NULL) {
+			fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
+			#if SHT_VERBOSE > 1
+			if (verbose>1) {
+				printf("fft=%lg\n",fftw_cost(fft2));	fflush(stdout);
+			}
+			#endif
+			if (fft2 != NULL) {
+				cost_fft_ip = fftw_cost(fft2);		cost_ifft_ip = fftw_cost(ifft2);
+			}
+		}
+	}
+	if ( (in_place == 0) || (cost_fft_ip * cost_ifft_ip > 0.0) )
+	{		// out-of-place FFT
+		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
+		#if SHT_VERBOSE > 1
+			if (verbose>1) {  printf("          oop cost : ifft=%lg  ",fftw_cost(ifft));	fflush(stdout);  }
+		#endif
+		if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
+		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
+		#if SHT_VERBOSE > 1
+			if (verbose>1) {  printf("fft=%lg\n",fftw_cost(fft));	fflush(stdout);  }
+		#endif
+		if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
+		cost_fft_oop = fftw_cost(fft);		cost_ifft_oop = fftw_cost(ifft);
+	}
+	if ( (cost_fft_ip * cost_ifft_ip > 0.0) && (cost_fft_oop * cost_ifft_oop > 0.0) ) {		// both have been succesfully timed.
+		if ( cost_fft_oop + SHT_NL_ORDER*cost_ifft_oop < cost_fft_ip + SHT_NL_ORDER*cost_ifft_ip )
+			in_place = 0;		// disable in-place, because out-of-place is faster.
+	}
+
+	if (in_place) {
+		/* IN-PLACE FFT */
+		if (fft != NULL)  fftw_destroy_plan(fft);
+		if (ifft != NULL) fftw_destroy_plan(ifft);
+		fft = fft2;		ifft = ifft2;
+		shtns->ncplx_fft = 0;		// fft is done in-place, no allocation needed.
+	} else {
+		/* OUT-OF-PLACE FFT */
+		if (fft2 != NULL)  fftw_destroy_plan(fft2);		// use OUT-OF-PLACE FFT
+		if (ifft2 != NULL) fftw_destroy_plan(ifft2);
+		shtns->ncplx_fft = ncplx * NLAT;		// fft is done out-of-place, store allocation size.
+		phi_embed = NPHI;
+		#if SHT_VERBOSE > 1
+			if (verbose>1) printf("        ** out-of-place fft **\n");
+		#endif
+	}
+	shtns->fft = fft;		shtns->ifft = ifft;
+  }
+	shtns->nspat = phi_embed * NLAT;
+	VFREE(Sh);		VFREE(ShF);
+
+	#if SHT_VERBOSE > 2
+	if (verbose>2) {
+		printf(" *** fft plan :\n");
+		fftw_print_plan(fft);
+		printf("\n *** ifft plan :\n");
+		fftw_print_plan(ifft);
+		printf("\n");
+	}
+	#endif
 }
 
 #ifdef SHTNS_DCT

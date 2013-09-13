@@ -109,8 +109,10 @@ struct shtns_info {		// MUST start with "int nlm;"
 	unsigned int nspat;			///< number of real numbers that must be allocated in a spatial field.
 /* END OF PUBLIC PART */
 
-	int k_stride;				///< stride in theta direction
-	int m_stride;				///< stride in phi direction (m)
+	unsigned short k_stride_s;			///< stride in theta direction
+	unsigned short m_stride_s;			///< stride in phi direction (m)
+	unsigned short k_stride_a;			///< stride in theta direction
+	unsigned short m_stride_a;			///< stride in phi direction (m)
 	short fftc_mode;			///< how to perform the complex fft : -1 = no fft; 0 = interleaved/native; 1 = split/transpose.
 	unsigned short nthreads;	///< number of threads (openmp).
 	unsigned short *tm;			///< start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
