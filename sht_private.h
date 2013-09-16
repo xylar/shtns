@@ -111,6 +111,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	short fftc_mode;			///< how to perform the complex fft : -1 = no fft; 0 = interleaved/native; 1 = split/transpose.
 	unsigned short nthreads;	///< number of threads (openmp).
 	unsigned short *tm;			///< start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+	int k_stride_a;				///< stride in theta direction
+	int m_stride_a;				///< stride in phi direction (m)
 	double *wg;					///< Gauss weights for Gauss-Legendre quadrature.
 	double *st_1;				///< 1/sin(theta);
 
@@ -272,9 +274,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
 	#endif
 
-	#define CFFT_TO_2REAL(nr, ni, sr, si ,smsk) { \
-		s2d tn = ni;	ni = _mm_xor_pd( vxchg(nr-ni), smsk);	nr = nr+tn; \
-		s2d ts = sr;	sr = vxchg(sr+si);		si = _mm_xor_pd( si-ts, smsk );  }
 	// build mask (-0, -0) to change sign of both hi and lo values using xorpd
 	#define SIGN_MASK_2  _mm_castsi128_pd(_mm_slli_epi64(_mm_cmpeq_epi16(_mm_set1_epi64x(0), _mm_set1_epi64x(0)), 63))
 	// build mask (0, -0) to change sign of hi value using xorpd (used in CFFT_TO_2REAL)

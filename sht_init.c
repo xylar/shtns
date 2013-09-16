@@ -439,6 +439,8 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		} else fftw_plan_with_nthreads(shtns->nthreads);
 	#endif
 
+	shtns->k_stride_a = 1;		shtns->m_stride_a = NLAT;		// default strides
+
 	shtns->fft = NULL;		shtns->ifft = NULL;
 	if (NPHI==1) 	// no FFT needed.
 	{
@@ -479,9 +481,16 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			dim.n = NPHI;    	dim.os = 1;			dim.is = NLAT;		// complex transpose
 			many.n = NLAT/2;	many.os = 2*NPHI;	many.is = 2;
 			shtns->ifftc = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
-			dim.n = NPHI;    	dim.is = 1;			dim.os = NLAT;		// complex transpose
-			many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2;
+
+			// legacy analysis fft
+			//dim.n = NPHI;    	dim.is = 1;			dim.os = NLAT;
+			//many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2;
+			// new internal
+			dim.n = NPHI;    	dim.is = 1;			dim.os = 2;		// split complex, but without global transpose (faster).
+			many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2*NPHI;
 			shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
+			shtns->k_stride_a = NPHI;		shtns->m_stride_a = 2;
+
 			#if SHT_VERBOSE > 1
 			if (verbose>1) {
 				printf("          fftw cost ifftc=%lg,  fftc=%lg  ",fftw_cost(shtns->ifftc), fftw_cost(shtns->fftc));	fflush(stdout);
