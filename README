@@ -60,6 +60,10 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
+  v2.4.1  (18 Sep 2013)
+	- performance improvement: analysis with SHT_PHI_CONTIGUOUS is now
+	  on par with synthesis (or better), even for large transforms.
+
   v2.4  (5 Aug 2013)
 	- new scalar transforms for complex spatial fields: SH_to_spat_cplx()
 	  and spat_cplx_to_SH().

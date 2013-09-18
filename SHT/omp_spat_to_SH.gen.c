@@ -36,7 +36,7 @@ VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *
 	double *alm, *al;
 	double *wg, *ct, *st;
 V	double *l_2;
-	long int nk, k, vnlat, l,m;
+	long int nk, k, l,m;
 	int k_inc, m_inc;
 	unsigned m0, mstep;
   #ifndef SHT_AXISYM
@@ -78,7 +78,6 @@ V	double poi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
 	#endif
 	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
 V	l_2 = shtns->l_2;
-	vnlat = ((unsigned) NLAT);		// vector size.
 	for (k=nk*VSIZE2; k<(nk+NWAY)*VSIZE2-1; ++k) {		// never written, so this is now done for all m's
 Q		rer[k] = 0.0;		ror[k] = 0.0;
 V		ter[k] = 0.0;		tor[k] = 0.0;
@@ -99,15 +98,6 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 	#endif
 	{		// im=0 : dzl.p = 0.0 and evrything is REAL
 		alm = shtns->blm[0];
-Q		double r0 = 0.0;
-Q		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-Q			double an = BrF[k*k_inc];			double bn = BrF[k*k_inc +1];
-Q			double bs = BrF[(NLAT-2-k)*k_inc];	double as = BrF[(NLAT-2-k)*k_inc +1];
-Q			rer[k] = an+as;			ror[k] = an-as;
-Q			rer[k+1] = bn+bs;		ror[k+1] = bn-bs;
-Q			r0 += (an+as)*wg[k] + (bn+bs)*wg[k+1];
-Q			k+=2;
-Q		} while(k < nk*VSIZE2);
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 V			double an = BtF[k*k_inc];			double bn = BtF[k*k_inc +1];
 V			double bs = BtF[(NLAT-2-k)*k_inc];	double as = BtF[(NLAT-2-k)*k_inc +1];
@@ -122,7 +112,16 @@ V			per[k] = an+as;			por[k] = an-as;
 V			per[k+1] = bn+bs;		por[k+1] = bn-bs;
 V			k+=2;
 V		} while(k < nk*VSIZE2);
-Q		Qlm[0] = r0 * alm[0];				// l=0 is done.
+Q		double r0a = 0.0;		double r0b = 0.0;
+Q		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
+Q			double an = BrF[k*k_inc];			double bn = BrF[k*k_inc +1];
+Q			double bs = BrF[(NLAT-2-k)*k_inc];	double as = BrF[(NLAT-2-k)*k_inc +1];
+Q			rer[k] = an+as;			ror[k] = an-as;
+Q			rer[k+1] = bn+bs;		ror[k+1] = bn-bs;
+Q			r0a += (an+as)*wg[k];	r0b += (bn+bs)*wg[k+1];
+Q			k+=2;
+Q		} while(k < nk*VSIZE2);
+Q		Qlm[0] = (r0a+r0b) * alm[0];				// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
 		for (l=0;l<llim;++l) {

@@ -103,15 +103,6 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
 	#endif
 V	l_2 = shtns->l_2;
 		alm = shtns->blm[0];
-Q		double r0 = 0.0;
-Q		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-Q			double an = BrF[k*k_inc];			double bn = BrF[k*k_inc +1];
-Q			double bs = BrF[(NLAT-2-k)*k_inc];	double as = BrF[(NLAT-2-k)*k_inc +1];
-Q			rer[k] = an+as;			ror[k] = an-as;
-Q			rer[k+1] = bn+bs;		ror[k+1] = bn-bs;
-Q			r0 += (an+as)*wg[k] + (bn+bs)*wg[k+1];
-Q			k+=2;
-Q		} while(k < nk*VSIZE2);
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 V			double an = BtF[k*k_inc];			double bn = BtF[k*k_inc +1];
 V			double bs = BtF[(NLAT-2-k)*k_inc];	double as = BtF[(NLAT-2-k)*k_inc +1];
@@ -126,12 +117,21 @@ V			per[k] = an+as;			por[k] = an-as;
 V			per[k+1] = bn+bs;		por[k+1] = bn-bs;
 V			k+=2;
 V		} while(k < nk*VSIZE2);
+Q		double r0a = 0.0;		double r0b = 0.0;
+Q		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
+Q			double an = BrF[k*k_inc];			double bn = BrF[k*k_inc +1];
+Q			double bs = BrF[(NLAT-2-k)*k_inc];	double as = BrF[(NLAT-2-k)*k_inc +1];
+Q			rer[k] = an+as;			ror[k] = an-as;
+Q			rer[k+1] = bn+bs;		ror[k+1] = bn-bs;
+Q			r0a += (an+as)*wg[k];	r0b += (bn+bs)*wg[k+1];
+Q			k+=2;
+Q		} while(k < nk*VSIZE2);
 		for (k=nk*VSIZE2; k<(nk+NWAY)*VSIZE2-1; ++k) {
 Q			rer[k] = 0.0;		ror[k] = 0.0;
 V			ter[k] = 0.0;		tor[k] = 0.0;
 V			per[k] = 0.0;		por[k] = 0.0;
 		}
-Q		Qlm[0] = r0 * alm[0];				// l=0 is done.
+Q		Qlm[0] = (r0a+r0b) * alm[0];				// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
 		for (l=0;l<llim;++l) {
