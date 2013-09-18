@@ -19,8 +19,6 @@ shtcc = $(CC) $(go) -O3
 # gcc compiler command with options for other source (initialization, ...)
 cc = $(CC) $(go) -O2
 
-## "version" identification string
-HGID=`hg id -ti`
 
 hfiles = sht_private.h sht_config.h shtns.h
 
@@ -73,7 +71,7 @@ SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 
 # objects :
 sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c $(hfiles) cycle.h
-	$(cc) -D_HGID_="\"$(HGID)\"" -c $< -o $@
+	$(cc) -c $< -o $@
 
 sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
 	$(shtcc) -c $< -o $@

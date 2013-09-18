@@ -1677,13 +1677,8 @@ done:
 }
 
 
-
-#ifndef _HGID_
-  #define _HGID_ "unknown"
-#endif
-
 void shtns_print_version() {
-	printf("[" PACKAGE_STRING "] built " __DATE__ ", " __TIME__ ", id: " _HGID_ " " _SIMD_NAME_ "\n");
+	printf("[" PACKAGE_STRING "] built " __DATE__ ", " __TIME__ ", id: " _SIMD_NAME_ "\n");
 }
 
 void shtns_print_cfg(shtns_cfg shtns)
