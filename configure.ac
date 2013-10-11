@@ -16,17 +16,19 @@ AC_ARG_ENABLE([verbose],
 	[],[enable_verbose=1])
 AC_ARG_ENABLE([openmp],
 	AS_HELP_STRING([--enable-openmp], [Enable multi-threading with OpenMP]), [], [enable_openmp=default])
+AC_ARG_ENABLE([mkl],
+	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW]), [], [enable_mkl=default])
+AC_ARG_ENABLE([mic],
+	AS_HELP_STRING([--enable-mic], [Enable compilation for Xeon Phi]), [], [enable_mic=no])
 AC_ARG_ENABLE([python],
 	AS_HELP_STRING([--enable-python], [Build Python interface]),
 	[], [enable_python=no])
 AC_ARG_ENABLE([long-double],
 	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
-AC_ARG_ENABLE([mkl],
-	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (can be slightly faster with avx)]))
 AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],
-	AS_HELP_STRING([--disable-simd], [Do not use SSE2 or AVX extensions]))
+	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX or MIC)]))
 AC_ARG_ENABLE([dct],
 	AS_HELP_STRING([--disable-dct], [Do not use DCT, removes support for regular grids.]))
 
@@ -63,7 +65,11 @@ AS_VAR_POPDEF([CACHEVAR])dnl
 ])dnl AX_CHECK_COMPILE_FLAGS
 
 # add gcc compile options if supported.
-AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"])
+AS_IF([test "x$enable_mic" != "xyes"], [
+	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"])
+  ],[
+	AX_CHECK_COMPILE_FLAG([-mmic],[CC="$CC -mmic"], [AC_MSG_ERROR(["Xeon Phi not supported."])])
+])
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-pointer"])
 AX_CHECK_COMPILE_FLAG([-std=gnu99],[CFLAGS="$CFLAGS -std=gnu99"])
@@ -81,6 +87,12 @@ AS_IF([test "x$enable_python" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 
+# With MIC, enable openmp and mkl by default.
+AS_IF([test "x$enable_mic" != "xno"], [
+	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
+	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
+])
+
 AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
@@ -90,22 +102,27 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 
 # Check for FFTW (FFTW preferred, MKL optional)
 AS_IF([test "x$enable_mkl" = "xyes"], [
-	# optionally use MKL instead of fftw3
+  # optionally use MKL instead of fftw3
+  AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
+  enable_dct=no		# MKL does not support dct (june 2013).
+  AX_CHECK_COMPILE_FLAG([-mkl], [
+	LIBS="-mkl $LIBS"	# easy way !
+	AC_CHECK_FUNC(fftw_plan_many_dft, [AC_MSG_NOTICE(["FFTW interface found in MKL, link with -mkl"])],
+		[AC_MSG_ERROR(["FFTW interface not found in MKL libraries (-mkl)."])])
+  ],[
 	AS_IF([test "x$enable_openmp" = "xyes"], [
 		# multi-threaded MKL libs
 		#mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread"
 		mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -Wl,--end-group"
-		AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
 	],[
 		# sequential MKL libs
 		mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
 	])
-	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [
-		LIBS="$mkl_libs $LIBS"
-		enable_dct=no		# MKL does not support dct (june 2013).
-	], AC_MSG_ERROR(["FFTW interface not found in MKL libraries ($mkl_libs)."]),
+	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [LIBS="$mkl_libs $LIBS"],
+		AC_MSG_ERROR(["FFTW interface not found in MKL libraries ($mkl_libs)."]),
 	["$mkl_libs"])
 	AC_MSG_NOTICE(["FFTW interface found in MKL, link with $mkl_libs"])
+  ])
 ],[
 	# fftw3
 	AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.]))
@@ -157,7 +174,7 @@ AS_IF([test "x$enable_f77" != "xno"], [
 
 # Disable SIMD ?
 AS_IF([test "x$enable_simd" != "xno"], [
-	AC_DEFINE([_GCC_VEC_],[1],[I compile with GCC 4 or later, and I would like fast vectorized code (if SSE2 or AVX is supported) !])
+	AC_DEFINE([_GCC_VEC_],[1],[I compile with GCC 4 or ICC 14 or later, and I would like fast vectorized code (if SSE2, AVX or MIC is supported) !])
 ])
 
 # Disable DCT ?
