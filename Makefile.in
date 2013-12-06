@@ -19,28 +19,26 @@ shtcc = $(CC) $(go) -O3
 # gcc compiler command with options for other source (initialization, ...)
 cc = $(CC) $(go) -O2
 
-
 hfiles = sht_private.h sht_config.h shtns.h
+
+ifeq ("@OPENMP_CFLAGS@","")
+  libname = libshtns.a
+  objs = sht_dct.o sht_mem.o sht_fly.o
+else
+  libname = libshtns_omp.a
+  objs = sht_dct.o sht_mem.o sht_fly.o sht_omp.o
+endif
 
 default : @target@
 
 install : @install@
 
-libshtns.a : Makefile sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
-	ar rcs libshtns.a sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+libshtns.a : Makefile sht_init.o $(objs)
+	ar rcs libshtns.a sht_init.o $(objs)
 	@echo " "
 	@cat COPYRIGHT
 	@echo " "
 	@echo "**** link with : @LDFLAGS@ @LIBS@"
-
-codelets1 = SHT/SH_to_spat.c SHT/SH_to_spat_fly.c SHT/spat_to_SH.c SHT/spat_to_SH_fly.c SHT/sht_generic.c
-ifeq ("@OPENMP_CFLAGS@","")
-  codelets = $(codelets1)
-  libname = libshtns.a
-else
-  codelets = $(codelets1) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
-  libname = libshtns_omp.a
-endif
 
 install-lib : libshtns.a
 	@mkdir -p $(PREFIX)/lib/
@@ -52,7 +50,6 @@ install-lib : libshtns.a
 	@cat COPYRIGHT
 	@echo " "
 	@echo "**** link with : -L$(PREFIX)/lib @LDFLAGS@ @LIBS@"
-
 
 # codelets :
 SHT/SH_to_spat.c : SHT/hyb_SH_to_spat.gen.c
@@ -68,14 +65,18 @@ SHT/SH_to_spat_omp.c : SHT/omp_SH_to_spat.gen.c
 SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp SED=$(SED)
 
-
 # objects :
 sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c $(hfiles) cycle.h
 	$(cc) -c $< -o $@
 
-sht_%.o : sht_%.c Makefile $(hfiles) $(codelets)
+sht_mem.o : sht_mem.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c
 	$(shtcc) -c $< -o $@
-
+sht_dct.o : sht_dct.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c
+	$(shtcc) -c $< -o $@
+sht_fly.o : sht_fly.c Makefile $(hfiles) SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
+	$(shtcc) -c $< -o $@
+sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
+	$(shtcc) -c $< -o $@
 
 # programs & Examples
 time_SHT : time_SHT.c libshtns.a shtns.h

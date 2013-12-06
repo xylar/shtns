@@ -70,18 +70,6 @@
 
 /* END COMPILE-TIME SETTINGS */
 
-
-// sht variants (std, ltr)
-enum sht_variants { SHT_STD, SHT_LTR, SHT_NVAR };
-// sht types (scal synth, scal analys, vect synth, ...)
-enum sht_types { SHT_TYP_SSY, SHT_TYP_SAN, SHT_TYP_VSY, SHT_TYP_VAN,
-				SHT_TYP_GSP, SHT_TYP_GTO, SHT_TYP_3SY, SHT_TYP_3AN, SHT_NTYP };
-// sht algorithms (hyb, fly1, ...)
-enum sht_algos { SHT_DCT, SHT_MEM, SHT_SV,
-	SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8,
-	SHT_OMP1, SHT_OMP2, SHT_OMP3, SHT_OMP4, SHT_OMP6, SHT_OMP8,
-	SHT_NALG };
-
 // sht grids
 enum sht_grids { GRID_NONE, GRID_GAUSS, GRID_REGULAR, GRID_POLES };
 
@@ -90,6 +78,14 @@ typedef void (*pf2l)(shtns_cfg, void*, void*, long int);
 typedef void (*pf3l)(shtns_cfg, void*, void*, void*, long int);
 typedef void (*pf4l)(shtns_cfg, void*, void*, void*, void*, long int);
 typedef void (*pf6l)(shtns_cfg, void*, void*, void*, void*, void*, void*, long int);
+
+// function table for sht
+struct sht_functable {
+	pf2l sy1, an1;
+	pf4l sy2, an2;
+	pf3l gsp, gto;
+	pf6l sy3, an3;
+};
 
 /// structure containing useful information about the SHT.
 struct shtns_info {		// MUST start with "int nlm;"
@@ -124,7 +120,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double **blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
 	double *l_2;	// array of size (LMAX+1) containing 1./l(l+1) for increasing integer l.
 
-	void* fptr[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
+	struct sht_functable ftable;		// pointers to transform functions.
+	struct sht_functable ftable_l;		// pointers to transform functions, variable l-truncation.
 
 	/* MEM matrices */
 	double **ylm;		// matrix for inverse transform (synthesis)

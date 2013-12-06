@@ -95,49 +95,76 @@ long nlm_calc(long lmax, long mmax, long mres)
 /*	SHT FUNCTIONS  */
 #include "sht_func.c"
 
+#include "sht_com.c"
 
 /*
 	INTERNAL INITIALIZATION FUNCTIONS
 */
 
+// sht algorithms (hyb, fly1, ...)
+enum sht_algos { SHT_DCT, SHT_MEM, SHT_SV,
+	SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8,
+	SHT_OMP1, SHT_OMP2, SHT_OMP3, SHT_OMP4, SHT_OMP6, SHT_OMP8,
+	SHT_NALG };
+enum sht_variants { SHT_STD, SHT_LTR, SHT_NVAR };
+// sht types (scal synth, scal analys, vect synth, ...)
+enum sht_types { SHT_TYP_SSY, SHT_TYP_SAN, SHT_TYP_VSY, SHT_TYP_VAN,
+	SHT_TYP_GSP, SHT_TYP_GTO, SHT_TYP_3SY, SHT_TYP_3AN, SHT_NTYP };
+
 char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "omp1", "omp2", "omp3", "omp4", "omp6", "omp8" };
-char* sht_var[SHT_NVAR] = {"std", "ltr"};
-char *sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
+char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
+char* sht_var[SHT_NVAR] = {"std", "ltr" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
-extern void* sht_array[SHT_NALG][SHT_NTYP];
-extern void* sht_array_l[SHT_NALG][SHT_NTYP];
-extern void* sht_array_m0[SHT_NALG][SHT_NTYP];
-extern void* sht_array_m0l[SHT_NALG][SHT_NTYP];
+extern struct sht_functable fmem;
+extern struct sht_functable fmem_l;
+extern struct sht_functable fmem_m0;
+extern struct sht_functable fmem_m0l;
+extern struct sht_functable fdct;
+extern struct sht_functable fdct_l;
+extern struct sht_functable fdct_m0;
+extern struct sht_functable fdct_m0l;
+extern struct sht_functable ffly[6];
+extern struct sht_functable ffly_m0[6];
+#ifdef _OPENMP
+extern struct sht_functable fomp[6];
+extern struct sht_functable fomp_m0[6];
+#endif
 
 // big array holding all sht functions, variants and algorithms
-void* sht_func[SHT_NVAR][SHT_NTYP][SHT_NALG];
+void* sht_func[SHT_NVAR][SHT_NALG][SHT_NTYP];
 
 /// \internal use on-the-fly alogorithm (guess without measuring)
 static void set_sht_fly(shtns_cfg shtns, int typ_start)
 {
 	int algo = SHT_FLY2;
+	void** f = (void**) &(shtns->ftable);
+	void** fl = (void**) &(shtns->ftable_l);
+
 	if (shtns->nthreads > 1) algo = SHT_OMP2;
 	for (int it=typ_start; it<SHT_NTYP; it++) {
-		for (int v=0; v<SHT_NVAR; v++)
-			shtns->fptr[v][it] = sht_func[v][it][algo];
+		f[it] = sht_func[SHT_STD][algo][it];
+		fl[it] = sht_func[SHT_LTR][algo][it];
 	}
 }
 
 /// \internal choose memory algorithm everywhere.
 static void set_sht_mem(shtns_cfg shtns) {
+	void** f = (void**) &(shtns->ftable);
+	void** fl = (void**) &(shtns->ftable_l);
+
 	for (int it=0; it<SHT_NTYP; it++) {
-		for (int v=0; v<SHT_NVAR; v++)
-			shtns->fptr[v][it] = sht_func[v][it][SHT_MEM];
+		f[it] = sht_func[SHT_STD][SHT_MEM][it];
+		fl[it] = sht_func[SHT_LTR][SHT_MEM][it];
 	}
 }
 
-/// \internal copy all algos to sht_func array (should be called by set_grid befor choosing variants).
-/// if nphi is 1, axisymmetric algorythms are used.
+/// \internal copy all algos to sht_func array (should be called by set_grid before choosing variants).
+/// if nphi is 1, axisymmetric algorithms are used.
 static void init_sht_array_func(shtns_cfg shtns)
 {
 	int it, j;
-	int alg_lim = SHT_NALG-1;
+	int alg_lim = SHT_FLY8;
 
 	if (shtns->nlat_2 < 8*VSIZE2) {		// limit available on-the-fly algorithm to avoid overflow (and segfaults).
 		it = shtns->nlat_2 / VSIZE2;
@@ -151,28 +178,45 @@ static void init_sht_array_func(shtns_cfg shtns)
 			default : alg_lim = SHT_FLY6;
 		}
 	}
+	alg_lim -= SHT_FLY1;
 
-	for (it=0; it<SHT_NTYP; it++) {
-		for (j=0; j<=alg_lim; j++) {
-			sht_func[SHT_LTR][it][j] = sht_array_l[j][it];
-			if (j >= SHT_FLY1) {
-				sht_func[SHT_STD][it][j] = sht_array_l[j][it];		// on-the-fly only exist in LTR version
-			} else  sht_func[SHT_STD][it][j] = sht_array[j][it];
+	memset(sht_func, 0, SHT_NVAR*SHT_NTYP*SHT_NALG*sizeof(void*) );		// zero out.
+	sht_func[SHT_STD][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2;
+	sht_func[SHT_LTR][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2l;
+	sht_func[SHT_STD][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2;
+	sht_func[SHT_LTR][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2l;
 
-			if ((shtns->nphi == 1)&&(j != SHT_SV)) {		// axisymmetric transform requested (but not for special case S+V)
-				sht_func[SHT_LTR][it][j] = sht_array_m0l[j][it];
-				if (j >= SHT_FLY1) {
-					sht_func[SHT_STD][it][j] = sht_array_m0l[j][it];		// on-the-fly only exist in LTR version
-				} else  sht_func[SHT_STD][it][j] = sht_array_m0[j][it];
-			}
+	if (shtns->nphi==1) {		// axisymmetric transform requested.
+		for (int j=0; j<=alg_lim; j++) {
+			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly_m0[j], sizeof(struct sht_functable));
+			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly_m0[j], sizeof(struct sht_functable));
+		  #ifdef _OPENMP
+			memcpy(sht_func[SHT_STD][SHT_OMP1 + j], &fomp_m0[j], sizeof(struct sht_functable));
+			memcpy(sht_func[SHT_LTR][SHT_OMP1 + j], &fomp_m0[j], sizeof(struct sht_functable));
+		  #endif
 		}
-		for (j=alg_lim+1; j<SHT_NALG; j++) {
-			sht_func[SHT_LTR][it][j] = NULL;
-			sht_func[SHT_STD][it][j] = NULL;
+		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct_m0, sizeof(struct sht_functable));
+		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_m0l, sizeof(struct sht_functable));
+		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem_m0, sizeof(struct sht_functable));
+		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_m0l, sizeof(struct sht_functable));		
+	} else {
+		for (int j=0; j<=alg_lim; j++) {
+			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly[j], sizeof(struct sht_functable));
+			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly[j], sizeof(struct sht_functable));
+		  #ifdef _OPENMP
+			memcpy(sht_func[SHT_STD][SHT_OMP1 + j], &fomp[j], sizeof(struct sht_functable));
+			memcpy(sht_func[SHT_LTR][SHT_OMP1 + j], &fomp[j], sizeof(struct sht_functable));
+		  #endif
 		}
+		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct, sizeof(struct sht_functable));
+		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_l, sizeof(struct sht_functable));
+		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem, sizeof(struct sht_functable));
+		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_l, sizeof(struct sht_functable));
 	}
+
 	set_sht_mem(shtns);		// default transform is MEM
 }
+
 
 /// \internal return the smallest power of 2 larger than n.
 static int next_power_of_2(int n)
@@ -264,15 +308,17 @@ static void free_unused_matrices(shtns_cfg shtns)
 	int count[SHT_NTYP];
 	int it, iv, ia, iv2;
 
+	void** fptr = (void**) &(shtns->ftable);
+	void** fptr_l = (void**) &(shtns->ftable_l);
 	for (it=0; it<SHT_NTYP; it++) {
 		count[it] = 0;
-		for (iv=0; iv<SHT_NVAR; iv++) {
-			if (shtns->fptr[iv][it] != NULL) {
-				for (ia=0; ia<SHT_SV; ia++)		// count occurences to mem algo
-					for (iv2=0; iv2<SHT_NVAR; iv2++)
-						if (sht_func[iv2][it][ia] == shtns->fptr[iv][it]) count[it]++;
+		for (ia=0; ia<=SHT_MEM; ia++)		// count occurences to mem algo
+			for (iv2=0; iv2<SHT_NVAR; iv2++) {
+				void* f = sht_func[iv2][ia][it];
+				if (f != NULL) {
+					if ((fptr[it] == f) || (fptr_l[it] == f)) count[it]++;
+				}
 			}
-		}
 		#if SHT_VERBOSE > 1
 			if (verbose>1) printf(" %d ",count[it]);
 		#endif
@@ -1563,10 +1609,10 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 				m = 0;		nloop *= 3;
 			} else 	m++;
 			tcpu = clock();
-			t0 = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_TYP_SSY][SHT_FLY2], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+			t0 = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_FLY2][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			tcpu = clock() - tcpu;		tt = 1.e-6 * tcpu;
 			if (tt >= SHT_TIME_LIMIT) break;			// we should not exceed 1 second
-			t = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_TYP_SSY][SHT_FLY2], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+			t = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_FLY2][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			r = fabs(2.0*(t-t0)/(t+t0));
 			#if SHT_VERBOSE > 1
 				if (verbose>1) printf(", nloop=%d, r=%g, m=%d (real time = %g s)\n",nloop,r,m,tt);
@@ -1596,7 +1642,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		if (shtns->nthreads <= 1) alg_end = SHT_OMP1;		// no OpenMP with 1 thread.
 		if ((ityp&1) && (otf_analys == 0)) alg_end = SHT_FLY1;		// no on-the-fly analysis for regular grid.
 		for (i=i0, m=0;	i<alg_end; i++) {
-			if (sht_func[0][ityp][i] != NULL) m++;		// count number of algos
+			if (sht_func[0][i][ityp] != NULL) m++;		// count number of algos
 		}
 		if (m >= 2) {		// don't time if there is only 1 algo !
 			#if SHT_VERBOSE > 1
@@ -1604,7 +1650,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 			#endif
 			i = i0-1;		i0 = -1;
 			while (++i < alg_end) {
-				void *pf = sht_func[0][ityp][i];
+				void *pf = sht_func[0][i][ityp];
 				if (pf != NULL) {
 					if (ityp&1) {	// analysis
 						t = get_time(shtns, nloop, sht_npar[ityp], sht_name[i], pf, Sh, Th, Qh, Slm, Tlm, Qlm, LMAX);
@@ -1619,9 +1665,13 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 				}
 			}
 			if (i0 >= 0) {
-				for (int j=0; j<SHT_NVAR; j++) {
-					shtns->fptr[j][ityp] = sht_func[j][ityp][i0];
-					if (ityp == 4) shtns->fptr[j][ityp+1] = sht_func[j][ityp+1][i0];		// only one timing for both gradients variants.
+				void** f = (void**) &(shtns->ftable);
+				void** fl = (void**) &(shtns->ftable_l);
+				f[ityp] = sht_func[SHT_STD][i0][ityp];
+				fl[ityp] = sht_func[SHT_LTR][i0][ityp];
+				if (ityp == 4) {		// only one timing for both gradients variants.
+					f[ityp+1] = sht_func[SHT_STD][i0][ityp+1];
+					fl[ityp+1] = sht_func[SHT_LTR][i0][ityp+1];
 				}
 				PRINT_DOT
 				#if SHT_VERBOSE > 1
@@ -1639,19 +1689,19 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		#endif
 		minc = MMAX/20 + 1;             // don't test every single m.
 		m = -1;		i = -1;		t0 = 0.0;		// reference = no dct.
-		if (sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT] != NULL)
-			t0 += get_time(shtns, *nlp, 2, "s", shtns->fptr[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-		if ( (sht_func[SHT_STD][SHT_TYP_VSY][SHT_DCT] != NULL) && (vector) )
-			t0 += get_time(shtns, nloop, 4, "v", shtns->fptr[SHT_STD][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+		if (sht_func[SHT_STD][SHT_DCT][SHT_TYP_SSY] != NULL)
+			t0 += get_time(shtns, *nlp, 2, "s", shtns->ftable.sy1, Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+		if ( (sht_func[SHT_STD][SHT_DCT][SHT_TYP_VSY] != NULL) && (vector) )
+			t0 += get_time(shtns, nloop, 4, "v", shtns->ftable.sy2, Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 		tnodct = t0;
 		for (m=0; m<=MMAX; m+=minc) {
 			#if SHT_VERBOSE > 1
 				if (verbose>1) printf("\n\tm=%d :",m);
 			#endif
 			if (Set_MTR_DCT(shtns, m) >= 0) {
-				t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_TYP_SSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+				t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_DCT][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 				if (vector)
-					t += get_time(shtns, nloop, 4, "vdct", sht_func[SHT_STD][SHT_TYP_VSY][SHT_DCT], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+					t += get_time(shtns, nloop, 4, "vdct", sht_func[SHT_STD][SHT_DCT][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 				if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
 				PRINT_DOT
 			}
@@ -1701,12 +1751,14 @@ void shtns_print_cfg(shtns_cfg shtns)
 	printf("      ");
 	for (int it=0; it<SHT_NTYP; it++)
 		printf("%5s ",sht_type[it]);
+	void** f = (void**) &(shtns->ftable);
 	for (int iv=0; iv<SHT_NVAR; iv++) {
 		printf("\n  %4s:",sht_var[iv]);
+		if (iv)  f = (void**) &(shtns->ftable_l);
 		for (int it=0; it<SHT_NTYP; it++) {
-			if (shtns->fptr[iv][it] != NULL) {
+			if (f[it] != NULL) {
 				for (int ia=0; ia<SHT_NALG; ia++)
-					if (sht_func[iv][it][ia] == shtns->fptr[iv][it]) {
+					if (sht_func[iv][ia][it] == f[it]) {
 						printf("%5s ",sht_name[ia]);	break;
 					}
 			} else  printf(" none ");
