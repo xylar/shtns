@@ -125,8 +125,8 @@
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #undef TIME_WITH_SYS_TIME
 
-/* I compile with GCC 4 or later, and I would like fast vectorized code (if
-   SSE2 or AVX is supported) ! */
+/* I compile with GCC 4 or ICC 14 or later, and I would like fast vectorized
+   code (if SSE2, AVX or MIC is supported) ! */
 #undef _GCC_VEC_
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler

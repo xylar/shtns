@@ -78,6 +78,9 @@ sht_fly.o : sht_fly.c Makefile $(hfiles) SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly
 sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
 	$(shtcc) -c $< -o $@
 
+fftv.o : fftv/*.c fftv/fftv.h Makefile
+	$(shtcc) -c fftv/fftv.c
+
 # programs & Examples
 time_SHT : time_SHT.c libshtns.a shtns.h
 	$(cc) time_SHT.c -I. ./libshtns.a $(LIBS) -o time_SHT
