@@ -124,7 +124,6 @@ extern void* ffly[6][SHT_NTYP];
 extern void* ffly_m0[6][SHT_NTYP];
 #ifdef _OPENMP
 extern void* fomp[6][SHT_NTYP];
-extern void* fomp_m0[6][SHT_NTYP];
 #endif
 
 // big array holding all sht functions, variants and algorithms
@@ -180,10 +179,6 @@ static void init_sht_array_func(shtns_cfg shtns)
 		for (int j=0; j<=alg_lim; j++) {
 			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
-		  #ifdef _OPENMP
-			memcpy(sht_func[SHT_STD][SHT_OMP1 + j], &fomp_m0[j], sizeof(void*)*SHT_NTYP);
-			memcpy(sht_func[SHT_LTR][SHT_OMP1 + j], &fomp_m0[j], sizeof(void*)*SHT_NTYP);
-		  #endif
 		}
 		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct_m0, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_m0l, sizeof(void*)*SHT_NTYP);
