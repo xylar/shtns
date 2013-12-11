@@ -100,7 +100,25 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)] = qr;
 				sgnt *= -1.0;
 			}
-		#ifndef _GCC_VEC_
+		#if _GCC_VEC_ && __SSE2__
+		s2d sgnm = SIGN_MASK_HI;
+		s2d sgnflip = SIGN_MASK_2;
+		for (m=1; m<=lmax; ++m) {
+			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
+			s2d sgnt = vdup(0.0);
+			s2d m_st = vset(2.0, -2*m*sint_1);		// x2 for m>0
+			sgnm = _mm_xor_pd(sgnm, sgnflip);	// (-1)^m
+			for (l=m; l<=lmax; ++l) {
+				v2d qc = ((v2d*)Qlm)[LiM(shtns, l, m)] * vdup(yl[l]) * m_st;	// (q0, dq0)
+				((v2d*)q0)[k*lmax +(l-1)] += qc;
+				((v2d*)q0)[(ntheta-1-k)*lmax +(l-1)] += (v2d)_mm_xor_pd(sgnt, qc);
+				qc = _mm_xor_pd(sgnm, qc);
+				((v2d*)q0)[(ntheta+k)*lmax +(l-1)] += (v2d)_mm_xor_pd( sgnt, qc );
+				((v2d*)q0)[(2*ntheta-1-k)*lmax +(l-1)] += qc;
+				sgnt = _mm_xor_pd(sgnt, sgnflip);	// (-1)^(l+m)
+			}
+		}
+		#else
 		double sgnm = 1.0;
 		for (m=1; m<=lmax; ++m) {
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
@@ -119,24 +137,6 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)] += sgnm*qr;
 				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)+1] += sgnm*qi;
 				sgnt *= -1.0;
-			}
-		}
-		#else
-		s2d sgnm = SIGN_MASK_HI;
-		s2d sgnflip = SIGN_MASK_2;
-		for (m=1; m<=lmax; ++m) {
-			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
-			s2d sgnt = vdup(0.0);
-			s2d m_st = vset(2.0, -2*m*sint_1);		// x2 for m>0
-			sgnm = _mm_xor_pd(sgnm, sgnflip);	// (-1)^m
-			for (l=m; l<=lmax; ++l) {
-				v2d qc = ((v2d*)Qlm)[LiM(shtns, l, m)] * vdup(yl[l]) * m_st;	// (q0, dq0)
-				((v2d*)q0)[k*lmax +(l-1)] += qc;
-				((v2d*)q0)[(ntheta-1-k)*lmax +(l-1)] += (v2d)_mm_xor_pd(sgnt, qc);
-				qc = _mm_xor_pd(sgnm, qc);
-				((v2d*)q0)[(ntheta+k)*lmax +(l-1)] += (v2d)_mm_xor_pd( sgnt, qc );
-				((v2d*)q0)[(2*ntheta-1-k)*lmax +(l-1)] += qc;
-				sgnt = _mm_xor_pd(sgnt, sgnflip);	// (-1)^(l+m)
 			}
 		}
 		#endif

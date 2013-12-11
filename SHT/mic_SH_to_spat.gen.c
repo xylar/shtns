@@ -27,50 +27,56 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
-	#ifndef _OPENMP
-	inline
-	#else
 	static
-	#endif
-3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
-QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, v2d *BrF, const long int llim, const int imlim) {
+3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, cplx *BrF, cplx *BtF, cplx *BpF, const long int llim, const int imlim)
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *BrF, const long int llim, const int imlim)
   #ifndef SHT_GRAD
-VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, cplx *BtF, cplx *BpF, const long int llim, const int imlim)
   #else
-S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
-T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *BtF, cplx *BpF, const long int llim, const int imlim)
+T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, cplx *BtF, cplx *BpF, const long int llim, const int imlim)
   #endif
-
+  {
   #ifndef SHT_AXISYM
-Q	#define BR0(i) ((double *)BrF)[2*(i)]
-V	#define BT0(i) ((double *)BtF)[2*(i)]
-V	#define BP0(i) ((double *)BpF)[2*(i)]
-Q	#define qr(l) vall(creal(Ql[l]))
-Q	#define qi(l) vall(cimag(Ql[l]))
-S	#define sr(l) vall(creal(Sl[l]))
-S	#define si(l) vall(cimag(Sl[l]))
-T	#define tr(l) vall(creal(Tl[l]))
-T	#define ti(l) vall(cimag(Tl[l]))
+Q	#define qr(l) vall(creal(Ql[l-1]))
+Q	#define qi(l) vall(cimag(Ql[l-1]))
+S	#define sr(l) vall(creal(Sl[l-1]))
+S	#define si(l) vall(cimag(Sl[l-1]))
+T	#define tr(l) vall(creal(Tl[l-1]))
+T	#define ti(l) vall(cimag(Tl[l-1]))
 V	double m_1;
 	unsigned im;
-  #else
-Q	#define BR0(i) ((double *)BrF)[i]
-S	#define BT0(i) ((double *)BtF)[i]
-T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	unsigned m0, mstep;
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
-Q	double Ql0[llim+1];
-S	double Sl0[llim];
-T	double Tl0[llim];
+Q	cplx Ql[llim+1] SSE;
+S	cplx Sl[llim] SSE;
+T	cplx Tl[llim] SSE;
+
+Q	double rnr[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+Q	double rsr[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double tnr[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double tsr[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double pnr[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double psr[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+  #ifndef SHT_AXISYM
+Q	double rni[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+Q	double rsi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double tni[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double tsi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double pni[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+V	double psi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+  #endif
+
 
 	ct = shtns->ct;		st = shtns->st;
 	nk = NLAT_2;
-	#if _GCC_VEC_
-		nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
-	#endif
+	nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
+
+	// ACCESS PATTERN
+	const int k_inc = 1;		const int m_inc = NLAT/2;
 
 	#ifndef _OPENMP
 		m0 = 0;		mstep = 1;
@@ -82,25 +88,23 @@ T	double Tl0[llim];
 	{	//	im=0;
 		#ifdef SHT_GRAD
 		  #ifndef SHT_AXISYM
-			#ifdef _GCC_VEC_
-S				k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2);
-T				k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2);
-			#else
-S				k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT);
-T				k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT);
-			#endif
+S			k=0; do { BpF[k]=0.0; } while(++k<NLAT_2);
+T			k=0; do { BtF[k]=0.0; } while(++k<NLAT_2);
 		  #else
-S			if (BpF != NULL) { int k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2); }
-T			if (BtF != NULL) { int k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2); }
+S			if (BpF != NULL) { int k=0; do { BpF[k]=0.0; } while(++k<NLAT_2); }
+T			if (BtF != NULL) { int k=0; do { BtF[k]=0.0; } while(++k<NLAT_2); }
 		  #endif
 		#endif
+Q		double* Ql0 = (double*) Ql;
+S		double* Sl0 = (double*) Sl;
+T		double* Tl0 = (double*) Tl;
  		l=1;
 		alm = shtns->alm[0];
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double
-Q			Ql0[l] = (double) Qlm[l];	//	Ql[l+1] = (double) Qlm[l+1];
-S			Sl0[l-1] = (double) Slm[l];	//	Sl[l] = (double) Slm[l+1];
-T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
+Q			Ql0[l] = creal( Qlm[l] );	//	Ql[l+1] = (double) Qlm[l+1];
+S			Sl0[l-1] = creal( Slm[l] );	//	Sl[l] = (double) Slm[l+1];
+T			Tl0[l-1] = creal( Tlm[l] );	//	Tl[l] = (double) Tlm[l+1];
 			++l;
 		} while(l<=llim);
 		k=0;
@@ -162,64 +166,46 @@ S					to[j] += dy0[j] * vall(Sl0[l-1]);
 T					po[j] -= dy0[j] * vall(Tl0[l-1]);
 				}
 			}
-		#if _GCC_VEC_
+
 			for (int j=0; j<NWAY; ++j) {
-Q				S2D_STORE(BrF, j+k, re[j], ro[j])
-S				S2D_STORE(BtF, j+k, te[j], to[j])
-T				S2D_STORE(BpF, j+k, pe[j], po[j])
+Q				vstor(rnr, j+k, re[j]+ro[j]);		vstor(rsr, j+k, re[j]-ro[j]);
+S				vstor(tnr, j+k, te[j]+to[j]);		vstor(tsr, j+k, te[j]-to[j]);
+T				vstor(pnr, j+k, pe[j]+po[j]);		vstor(psr, j+k, pe[j]-po[j]);
 			}
-		#else
-			for (int j=0; j<NWAY; ++j) {
-Q				BR0(k+j) = (re[j]+ro[j]);
-Q				BR0(NLAT-k-1-j) = (re[j]-ro[j]);
-S				BT0(k+j) = (te[j]+to[j]);
-S				BT0(NLAT-k-1-j) = (te[j]-to[j]);
-T				BP0(k+j) = (pe[j]+po[j]);
-T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
-			}
-		#endif
 			k+=NWAY;
 		} while (k < nk);
+
+		k=0;  do {	// merge symmetric and antisymmetric parts.
+Q			BrF[(k/2)*k_inc]            = rnr[k]   + I*rnr[k+1];
+Q			BrF[(NLAT_2-1 - k/2)*k_inc] = rsr[k+1] + I*rsr[k];
+S			BtF[(k/2)*k_inc]            = tnr[k]   + I*tnr[k+1];
+S			BtF[(NLAT_2-1 - k/2)*k_inc] = tsr[k+1] + I*tsr[k];
+T			BpF[(k/2)*k_inc]            = pnr[k]   + I*pnr[k+1];
+T			BpF[(NLAT_2-1 - k/2)*k_inc] = psr[k+1] + I*psr[k];
+			k+=2;
+		} while(k < NLAT_2);
+
 		m0=mstep;
 	}
 
   #ifndef SHT_AXISYM
-	#if _GCC_VEC_
-Q		BrF += m0*NLAT_2;
-V		BtF += m0*NLAT_2;	BpF += m0*NLAT_2;
-	#else
-Q		BrF += m0*NLAT;
-V		BtF += m0*NLAT;		BpF += m0*NLAT;
-	#endif
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
-		l = LiM(shtns, 0,im);
 V		m_1 = 1.0/m;
 		alm = shtns->alm[im];
-Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
-S		cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
-T		cplx* Tl = &Tlm[l];
-		k=0;	l=shtns->tm[im];
-	#if _GCC_VEC_
-		l>>=1;		// stay on a 16 byte boundary
-		while (k<l) {	// polar optimization
-Q			BrF[k] = vdup(0.0);				BrF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
-Q			BrF[NLAT_2-l+k] = vdup(0.0);	BrF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
-V			BtF[k] = vdup(0.0);				BtF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
-V			BtF[NLAT_2-l+k] = vdup(0.0);	BtF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
-V			BpF[k] = vdup(0.0);				BpF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
-V			BpF[NLAT_2-l+k] = vdup(0.0);	BpF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
-			++k;
-		}
-		k = ((unsigned) k) / (VSIZE2/2);
-	#else
-		while (k<l) {	// polar optimization
-Q			BrF[k] = 0.0;		BrF[NLAT-l+k] = 0.0;
-V			BtF[k] = 0.0;		BtF[NLAT-l+k] = 0.0;
-V			BpF[k] = 0.0;		BpF[NLAT-l+k] = 0.0;
-			++k;
-		}
-	#endif
+		l = m;
+		k = LiM(shtns, l,im);
+		do {		// copy input coefficients to a local array.
+Q			((v2d*)Ql)[l-1] = ((v2d*)Qlm)[k];
+S			((v2d*)Sl)[l-1] = ((v2d*)Slm)[k];
+T			((v2d*)Tl)[l-1] = ((v2d*)Tlm)[k];
+			++l;	++k;
+		} while(l<=llim);
+
+		k = shtns->tm[im] / VSIZE2;			// stay on vector boundary
+		#if VSIZE2 == 1
+			k -= k&1;		// we operate without vectors, but we still need complex alignement (2 doubles).
+		#endif
 		do {
 			al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
@@ -298,33 +284,14 @@ V						dy0[j] *= vall(1.0/SHT_SCALE_FACTOR);		dy1[j] *= vall(1.0/SHT_SCALE_FACTO
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
 Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y1[j]  * qr(l+1);		roi[j] += y1[j] * qi(l+1);	}
-			#ifdef SHT_GRAD
 S				for (int j=0; j<NWAY; ++j) {	tor[j] += dy0[j] * sr(l);		pei[j] += y0[j] * sr(l);	}
-S				for (int j=0; j<NWAY; ++j) {	toi[j] += dy0[j] * si(l);		per[j] -= y0[j] * si(l);	}
-T				for (int j=0; j<NWAY; ++j) {	por[j] -= dy0[j] * tr(l);		tei[j] += y0[j] * tr(l);	}
-T				for (int j=0; j<NWAY; ++j) {	poi[j] -= dy0[j] * ti(l);		ter[j] -= y0[j] * ti(l);	}
 S				for (int j=0; j<NWAY; ++j) {	ter[j] += dy1[j] * sr(l+1);		poi[j] += y1[j] * sr(l+1);	}
+S				for (int j=0; j<NWAY; ++j) {	toi[j] += dy0[j] * si(l);		per[j] -= y0[j] * si(l);	}
 S				for (int j=0; j<NWAY; ++j) {	tei[j] += dy1[j] * si(l+1);		por[j] -= y1[j] * si(l+1);	}
+T				for (int j=0; j<NWAY; ++j) {	por[j] -= dy0[j] * tr(l);		tei[j] += y0[j] * tr(l);	}
 T				for (int j=0; j<NWAY; ++j) {	per[j] -= dy1[j] * tr(l+1);		toi[j] += y1[j] * tr(l+1);	}
+T				for (int j=0; j<NWAY; ++j) {	poi[j] -= dy0[j] * ti(l);		ter[j] -= y0[j] * ti(l);	}
 T				for (int j=0; j<NWAY; ++j) {	pei[j] -= dy1[j] * ti(l+1);		tor[j] -= y1[j] * ti(l+1);	}
-			#else
-V				for (int j=0; j<NWAY; ++j) {
-V					tor[j] += dy0[j] * sr(l) - y1[j]  * ti(l+1);
-V					pei[j] += y0[j]  * sr(l) - dy1[j] * ti(l+1);
-V				}
-V				for (int j=0; j<NWAY; ++j) {
-V					poi[j] -= dy0[j] * ti(l) - y1[j]  * sr(l+1);
-V					ter[j] -= y0[j]  * ti(l) - dy1[j] * sr(l+1);
-V				}
-V				for (int j=0; j<NWAY; ++j) {
-V					toi[j] += dy0[j] * si(l) + y1[j]  * tr(l+1);
-V					per[j] -= y0[j]  * si(l) + dy1[j] * tr(l+1);
-V				}
-V				for (int j=0; j<NWAY; ++j) {
-V					por[j] -= dy0[j] * tr(l) + y1[j]  * si(l+1);
-V					tei[j] += y0[j]  * tr(l) + dy1[j] * si(l+1);
-V				}
-			#endif
 				for (int j=0; j<NWAY; ++j) {
 V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
 					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
@@ -345,62 +312,72 @@ T				for (int j=0; j<NWAY; ++j) {	poi[j] -= dy0[j] * ti(l);		ter[j] -= y0[j] * t
 3			for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j) * vall(m_1);
 3			for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
 		  }
-		#if _GCC_VEC_
+		  
 			for (int j=0; j<NWAY; ++j) {
-Q				S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
-V				S2D_CSTORE(BtF, k+j, ter[j], tor[j], tei[j], toi[j])
-V				S2D_CSTORE(BpF, k+j, per[j], por[j], pei[j], poi[j])
+Q				vstor(rnr, j+k, rer[j]+ror[j]);		vstor(rsr, j+k, rer[j]-ror[j]);
+Q				vstor(rni, j+k, rei[j]+roi[j]);		vstor(rsi, j+k, rei[j]-roi[j]);
+V				vstor(tnr, j+k, ter[j]+tor[j]);		vstor(tsr, j+k, ter[j]-tor[j]);
+V				vstor(tni, j+k, tei[j]+toi[j]);		vstor(tsi, j+k, tei[j]-toi[j]);
+V				vstor(pnr, j+k, per[j]+por[j]);		vstor(psr, j+k, per[j]-por[j]);
+V				vstor(pni, j+k, pei[j]+poi[j]);		vstor(psi, j+k, pei[j]-poi[j]);
 			}
-		#else
-			for (int j=0; j<NWAY; ++j) {
-Q				BrF[k+j] = (rer[j]+ror[j]) + I*(rei[j]+roi[j]);
-Q				BrF[NLAT-k-1-j] = (rer[j]-ror[j]) + I*(rei[j]-roi[j]);
-V				BtF[k+j] = (ter[j]+tor[j]) + I*(tei[j]+toi[j]);
-V				BtF[NLAT-1-k-j] = (ter[j]-tor[j]) + I*(tei[j]-toi[j]);
-V				BpF[k+j] = (per[j]+por[j]) + I*(pei[j]+poi[j]);
-V				BpF[NLAT-1-k-j] = (per[j]-por[j]) + I*(pei[j]-poi[j]);
-			}
-		#endif
 			k+=NWAY;
 		} while (k < nk);
-	#if _GCC_VEC_
-Q		BrF += mstep*NLAT_2;
-V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
-	#else
-Q		BrF += mstep*NLAT;
-V		BtF += mstep*NLAT;	BpF += mstep*NLAT;
-	#endif
+
+		l = shtns->tm[im] >> 1;		// stay on a 16 byte boundary
+Q		k=0;	while (k<l) {	// polar optimization
+Q			BrF[im*m_inc + k*k_inc] = 0.0;				BrF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
+Q			BrF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BrF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
+Q			++k;
+Q		}
+Q		k*=2;	do {
+Q			BrF[im*m_inc + (k/2)*k_inc] = (rnr[k]-rni[k+1]) + I*(rnr[k+1]+rni[k]);
+Q			BrF[(NPHI-im)*m_inc + (k/2)*k_inc] = (rnr[k]+rni[k+1]) + I*(rnr[k+1]-rni[k]);
+Q			BrF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (rsr[k+1]-rsi[k]) + I*(rsr[k]+rsi[k+1]);
+Q			BrF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (rsr[k+1]+rsi[k]) + I*(rsr[k]-rsi[k+1]);
+Q			k+=2;
+Q		} while(k < NLAT_2);
+
+V		k=0;	while (k<l) {	// polar optimization
+V			BtF[im*m_inc + k*k_inc] = 0.0;				BtF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
+V			BtF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BtF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
+V			++k;
+V		}
+V		k*=2;	do {
+V			BtF[im*m_inc + (k/2)*k_inc] = (tnr[k]-tni[k+1]) + I*(tnr[k+1]+tni[k]);
+V			BtF[(NPHI-im)*m_inc + (k/2)*k_inc] = (tnr[k]+tni[k+1]) + I*(tnr[k+1]-tni[k]);
+V			BtF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (tsr[k+1]-tsi[k]) + I*(tsr[k]+tsi[k+1]);
+V			BtF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (tsr[k+1]+tsi[k]) + I*(tsr[k]-tsi[k+1]);
+V			k+=2;
+V		} while(k < NLAT_2);
+
+V		k=0;	while (k<l) {	// polar optimization
+V			BpF[im*m_inc + k*k_inc] = 0.0;				BpF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
+V			BpF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BpF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
+V			++k;
+V		}
+V		k*=2;	do {
+V			BpF[im*m_inc + (k/2)*k_inc] = (pnr[k]-pni[k+1]) + I*(pnr[k+1]+pni[k]);
+V			BpF[(NPHI-im)*m_inc + (k/2)*k_inc] = (pnr[k]+pni[k+1]) + I*(pnr[k+1]-pni[k]);
+V			BpF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (psr[k+1]-psi[k]) + I*(psr[k]+psi[k+1]);
+V			BpF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (psr[k+1]+psi[k]) + I*(psr[k]-psi[k+1]);
+V			k+=2;
+V		} while(k < NLAT_2);
+
 	}
 
-	#if _GCC_VEC_
 	while(im <= NPHI-imlim) {	// padding for high m's
 		k=0;
 		do {
-Q			BrF[k] = vdup(0.0);
-V			BtF[k] = vdup(0.0);		BpF[k] = vdup(0.0);
+Q			BrF[im*m_inc + k*k_inc] = 0.0;
+V			BtF[im*m_inc + k*k_inc] = 0.0;
+V			BpF[im*m_inc + k*k_inc] = 0.0;
 		} while (++k < NLAT_2);
-Q		BrF += mstep*NLAT_2;
-V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
 	  im+=mstep;
 	}
-	#else
-	while(im <= NPHI/2) {	// padding for high m's
-		k=0;
-		do {
-Q			BrF[k] = 0.0;
-V			BtF[k] = 0.0;	BpF[k] = 0.0;
-		} while (++k < NLAT);
-Q		BrF += mstep*NLAT;
-V		BtF += mstep*NLAT;	BpF += mstep*NLAT;
-	  im+=mstep;
-	}
-	#endif
   #endif
-}
+  }
 
-Q	#undef BR0
-V	#undef BT0
-V	#undef BP0
 Q	#undef qr
 Q	#undef qi
 S	#undef sr
@@ -408,43 +385,34 @@ S	#undef si
 T	#undef tr
 T	#undef ti
 
-3	static void GEN3(SHqst_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	static void GEN3(SH_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
+	static
+3	void GEN3(SHqst_to_spat_mic,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	void GEN3(SH_to_spat_mic,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	static void GEN3(SHsphtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
+VX	void GEN3(SHsphtor_to_spat_mic,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-S	static void GEN3(SHsph_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
-T	static void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
+S	void GEN3(SHsph_to_spat_mic,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
+T	void GEN3(SHtor_to_spat_mic,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 	int k;
 	unsigned imlim = 0;
-Q	v2d* BrF = (v2d*) Vr;
-V	v2d* BtF = (v2d*) Vt;	v2d* BpF = (v2d*) Vp;
+Q	cplx* BrF = (cplx*) Vr;
+V	cplx* BtF = (cplx*) Vt;	cplx* BpF = (cplx*) Vp;
 
   #ifndef SHT_AXISYM
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
-	#ifdef _GCC_VEC_
 	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
 		unsigned long nv = shtns->nspat;
-QX		BrF = (v2d*) VMALLOC( nv * sizeof(double) );
-VX		BtF = (v2d*) VMALLOC( 2*nv * sizeof(double) );
+QX		BrF = (cplx*) VMALLOC( nv * sizeof(double) );
+VX		BtF = (cplx*) VMALLOC( 2*nv * sizeof(double) );
 VX		BpF = BtF + nv/2;
-3		BrF = (v2d*) VMALLOC( 3*nv * sizeof(double) );
+3		BrF = (cplx*) VMALLOC( 3*nv * sizeof(double) );
 3		BtF = BrF + nv/2;		BpF = BrF + nv;
 	}
-	#else
-	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
-QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(cplx) );
-VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(cplx) );
-VX		BpF = BtF + shtns->ncplx_fft;
-3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(cplx) );
-3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
-	}
-	#endif
   #endif
 	imlim += 1;
   
@@ -459,72 +427,23 @@ VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
 S		GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
 T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
 	#endif
-
-  #ifndef SHT_AXISYM
-V	#ifndef HAVE_LIBFFTW3_OMP
-V	  #pragma omp barrier
-V	  #if _GCC_VEC_
-V		if (shtns->fftc_mode == 0) {
-3			#pragma omp single nowait
-3			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
-V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
-V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
-V		} else if (shtns->fftc_mode > 0) {		// split dft
-3			#pragma omp single nowait
-3			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
-V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
-V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-V		}
-V	  #else
-3		#pragma omp single nowait
-3		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BrF, Vr);
-V		#pragma omp single nowait
-V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BtF, Vt);
-V		#pragma omp single nowait
-V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BpF, Vp);
-V	  #endif
-V	#endif
-  #endif
-
   }
 
   #ifndef SHT_AXISYM
     // NPHI > 1 as SHT_AXISYM is not defined.
-	#if _GCC_VEC_
   	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode == 0) {
-V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
-V		  #endif
 		} else {		// split dft
-V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-V		  #endif
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.
 		}
 	}
-	#else
-	if (shtns->ncplx_fft >= 0) {
-V	  #ifdef HAVE_LIBFFTW3_OMP
-Q		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BrF, Vr);
-V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BtF, Vt);
-V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BpF, Vp);
-V	  #endif
-		if (shtns->ncplx_fft > 0) {		// free memory
-Q			VFREE(BrF);
-VX			VFREE(BtF);		// this frees also BpF.
-		}
-	}
-	#endif
   #endif
 
   }

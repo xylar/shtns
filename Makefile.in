@@ -11,12 +11,10 @@ PYTHON=@PYTHON@
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
 go= $(CFLAGS) -D_GNU_SOURCE
 
-# intel compiler may be used for codelets
-#shtcc = icc -axT -xT -O3 -prec-div -complex-limited-range
-# gcc + vector intrinsic leads to faster code (with _GCC_VEC_ set to 1 in sht_config.h)
-# gcc compiler command with options for the sht codelets
+
+# compiler command with options for the sht codelets
 shtcc = $(CC) $(go) -O3
-# gcc compiler command with options for other source (initialization, ...)
+# compiler command with options for other source (initialization, ...)
 cc = $(CC) $(go) -O2
 
 hfiles = sht_private.h sht_config.h shtns.h
@@ -58,9 +56,13 @@ SHT/SH_to_spat_omp.c : SHT/omp_SH_to_spat.gen.c
 	$(MAKE) SH_to_spat_omp.c -C SHT SFX=omp SED=$(SED)
 SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp SED=$(SED)
+SHT/SH_to_spat_mic.c : SHT/mic_SH_to_spat.gen.c
+	$(MAKE) SH_to_spat_mic.c -C SHT SFX=mic SED=$(SED)
+SHT/spat_to_SH_mic.c : SHT/mic_spat_to_SH.gen.c
+	$(MAKE) spat_to_SH_mic.c -C SHT SFX=mic SED=$(SED)
 
 # objects :
-sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c $(hfiles) cycle.h
+sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c $(hfiles)
 	$(cc) -c $< -o $@
 
 sht_mem.o : sht_mem.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c
@@ -71,9 +73,9 @@ sht_fly.o : sht_fly.c Makefile $(hfiles) SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly
 	$(shtcc) -c $< -o $@
 sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
 	$(shtcc) -c $< -o $@
+sht_mic.o : sht_mic.c Makefile $(hfiles) SHT/SH_to_spat_mic.c SHT/spat_to_SH_mic.c
+	$(cc) -c $< -o $@
 
-fftv.o : fftv/*.c fftv/fftv.h Makefile
-	$(shtcc) -c fftv/fftv.c
 
 # programs & Examples
 time_SHT : time_SHT.c $(libname) shtns.h
@@ -94,7 +96,7 @@ docs :
 
 clean :
 	$(MAKE) clean -C SHT
-	rm -f *.o
+	rm -f *.o *.a
 	rm -rf doc/html
 	rm -rf doc/latex
 	rm -rf build

@@ -60,6 +60,12 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
+  v2.5  (12 Dec 2013)
+	- new experimental support for Intel Xeon Phi (MIC) in native mode,
+	  with contributions from Vincent Boulos (Bull). For good performance
+	  icc 14 is required. Configure with ./configure --enable-mic CC=icc
+	- fftw3.h included for easier compilation.
+
   v2.4.1  (18 Sep 2013)
 	- performance improvement: analysis with SHT_PHI_CONTIGUOUS is now
 	  on par with synthesis (or better), even for large transforms.

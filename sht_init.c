@@ -31,7 +31,7 @@
 #include "sht_private.h"
 
 // cycle counter from FFTW
-#include "cycle.h"
+#include "fftw3/cycle.h"
 
 // chained list of sht_setup : start with NULL
 shtns_cfg sht_data = NULL;
@@ -116,10 +116,12 @@ extern void* fmem[SHT_NTYP];
 extern void* fmem_l[SHT_NTYP];
 extern void* fmem_m0[SHT_NTYP];
 extern void* fmem_m0l[SHT_NTYP];
+#ifdef SHTNS_DCT
 extern void* fdct[SHT_NTYP];
 extern void* fdct_l[SHT_NTYP];
 extern void* fdct_m0[SHT_NTYP];
 extern void* fdct_m0l[SHT_NTYP];
+#endif
 extern void* ffly[6][SHT_NTYP];
 extern void* ffly_m0[6][SHT_NTYP];
 #ifdef _OPENMP
@@ -180,8 +182,10 @@ static void init_sht_array_func(shtns_cfg shtns)
 			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
 		}
+	  #ifdef SHTNS_DCT
 		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct_m0, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_m0l, sizeof(void*)*SHT_NTYP);
+	  #endif
 		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem_m0, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_m0l, sizeof(void*)*SHT_NTYP);		
 	} else {
@@ -193,8 +197,10 @@ static void init_sht_array_func(shtns_cfg shtns)
 			memcpy(sht_func[SHT_LTR][SHT_OMP1 + j], &fomp[j], sizeof(void*)*SHT_NTYP);
 		  #endif
 		}
+	  #ifdef SHTNS_DCT
 		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_l, sizeof(void*)*SHT_NTYP);
+	  #endif
 		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_l, sizeof(void*)*SHT_NTYP);
 	}
@@ -1997,7 +2003,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
 		#ifdef __MIC__
 			if (*nlat % VSIZE2) shtns_runerr("Nlat must be a multiple of 8 for the MIC\n");
-			if (*nlat < 256) shtns_runerr("Nlat must be larger than 256 for the MIC\n");
 		#endif
 	#endif
 	shtns_unset_grid(shtns);		// release grid if previously allocated.

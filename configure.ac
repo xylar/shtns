@@ -2,11 +2,11 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[2.4.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[2.5],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
 target="libshtns.a"		# by default, build the library.
-objs="sht_dct.o sht_mem.o sht_fly.o"
+objs="sht_mem.o sht_fly.o"
 install="install-lib"	# by default, install the library.
 
 # optional variables :
@@ -65,11 +65,15 @@ AS_IF([test x"AS_VAR_GET(CACHEVAR)" = xyes],
 AS_VAR_POPDEF([CACHEVAR])dnl
 ])dnl AX_CHECK_COMPILE_FLAGS
 
-# add gcc compile options if supported.
 AS_IF([test "x$enable_mic" != "xyes"], [
+	# add gcc compile options if supported.
 	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"])
   ],[
+	# MIC native cross-compiling
 	AX_CHECK_COMPILE_FLAG([-mmic],[CC="$CC -mmic"], [AC_MSG_ERROR(["Xeon Phi not supported."])])
+	# With MIC, enable openmp and mkl by default.
+	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
+	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
 ])
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-pointer"])
@@ -88,18 +92,17 @@ AS_IF([test "x$enable_python" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 
-# With MIC, enable openmp and mkl by default.
-AS_IF([test "x$enable_mic" != "xno"], [
-	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
-	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
-])
-
 AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 	dnl AC_CHECK_HEADERS([omp.h])
-	target="libshtns_omp.a"
-	objs="$objs sht_omp.o"
+	AS_IF([test "x$enable_mic" != "xno"], [
+		target="libshtns_mic.a"
+		objs="sht_mic.o"
+	],[
+		target="libshtns_omp.a"
+		objs="$objs sht_omp.o"
+	])
 ])
 libname=$target		# set the libname befor checking for python.
 
@@ -184,6 +187,7 @@ AS_IF([test "x$enable_simd" != "xno"], [
 # Disable DCT ?
 AS_IF([test "x$enable_dct" != "xno"], [
 	AC_DEFINE([SHTNS_DCT],[1],[include DCT support (Fejer quadrature on regular grids)])
+	objs="$objs sht_dct.o"		# compile dct transforms
 ])
 
 

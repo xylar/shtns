@@ -24,10 +24,10 @@
 #include <complex.h>
 #include <math.h>
 #include <time.h>
-#include <fftw3.h>
+#include "fftw3/fftw3.h"
 
 // cycle counter from FFTW
-#include "cycle.h"
+#include "fftw3/cycle.h"
 
 #include <shtns.h>
 
