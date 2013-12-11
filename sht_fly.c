@@ -142,7 +142,7 @@
 
 
 
-struct sht_functable ffly[6] = {
+void* ffly[6][SHT_NTYP] = {
 	{ NULL, NULL, SHsphtor_to_spat_fly1_l, spat_to_SHsphtor_fly1_l,
 		SHsph_to_spat_fly1_l, SHtor_to_spat_fly1_l, SHqst_to_spat_fly1_l, spat_to_SHqst_fly1_l },
 	{ SH_to_spat_fly2_l, spat_to_SH_fly2_l, SHsphtor_to_spat_fly2_l, spat_to_SHsphtor_fly2_l,
@@ -157,7 +157,7 @@ struct sht_functable ffly[6] = {
 		NULL, NULL, NULL, NULL }
 };
 
-struct sht_functable ffly_m0[6] = {
+void* ffly_m0[6][SHT_NTYP] = {
 	{ NULL, NULL, SHsphtor_to_spat_fly1_m0l, spat_to_SHsphtor_fly1_m0l,
 		SHsph_to_spat_fly1_m0l, SHtor_to_spat_fly1_m0l, SHqst_to_spat_fly1_m0l, spat_to_SHqst_fly1_m0l },
 	{ SH_to_spat_fly2_m0l, spat_to_SH_fly2_m0l, SHsphtor_to_spat_fly2_m0l, spat_to_SHsphtor_fly2_m0l,

@@ -2,9 +2,8 @@
 
 #define MTR MMAX
 
-/* regular mem functions (without dct), at the end for SHT_NO_DCT must no interfere with others */
-#define SHT_NO_DCT
-#define ID_NME mem
+/* Hybrid (DCT enabled) functions */
+#define ID_NME hyb
 
 // standard
 #undef SHT_AXISYM
@@ -23,7 +22,6 @@
 #undef SHT_GRAD
 #define SHT_3COMP
 #include "SHT/spat_to_SHqst.c"
-#include "SHT/SHqst_to_spat.c"
 #undef SHT_3COMP
 
 // axisymmetric
@@ -70,7 +68,6 @@
 // 3 components
 #define SHT_3COMP
 #include "SHT/spat_to_SHqst.c"
-#include "SHT/SHqst_to_spat.c"
 #undef SHT_3COMP
 
 
@@ -99,12 +96,12 @@
 
 #undef ID_NME
 
+void* fdct[SHT_NTYP] = { SH_to_spat_hyb, spat_to_SH_hyb, SHsphtor_to_spat_hyb, spat_to_SHsphtor_hyb,
+		SHsph_to_spat_hyb, SHtor_to_spat_hyb, NULL, spat_to_SHqst_hyb };
+void* fdct_l[SHT_NTYP] = { SH_to_spat_hyb_l, spat_to_SH_hyb_l, SHsphtor_to_spat_hyb_l, spat_to_SHsphtor_hyb_l,
+		SHsph_to_spat_hyb_l, SHtor_to_spat_hyb_l, NULL, spat_to_SHqst_hyb_l };
+void* fdct_m0[SHT_NTYP] = { SH_to_spat_hyb_m0, spat_to_SH_hyb_m0, SHsphtor_to_spat_hyb_m0, spat_to_SHsphtor_hyb_m0,
+		SHsph_to_spat_hyb_m0, SHtor_to_spat_hyb_m0, SHqst_to_spat_hyb_m0, spat_to_SHqst_hyb_m0 };
+void* fdct_m0l[SHT_NTYP] = { SH_to_spat_hyb_m0l, spat_to_SH_hyb_m0l, SHsphtor_to_spat_hyb_m0l, spat_to_SHsphtor_hyb_m0l,
+		SHsph_to_spat_hyb_m0l, SHtor_to_spat_hyb_m0l, SHqst_to_spat_hyb_m0l, spat_to_SHqst_hyb_m0l };
 
-void* fmem[SHT_NTYP] = { SH_to_spat_mem, spat_to_SH_mem, SHsphtor_to_spat_mem, spat_to_SHsphtor_mem,
-		SHsph_to_spat_mem, SHtor_to_spat_mem, SHqst_to_spat_mem, spat_to_SHqst_mem};
-void* fmem_l[SHT_NTYP] = {	SH_to_spat_mem_l, spat_to_SH_mem_l, SHsphtor_to_spat_mem_l, spat_to_SHsphtor_mem_l,
-		SHsph_to_spat_mem_l, SHtor_to_spat_mem_l, SHqst_to_spat_mem_l, spat_to_SHqst_mem_l };
-void* fmem_m0[SHT_NTYP] = { SH_to_spat_mem_m0, spat_to_SH_mem_m0, SHsphtor_to_spat_mem_m0, spat_to_SHsphtor_mem_m0,
-		SHsph_to_spat_mem_m0, SHtor_to_spat_mem_m0, SHqst_to_spat_mem_m0, spat_to_SHqst_mem_m0};
-void* fmem_m0l[SHT_NTYP] = { SH_to_spat_mem_m0l, spat_to_SH_mem_m0l, SHsphtor_to_spat_mem_m0l, spat_to_SHsphtor_mem_m0l,
-		SHsph_to_spat_mem_m0l, SHtor_to_spat_mem_m0l, SHqst_to_spat_mem_m0l, spat_to_SHqst_mem_m0l };
