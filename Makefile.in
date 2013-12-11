@@ -20,30 +20,24 @@ shtcc = $(CC) $(go) -O3
 cc = $(CC) $(go) -O2
 
 hfiles = sht_private.h sht_config.h shtns.h
-
-ifeq ("@OPENMP_CFLAGS@","")
-  libname = libshtns.a
-  objs = sht_dct.o sht_mem.o sht_fly.o
-else
-  libname = libshtns_omp.a
-  objs = sht_dct.o sht_mem.o sht_fly.o sht_omp.o
-endif
+objs = sht_init.o @objs@
+libname = @libname@
 
 default : @target@
 
 install : @install@
 
-libshtns.a : Makefile sht_init.o $(objs)
-	ar rcs libshtns.a sht_init.o $(objs)
+@libname@ : Makefile $(objs)
+	ar rcs @libname@ $(objs)
 	@echo " "
 	@cat COPYRIGHT
 	@echo " "
 	@echo "**** link with : @LDFLAGS@ @LIBS@"
 
-install-lib : libshtns.a
+install-lib : $(libname)
 	@mkdir -p $(PREFIX)/lib/
 	@mkdir -p $(PREFIX)/include/
-	cp libshtns.a $(PREFIX)/lib/$(libname)
+	cp $(libname) $(PREFIX)/lib/$(libname)
 	cp shtns.h $(PREFIX)/include/
 	cp shtns.f $(PREFIX)/include/
 	@echo " "
@@ -82,17 +76,17 @@ fftv.o : fftv/*.c fftv/fftv.h Makefile
 	$(shtcc) -c fftv/fftv.c
 
 # programs & Examples
-time_SHT : time_SHT.c libshtns.a shtns.h
-	$(cc) time_SHT.c -I. ./libshtns.a $(LIBS) -o time_SHT
+time_SHT : time_SHT.c $(libname) shtns.h
+	$(cc) time_SHT.c -I. ./$(libname) $(LIBS) -o time_SHT
 
-test_rot : examples/test_rot.c libshtns.a shtns.h
-	$(cc) examples/test_rot.c -I. ./libshtns.a $(LIBS) -o test_rot
+test_rot : examples/test_rot.c $(libname) shtns.h
+	$(cc) examples/test_rot.c -I. ./$(libname) $(LIBS) -o test_rot
 
-SHT_example : examples/SHT_example.c libshtns.a shtns.h
-	$(cc) examples/SHT_example.c -I. ./libshtns.a $(LIBS) -o SHT_example
+SHT_example : examples/SHT_example.c $(libname) shtns.h
+	$(cc) examples/SHT_example.c -I. ./$(libname) $(LIBS) -o SHT_example
 
-SHT_fort_ex : examples/SHT_example.f libshtns.a shtns.f
-	gfortran -L$(PREFIX)/lib -I$(PREFIX)/include -I. -fdefault-real-8 examples/SHT_example.f ./libshtns.a $(LIBS) -lc -o SHT_fort_ex
+SHT_fort_ex : examples/SHT_example.f $(libname) shtns.f
+	gfortran -L$(PREFIX)/lib -I$(PREFIX)/include -I. -fdefault-real-8 examples/SHT_example.f ./$(libname) $(LIBS) -lc -o SHT_fort_ex
 
 #documentation :
 docs :
@@ -108,7 +102,7 @@ clean :
 
 # build a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
-_shtns.so : shtns_numpy_wrap.c Makefile $(hfiles) sht_init.o sht_std.o sht_ltr.o sht_m0.o sht_m0ltr.o
+_shtns.so : shtns_numpy_wrap.c Makefile $(hfiles) $(objs)
 	$(PYTHON) setup.py build
 
 # generate python and c glue code with SWIG.

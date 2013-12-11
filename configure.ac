@@ -6,6 +6,7 @@ AC_INIT([SHTns],[2.4.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
 target="libshtns.a"		# by default, build the library.
+objs="sht_dct.o sht_mem.o sht_fly.o"
 install="install-lib"	# by default, install the library.
 
 # optional variables :
@@ -97,7 +98,10 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 	dnl AC_CHECK_HEADERS([omp.h])
+	target="libshtns_omp.a"
+	objs="$objs sht_omp.o"
 ])
+libname=$target		# set the libname befor checking for python.
 
 
 # Check for FFTW (FFTW preferred, MKL optional)
@@ -220,5 +224,7 @@ AC_CHECK_FUNCS([fftw_cost])
 echo "prefix=$prefix"
 AC_SUBST([target])
 AC_SUBST([install])
+AC_SUBST([objs])
+AC_SUBST([libname])
 AC_CONFIG_FILES([Makefile setup.py])
 AC_OUTPUT

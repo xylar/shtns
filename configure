@@ -621,6 +621,8 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+libname
+objs
 install
 target
 python_inc
@@ -2172,6 +2174,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 ac_config_headers="$ac_config_headers sht_config.h"
 
 target="libshtns.a"		# by default, build the library.
+objs="sht_dct.o sht_mem.o sht_fly.o"
 install="install-lib"	# by default, install the library.
 
 # optional variables :
@@ -3888,8 +3891,11 @@ $as_echo "$ac_cv_prog_c_openmp" >&6; }
 
 
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
+		target="libshtns_omp.a"
+	objs="$objs sht_omp.o"
 
 fi
+libname=$target		# set the libname befor checking for python.
 
 
 # Check for FFTW (FFTW preferred, MKL optional)
@@ -4428,6 +4434,8 @@ $as_echo "$rtc_ok" >&6; }
 ### end cycle.h ###
 
 echo "prefix=$prefix"
+
+
 
 
 ac_config_files="$ac_config_files Makefile setup.py"
