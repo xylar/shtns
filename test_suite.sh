@@ -5,10 +5,11 @@ id=`hg id`
 log="test_suite.log"
 
 function test1 {
-    echo $1
+    run="./time_SHT $1 -vector"
+    echo $run
     echo "---" >> $log
-    echo "*** $1 *** " >> $log
-    $1 > tmp.out
+    echo "*** $run *** " >> $log
+    $run > tmp.out
     cat tmp.out | grep ERROR
     cat tmp.out | grep -i nan
     cat tmp.out >> $log
@@ -17,13 +18,13 @@ function test1 {
 echo "beginning test suite for $id" > $log
 
 # first, do a huge transform :
-test1 "./time_SHT 2047 -mres=15 -quickinit -iter=1"
+test1 "2047 -mres=15 -quickinit -iter=1"
 
 # even bigger :
-test1 "./time_SHT 7975 -mres=145 -quickinit -iter=1"
+test1 "7975 -mres=145 -quickinit -iter=1"
 
 # without threads
-test1 "./time_SHT 2047 -mres=15 -quickinit -iter=1 -nth=1"
+test1 "2047 -mres=15 -quickinit -iter=1 -nth=1"
 
 for switch in "" "-oop" "-transpose" "-schmidt" "-4pi"
 do
@@ -33,7 +34,7 @@ do
     do
       for mmax in 0 1 $lmax
       do
-         test1 "./time_SHT $lmax -mmax=$mmax $mode $switch -iter=1"
+         test1 "$lmax -mmax=$mmax $mode $switch -iter=1"
       done
     done
   done

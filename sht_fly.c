@@ -74,6 +74,7 @@
 #undef SHT_3COMP
 
 // axisymmetric
+#define SHT_AXISYM
 #undef SUFFIX
 #define SUFFIX _m0l
 
