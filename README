@@ -60,7 +60,6 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
-  v2.5  (12 Dec 2013)
 	- new experimental support for Intel Xeon Phi (MIC) in native mode,
 	  with contributions from Vincent Boulos (Bull). For good performance
 	  icc 14 is required. Configure with ./configure --enable-mic CC=icc
