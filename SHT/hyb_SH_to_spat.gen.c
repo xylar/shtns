@@ -92,10 +92,10 @@ T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	long int k,m,l;
   #ifdef _GCC_VEC_
-QX	s2d Ql0[(llim+4)>>1];		// we need some zero-padding.
-3	s2d Ql0[(llim+3)>>1];		// we need some zero-padding.
-S	s2d Sl0[(llim+2)>>1];
-T	s2d Tl0[(llim+2)>>1];
+QX	s2d Ql0[(llim+5)>>1];		// we need some zero-padding (icc 14 bug: needs 1 more for SHT_AXISYM only!)
+3	s2d Ql0[(llim+4)>>1];		// we need some zero-padding (icc 14 bug: needs 1 more for SHT_AXISYM only!).
+S	s2d Sl0[(llim+3)>>1];		// we need some zero-padding (icc 14 bug: needs 1 more for SHT_AXISYM only!).
+T	s2d Tl0[(llim+3)>>1];		// we need some zero-padding (icc 14 bug: needs 1 more for SHT_AXISYM only!).
   #endif
 
   #ifndef SHT_AXISYM
