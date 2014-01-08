@@ -2232,7 +2232,7 @@ int shtns_use_threads(int num_threads)
 {
 #ifdef _OPENMP
 	int procs = omp_get_num_procs();
-	if (num_threads <= 0)  num_threads = procs;
+	if (num_threads <= 0)  num_threads = omp_get_max_threads();
 	else if (num_threads > 4*procs) num_threads = 4*procs;		// limit the number of threads
 	omp_threads = num_threads;
 #endif
@@ -2281,6 +2281,13 @@ void shtns_verbose_(int *v)
 void shtns_use_threads_(int *num_threads)
 {
 	shtns_use_threads(*num_threads);
+}
+
+/// Print info
+void shtns_print_cfg_()
+{
+	shtns_print_version();
+	if (sht_data) shtns_print_cfg(sht_data);
 }
 	
 /// Initializes spherical harmonic transforms of given size using Gauss algorithm with default polar optimization.
