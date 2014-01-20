@@ -1,5 +1,5 @@
 !
-!  Copyright (c) 2010-2013 Centre National de la Recherche Scientifique.
+!  Copyright (c) 2010-2014 Centre National de la Recherche Scientifique.
 !  written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
 !  
 !  nathanael.schaeffer@ujf-grenoble.fr
@@ -58,9 +58,9 @@
 ! namely you can choose a normalization with 'norm' and control the polar optimization
 ! with 'eps_polar' : from 0 (no optimization) to 1e-6 (agressive optimization).
 !      norm = SHT_ORTHONORMAL + SHT_REAL_NORM
-!      call shtns_set_size_(lmax, mmax, mres, norm)
+!      call shtns_set_size(lmax, mmax, mres, norm)
 !      eps_polar = 1.e-10
-!      call shtns_precompute_(SHT_GAUSS, layout, eps_polar, nlat, nphi)
+!      call shtns_precompute(SHT_GAUSS, layout, eps_polar, nlat, nphi)
 
 ! allocate memory for spectral and spatial representation
       allocate ( Slm(1:nlm), Tlm(1:nlm) )

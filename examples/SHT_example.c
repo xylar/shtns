@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2013 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2014 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@ujf-grenoble.fr
@@ -14,6 +14,7 @@
  * knowledge of the CeCILL license and that you accept its terms.
  * 
  */
+
 
 /** \example SHT_example.c
  \brief An example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
