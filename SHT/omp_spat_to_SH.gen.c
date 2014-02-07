@@ -53,19 +53,19 @@ V	double ss[llim];
 V	double tt[llim];
   #endif
 
-Q	double rer[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-Q	double ror[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double ter[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double tor[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double per[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double por[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+Q	double rer[NLAT_2 + NWAY*VSIZE2] SSE;
+Q	double ror[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double ter[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double tor[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double per[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double por[NLAT_2 + NWAY*VSIZE2] SSE;
   #ifndef SHT_AXISYM
-Q	double rei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-Q	double roi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double tei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double toi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double pei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double poi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+Q	double rei[NLAT_2 + NWAY*VSIZE2] SSE;
+Q	double roi[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double tei[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double toi[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double pei[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double poi[NLAT_2 + NWAY*VSIZE2] SSE;
   #endif
 
 	// ACCESS PATTERN
@@ -78,7 +78,7 @@ V	double poi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
 	#endif
 	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
 V	l_2 = shtns->l_2;
-	for (k=nk*VSIZE2; k<(nk+NWAY)*VSIZE2-1; ++k) {		// never written, so this is now done for all m's
+	for (k=nk*VSIZE2; k<(nk-1+NWAY)*VSIZE2; ++k) {		// never written, so this is now done for all m's
 Q		rer[k] = 0.0;		ror[k] = 0.0;
 V		ter[k] = 0.0;		tor[k] = 0.0;
 V		per[k] = 0.0;		por[k] = 0.0;

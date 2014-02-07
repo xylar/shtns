@@ -37,5 +37,9 @@ do
          test1 "$lmax -mmax=$mmax $mode $switch -iter=1"
       done
     done
+    for nlat in 32 34 36 38 40 42 44 46
+    do
+         test1 "19 -mmax=10 -nlat=$nlat $mode $switch -iter=10"
+    done
   done
 done

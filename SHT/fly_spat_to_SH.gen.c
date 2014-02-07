@@ -51,19 +51,19 @@ V	double ss[llim];
 V	double tt[llim];
   #endif
 
-Q	double rer[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-Q	double ror[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double ter[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double tor[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double per[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double por[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+Q	double rer[NLAT_2 + NWAY*VSIZE2] SSE;
+Q	double ror[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double ter[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double tor[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double per[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double por[NLAT_2 + NWAY*VSIZE2] SSE;
   #ifndef SHT_AXISYM
-Q	double rei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-Q	double roi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double tei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double toi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double pei[NLAT_2 + NWAY*VSIZE2 -1] SSE;
-V	double poi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
+Q	double rei[NLAT_2 + NWAY*VSIZE2] SSE;
+Q	double roi[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double tei[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double toi[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double pei[NLAT_2 + NWAY*VSIZE2] SSE;
+V	double poi[NLAT_2 + NWAY*VSIZE2] SSE;
   #endif
 
 Q	BrF = Vr;
@@ -126,7 +126,7 @@ Q			rer[k+1] = bn+bs;		ror[k+1] = bn-bs;
 Q			r0a += (an+as)*wg[k];	r0b += (bn+bs)*wg[k+1];
 Q			k+=2;
 Q		} while(k < nk*VSIZE2);
-		for (k=nk*VSIZE2; k<(nk+NWAY)*VSIZE2-1; ++k) {
+		for (k=nk*VSIZE2; k<(nk-1+NWAY)*VSIZE2; ++k) {
 Q			rer[k] = 0.0;		ror[k] = 0.0;
 V			ter[k] = 0.0;		tor[k] = 0.0;
 V			per[k] = 0.0;		por[k] = 0.0;
@@ -185,7 +185,7 @@ V					tt[l-1] -= dy1[j] * perk[j];
 				}
 			}
 			k+=NWAY;
-		} while (k < nk);
+		} while (k < nk);		// limit: k=nk-1   =>  k=nk-1+NWAY is never read.
 		for (l=1; l<=llim; ++l) {
 			#if _GCC_VEC_
 Q				((v2d*)Qlm)[l] = v2d_reduce(qq[l-1], vall(0));
@@ -204,7 +204,7 @@ V				Slm[l] = 0.0;		Tlm[l] = 0.0;
 		#endif
 
   #ifndef SHT_AXISYM
-	for (k=nk*VSIZE2; k<(nk+NWAY)*VSIZE2-1; ++k) {		// never written, so this is now done for all m's (real parts already zero)
+	for (k=nk*VSIZE2; k<(nk-1+NWAY)*VSIZE2; ++k) {		// never written, so this is now done for all m's (real parts already zero)
 Q		rei[k] = 0.0;		roi[k] = 0.0;
 V		tei[k] = 0.0;		toi[k] = 0.0;
 V		pei[k] = 0.0;		poi[k] = 0.0;
@@ -391,7 +391,7 @@ V				for (int j=0; j<NWAY; ++j)	t[1] -= dy0[j] * poik[j]  + y0[j] * terk[j];
 			}
 		  }
 			k+=NWAY;
-		} while (k < nk);
+		} while (k < nk);		// limit: k=nk-1   =>  k=nk-1+NWAY is never read.
 		l = LiM(shtns, m, im);
 Q		v2d *Ql = (v2d*) &Qlm[l];
 V		v2d *Sl = (v2d*) &Slm[l];
