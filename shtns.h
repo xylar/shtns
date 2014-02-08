@@ -66,6 +66,7 @@ enum shtns_type {
 #define SHT_SOUTH_POLE_FIRST (256*32)	///< latitudinal data are stored starting from south pole.
 
 #define SHT_SCALAR_ONLY (256*16)	///< don't compute vector matrices. (add to flags in shtns_set_grid)
+#define SHT_LOAD_SAVE_CFG (256*64)	///< try to load and save the config. (add to flags in shtns_set_grid)
 
 
 #ifndef SHTNS_PRIVATE

@@ -60,10 +60,15 @@ DOCUMENTATION:
 
 CHANGE LOG:
 
+  v2.5
 	- new experimental support for Intel Xeon Phi (MIC) in native mode,
 	  with contributions from Vincent Boulos (Bull). For good performance
 	  icc 14 is required. Configure with ./configure --enable-mic CC=icc
 	- fftw3.h included for easier compilation.
+	- fix: obey OMP_NUM_THREADS environement variable
+	- fix: failure of fly analysis with some special (rare) sizes.
+	- add missing shtns_print_cfg to Fortran interface
+	- new save/restore plan feature for bit-level reproducibility
 
   v2.4.1  (18 Sep 2013)
 	- performance improvement: analysis with SHT_PHI_CONTIGUOUS is now

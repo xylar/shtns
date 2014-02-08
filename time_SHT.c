@@ -612,6 +612,7 @@ int main(int argc, char *argv[])
 	int nlorder = 0;
 	int point = 0;
 	int vector = 0;
+	int loadsave = 0;
 	char name[20];
 	FILE* fw;
 
@@ -621,14 +622,6 @@ int main(int argc, char *argv[])
 	printf("time_SHT performs some spherical harmonic transforms, and displays timings and accuracy.\n");
 	if (argc < 2) {
 		usage();	exit(1);
-	}
-
-// if some wisdom has been saved, reload it.
-	fw = fopen("fftw_wisdom","r");
-	if (fw != NULL) {
-		printf("> FFTW wisdom found.\n");
-		fftw_import_wisdom_from_file(fw);
-		fclose(fw);
 	}
 
 //	first argument is lmax, and is mandatory.
@@ -655,9 +648,11 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"nlorder") == 0) nlorder = t;
 		if (strcmp(name,"vector") == 0) vector = 1;
 		if (strcmp(name,"point") == 0) point = 1;
+		if (strcmp(name,"loadsave") == 0) loadsave = 1;
 	}
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
+	if (loadsave) layout |= SHT_LOAD_SAVE_CFG;
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	shtns_use_threads(nthreads);		// 0 : means automatically chooses the number of threads.
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);

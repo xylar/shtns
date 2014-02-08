@@ -478,7 +478,6 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 
 	shtns->k_stride_a = 1;		shtns->m_stride_a = NLAT;		// default strides
 
-
 	shtns->fft = NULL;		shtns->ifft = NULL;
 	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
 
@@ -1509,7 +1508,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 
 
 #if SHT_VERBOSE == 1
-  #define PRINT_DOT 	if (verbose==1) {	printf(".");	fflush(stdout);	}
+  #define PRINT_DOT 	if (verbose>=1) {	printf(".");	fflush(stdout);	}
 #else
   #define PRINT_DOT (0);
 #endif
@@ -1722,6 +1721,22 @@ void shtns_print_version() {
 	printf("[" PACKAGE_STRING "] built " __DATE__ ", " __TIME__ ", id: " _SIMD_NAME_ "\n");
 }
 
+void fprint_ftable(FILE* fp, void* ftable[SHT_NVAR][SHT_NTYP])
+{
+	for (int iv=0; iv<SHT_NVAR; iv++) {
+		fprintf(fp, "\n  %4s:",sht_var[iv]);
+		void** f = ftable[iv];
+		for (int it=0; it<SHT_NTYP; it++) {
+			if (f[it] != NULL) {
+				for (int ia=0; ia<SHT_NALG; ia++)
+					if (sht_func[iv][ia][it] == f[it]) {
+						fprintf(fp, "%5s ",sht_name[ia]);	break;
+					}
+			} else  fprintf(fp, " none ");
+		}
+	}
+}
+
 void shtns_print_cfg(shtns_cfg shtns)
 {
 	printf("Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d  [%d threads, ",LMAX, MMAX*MRES, MRES, NLM, shtns->nthreads);
@@ -1734,7 +1749,7 @@ void shtns_print_cfg(shtns_cfg shtns)
 
 	switch(shtns->grid) {
 		case GRID_GAUSS : printf("Gauss grid");	 break;
-		case GRID_REGULAR : printf("Regular grid");	 break;
+		case GRID_REGULAR : printf("Regular grid (mtr_dct=%d)",shtns->mtr_dct);	 break;
 		case GRID_POLES : printf("Regular grid including poles");  break;
 		default : printf("Unknown grid");
 	}
@@ -1742,19 +1757,92 @@ void shtns_print_cfg(shtns_cfg shtns)
 	printf("      ");
 	for (int it=0; it<SHT_NTYP; it++)
 		printf("%5s ",sht_type[it]);
-	for (int iv=0; iv<SHT_NVAR; iv++) {
-		printf("\n  %4s:",sht_var[iv]);
-		void** f = shtns->ftable[iv];
-		for (int it=0; it<SHT_NTYP; it++) {
-			if (f[it] != NULL) {
-				for (int ia=0; ia<SHT_NALG; ia++)
-					if (sht_func[iv][ia][it] == f[it]) {
-						printf("%5s ",sht_name[ia]);	break;
-					}
-			} else  printf(" none ");
-		}
-	}
+	fprint_ftable(stdout, shtns->ftable);
 	printf("\n");
+}
+
+
+/// \internal saves config to a file for later restart.
+int config_save(shtns_cfg shtns, int req_flags)
+{
+	if (shtns->ct == NULL) return -1;		// no grid set
+
+	if ((shtns->nphi > 1)||(shtns->mtr_dct >= 0))	fftw_export_wisdom_to_filename("shtns_cfg_fftw");
+
+	FILE *fcfg = fopen("shtns_cfg","a");
+	if (fcfg != NULL) {
+		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",PACKAGE_VERSION, _SIMD_NAME_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, shtns->mtr_dct);
+		fprint_ftable(fcfg, shtns->ftable);
+		fprintf(fcfg,"\n");
+		fclose(fcfg);
+		return 0;
+	} else {
+		#if SHT_VERBOSE > 0
+			fprintf(stderr,"! Warning ! SHTns could not save config\n");
+		#endif
+		return -2;		// file creation error
+	}
+}
+
+/// \internal try to load config from a file 
+int config_load(shtns_cfg shtns, int req_flags)
+{
+	void* ft2[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
+	int lmax2, mmax2, mres2, nphi2, nlat2, grid2, nthreads2, req_flags2, nlorder2, mtr_dct2;
+	int found = 0;
+	char version[32], simd[8], alg[8];
+
+	if (shtns->ct == NULL) return -1;		// no grid set
+
+	if ((req_flags & 255) == sht_quick_init) req_flags += sht_gauss - sht_quick_init;		// quick_init uses gauss.
+
+	FILE *fcfg = fopen("shtns_cfg","r");
+	if (fcfg != NULL) {
+		int i=0;
+		while(1) {
+			fscanf(fcfg, "%30s %8s %d %d %d %d %d %d %d %d %d %d",version, simd, &lmax2, &mmax2, &mres2, &nphi2, &nlat2, &grid2, &nthreads2, &req_flags2, &nlorder2, &mtr_dct2);
+			for (int iv=0; iv<SHT_NVAR; iv++) {
+				fscanf(fcfg, "%7s", alg);
+				for (int it=0; it<SHT_NTYP; it++) {
+					fscanf(fcfg, "%7s", alg),
+					ft2[iv][it] = 0;
+					for (int ia=0; ia<SHT_NALG; ia++) {
+						if (strcmp(alg, sht_name[ia]) == 0) {
+							ft2[iv][it] = sht_func[iv][ia][it];
+							break;
+						}
+					}
+				}
+			}
+			if (feof(fcfg)) break;
+			if ((shtns->lmax == lmax2) && (shtns->mmax == mmax2) && (shtns->mres == mres2) && (shtns->nthreads == nthreads2) &&
+			  (shtns->nphi == nphi2) && (shtns->nlat == nlat2) && (shtns->grid == grid2) &&  (req_flags == req_flags2) &&
+			  (shtns->nlorder == nlorder2) && (strcmp(simd, _SIMD_NAME_)==0)) {
+			#if SHT_VERBOSE > 0
+				if (verbose > 0) printf("        + using saved config\n");
+			#endif
+			#if SHT_VERBOSE > 1
+				if (verbose > 1) {
+					fprint_ftable(stdout, ft2);
+					printf("\n");
+				}
+			#endif
+				Set_MTR_DCT(shtns, mtr_dct2);		// use loaded mtr_dct
+				for (int iv=0; iv<SHT_NVAR; iv++)
+				for (int it=0; it<SHT_NTYP; it++)
+					if (ft2[iv][it]) shtns->ftable[iv][it] = ft2[iv][it];		// accept only non-null pointer
+				found = 1;
+				break;
+			}
+		}
+		fclose(fcfg);
+		return found;
+	} else {
+		#if SHT_VERBOSE > 0
+			if (verbose) fprintf(stderr,"! Warning ! SHTns could not load config\n");
+		#endif
+		return -2;		// file not found
+	}
 }
 
 /// \internal returns 1 if val cannot fit in dest (unsigned)
@@ -1997,7 +2085,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	int quick_init = 0;
 	int vector = !(flags & SHT_SCALAR_ONLY);
 	int latdir = (flags & SHT_SOUTH_POLE_FIRST) ? -1 : 1;		// choose latitudinal direction (change sign of ct)
+	int cfg_loaded = 0;
 	int analys = 1;
+	const int req_flags = flags;		// requested flags.
 
 	#if _GCC_VEC_
 		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
@@ -2084,6 +2174,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	shtns->nphi = *nphi;
 	shtns->nlat_2 = (*nlat+1)/2;	shtns->nlat = *nlat;
 
+	if (layout & SHT_LOAD_SAVE_CFG)	fftw_import_wisdom_from_filename("shtns_cfg_fftw");		// load fftw wisdom.
 	planFFT(shtns, layout, on_the_fly);		// initialize fftw
 	shtns->zlm_dct0 = NULL;		// used as a flag.
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
@@ -2102,19 +2193,23 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		grid_dct(shtns, latdir);		init_SH_dct(shtns, 1);
 		OptimizeMatrices(shtns, eps);
 		if (NLAT >= SHT_MIN_NLAT_DCT) {			// dct requires large NLAT to perform well.
-			t = choose_best_sht(shtns, &nloop, vector, 1);		// find optimal MTR_DCT.
-			if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) n_gauss)/NLAT;	// we can revert to gauss with a smaller nlat.
-			if (t < MIN_PERF_IMPROVE_DCT) {
-				Set_MTR_DCT(shtns, -1);		// turn off DCT.
-			} else {
-				t = SHT_error(shtns, vector);
-				if (t > MIN_ACCURACY_DCT) {
-				#if SHT_VERBOSE > 0
-					if (verbose) printf("     !! Not enough accuracy (%.3g) => DCT disabled.\n",t);
-				#endif
-				#if SHT_VERBOSE < 2
+			if ((layout & SHT_LOAD_SAVE_CFG) && (flags == sht_reg_fast))
+				cfg_loaded = (config_load(shtns, req_flags) > 0);
+			if (!cfg_loaded) {
+				t = choose_best_sht(shtns, &nloop, vector, 1);		// find optimal MTR_DCT.
+				if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) n_gauss)/NLAT;	// we can revert to gauss with a smaller nlat.
+				if (t < MIN_PERF_IMPROVE_DCT) {
 					Set_MTR_DCT(shtns, -1);		// turn off DCT.
-				#endif
+				} else {
+					t = SHT_error(shtns, vector);
+					if (t > MIN_ACCURACY_DCT) {
+					#if SHT_VERBOSE > 0
+						if (verbose) printf("     !! Not enough accuracy (%.3g) => DCT disabled.\n",t);
+					#endif
+					#if SHT_VERBOSE < 2
+						Set_MTR_DCT(shtns, -1);		// turn off DCT.
+					#endif
+					}
 				}
 			}
 		}
@@ -2168,8 +2263,12 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		set_sht_fly(shtns, 0);		// switch function pointers to "on-the-fly" functions.
 	}
 
+	if ((layout & SHT_LOAD_SAVE_CFG) && (!cfg_loaded)) cfg_loaded = (config_load(shtns, req_flags) > 0);
 	if (quick_init == 0) {
-		choose_best_sht(shtns, &nloop, vector, 0);
+		if (!cfg_loaded) {
+			choose_best_sht(shtns, &nloop, vector, 0);
+			if (layout & SHT_LOAD_SAVE_CFG) config_save(shtns, req_flags);
+		}
 		if (on_the_fly == 0) free_unused_matrices(shtns);
 		t = SHT_error(shtns, vector);		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
@@ -2179,6 +2278,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		if (t > 1.e-3) shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
   #endif
 	}
+
 //	set_sht_fly(shtns, SHT_TYP_VAN);
   #if SHT_VERBOSE > 1
 	if ((omp_threads > 1)&&(verbose>1)) printf(" nthreads = %d\n",shtns->nthreads);

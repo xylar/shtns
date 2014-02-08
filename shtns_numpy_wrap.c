@@ -5832,6 +5832,7 @@ SWIG_init(void) {
   SWIG_Python_SetConstant(d, "SHT_PHI_CONTIGUOUS",SWIG_From_int((int)((256*2))));
   SWIG_Python_SetConstant(d, "SHT_SOUTH_POLE_FIRST",SWIG_From_int((int)((256*32))));
   SWIG_Python_SetConstant(d, "SHT_SCALAR_ONLY",SWIG_From_int((int)((256*16))));
+  SWIG_Python_SetConstant(d, "SHT_LOAD_SAVE_CFG",SWIG_From_int((int)((256*64))));
 #if PY_VERSION_HEX >= 0x03000000
   return m;
 #else

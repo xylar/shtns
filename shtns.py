@@ -91,6 +91,7 @@ SHT_THETA_CONTIGUOUS = _shtns.SHT_THETA_CONTIGUOUS
 SHT_PHI_CONTIGUOUS = _shtns.SHT_PHI_CONTIGUOUS
 SHT_SOUTH_POLE_FIRST = _shtns.SHT_SOUTH_POLE_FIRST
 SHT_SCALAR_ONLY = _shtns.SHT_SCALAR_ONLY
+SHT_LOAD_SAVE_CFG = _shtns.SHT_LOAD_SAVE_CFG
 class sht(_object):
     """Proxy of C shtns_info struct"""
     __swig_setmethods__ = {}
