@@ -9,19 +9,19 @@ SHTns is distributed under the open source [CeCILL License](http://www.cecill.in
 FEATURES:
 ---------
 
-- **blazingly fast**
-- both **scalar and vector transforms**
-- backward and forward (synthesis and analysis) functions
-- flexible truncation (degree, order, azimuthal periodicity)
+- **blazingly fast**.
+- both **scalar and vector transforms**.
+- backward and forward (synthesis and analysis) functions.
+- flexible truncation (degree, order, azimuthal periodicity).
 - spatial data can be stored in latitude-major or longitude-major arrays.
-- various conventions (normalization and Condon-Shortley phase)
-- can be used from **Fortran, c/c++, and Python** programs
+- various conventions (normalization and Condon-Shortley phase).
+- can be used from **Fortran, c/c++, and Python** programs.
 - a highly efficient Gauss algorithm working with Gauss nodes (based on
-  Gauss-Legendre quadrature)
-- support for SSE2, SSE3 and **AVX** vectorization with gcc and clang.
+  Gauss-Legendre quadrature).
+- support for SSE2, SSE3 and **AVX** vectorization, as well as Xeon Phi.
 - **parallel transforms with OpenMP** (for Gauss grid only).
-- an algorithm using DCT for regular nodes (generalized Fejer quadrature)
-- synthesis (inverse transform) at any coordinate (not constrained to a grid)
+- an algorithm using DCT for regular nodes (generalized Fejer quadrature).
+- synthesis (inverse transform) at any coordinate (not constrained to a grid).
 - ability to choose the optimal spatial sizes for a given spectral truncation.
 - **on-the-fly transforms** : saving memory and bandwidth, and can even
   be faster depending on architecture.
@@ -34,8 +34,8 @@ FEATURES:
 INSTALL:
 --------
 
-Briefly, the shell commands `./configure; make; make install' should
-configure, build, and install this package. `./configure --help' will
+Briefly, the shell commands `./configure; make; make install` should
+configure, build, and install this package. `./configure --help` will
 list available options (among which `--enable-openmp` and `--enable-python`).
 However, in order to get the best performance, it is highly recommended to
 compile and install the FFTW library yourself, because many distributions
@@ -66,7 +66,7 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
-* v2.5
+* v2.5  (13 Mar 2014)
 	- new experimental support for Intel Xeon Phi (MIC) in native mode,
 	  with contributions from Vincent Boulos (Bull). For good performance
 	  icc 14 is required. Configure with `./configure --enable-mic CC=icc`

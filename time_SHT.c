@@ -661,13 +661,6 @@ int main(int argc, char *argv[])
 
 	shtns_print_cfg(shtns);
 
-// now would be a good time to save fftw's wisdom.
-	fw = fopen("fftw_wisdom","w");
-	if (fw != NULL) {
-		fftw_export_wisdom_to_file(fw);
-		fclose(fw);
-	}
-
 /*
 	t1 = 1.0+2.0*I;
 	t2 = 1.0-I;

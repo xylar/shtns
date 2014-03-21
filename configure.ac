@@ -80,7 +80,7 @@ AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-point
 AX_CHECK_COMPILE_FLAG([-std=gnu99],[CFLAGS="$CFLAGS -std=gnu99"])
 
 # Checks for header files.
-AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h fftw3.h])
+AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h])
 
 # Checks for libraries.
 AC_CHECK_LIB([m],[cos],,AC_MSG_ERROR([math library not found.]))

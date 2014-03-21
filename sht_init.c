@@ -1765,9 +1765,17 @@ void shtns_print_cfg(shtns_cfg shtns)
 /// \internal saves config to a file for later restart.
 int config_save(shtns_cfg shtns, int req_flags)
 {
+	int err = 0;
+	
 	if (shtns->ct == NULL) return -1;		// no grid set
 
-	if ((shtns->nphi > 1)||(shtns->mtr_dct >= 0))	fftw_export_wisdom_to_filename("shtns_cfg_fftw");
+	if ((shtns->nphi > 1)||(shtns->mtr_dct >= 0)) {
+		FILE* f = fopen("shtns_cfg_fftw","w");
+		if (f != NULL) {
+			fftw_export_wisdom_to_file(f);
+			fclose(f);
+		} else err -= 2;
+	}
 
 	FILE *fcfg = fopen("shtns_cfg","a");
 	if (fcfg != NULL) {
@@ -1776,11 +1784,13 @@ int config_save(shtns_cfg shtns, int req_flags)
 		fprintf(fcfg,"\n");
 		fclose(fcfg);
 		return 0;
-	} else {
+	} else err -= 4;
+
+	if (err < 0) {
 		#if SHT_VERBOSE > 0
 			fprintf(stderr,"! Warning ! SHTns could not save config\n");
 		#endif
-		return -2;		// file creation error
+		return err;		// file creation error
 	}
 }
 
@@ -1815,6 +1825,9 @@ int config_load(shtns_cfg shtns, int req_flags)
 				}
 			}
 			if (feof(fcfg)) break;
+			#ifndef SHTNS_DCT
+				if (mtr_dct2 <= 0)
+			#endif
 			if ((shtns->lmax == lmax2) && (shtns->mmax == mmax2) && (shtns->mres == mres2) && (shtns->nthreads == nthreads2) &&
 			  (shtns->nphi == nphi2) && (shtns->nlat == nlat2) && (shtns->grid == grid2) &&  (req_flags == req_flags2) &&
 			  (shtns->nlorder == nlorder2) && (strcmp(simd, _SIMD_NAME_)==0)) {
@@ -1827,7 +1840,9 @@ int config_load(shtns_cfg shtns, int req_flags)
 					printf("\n");
 				}
 			#endif
+			#ifdef SHTNS_DCT
 				Set_MTR_DCT(shtns, mtr_dct2);		// use loaded mtr_dct
+			#endif
 				for (int iv=0; iv<SHT_NVAR; iv++)
 				for (int it=0; it<SHT_NTYP; it++)
 					if (ft2[iv][it]) shtns->ftable[iv][it] = ft2[iv][it];		// accept only non-null pointer
@@ -2174,7 +2189,13 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	shtns->nphi = *nphi;
 	shtns->nlat_2 = (*nlat+1)/2;	shtns->nlat = *nlat;
 
-	if (layout & SHT_LOAD_SAVE_CFG)	fftw_import_wisdom_from_filename("shtns_cfg_fftw");		// load fftw wisdom.
+	if (layout & SHT_LOAD_SAVE_CFG)	{
+		FILE* f = fopen("shtns_cfg_fftw","r");
+		if (f) {
+			fftw_import_wisdom_from_file(f);		// load fftw wisdom.
+			fclose(f);
+		}
+	}
 	planFFT(shtns, layout, on_the_fly);		// initialize fftw
 	shtns->zlm_dct0 = NULL;		// used as a flag.
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
