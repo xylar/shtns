@@ -99,7 +99,7 @@ Q		double* Ql0 = (double*) Ql;
 S		double* Sl0 = (double*) Sl;
 T		double* Tl0 = (double*) Tl;
  		l=1;
-		alm = shtns->alm[0];
+		alm = shtns->alm;
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double
 Q			Ql0[l] = creal( Qlm[l] );	//	Ql[l+1] = (double) Qlm[l+1];
@@ -192,9 +192,11 @@ T			BpF[(NLAT_2-1 - k/2)*k_inc] = psr[k+1] + I*psr[k];
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 V		m_1 = 1.0/m;
-		alm = shtns->alm[im];
+		//alm = shtns->alm[im];
+		alm = shtns->alm + im*(2*LMAX -m+MRES);
 		l = m;
 		k = LiM(shtns, l,im);
+		//k = (im*(2*(LMAX+1)-(m+MRES)))>>1 + l;
 		do {		// copy input coefficients to a local array.
 Q			((v2d*)Ql)[l-1] = ((v2d*)Qlm)[k];
 S			((v2d*)Sl)[l-1] = ((v2d*)Slm)[k];

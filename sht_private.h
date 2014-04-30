@@ -114,8 +114,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	fftw_plan ifftc, fftc;
 
 	/* Legendre function generation arrays */
-	double **alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
-	double **blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
+	double *alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
+	double *blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
 	double *l_2;	// array of size (LMAX+1) containing 1./l(l+1) for increasing integer l.
 
 	void* ftable[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.

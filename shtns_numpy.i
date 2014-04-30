@@ -206,17 +206,20 @@ inline PyObject* SpatArray_New(int size) {
 
 	/* returns useful data */
 	PyObject* __ct() {		// grid must have been initialized.
+		PyObject *obj;
+		double *ct;
 		int i;
 		if ($self->nlat == 0) {	// no grid
 			throw_exception(SWIG_RuntimeError,0,msg_grid_err);
 			return NULL;
 		}
-		PyObject *obj = SpatArray_New($self->nlat);
-		double *ct = (double*) PyArray_DATA(obj);
+		obj = SpatArray_New($self->nlat);
+		ct = (double*) PyArray_DATA(obj);
 		for (i=0; i<$self->nlat; i++)		ct[i] = $self->ct[i];		// copy
 		return obj;
 	}
 	PyObject* gauss_wts() {		// gauss grid must have been initialized.
+		PyObject *obj;
 		if ($self->nlat == 0) {	// no grid
 			throw_exception(SWIG_RuntimeError,0,msg_grid_err);
 			return NULL;
@@ -225,7 +228,7 @@ inline PyObject* SpatArray_New(int size) {
 			throw_exception(SWIG_RuntimeError,0,"not a gauss grid");
 			return NULL;
 		}
-		PyObject *obj = SpatArray_New($self->nlat_2);
+		obj = SpatArray_New($self->nlat_2);
 		shtns_gauss_wts($self, PyArray_DATA(obj));
 		return obj;
 	}
@@ -291,6 +294,10 @@ inline PyObject* SpatArray_New(int size) {
 		if (check_spectral(2,z, $self->nspat) && check_spectral(1,alm, n*n))
 			SH_to_spat_cplx($self, PyArray_DATA(alm), PyArray_DATA(z));
 	}
+	/*void SH_to_spat_grad(PyObject *alm, PyObject *gt, PyObject *gp) {
+		if (check_spatial(3,gp, $self->nspat) && check_spatial(2,gt, $self->nspat) && check_spectral(1,alm, $self->nlm))
+			SH_to_spat_grad($self, PyArray_DATA(alm), PyArray_DATA(gt), PyArray_DATA(gp));
+	}*/
 
 	/* 2D vectors */
 	void spat_to_SHsphtor(PyObject *Vt, PyObject *Vp, PyObject *Slm, PyObject *Tlm) {

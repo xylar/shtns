@@ -88,7 +88,7 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 		if (m0 == 0)
 	#endif
 	{		// im=0 : dzl.p = 0.0 and evrything is REAL
-		alm = shtns->blm[0];
+		alm = shtns->blm;
 Q		double r0 = 0.0;
 Q		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 Q			double an = BrF[k*k_inc];			double bn = BrF[k*k_inc +1];
@@ -211,9 +211,9 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 
   #ifndef SHT_AXISYM
 	for (im=m0; im<imlim; im+=mstep) {
-		l = shtns->tm[im] / VSIZE2;
-		alm = shtns->blm[im];
 		m = im*MRES;
+		l = shtns->tm[im] / VSIZE2;
+		alm = shtns->blm + im*(2*LMAX -m+MRES);
 Q		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 Q		do {	// compute symmetric and antisymmetric parts, and reorganize data.
 Q			double an, bn, ani, bni, bs, as, bsi, asi, t;

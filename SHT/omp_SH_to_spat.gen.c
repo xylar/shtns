@@ -95,7 +95,7 @@ T			if (BtF != NULL) { int k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2); }
 		  #endif
 		#endif
  		l=1;
-		alm = shtns->alm[0];
+		alm = shtns->alm;
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double
 Q			Ql0[l] = (double) Qlm[l];	//	Ql[l+1] = (double) Qlm[l+1];
@@ -193,9 +193,11 @@ V		BtF += m0*NLAT;		BpF += m0*NLAT;
 	#endif
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
-		l = LiM(shtns, 0,im);
+		//l = LiM(shtns, 0,im);
+		l = (im*(2*(LMAX+1)-(m+MRES)))>>1;
 V		m_1 = 1.0/m;
-		alm = shtns->alm[im];
+		//alm = shtns->alm[im];
+		alm = shtns->alm + im*(2*LMAX -m+MRES);
 Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 S		cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
 T		cplx* Tl = &Tlm[l];

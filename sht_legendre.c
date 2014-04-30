@@ -32,6 +32,9 @@
  precomputed once for all by \ref legendre_precomp.
 */
 
+// index in alm array for given im.
+#define alm_im(shtns, im) (shtns->alm + (im)*(2*shtns->lmax - ((im)-1)*shtns->mres))
+
 #if SHT_VERBOSE > 1
   #define LEG_RANGE_CHECK
 #endif
@@ -153,7 +156,7 @@ static double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, const 
 #endif
 
 	ny = 0;
-	al = shtns->alm[im];
+	al = alm_im(shtns, im);
 	ymm = al[0];
 	if (m>0) ymm = a_sint_pow_n_ext(ymm, x, m, &ny);	// ny <= 0
 
@@ -202,7 +205,7 @@ static double legendre_sphPlm_hp(shtns_cfg shtns, const int l, const int im, dou
 	if ( (l>LMAX) || (l<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
 #endif
 
-	al = shtns->alm[im];
+	al = alm_im(shtns, im);
 	ymm = al[0];		// l=m
 	if (m>0) ymm *= SHT_LEG_SCALEF;
 	ymmp1 = ymm;
@@ -244,7 +247,7 @@ static void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im,
 	if ( (lmax>LMAX) || (lmax<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
 #endif
 
-	al = shtns->alm[im];
+	al = alm_im(shtns, im);
 	yl -= m;			// shift pointer
 	for (l=m; l<=lmax; ++l) yl[l] = 0.0;		// zero out array.
 
@@ -297,7 +300,7 @@ static void legendre_sphPlm_array_hp(shtns_cfg shtns, const int lmax, const int 
 #endif
 
 	x = cost;
-	al = shtns->alm[im];
+	al = alm_im(shtns, im);
 	yl -= m;			// shift pointer
 	ymm = al[0];	// l=m
 	if (m>0) {
@@ -357,7 +360,7 @@ static void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const i
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
 
-	al = shtns->alm[im];
+	al = alm_im(shtns, im);
 	yl -= m;	dyl -= m;			// shift pointers
 	for (l=m; l<=lmax; ++l) {
 		yl[l] = 0.0;	dyl[l] = 0.0;	// zero out arrays.
@@ -429,7 +432,7 @@ static void legendre_sphPlm_deriv_array_hp(shtns_cfg shtns, const int lmax, cons
 #ifdef LEG_RANGE_CHECK
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
-	al = shtns->alm[im];
+	al = alm_im(shtns, im);
 	yl -= m;	dyl -= m;			// shift pointers
 
 	st = sint;
@@ -498,7 +501,7 @@ static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, con
 	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
 
-	al = shtns->alm[im];
+	al = alm_im(shtns, im);
 	yl -= m;	dyl -= m;			// shift pointers
 
 	y0 = al[0];
@@ -533,8 +536,7 @@ static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, con
 ///  1.0 (no renormalization) is the "complex" convention, while 0.5 leads to the "real" convention (with FFTW).
 static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
 {
-	double *al0, *bl0;
-	double **alm, **blm;
+	double *alm, *blm;
 	long int im, m, l, lm;
 	real t1, t2;
 
@@ -550,44 +552,40 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 
 	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
 
-	im = (MMAX+1)*sizeof(double*) + (MIN_ALIGNMENT-1);		// alloc memory for arrays + sse alignement.
-	alm = (double **) malloc( im + (2*NLM)*sizeof(double) );
-	al0 = (double *) PTR_ALIGN( alm + (MMAX+1) );
-	bl0 = al0;		blm = alm;		// by default analysis recurrence is the same
+	alm = (double *) malloc( (2*NLM)*sizeof(double) );
+	blm = alm;
 	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
-		blm = (double **) malloc( im + (2*NLM)*sizeof(double) );
-		bl0 = (double *) PTR_ALIGN( blm + (MMAX+1) );
+		blm = (double *) malloc( (2*NLM)*sizeof(double) );
 	}
 	if ((alm==0) || (blm==0)) shtns_runerr("not enough memory.");
+	shtns->alm = alm;
 
 /// - Precompute the factors alm and blm of the recurrence relation :
   if (norm == sht_schmidt) {
 	for (im=0, lm=0; im<=MMAX; ++im) {		/// <b> For Schmidt semi-normalized </b>
 		m = im*MRES;
-		alm[im] = al0 + lm;
 		t2 = SQRT(2*m+1);
-		al0[lm] = 1.0/t2;		/// starting value will be divided by \f$ \sqrt{2m+1} \f$ 
-		al0[lm+1] = t2;		// l=m+1
+		alm[lm] = 1.0/t2;		/// starting value will be divided by \f$ \sqrt{2m+1} \f$ 
+		alm[lm+1] = t2;		// l=m+1
 		lm+=2;
 		for (l=m+2; l<=LMAX; ++l) {
 			t1 = SQRT((l+m)*(l-m));
-			al0[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
-			al0[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
+			alm[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
+			alm[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
 			t2 = t1;	lm+=2;
 		}
 	}
   } else {
 	for (im=0, lm=0; im<=MMAX; ++im) {		/// <b> For orthonormal or 4pi-normalized </b>
 		m = im*MRES;
-		alm[im] = al0 + lm;
 		t2 = 2*m+1;
-		al0[lm] = 1.0;		// will contain the starting value.
-		al0[lm+1] = SQRT(2*m+3);		// l=m+1
+		alm[lm] = 1.0;		// will contain the starting value.
+		alm[lm+1] = SQRT(2*m+3);		// l=m+1
 		lm+=2;
 		for (l=m+2; l<=LMAX; ++l) {
 			t1 = (l+m)*(l-m);
-			al0[lm+1] = SQRT(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
-			al0[lm] = - SQRT(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
+			alm[lm+1] = SQRT(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
+			alm[lm] = - SQRT(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
 			t2 = t1;	lm+=2;
 		}
 	}
@@ -597,10 +595,10 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 /// \f[  Y_m^m(x) = Y_0^0 \ \sqrt{ \prod_{k=1}^{m} \frac{2k+1}{2k} } \ \ (-1)^m \ (1-x^2)^{m/2}  \f]
 	if ((norm == sht_fourpi)||(norm == sht_schmidt)) {
 		t1 = 1.0;
-		al0[0] = t1;		/// \f$ Y_0^0 = 1 \f$  for Schmidt or 4pi-normalized 
+		alm[0] = t1;		/// \f$ Y_0^0 = 1 \f$  for Schmidt or 4pi-normalized 
 	} else {
 		t1 = 0.25L/M_PIl;
-		al0[0] = SQRT(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
+		alm[0] = SQRT(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
 	}
 	t1 *= mpos_renorm;		// renormalization for m>0
 	for (im=1, m=0; im<=MMAX; ++im) {
@@ -610,38 +608,35 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 		}
 		t2 = SQRT(t1);
 		if ( m & with_cs_phase ) t2 = -t2;		/// optional \f$ (-1)^m \f$ Condon-Shortley phase.
-		alm[im][0] *= t2;
+		alm_im(shtns, im)[0] *= t2;
 	}
 
 /// - Compute analysis recurrence coefficients if necessary
 	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
 		im = ((MMAX+2)>>1)*2;
-		blm = (double **) malloc( im * sizeof(double *) + (2*NLM)*sizeof(double) );
-		bl0 = (double *) (blm + im);
-		for (lm=0; lm<2*NLM; ++lm) bl0[lm] = al0[lm];		// copy
+		blm = (double *) malloc( (2*NLM)*sizeof(double) );
+		for (lm=0; lm<2*NLM; ++lm) blm[lm] = alm[lm];		// copy
 		for (im=0, lm=0; im<=MMAX; ++im) {
 			m = im*MRES;
-			blm[im] = bl0 + lm;
 			t1 = 1.0;
 			if (norm == sht_schmidt) {
 				t1 = 2*m+1;
-				bl0[lm+1] *= (2*m+3)/t1;
+				blm[lm+1] *= (2*m+3)/t1;
 			}
 			if (m>0) t1 /= mpos_renorm;
-			bl0[lm] *= t1;
+			blm[lm] *= t1;
 			lm+=2;
 			for (l=m+2; l<=LMAX; ++l) {
 				if (norm == sht_schmidt) {
 					t1 = 2*l+1;
-					bl0[lm] *= t1/(2*l-3);
-					bl0[lm+1] *= t1/(2*l-1);
+					blm[lm] *= t1/(2*l-3);
+					blm[lm+1] *= t1/(2*l-1);
 				}
 				lm+=2;
 			}
 		}
 	}
-
-	shtns->alm = alm;		shtns->blm = blm;
+	shtns->blm = blm;
 }
 
 /// \internal returns the value of the Legendre Polynomial of degree l.

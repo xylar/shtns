@@ -255,7 +255,7 @@ void mul_ct_matrix(shtns_cfg shtns, double* mx)
 	if (SHT_NORM == sht_schmidt) {
 		lm=0;
 		for (im=0; im<=MMAX; im++) {
-			double* al = shtns->alm[im];
+			double* al = alm_im(shtns,im);
 			long int m=im*MRES;
 			mx[2*lm] = 0.0;
 			a_1 = 1.0 / al[1];
@@ -278,7 +278,7 @@ void mul_ct_matrix(shtns_cfg shtns, double* mx)
 	} else {
 		lm=0;
 		for (im=0; im<=MMAX; im++) {
-			double* al = shtns->alm[im];
+			double* al = alm_im(shtns, im);
 			l=im*MRES;
 			mx[2*lm] = 0.0;
 			while(++l <= LMAX) {
@@ -733,3 +733,35 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 
 	VFREE(re);
 }
+
+/*
+void SH_to_spat_grad(shtns_cfg shtns, cplx *alm, double *gt, double *gp)
+{
+	double *mx;
+	cplx *blm, *clm;
+	
+	blm = (cplx*) VMALLOC( 3*NLM*sizeof(cplx) );
+	clm = blm + NLM;
+	mx = (double*)(clm + NLM);
+
+	st_dt_matrix(shtns, mx);
+	SH_mul_mx(shtns, mx, alm, blm);
+	int lm=0;
+	for (int im=0; im<=MMAX; im++) {
+		int m = im*MRES;
+		for (int l=m; l<=LMAX; l++) {
+			clm[lm] = alm[lm] * I*m;
+			lm++;
+		}
+	}
+	SH_to_spat(shtns, blm, gt);
+	SH_to_spat(shtns, clm, gp);
+	for (int ip=0; ip<NPHI; ip++) {
+		for (int it=0; it<NLAT; it++) {
+			gt[ip*NLAT+it] /= shtns->st[it];
+			gp[ip*NLAT+it] /= shtns->st[it];
+		}
+	}
+	VFREE(blm);
+}
+*/

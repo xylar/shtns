@@ -110,7 +110,7 @@ T	BpF = (v2d*) Vp;
 	ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
 	//	im=0;
  		l=1;
-		alm = shtns->alm[0];
+		alm = shtns->alm;
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double
 Q			Ql0[l] = (double) Qlm[l];	//	Ql[l+1] = (double) Qlm[l+1];
@@ -209,9 +209,12 @@ V		BtF += NLAT;	BpF += NLAT;
 	#endif
 	for(im=1; im<=imlim; ++im) {
 		m = im*MRES;
-		l = LiM(shtns, 0,im);
+		//l = LiM(shtns, 0,im);
+		l = (im*(2*(LMAX+1)-(m+MRES)))>>1;
 V		m_1 = 1.0/m;
-		alm = shtns->alm[im];
+		//alm = shtns->alm[im];
+		//alm = shtns->alm[0] + im*(2*LMAX - (im-1)*MRES);        // for m > 0
+		alm += 2*(LMAX-m+MRES);
 Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 S		cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
 T		cplx* Tl = &Tlm[l];
@@ -299,7 +302,7 @@ V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
 				}
 				for (int j=0; j<NWAY; ++j) {
 					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
-V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];				
+V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];
 				}
 				l+=2;	al+=4;
 				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant

@@ -102,7 +102,7 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
 	  nk = ((unsigned) nk+(VSIZE2-1))/VSIZE2;
 	#endif
 V	l_2 = shtns->l_2;
-		alm = shtns->blm[0];
+		alm = shtns->blm;
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 V			double an = BtF[k*k_inc];			double bn = BtF[k*k_inc +1];
 V			double bs = BtF[(NLAT-2-k)*k_inc];	double as = BtF[(NLAT-2-k)*k_inc +1];
@@ -210,9 +210,10 @@ V		tei[k] = 0.0;		toi[k] = 0.0;
 V		pei[k] = 0.0;		poi[k] = 0.0;
 	}
 	for (im=1;im<=imlim;++im) {
-		l = shtns->tm[im] / VSIZE2;
-		alm = shtns->blm[im];
 		m = im*MRES;
+		l = shtns->tm[im] / VSIZE2;
+		//alm = shtns->blm[im];
+		alm += 2*(LMAX-m+MRES);
 Q		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 Q		do {	// compute symmetric and antisymmetric parts, and reorganize data.
 Q			double an, bn, ani, bni, bs, as, bsi, asi, t;
