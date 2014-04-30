@@ -66,6 +66,10 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+
+	- faster initialization with OpenMP.
+	- fix: in python, a rare coredump now correctly raises an exception.
+
 * v2.5  (13 Mar 2014)
 	- new experimental support for Intel Xeon Phi (MIC) in native mode,
 	  with contributions from Vincent Boulos (Bull). For good performance

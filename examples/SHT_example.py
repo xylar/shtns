@@ -65,6 +65,9 @@ print(y[i_theta, i_phi])	# spatial element of coordinate i_theta, i_phi
 zlm = sh.analys(y)		# transform the spatial field back to spectral
 print(zlm)
 
+### compute gradients :
+dy_dt, dy_dp = sh.synth_grad(ylm)	# compute gradients of ylm on a spatial grid.
+
 ### vector transforms :
 #slm, tlm = sh.analys(v_theta,v_phi)		# with two arguments, sh.analys() performs a 2D vector transform (spherical coordinates without radial)
 #qlm, slm, tlm = sh.analys(v_r,v_theta,v_phi)	# with three arguments, sh.alanys() performs a 3D vector tansform (spherical coordinates)

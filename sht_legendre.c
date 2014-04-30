@@ -558,38 +558,7 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 		blm = (double *) malloc( (2*NLM)*sizeof(double) );
 	}
 	if ((alm==0) || (blm==0)) shtns_runerr("not enough memory.");
-	shtns->alm = alm;
-
-/// - Precompute the factors alm and blm of the recurrence relation :
-  if (norm == sht_schmidt) {
-	for (im=0, lm=0; im<=MMAX; ++im) {		/// <b> For Schmidt semi-normalized </b>
-		m = im*MRES;
-		t2 = SQRT(2*m+1);
-		alm[lm] = 1.0/t2;		/// starting value will be divided by \f$ \sqrt{2m+1} \f$ 
-		alm[lm+1] = t2;		// l=m+1
-		lm+=2;
-		for (l=m+2; l<=LMAX; ++l) {
-			t1 = SQRT((l+m)*(l-m));
-			alm[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
-			alm[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
-			t2 = t1;	lm+=2;
-		}
-	}
-  } else {
-	for (im=0, lm=0; im<=MMAX; ++im) {		/// <b> For orthonormal or 4pi-normalized </b>
-		m = im*MRES;
-		t2 = 2*m+1;
-		alm[lm] = 1.0;		// will contain the starting value.
-		alm[lm+1] = SQRT(2*m+3);		// l=m+1
-		lm+=2;
-		for (l=m+2; l<=LMAX; ++l) {
-			t1 = (l+m)*(l-m);
-			alm[lm+1] = SQRT(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
-			alm[lm] = - SQRT(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
-			t2 = t1;	lm+=2;
-		}
-	}
-  }
+	shtns->alm = alm;		shtns->blm = blm;
 
 /// - Compute and store the prefactor (independant of x) of the starting value for the recurrence :
 /// \f[  Y_m^m(x) = Y_0^0 \ \sqrt{ \prod_{k=1}^{m} \frac{2k+1}{2k} } \ \ (-1)^m \ (1-x^2)^{m/2}  \f]
@@ -608,16 +577,41 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 		}
 		t2 = SQRT(t1);
 		if ( m & with_cs_phase ) t2 = -t2;		/// optional \f$ (-1)^m \f$ Condon-Shortley phase.
-		alm_im(shtns, im)[0] *= t2;
+		alm_im(shtns, im)[0] = t2;
 	}
 
+/// - Precompute the factors alm and blm of the recurrence relation :
+	#pragma omp parallel for private(im,m,l,lm, t1, t2) schedule(dynamic)
+	for (im=0; im<=MMAX; ++im) {
+		m = im*MRES;
+		lm = im*(2*LMAX - (im-1)*MRES);
+		if (norm == sht_schmidt) {		/// <b> For Schmidt semi-normalized </b>
+			t2 = SQRT(2*m+1);
+			alm[lm] /= t2;		/// starting value divided by \f$ \sqrt{2m+1} \f$ 
+			alm[lm+1] = t2;		// l=m+1
+			lm+=2;
+			for (l=m+2; l<=LMAX; ++l) {
+				t1 = SQRT((l+m)*(l-m));
+				alm[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
+				alm[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
+				t2 = t1;	lm+=2;
+			}
+		} else {			/// <b> For orthonormal or 4pi-normalized </b>
+			t2 = 2*m+1;
+			// starting value unchanged.
+			alm[lm+1] = SQRT(2*m+3);		// l=m+1
+			lm+=2;
+			for (l=m+2; l<=LMAX; ++l) {
+				t1 = (l+m)*(l-m);
+				alm[lm+1] = SQRT(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
+				alm[lm] = - SQRT(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
+				t2 = t1;	lm+=2;
+			}
+		}
 /// - Compute analysis recurrence coefficients if necessary
-	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
-		im = ((MMAX+2)>>1)*2;
-		blm = (double *) malloc( (2*NLM)*sizeof(double) );
-		for (lm=0; lm<2*NLM; ++lm) blm[lm] = alm[lm];		// copy
-		for (im=0, lm=0; im<=MMAX; ++im) {
-			m = im*MRES;
+		if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
+			lm = im*(2*LMAX - (im-1)*MRES);
+			for (l=0; l<2*(LMAX-m); l++)  blm[lm+l] = alm[lm+l];		// copy
 			t1 = 1.0;
 			if (norm == sht_schmidt) {
 				t1 = 2*m+1;
@@ -636,7 +630,6 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 			}
 		}
 	}
-	shtns->blm = blm;
 }
 
 /// \internal returns the value of the Legendre Polynomial of degree l.
