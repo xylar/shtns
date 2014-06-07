@@ -88,6 +88,41 @@ void SHsph_to_spat_l(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, int ltr
 }
 
 
+/* fixed m, variable l-truncated legendre transforms (no fft) */
+
+void SH_to_spat_ml(shtns_cfg shtns, int im, cplx *Qlm, cplx *Vr, int ltr) {
+	((pf2ml)shtns->ftable[SHT_M][SHT_TYP_SSY])(shtns, im, Qlm, Vr, ltr);
+}
+
+void spat_to_SH_ml(shtns_cfg shtns, int im, cplx *Vr, cplx *Qlm, int ltr) {
+	((pf2ml)shtns->ftable[SHT_M][SHT_TYP_SAN])(shtns, im, Vr, Qlm, ltr);
+}
+
+void SHsphtor_to_spat_ml(shtns_cfg shtns, int im, cplx *Slm, cplx *Tlm, cplx *Vt, cplx *Vp, int ltr) {
+	((pf4ml)shtns->ftable[SHT_M][SHT_TYP_VSY])(shtns, im, Slm, Tlm, Vt, Vp, ltr);
+}
+
+void spat_to_SHsphtor_ml(shtns_cfg shtns, int im, cplx *Vt, cplx *Vp, cplx *Slm, cplx *Tlm, int ltr) {
+	((pf4ml)shtns->ftable[SHT_M][SHT_TYP_VAN])(shtns, im, Vt, Vp, Slm, Tlm, ltr);
+}
+
+void SHqst_to_spat_ml(shtns_cfg shtns, int im, cplx *Qlm, cplx *Slm, cplx *Tlm, cplx *Vr, cplx *Vt, cplx *Vp, int ltr) {
+	((pf6ml)shtns->ftable[SHT_M][SHT_TYP_3SY])(shtns, im, Qlm, Slm, Tlm, Vr, Vt, Vp, ltr);
+}
+
+void spat_to_SHqst_ml(shtns_cfg shtns, int im, cplx *Vr, cplx *Vt, cplx *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, int ltr) {
+	((pf6ml)shtns->ftable[SHT_M][SHT_TYP_3AN])(shtns, im, Vr, Vt, Vp, Qlm, Slm, Tlm, ltr);
+}
+
+void SHtor_to_spat_ml(shtns_cfg shtns, int im, cplx *Tlm, cplx *Vt, cplx *Vp, int ltr) {
+	((pf3ml)shtns->ftable[SHT_M][SHT_TYP_GTO])(shtns, im, Tlm, Vt, Vp, ltr);
+}
+
+void SHsph_to_spat_ml(shtns_cfg shtns, int im, cplx *Slm, cplx *Vt, cplx *Vp, int ltr) {
+	((pf3ml)shtns->ftable[SHT_M][SHT_TYP_GSP])(shtns, im, Slm, Vt, Vp, ltr);
+}
+
+
 /* successive scalar + vector for 3D transform (can be faster than simultaneous transform) */
 static
 void SHqst_to_spat_2(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp) {
@@ -113,6 +148,18 @@ static
 void spat_to_SHqst_2l(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, int ltr) {
 	((pf2l)shtns->ftable[SHT_LTR][SHT_TYP_SAN])(shtns, Vr, Qlm, ltr);
 	((pf4l)shtns->ftable[SHT_LTR][SHT_TYP_VAN])(shtns, Vt, Vp, Slm, Tlm, ltr);
+}
+
+static
+void SHqst_to_spat_2ml(shtns_cfg shtns, int im, cplx *Qlm, cplx *Slm, cplx *Tlm, cplx *Vr, cplx *Vt, cplx *Vp, int ltr) {
+	((pf2ml)shtns->ftable[SHT_M][SHT_TYP_SSY])(shtns, im, Qlm, Vr, ltr);
+	((pf4ml)shtns->ftable[SHT_M][SHT_TYP_VSY])(shtns, im, Slm, Tlm, Vt, Vp, ltr);
+}
+
+static
+void spat_to_SHqst_2ml(shtns_cfg shtns, int im, cplx *Vr, cplx *Vt, cplx *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, int ltr) {
+	((pf2ml)shtns->ftable[SHT_M][SHT_TYP_SAN])(shtns, im, Vr, Qlm, ltr);
+	((pf4ml)shtns->ftable[SHT_M][SHT_TYP_VAN])(shtns, im, Vt, Vp, Slm, Tlm, ltr);
 }
 
 

@@ -71,7 +71,7 @@
 /* END COMPILE-TIME SETTINGS */
 
 // sht variants (std, ltr)
-enum sht_variants { SHT_STD, SHT_LTR, SHT_NVAR };
+enum sht_variants { SHT_STD, SHT_LTR, SHT_M, SHT_NVAR };
 // sht types (scal synth, scal analys, vect synth, ...)
 enum sht_types { SHT_TYP_SSY, SHT_TYP_SAN, SHT_TYP_VSY, SHT_TYP_VAN,
 	SHT_TYP_GSP, SHT_TYP_GTO, SHT_TYP_3SY, SHT_TYP_3AN, SHT_NTYP };
@@ -84,6 +84,10 @@ typedef void (*pf2l)(shtns_cfg, void*, void*, long int);
 typedef void (*pf3l)(shtns_cfg, void*, void*, void*, long int);
 typedef void (*pf4l)(shtns_cfg, void*, void*, void*, void*, long int);
 typedef void (*pf6l)(shtns_cfg, void*, void*, void*, void*, void*, void*, long int);
+typedef void (*pf2ml)(shtns_cfg, int, void*, void*, long int);
+typedef void (*pf3ml)(shtns_cfg, int, void*, void*, void*, long int);
+typedef void (*pf4ml)(shtns_cfg, int, void*, void*, void*, void*, long int);
+typedef void (*pf6ml)(shtns_cfg, int, void*, void*, void*, void*, void*, void*, long int);
 
 /// structure containing useful information about the SHT.
 struct shtns_info {		// MUST start with "int nlm;"
@@ -299,6 +303,17 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[NLAT_2-2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(bb, aa, 10 ), 1);	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)*2] = _mm256_castpd256_pd128(_mm256_shuffle_pd(aa, bb, 10 ));	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ), 1);	}
+		#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
+			rnd aa = (rnd)_mm_unpacklo_pd(er+or, ei+oi);	rnd bb = (rnd)_mm256_unpackhi_pd(er+or, ei+oi);	\
+			((s2d*)mem)[(idx)*4]   = _mm256_castpd256_pd128(aa);	\
+			((s2d*)mem)[(idx)*4+1] = _mm256_castpd256_pd128(bb);	\
+			((s2d*)mem)[(idx)*4+2] = _mm256_extractf128_pd(aa, 1);	\
+			((s2d*)mem)[(idx)*4+3] = _mm256_extractf128_pd(bb, 1);	\
+			aa = (rnd)_mm_unpacklo_pd(er-or, ei-oi);	bb = (rnd)_mm256_unpackhi_pd(er-or, ei-oi);	\
+			((s2d*)mem)[NLAT-1-(idx)*4] = _mm256_castpd256_pd128(aa);	\
+			((s2d*)mem)[NLAT-2-(idx)*4] = _mm256_castpd256_pd128(bb);	\
+			((s2d*)mem)[NLAT-3-(idx)*4] = _mm256_extractf128_pd(aa, 1);	\
+			((s2d*)mem)[NLAT-4-(idx)*4] = _mm256_extractf128_pd(bb, 1);	}
 	#else
 		#define VSIZE2 2
 		typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 2 doubles.
@@ -328,6 +343,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 			aa = vxchg(er - or) + (ei - oi);		bb = vxchg(er - or) - (ei - oi);	\
 			((s2d*)mem)[NLAT_2-1 -(idx)] = _mm_shuffle_pd(bb, aa, 2 );	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = _mm_shuffle_pd(aa, bb, 2 );	}
+		#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
+			((s2d*)mem)[(idx)*2]   = _mm_unpacklo_pd(er+or, ei+oi);	\
+			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(er+or, ei+oi);	\
+			((s2d*)mem)[NLAT-1-(idx)*2] = _mm_unpacklo_pd(er-or, ei-oi);	\
+			((s2d*)mem)[NLAT-2-(idx)*2] = _mm_unpackhi_pd(er-or, ei-oi);	}
 	#endif
 	#ifdef __SSE3__
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd(b,b,1))		// a + I*b

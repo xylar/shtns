@@ -260,6 +260,22 @@ void SHqst_to_spat_l(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, dou
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_l(shtns, S,Gt,Gp,ltr) SHsph_to_spat_l(shtns, S, Gt, Gp, ltr)
 
+/// \name Legendre transform at given m (no fft) and truncated at given degree l <= lmax
+//@{
+void spat_to_SH_ml(shtns_cfg, int im, cplx *Vr, cplx *Qlm, int ltr);
+void SH_to_spat_ml(shtns_cfg, int im, cplx *Qlm, cplx *Vr, int ltr);
+
+void SHsphtor_to_spat_ml(shtns_cfg, int im, cplx *Slm, cplx *Tlm, cplx *Vt, cplx *Vp, int ltr);
+void SHsph_to_spat_ml(shtns_cfg, int im, cplx *Slm, cplx *Vt, cplx *Vp, int ltr);
+void SHtor_to_spat_ml(shtns_cfg, int im, cplx *Tlm, cplx *Vt, cplx *Vp, int ltr);
+void spat_to_SHsphtor_ml(shtns_cfg, int im, cplx *Vt, cplx *Vp, cplx *Slm, cplx *Tlm, int ltr);
+
+void spat_to_SHqst_ml(shtns_cfg, int im, cplx *Vr, cplx *Vt, cplx *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, int ltr);
+void SHqst_to_spat_ml(shtns_cfg, int im, cplx *Qlm, cplx *Slm, cplx *Tlm, cplx *Vr, cplx *Vt, cplx *Vp, int ltr);
+//@}
+/// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
+#define SH_to_grad_spat_ml(shtns, im, S,Gt,Gp,ltr) SHsph_to_spat_ml(shtns, im, S, Gt, Gp, ltr)
+
 //@}
 
 /// \name Local and partial evalutions of a SH representation :

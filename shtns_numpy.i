@@ -253,9 +253,13 @@ inline PyObject* SpatArray_New(int size) {
 	}
 
 	%pythoncode %{
-		def spec_array(self):
-			"""return a numpy array of spherical harmonic coefficients (complex). Adress coefficients with index sh.idx(l,m)"""
-			return np.zeros(self.nlm, dtype=complex)
+		def spec_array(self, im=-1):
+			"""return a numpy array of spherical harmonic coefficients (complex). Adress coefficients with index sh.idx(l,m)
+			   if optional argument im is given, the spectral array is restricted to order im*mres."""
+			if im<0:
+				return np.zeros(self.nlm, dtype=complex)
+			else:
+				return np.zeros(self.lmax + 1 - im*self.mres, dtype=complex)
 		
 		def spat_array(self):
 			"""return a numpy array of 2D spatial field."""
@@ -503,6 +507,50 @@ inline PyObject* SpatArray_New(int size) {
 			return Rlm;
 		}
 		return NULL;
+	}
+
+	/* Legendre transforms (no fft) at given order m */
+	void spat_to_SH_m(PyObject *Vr, PyObject *Qlm, PyObject *im) {
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;
+		if ((im_ >= 0) && check_spectral(1,Vr, $self->nlat) && check_spectral(2,Qlm, ltr+1 - im_*$self->mres))
+			spat_to_SH_ml($self, im_, PyArray_DATA(Vr), PyArray_DATA(Qlm), ltr);
+	}
+	void SH_to_spat_m(PyObject *Qlm, PyObject *Vr, PyObject *im) {
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;
+		if ((im_ >= 0) && check_spectral(2,Vr, $self->nlat) && check_spectral(1,Qlm, ltr+1 - im_*$self->mres))
+			SH_to_spat_ml($self, im_, PyArray_DATA(Qlm), PyArray_DATA(Vr), ltr);
+	}
+	void spat_to_SHsphtor_m(PyObject *Vt, PyObject *Vp, PyObject *Slm, PyObject *Tlm, PyObject *im) {
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
+		if ((im_ >= 0) && check_spectral(1,Vt, $self->nlat) && check_spectral(2,Vp, $self->nlat) && check_spectral(3,Slm, nelem) && check_spectral(4,Tlm, nelem))
+			spat_to_SHsphtor_ml($self, im_, PyArray_DATA(Vt), PyArray_DATA(Vp), PyArray_DATA(Slm), PyArray_DATA(Tlm), ltr);
+	}
+	void SHsphtor_to_spat_m(PyObject *Slm, PyObject *Tlm, PyObject *Vt, PyObject *Vp, PyObject *im) {
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
+		if ((im_ >= 0) && check_spectral(3,Vt, $self->nlat) && check_spectral(4,Vp, $self->nlat) && check_spectral(1,Slm, nelem) && check_spectral(2,Tlm, nelem))
+			SHsphtor_to_spat_ml($self, im_, PyArray_DATA(Slm), PyArray_DATA(Tlm), PyArray_DATA(Vt), PyArray_DATA(Vp), ltr);
+	}
+	void SHsph_to_spat_m(PyObject *Slm, PyObject *Vt, PyObject *Vp, PyObject *im) {
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
+		if ((im_ >= 0) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat) && check_spectral(1,Slm, nelem))
+		SHsph_to_spat_ml($self, im_, PyArray_DATA(Slm), PyArray_DATA(Vt), PyArray_DATA(Vp), ltr);
+	}
+	void SHtor_to_spat_m(PyObject *Tlm, PyObject *Vt, PyObject *Vp, PyObject *im) {
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
+		if ((im_ >= 0) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat) && check_spectral(1,Tlm, nelem))
+		SHtor_to_spat_ml($self, im_, PyArray_DATA(Tlm), PyArray_DATA(Vt), PyArray_DATA(Vp), ltr);
+	}
+	void spat_to_SHqst_m(PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *Qlm, PyObject *Slm, PyObject *Tlm, PyObject *im) {
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
+		if ((im_ >= 0) && check_spectral(1,Vr, $self->nlat) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat)
+			&& check_spectral(4,Qlm, nelem) && check_spectral(5,Slm, nelem) && check_spectral(6,Tlm, nelem))
+		spat_to_SHqst_ml($self, im_, PyArray_DATA(Vr), PyArray_DATA(Vt), PyArray_DATA(Vp), PyArray_DATA(Qlm), PyArray_DATA(Slm), PyArray_DATA(Tlm), ltr);
+	}
+	void SHqst_to_spat_m(PyObject *Qlm, PyObject *Slm, PyObject *Tlm, PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *im) {
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
+		if ((im_ >= 0) && check_spectral(4,Vr, $self->nlat) && check_spectral(5,Vt, $self->nlat) && check_spectral(6,Vp, $self->nlat)
+			&& check_spectral(1,Qlm, nelem) && check_spectral(2,Slm, nelem) && check_spectral(3,Tlm, nelem))
+		SHqst_to_spat_ml($self, im_, PyArray_DATA(Qlm), PyArray_DATA(Slm), PyArray_DATA(Tlm), PyArray_DATA(Vr), PyArray_DATA(Vt), PyArray_DATA(Vp), ltr);
 	}
 
 };

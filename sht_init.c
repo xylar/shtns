@@ -109,7 +109,7 @@ enum sht_algos { SHT_DCT, SHT_MEM, SHT_SV,
 
 char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "omp1", "omp2", "omp3", "omp4", "omp6", "omp8" };
 char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
-char* sht_var[SHT_NVAR] = {"std", "ltr" };
+char* sht_var[SHT_NVAR] = {"std", "ltr", "m" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
 extern void* fmem[SHT_NTYP];
@@ -123,6 +123,7 @@ extern void* fdct_m0[SHT_NTYP];
 extern void* fdct_m0l[SHT_NTYP];
 #endif
 extern void* ffly[6][SHT_NTYP];
+extern void* ffly_m[6][SHT_NTYP];
 extern void* ffly_m0[6][SHT_NTYP];
 #ifdef _OPENMP
 extern void* fomp[6][SHT_NTYP];
@@ -147,6 +148,7 @@ static void set_sht_mem(shtns_cfg shtns) {
 	for (int it=0; it<SHT_NTYP; it++) {
 		for (int v=0; v<SHT_NVAR; v++)
 			shtns->ftable[v][it] = sht_func[v][SHT_MEM][it];
+		shtns->ftable[SHT_M][it] = sht_func[SHT_M][SHT_FLY2][it];		// there is no "mem" algo for SHT_M
 	}
 }
 
@@ -176,6 +178,8 @@ static void init_sht_array_func(shtns_cfg shtns)
 	sht_func[SHT_LTR][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2l;
 	sht_func[SHT_STD][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2;
 	sht_func[SHT_LTR][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2l;
+	sht_func[SHT_M][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2ml;
+	sht_func[SHT_M][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2ml;
 
 	if (shtns->nphi==1) {		// axisymmetric transform requested.
 		for (int j=0; j<=alg_lim; j++) {
@@ -192,9 +196,11 @@ static void init_sht_array_func(shtns_cfg shtns)
 		for (int j=0; j<=alg_lim; j++) {
 			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
+			memcpy(sht_func[SHT_M][SHT_FLY1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);
 		  #ifdef _OPENMP
 			memcpy(sht_func[SHT_STD][SHT_OMP1 + j], &fomp[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_LTR][SHT_OMP1 + j], &fomp[j], sizeof(void*)*SHT_NTYP);
+			memcpy(sht_func[SHT_M][SHT_OMP1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);		// no omp algo for SHT_M, use fly instead
 		  #endif
 		}
 	  #ifdef SHTNS_DCT

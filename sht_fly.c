@@ -189,3 +189,18 @@ void* ffly_m0[6][SHT_NTYP] = {
 	{ SH_to_spat_fly8_m0l, spat_to_SH_fly8_m0l, NULL, NULL,
 		NULL, NULL, NULL, NULL }
 };
+
+void* ffly_m[6][SHT_NTYP] = {
+	{ NULL, NULL, SHsphtor_m_to_spat_fly1_l, spat_to_SHsphtor_m_fly1_l,
+		SHsph_m_to_spat_fly1_l, SHtor_m_to_spat_fly1_l, SHqst_m_to_spat_fly1_l, spat_to_SHqst_m_fly1_l },
+	{ SH_m_to_spat_fly2_l, spat_to_SH_m_fly2_l, SHsphtor_m_to_spat_fly2_l, spat_to_SHsphtor_m_fly2_l,
+		SHsph_m_to_spat_fly2_l, SHtor_m_to_spat_fly2_l, SHqst_m_to_spat_fly2_l, spat_to_SHqst_m_fly2_l },
+	{ SH_m_to_spat_fly3_l, spat_to_SH_m_fly3_l, SHsphtor_m_to_spat_fly3_l, spat_to_SHsphtor_m_fly3_l,
+		SHsph_m_to_spat_fly3_l, SHtor_m_to_spat_fly3_l, SHqst_m_to_spat_fly3_l, spat_to_SHqst_m_fly3_l },
+	{ SH_m_to_spat_fly4_l, spat_to_SH_m_fly4_l, NULL, NULL,
+		SHsph_m_to_spat_fly4_l, SHtor_m_to_spat_fly4_l, NULL, NULL },
+	{ SH_m_to_spat_fly6_l, spat_to_SH_m_fly6_l, NULL, NULL,
+		NULL, NULL, NULL, NULL },
+	{ SH_m_to_spat_fly8_l, spat_to_SH_m_fly8_l, NULL, NULL,
+		NULL, NULL, NULL, NULL }
+};
