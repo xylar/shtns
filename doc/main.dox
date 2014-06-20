@@ -284,8 +284,18 @@ A few useful examples, for orthonormal spherical harmonics :
 The functions \ref sh00_1(), \ref sh10_ct(), \ref sh11_st() \ref shlm_e1() will help to build simple
 spectral fields, no matter what normalization you choose.
 
+\subsection nrj Energy
+
+\note <b>The energy of a scalar field</b> can be retrieved from it's spherical harmonic representation as:
+\f[ \int ||q||^2 = \sum_{l,m \geq 0} C_m N_l \: |Q_l^m|^2 \f]
+where \f$ C_m \f$ and \f$ N_l \f$ are the following normalization factor:
+- if \ref SHT_REAL_NORM has been used, \f$ C_m = 1 \f$. Otherwise \f$ C_m = 2 - \delta_{m0} \f$ (ie \f$ C_m=1 \f$ for \f$ m=0 \f$ and \f$ C_m = 2 \f$ for \f$ m>0 \f$).
+- for \ref sht_orthonormal : \f$ N_l = 1 \f$
+- for \ref sht_fourpi : \f$ N_l = 4\pi \f$
+- for \ref sht_schmidt : \f$ N_l = 4\pi/(2l+1) \f$
+
 \subsection Troubleshooting
-If you have problem in getting your spherical harmonic coefficient right, you may check the following :
+If you have problems in getting your spherical harmonic coefficient right, you may check the following :
  - Schmidt semi-normalization ? try multiplying or dividing by \f$ \sqrt{2l+1} \f$
  - Condon-Shortley phase ? try multiplying by \f$ (-1)^m \f$
  - Real or Complex ? try multiplying or dividing the m>0 coefficients by \f$ \sqrt{2} \f$
@@ -325,6 +335,11 @@ spherical coordinate spatial representation \c Vr, \c Vt, \c Vp to their spectra
 The functions \ref SHsphtor_to_spat and \ref spat_to_SHsphtor do the same for a tangential vector on the sphere (without radial component).
 
 \see A closely related definition of <a href="http://en.wikipedia.org/wiki/Vector_spherical_harmonics#Definition">vector spherical harmonics on wikipedia</a>.
+
+\note <b>The energy of the vector field</b> can be retrieved from it's orthonormal spherical harmonic representation as:
+\f[ \int ||\mathbf{v}||^2 = \sum_{l,m \geq 0} C_m N_l \: \left( |Q_l^m|^2 \, + \, l(l+1)\,\left( |S_l^m|^2 + |T_l^m|^2 \right) \right) \f]
+where \f$ C_m \f$ and \f$ N_l \f$ are defined in the \ref nrj section.
+
 
 \section vsh_3d Special case of 3D divergence-free fields
 
@@ -590,7 +605,9 @@ The Python interface has been generated using <a href="http://www.swig.org/">SWI
 \code ./configure --enable-python
 make
 make install \endcode
-Optionally you can indicate an alternate pyhton interpreter to \c ./configure using PYTHON=<my-python> (see ./configure --help)
+Optionally you can indicate an alternate pyhton interpreter to \c ./configure using PYTHON=<my-python> (see ./configure --help).<br/>
+If you cannot install as root, you can alternatively intall the python package as user, replacing \code make install \endcode with
+\code  python setup.py install --user \endcode
 
 \li Use within a python script or shell \code import shtns \endcode
 

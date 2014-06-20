@@ -30,6 +30,8 @@ FEATURES:
 - special spectral operator functions that do not require a transform
   (multiply by cos(theta)...).
 - scalar transforms for complex spatial fields.
+- SHT at fixed m (without fft, aka Legendre transform).
+
 
 INSTALL:
 --------
@@ -66,7 +68,7 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
-
+	- New feature: SHT at fixed m (aka Legendre transform).
 	- faster initialization with OpenMP.
 	- fix: in python, a rare coredump now correctly raises an exception.
 
