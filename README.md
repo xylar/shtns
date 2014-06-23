@@ -68,6 +68,7 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v2.6beta
 	- New feature: SHT at fixed m (aka Legendre transform).
 	- faster initialization with OpenMP.
 	- fix: in python, a rare coredump now correctly raises an exception.

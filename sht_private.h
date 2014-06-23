@@ -304,12 +304,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)*2] = _mm256_castpd256_pd128(_mm256_shuffle_pd(aa, bb, 10 ));	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ), 1);	}
 		#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
-			rnd aa = (rnd)_mm_unpacklo_pd(er+or, ei+oi);	rnd bb = (rnd)_mm256_unpackhi_pd(er+or, ei+oi);	\
+			rnd aa = (rnd)_mm256_unpacklo_pd(er+or, ei+oi);	rnd bb = (rnd)_mm256_unpackhi_pd(er+or, ei+oi);	\
 			((s2d*)mem)[(idx)*4]   = _mm256_castpd256_pd128(aa);	\
 			((s2d*)mem)[(idx)*4+1] = _mm256_castpd256_pd128(bb);	\
 			((s2d*)mem)[(idx)*4+2] = _mm256_extractf128_pd(aa, 1);	\
 			((s2d*)mem)[(idx)*4+3] = _mm256_extractf128_pd(bb, 1);	\
-			aa = (rnd)_mm_unpacklo_pd(er-or, ei-oi);	bb = (rnd)_mm256_unpackhi_pd(er-or, ei-oi);	\
+			aa = (rnd)_mm256_unpacklo_pd(er-or, ei-oi);	bb = (rnd)_mm256_unpackhi_pd(er-or, ei-oi);	\
 			((s2d*)mem)[NLAT-1-(idx)*4] = _mm256_castpd256_pd128(aa);	\
 			((s2d*)mem)[NLAT-2-(idx)*4] = _mm256_castpd256_pd128(bb);	\
 			((s2d*)mem)[NLAT-3-(idx)*4] = _mm256_extractf128_pd(aa, 1);	\
