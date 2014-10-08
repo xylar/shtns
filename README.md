@@ -23,14 +23,14 @@ FEATURES:
 - an algorithm using DCT for regular nodes (generalized Fejer quadrature).
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).
 - ability to choose the optimal spatial sizes for a given spectral truncation.
-- **on-the-fly transforms** : saving memory and bandwidth, and can even
-  be faster depending on architecture.
+- **on-the-fly transforms** : saving memory and bandwidth, they are even faster
+  on modern architectures.
 - accurate up to spherical harmonic degree l=16383 (at least).
 - rotation functions to rotate spherical harmonics (beta).
 - special spectral operator functions that do not require a transform
   (multiply by cos(theta)...).
 - scalar transforms for complex spatial fields.
-- SHT at fixed m (without fft, aka Legendre transform).
+- SHT at fixed m (without fft, aka Legendre transform - beta).
 
 
 INSTALL:

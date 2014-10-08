@@ -1789,15 +1789,12 @@ int config_save(shtns_cfg shtns, int req_flags)
 		fprint_ftable(fcfg, shtns->ftable);
 		fprintf(fcfg,"\n");
 		fclose(fcfg);
-		return 0;
 	} else err -= 4;
 
-	if (err < 0) {
-		#if SHT_VERBOSE > 0
-			fprintf(stderr,"! Warning ! SHTns could not save config\n");
-		#endif
-		return err;		// file creation error
-	}
+	#if SHT_VERBOSE > 0
+		if (err < 0) fprintf(stderr,"! Warning ! SHTns could not save config\n");
+	#endif
+	return err;
 }
 
 /// \internal try to load config from a file 
