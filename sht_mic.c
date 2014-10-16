@@ -124,9 +124,11 @@ void* fomp[6][SHT_NTYP] = {
 	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
-void* fmem[SHT_NTYP] = 	{ SH_to_spat_mic2_l, spat_to_SH_mic2_l, SHsphtor_to_spat_mic2_l, spat_to_SHsphtor_mic2_l,
-		SHsph_to_spat_mic2_l, SHtor_to_spat_mic2_l, SHqst_to_spat_mic2_l, spat_to_SHqst_mic2_l };
-void* fmem_l[SHT_NTYP] = { SH_to_spat_mic2_l, spat_to_SH_mic2_l, SHsphtor_to_spat_mic2_l, spat_to_SHsphtor_mic2_l,
-		SHsph_to_spat_mic2_l, SHtor_to_spat_mic2_l, SHqst_to_spat_mic2_l, spat_to_SHqst_mic2_l };
-void* fmem_m0[SHT_NTYP] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
-void* fmem_m0l[SHT_NTYP] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+void* ffly_m[6][SHT_NTYP] = {
+	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
+};

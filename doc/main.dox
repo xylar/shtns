@@ -578,7 +578,7 @@ It allows:
  - better reproducibility at bit-level between several runs.
  - ensure that all MPI processes use the same config/plan.
 
-All the calling program has to do is add \ref SHT_LOAD_SAVE_CFG to the layout parameter when calling
+All the calling program has to do is add \ref SHT_LOAD_SAVE_CFG to the flags or layout parameter when calling
 \ref shtns_set_grid / \ref shtns_set_grid_auto (C) or shtns_precompute / shtns_precompute_auto (Fortran).
 SHTns will first look for the files \c shtns_cfg and \c shtns_cfg_fftw and use the data stored therein.
 If no configuration stored in the files correspond to the required one, SHTns will proceed as usual
@@ -587,10 +587,10 @@ and then store the configuration (unless \ref sht_quick_init mode is used).
 \section mpi_safe Ensuring same config is used across MPI processes:
 
 \code
-layout |= SHT_LOAD_SAVE_CFG;
-if (rank==0) shtns_set_grid_auto(... layout ...);      // this will save the config to a file on process 0
-MPI_Barrier();
-if (rank > 0) shtns_set_grid_auto(... layout ...);     // this will load the config from file on other processes.
+flags |= SHT_LOAD_SAVE_CFG;
+if (rank > 0) MPI_Barrier();	// all processes except 0 wait here until process 0 has initialized shtns.
+shtns_set_grid_auto(... flags ...);	// this will save the config to a file on process 0 and load from file on other processes.
+if (rank == 0) MPI_Barrier();	// other processes now resume and load the config from file.
 \endcode
 
 */

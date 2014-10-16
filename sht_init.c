@@ -112,10 +112,12 @@ char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3
 char* sht_var[SHT_NVAR] = {"std", "ltr", "m" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
+#ifdef SHTNS_MEM
 extern void* fmem[SHT_NTYP];
 extern void* fmem_l[SHT_NTYP];
 extern void* fmem_m0[SHT_NTYP];
 extern void* fmem_m0l[SHT_NTYP];
+#endif
 #ifdef SHTNS_DCT
 extern void* fdct[SHT_NTYP];
 extern void* fdct_l[SHT_NTYP];
@@ -136,13 +138,14 @@ void* sht_func[SHT_NVAR][SHT_NALG][SHT_NTYP];
 static void set_sht_fly(shtns_cfg shtns, int typ_start)
 {
 	int algo = SHT_FLY2;
-	if (shtns->nthreads > 1) algo = SHT_OMP2;
+	if ((shtns->nthreads > 1) && (sht_func[0][SHT_OMP2][typ_start])) algo = SHT_OMP2;
 	for (int it=typ_start; it<SHT_NTYP; it++) {
 		for (int v=0; v<SHT_NVAR; v++)
 			shtns->ftable[v][it] = sht_func[v][algo][it];
 	}
 }
 
+#ifdef SHTNS_MEM
 /// \internal choose memory algorithm everywhere.
 static void set_sht_mem(shtns_cfg shtns) {
 	for (int it=0; it<SHT_NTYP; it++) {
@@ -151,6 +154,7 @@ static void set_sht_mem(shtns_cfg shtns) {
 		shtns->ftable[SHT_M][it] = sht_func[SHT_M][SHT_FLY2][it];		// there is no "mem" algo for SHT_M
 	}
 }
+#endif
 
 /// \internal copy all algos to sht_func array (should be called by set_grid before choosing variants).
 /// if nphi is 1, axisymmetric algorithms are used.
@@ -190,8 +194,10 @@ static void init_sht_array_func(shtns_cfg shtns)
 		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct_m0, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_m0l, sizeof(void*)*SHT_NTYP);
 	  #endif
+	  #ifdef SHTNS_MEM
 		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem_m0, sizeof(void*)*SHT_NTYP);
-		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_m0l, sizeof(void*)*SHT_NTYP);		
+		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_m0l, sizeof(void*)*SHT_NTYP);
+	  #endif
 	} else {
 		for (int j=0; j<=alg_lim; j++) {
 			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
@@ -207,11 +213,17 @@ static void init_sht_array_func(shtns_cfg shtns)
 		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_l, sizeof(void*)*SHT_NTYP);
 	  #endif
+	  #ifdef SHTNS_MEM
 		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_l, sizeof(void*)*SHT_NTYP);
+	  #endif
 	}
 
+	#ifdef SHTNS_MEM
 	set_sht_mem(shtns);		// default transform is MEM
+	#else
+	set_sht_fly(shtns, 0);
+	#endif
 }
 
 
@@ -298,6 +310,7 @@ static int free_unused(shtns_cfg shtns, void* pp)
 	return (n-1);
 }
 
+#ifdef SHTNS_MEM
 /// \internal Free matrices if on-the-fly has been selected.
 static void free_unused_matrices(shtns_cfg shtns)
 {
@@ -355,7 +368,7 @@ static void free_unused_matrices(shtns_cfg shtns)
 		}
 	}
 }
-
+#endif
 
 /// \internal allocate arrays for SHT related to a given grid.
 static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
@@ -745,6 +758,8 @@ static void PolarOptimize(shtns_cfg shtns, double eps)
 	}
 }
 
+#ifdef SHTNS_MEM
+
 /// \internal Perform some optimization on the SHT matrices.
 static void OptimizeMatrices(shtns_cfg shtns, double eps)
 {
@@ -944,6 +959,8 @@ static void init_SH_gauss(shtns_cfg shtns)
 		}
 	}
 }
+
+#endif
 
 #ifdef SHTNS_DCT
 
@@ -2136,6 +2153,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		case sht_reg_poles :  analys = 0;         quick_init = 1;  break;
 		default : break;
 	}
+	#ifndef SHTNS_MEM
+		on_the_fly = 1;
+	#endif
 
 	if (*nphi == 0) {
 		*nphi = fft_int((nl_order+1)*MMAX+1, 7);		// required fft nodes
@@ -2263,19 +2283,23 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	{
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
 		grid_gauss(shtns, latdir);
+		#ifdef SHTNS_MEM
 		if (on_the_fly == 0) {
 			init_SH_gauss(shtns);			// precompute matrices
 			OptimizeMatrices(shtns, eps);
 		}
+		#endif
 	}
 	if (flags == sht_reg_poles)
 	{
 		alloc_SHTarrays(shtns, on_the_fly, vector, 0);		// allocate dynamic arrays (no analysis)
 		grid_equal_polar(shtns, latdir);
+		#ifdef SHTNS_MEM
 		if (on_the_fly == 0) {
 			init_SH_synth(shtns);
 			for (im=0; im<=MMAX; im++) shtns->tm[im] = 0;	// avoid problems with tm[im] modified ????
 		}
+		#endif
 	}
 
 	if (on_the_fly == 1) {
@@ -2293,7 +2317,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			choose_best_sht(shtns, &nloop, vector, 0);
 			if (layout & SHT_LOAD_SAVE_CFG) config_save(shtns, req_flags);
 		}
+		#ifdef SHTNS_MEM
 		if (on_the_fly == 0) free_unused_matrices(shtns);
+		#endif
 		t = SHT_error(shtns, vector);		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		if (verbose) printf("        + SHT accuracy = %.3g\n",t);

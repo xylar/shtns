@@ -6,7 +6,7 @@ AC_INIT([SHTns],[2.6beta],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
 target="libshtns.a"		# by default, build the library.
-objs="sht_mem.o sht_fly.o"
+objs="sht_fly.o"
 install="install-lib"	# by default, install the library.
 
 # optional variables :
@@ -32,6 +32,8 @@ AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX or MIC)]))
 AC_ARG_ENABLE([dct],
 	AS_HELP_STRING([--disable-dct], [Do not use DCT, removes support for regular grids.]))
+AC_ARG_ENABLE([mem],
+	AS_HELP_STRING([--disable-mem], [Do not use matrix precomputed and stored in memory. Implies --disable-dct.]))
 
 dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
 dnl generated configure script that the expansion does not occur until
@@ -74,6 +76,7 @@ AS_IF([test "x$enable_mic" != "xyes"], [
 	# With MIC, enable openmp and mkl by default.
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
+  	enable_mem=no		# No precomputed matrix support with MIC.
 ])
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-pointer"])
@@ -184,12 +187,16 @@ AS_IF([test "x$enable_simd" != "xno"], [
 	AC_DEFINE([_GCC_VEC_],[1],[I compile with GCC 4 or ICC 14 or later, and I would like fast vectorized code (if SSE2, AVX or MIC is supported) !])
 ])
 
-# Disable DCT ?
-AS_IF([test "x$enable_dct" != "xno"], [
-	AC_DEFINE([SHTNS_DCT],[1],[include DCT support (Fejer quadrature on regular grids)])
-	objs="$objs sht_dct.o"		# compile dct transforms
+# Disable MEM ?
+AS_IF([test "x$enable_mem" != "xno"], [
+	AC_DEFINE([SHTNS_MEM],[1],[Include algorithms using precomputed matrix stored in memory)])
+	objs="$objs sht_mem.o"		# compile dct transforms
+	# Disable DCT ?
+	AS_IF([test "x$enable_dct" != "xno"], [
+		AC_DEFINE([SHTNS_DCT],[1],[Include DCT support (Fejer quadrature on regular grids)])
+		objs="$objs sht_dct.o"		# compile dct transforms
+	])
 ])
-
 
 # Verbosity setting
 AS_IF([test "x$enable_verbose" == "xno"], [enable_verbose=0],

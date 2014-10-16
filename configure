@@ -690,6 +690,7 @@ enable_long_double
 enable_f77
 enable_simd
 enable_dct
+enable_mem
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1323,6 +1324,8 @@ Optional Features:
                           from Fortran
   --disable-simd          Do not use vector extensions (SSE2, AVX or MIC)
   --disable-dct           Do not use DCT, removes support for regular grids.
+  --disable-mem           Do not use matrix precomputed and stored in memory.
+                          Implies --disable-dct.
   --disable-openmp        do not use OpenMP
 
 Some influential environment variables:
@@ -2174,7 +2177,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 ac_config_headers="$ac_config_headers sht_config.h"
 
 target="libshtns.a"		# by default, build the library.
-objs="sht_mem.o sht_fly.o"
+objs="sht_fly.o"
 install="install-lib"	# by default, install the library.
 
 # optional variables :
@@ -2233,6 +2236,11 @@ fi
 # Check whether --enable-dct was given.
 if test "${enable_dct+set}" = set; then :
   enableval=$enable_dct;
+fi
+
+# Check whether --enable-mem was given.
+if test "${enable_mem+set}" = set; then :
+  enableval=$enable_mem;
 fi
 
 
@@ -3194,6 +3202,7 @@ fi
 	if test "x$enable_mkl" = "xdefault"; then :
   enable_mkl=yes
 fi
+  	enable_mem=no		# No precomputed matrix support with MIC.
 
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -ffast-math" >&5
@@ -4242,16 +4251,24 @@ $as_echo "#define _GCC_VEC_ 1" >>confdefs.h
 
 fi
 
-# Disable DCT ?
-if test "x$enable_dct" != "xno"; then :
+# Disable MEM ?
+if test "x$enable_mem" != "xno"; then :
+
+
+$as_echo "#define SHTNS_MEM 1" >>confdefs.h
+
+	objs="$objs sht_mem.o"		# compile dct transforms
+	# Disable DCT ?
+	if test "x$enable_dct" != "xno"; then :
 
 
 $as_echo "#define SHTNS_DCT 1" >>confdefs.h
 
-	objs="$objs sht_dct.o"		# compile dct transforms
+		objs="$objs sht_dct.o"		# compile dct transforms
 
 fi
 
+fi
 
 # Verbosity setting
 if test "x$enable_verbose" == "xno"; then :

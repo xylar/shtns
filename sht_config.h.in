@@ -9,9 +9,6 @@
 /* Define to 1 if you have the <c_asm.h> header file. */
 #undef HAVE_C_ASM_H
 
-/* Define to 1 if you have the <fftw3.h> header file. */
-#undef HAVE_FFTW3_H
-
 /* Define to 1 if you have the `fftw_cost' function. */
 #undef HAVE_FFTW_COST
 
@@ -109,8 +106,11 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
-/* include DCT support (Fejer quadrature on regular grids) */
+/* Include DCT support (Fejer quadrature on regular grids) */
 #undef SHTNS_DCT
+
+/* Include algorithms using precomputed matrix stored in memory) */
+#undef SHTNS_MEM
 
 /* Compile the Fortran API */
 #undef SHT_F77_API
