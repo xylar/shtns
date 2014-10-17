@@ -189,7 +189,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 #endif
 
 /* are there vector extensions available ? */
-#if !(defined __SSE2__ || defined __MIC__)
+#if !(defined __SSE2__ || defined __MIC__ || defined __VECTOR4DOUBLE__)
 	#undef _GCC_VEC_
 #endif
 #ifdef __INTEL_COMPILER
@@ -203,6 +203,62 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#undef _GCC_VEC_
 		#warning "no vector extensions available ! use gcc 4+ or icc 14+ for best performance."
 	#endif
+#endif
+
+#if _GCC_VEC_ && __VECTOR4DOUBLE__
+	// support Blue Gene/Q QPX vectors
+	#define MIN_ALIGNMENT 32
+	#define VSIZE 2
+	typedef complex double v2d __attribute__((aligned (16)));		// vector that contains a complex number
+	typedef double s2d __attribute__((aligned (16)));		// scalar number
+	#define VSIZE2 4
+	#define _SIMD_NAME_ "qpx"
+	typedef vector4double rnd;		// vector of 4 doubles.
+	#define vall(x) vec_splats(x)
+	#define vread(mem, idx) vec_lda((idx)*32, ((double*)mem))
+	#define vstor(mem, idx, v) vec_sta(v, (idx)*32, ((double*)mem))
+	inline static double reduce_add(rnd a) {
+		return (a[0]+a[1])+(a[2]+a[3]);
+	}
+	#define v2d_reduce(a, b) ( reduce_add(a) +I* reduce_add(b) )
+
+	#define S2D_STORE(mem, idx, ev, od) \
+		vstor(mem, idx, ev+od); \
+		vstor((double*)mem + NLAT-VSIZE2 - (idx)*VSIZE2, 0, vec_perm(ev-od, ev-od, vec_gpci(03210)));
+	#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
+		rnd aa = vec_perm(ei+oi, ei+oi, vec_gpci(01032)) + (er+or); \
+		rnd bb = (er + or) - vec_perm(ei+oi, ei+oi, vec_gpci(01032)); \
+		vstor(mem, idx, vec_perm(bb, aa, vec_gpci(00527))); \
+		vstor(((double*)mem) + (NPHI-2*im)*NLAT, idx, vec_perm(aa, bb, vec_gpci(00527))); \
+		aa = vec_perm(er-or, er-or, vec_gpci(01032)) + (ei-oi); \
+		bb = vec_perm(er-or, er-or, vec_gpci(01032)) - (ei-oi); \
+		vstor(((double*)mem) + NLAT, -(idx+1), vec_perm(bb, aa, vec_gpci(02705))); \
+		vstor(((double*)mem) + (NPHI+1-2*im)*NLAT, -(idx+1), vec_perm(aa, bb, vec_gpci(02705))); }
+	// TODO: S2D_CSTORE2 has not been tested and is probably wrong...
+	#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
+		rnd aa = vec_perm(er+or, ei+oi, vec_gpci(00415)); \
+		rnd bb = vec_perm(er+or, ei+oi, vec_gpci(02637)); \
+		vstor(mem, idx*2, aa); \
+		vstor(mem, idx*2+1, bb); \
+		aa = vec_perm(er-or, ei-oi, vec_gpci(00415)); \
+		bb = vec_perm(er-or, ei-oi, vec_gpci(02637)); \
+		vstor(mem, NLAT_2-1-idx*2, aa); \
+		vstor(mem, NLAT_2-2-idx*2, bb); }
+
+	#define vdup(x) (x)
+
+	#define vlo(a) (a[0])
+
+	#define vcplx_real(a) creal(a)
+	#define vcplx_imag(a) cimag(a)
+
+	/*inline static void* VMALLOC(size_t s) {
+		void* ptr;
+		posix_memalign(&ptr, MIN_ALIGNMENT, s);
+		return ptr;
+	}*/
+	#define VMALLOC(s)	malloc(s)
+	#define VFREE(s)	free(s)
 #endif
 
 #if _GCC_VEC_ && __MIC__
