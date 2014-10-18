@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[2.6beta],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[2.6],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
 target="libshtns.a"		# by default, build the library.
@@ -21,9 +21,10 @@ AC_ARG_ENABLE([mkl],
 	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (can be slightly faster, but NOT THREAD SAFE)]), [], [enable_mkl=default])
 AC_ARG_ENABLE([mic],
 	AS_HELP_STRING([--enable-mic], [Enable compilation for Xeon Phi]), [], [enable_mic=no])
+AC_ARG_ENABLE([many-core],
+	AS_HELP_STRING([--enable-many-core], [Enable optimizations for many-core systems (Blue Gene/Q, Xeon Phi,...) and remove single-threaded transforms]), [], [enable_many-core=no])
 AC_ARG_ENABLE([python],
-	AS_HELP_STRING([--enable-python], [Build Python interface]),
-	[], [enable_python=no])
+	AS_HELP_STRING([--enable-python], [Build Python interface]), [], [enable_python=no])
 AC_ARG_ENABLE([long-double],
 	AS_HELP_STRING([--enable-long-double], [Use long double during initialization for (maybe) slightly better precision]))
 AC_ARG_ENABLE([f77],
@@ -69,14 +70,15 @@ AS_VAR_POPDEF([CACHEVAR])dnl
 
 AS_IF([test "x$enable_mic" != "xyes"], [
 	# add gcc compile options if supported.
-	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"])
+	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"], [
+		AX_CHECK_COMPILE_FLAG([-mtune=native],[CC="$CC -mtune=native"])
+	])
   ],[
+	enable_many-core=yes		# optimize for many-core architecture
 	# MIC native cross-compiling
 	AX_CHECK_COMPILE_FLAG([-mmic],[CC="$CC -mmic"], [AC_MSG_ERROR(["Xeon Phi not supported."])])
-	# With MIC, enable openmp and mkl by default.
-	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
+	# With MIC, enable mkl by default.
 	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
-  	enable_mem=no		# No precomputed matrix support with MIC.
 ])
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-pointer"])
@@ -95,6 +97,12 @@ AS_IF([test "x$enable_python" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 
+# On many-core systems, enable openmp by default, and disable precomputed matrix support.
+AS_IF([test "x$enable_many-core" != "xno"], [
+  	enable_mem=no
+	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
+])
+
 AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
@@ -105,6 +113,7 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 	],[
 		target="libshtns_omp.a"
 		objs="$objs sht_omp.o"
+		AS_IF([test "x$enable_many-core" != "xno"], [objs="sht_mic.o"])
 	])
 ])
 libname=$target		# set the libname befor checking for python.

@@ -459,7 +459,6 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
   #endif
 	imlim += 1;
 
-  //omp_set_num_threads(shtns->nthreads);
   #pragma omp parallel num_threads(shtns->nthreads)
   {
 QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);

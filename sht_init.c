@@ -2325,7 +2325,10 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		if (verbose) printf("        + SHT accuracy = %.3g\n",t);
   #endif
   #if SHT_VERBOSE < 2
-		if (t > 1.e-3) shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
+		if (t > 1.e-3) {
+			shtns_print_cfg(shtns);
+			shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
+		}
   #endif
 	}
 

@@ -18,7 +18,8 @@ FEATURES:
 - can be used from **Fortran, c/c++, and Python** programs.
 - a highly efficient Gauss algorithm working with Gauss nodes (based on
   Gauss-Legendre quadrature).
-- support for SSE2, SSE3 and **AVX** vectorization, as well as Xeon Phi.
+- support for SSE2, SSE3 and **AVX** vectorization, as well as Xeon Phi and
+  Blue Gene/Q.
 - **parallel transforms with OpenMP** (for Gauss grid only).
 - an algorithm using DCT for regular nodes (generalized Fejer quadrature).
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).
@@ -68,8 +69,10 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
-* v2.6beta
-	- New feature: SHT at fixed m (aka Legendre transform).
+* v2.6  (16 Oct 2014)
+	- support for IBM Blue Gene/Q (QPX) with [bgclang](http://trac.alcf.anl.gov/projects/llvm-bgq).
+          Configure with `./configure --enable-many-core CC=bgclang`
+	- new beta feature: SHT at fixed m (aka Legendre transform).
 	- faster initialization with OpenMP.
 	- fix: in python, a rare coredump now correctly raises an exception.
 

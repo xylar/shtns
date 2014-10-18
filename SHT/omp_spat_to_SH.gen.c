@@ -457,7 +457,6 @@ V		  #endif
   #endif
 	imlim += 1;
 
-  //omp_set_num_threads(shtns->nthreads);
   #pragma omp parallel num_threads(shtns->nthreads)
   {
 	#ifndef SHT_AXISYM

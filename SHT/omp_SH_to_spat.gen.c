@@ -450,7 +450,6 @@ VX		BpF = BtF + shtns->ncplx_fft;
   #endif
 	imlim += 1;
   
-  //omp_set_num_threads(shtns->nthreads);
   #pragma omp parallel num_threads(shtns->nthreads)
   {
 3	GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim);

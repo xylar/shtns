@@ -218,7 +218,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vread(mem, idx) vec_lda((idx)*32, ((double*)mem))
 	#define vstor(mem, idx, v) vec_sta(v, (idx)*32, ((double*)mem))
 	inline static double reduce_add(rnd a) {
-		return (a[0]+a[1])+(a[2]+a[3]);
+		a += vec_perm(a, a, vec_gpci(02301));
+		a += vec_perm(a, a, vec_gpci(01032));
+		return( a[0] );
 	}
 	#define v2d_reduce(a, b) ( reduce_add(a) +I* reduce_add(b) )
 
