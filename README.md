@@ -69,12 +69,13 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
-* v2.6  (16 Oct 2014)
+* v2.6  (24 Oct 2014)
 	- support for IBM Blue Gene/Q (QPX) with [bgclang](http://trac.alcf.anl.gov/projects/llvm-bgq).
           Configure with `./configure --enable-many-core CC=bgclang`
 	- new beta feature: SHT at fixed m (aka Legendre transform).
 	- faster initialization with OpenMP.
 	- fix: in python, a rare coredump now correctly raises an exception.
+	- fix: a few compilation problems.
 
 * v2.5  (13 Mar 2014)
 	- new experimental support for Intel Xeon Phi (MIC) in native mode,

@@ -2219,7 +2219,7 @@ fi
 if test "${enable_many_core+set}" = set; then :
   enableval=$enable_many_core;
 else
-  enable_many-core=no
+  enable_many_core=no
 fi
 
 # Check whether --enable-python was given.
@@ -3206,7 +3206,7 @@ fi
 
 else
 
-	enable_many-core=yes		# optimize for many-core architecture
+	enable_many_core=yes		# optimize for many-core architecture
 	# MIC native cross-compiling
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mmic" >&5
 $as_echo_n "checking whether C compiler accepts -mmic... " >&6; }
@@ -3872,7 +3872,7 @@ fi
 fi
 
 # On many-core systems, enable openmp by default, and disable precomputed matrix support.
-if test "x$enable_many-core" != "xno"; then :
+if test "x$enable_many_core" != "xno"; then :
 
   	enable_mem=no
 	if test "x$enable_openmp" = "xdefault"; then :
@@ -3959,7 +3959,7 @@ else
 
 		target="libshtns_omp.a"
 		objs="$objs sht_omp.o"
-		if test "x$enable_many-core" != "xno"; then :
+		if test "x$enable_many_core" != "xno"; then :
   objs="sht_mic.o"
 fi
 
