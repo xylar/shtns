@@ -222,7 +222,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 		a += vec_perm(a, a, vec_gpci(01032));
 		return( a[0] );
 	}
-	#define v2d_reduce(a, b) ( reduce_add(a) +I* reduce_add(b) )
+	inline static v2d v2d_reduce(rnd a, rnd b) {
+		a = vec_perm(a, b, vec_gpci(00426)) + vec_perm(a, b, vec_gpci(01537));
+		a += vec_perm(a, a, vec_gpci(02301));
+		return a[0] + I*a[1];
+	}
+	//#define v2d_reduce(a, b) ( reduce_add(a) +I* reduce_add(b) )
 
 	#define S2D_STORE(mem, idx, ev, od) \
 		vstor(mem, idx, ev+od); \
