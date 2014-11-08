@@ -500,13 +500,14 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	shtns->fft = NULL;		shtns->ifft = NULL;
 	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
 
+	shtns->nspat = NPHI * NLAT;		// default spatial size
+
 	if (NPHI==1) 	// no FFT needed.
 	{
 		shtns->fftc_mode = -1;		// no FFT
 		#if SHT_VERBOSE > 0
 			if (verbose) printf("        => no fft : Mmax=0, Nphi=1, Nlat=%d\n",NLAT);
 		#endif
-		shtns->nspat = NLAT;
 		shtns->ncplx_fft = -1;	// no fft.
 		return;
 	}
@@ -617,19 +618,18 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		if (ifft != NULL) fftw_destroy_plan(ifft);
 		fft = fft2;		ifft = ifft2;
 		shtns->ncplx_fft = 0;		// fft is done in-place, no allocation needed.
+		shtns->nspat = phi_embed * NLAT;	// more space must be reserved for inplace ffts.
 	} else {
 		/* OUT-OF-PLACE FFT */
 		if (fft2 != NULL)  fftw_destroy_plan(fft2);		// use OUT-OF-PLACE FFT
 		if (ifft2 != NULL) fftw_destroy_plan(ifft2);
 		shtns->ncplx_fft = ncplx * NLAT;		// fft is done out-of-place, store allocation size.
-		phi_embed = NPHI;
 		#if SHT_VERBOSE > 1
 			if (verbose>1) printf("        ** out-of-place fft **\n");
 		#endif
 	}
 	shtns->fft = fft;		shtns->ifft = ifft;
   }
-	shtns->nspat = phi_embed * NLAT;
 	VFREE(Sh);		VFREE(ShF);
 
 	#if SHT_VERBOSE > 2
