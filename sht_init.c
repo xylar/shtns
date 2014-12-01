@@ -1681,9 +1681,9 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 			}
 			if (i0 >= 0) {
 				for (int iv=0; iv<SHT_NVAR; iv++) {
-					shtns->ftable[iv][ityp] = sht_func[iv][i0][ityp];
+					if (sht_func[iv][i0][ityp]) shtns->ftable[iv][ityp] = sht_func[iv][i0][ityp];
 					if (ityp == 4) {		// only one timing for both gradients variants.
-						shtns->ftable[iv][ityp+1] = sht_func[iv][i0][ityp+1];
+						if (sht_func[iv][i0][ityp+1]) shtns->ftable[iv][ityp+1] = sht_func[iv][i0][ityp+1];
 					}
 				}
 				PRINT_DOT
