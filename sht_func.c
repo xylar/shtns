@@ -675,8 +675,10 @@ void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 			ll += 2*l;		// ll = l*(l+1)
 			cplx rr = rlm[lm];
 			cplx ii = ilm[lm];
-			alm[ll+m] = rr + I*ii;					// m>0
-			alm[ll-m] = conj(rr) + I*conj(ii);		// m<0
+			alm[ll+m] = rr + I*ii;			// m>0
+			rr = conj(rr) + I*conj(ii);		// m<0, m even
+			if (m&1) rr = -rr;				// m<0, m odd
+			alm[ll-m] = rr;
 			lm++;
 		}
 	}
@@ -711,14 +713,16 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 		ilm[lm] = cimag(alm[ll]);
 		lm++;
 	}
+	double half_parity = 0.5;
 	for (int m=1; m<=MMAX; m++) {
 		ll = (m-1)*m;
+		half_parity = -half_parity;		// (-1)^m * 0.5
 		for (int l=m; l<=LMAX; l++) {
 			ll += 2*l;		// ll = l*(l+1)
-			cplx b = alm[ll-m];
-			cplx a = alm[ll+m];
-			rlm[lm] = (conj(b) + a)*0.5;		// real part
-			ilm[lm] = (conj(b) - a)*I*0.5;		// imag part
+			cplx b = alm[ll-m] * half_parity;		// (-1)^m for m negative.
+			cplx a = alm[ll+m] * 0.5;
+			rlm[lm] = (conj(b) + a);		// real part
+			ilm[lm] = (conj(b) - a)*I;		// imag part
 			lm++;
 		}
 	}
