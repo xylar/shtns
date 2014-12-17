@@ -124,7 +124,12 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 /// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require any previous setup.
 long nlm_calc(long lmax, long mmax, long mres);
 
+void shtns_verbose(int);			///< controls output during initialization: 0=no output (default), 1=some output, 2=degug (if compiled in)
+void shtns_print_version(void);		///< print version information to stdout.
+
 #ifndef SWIG
+
+void shtns_print_cfg(shtns_cfg);	///< print information about given config to stdout.
 
 /// \name initialization
 //@{
@@ -145,9 +150,6 @@ void shtns_reset(void);				///< destroy all configs, free memory, and go back to
 void shtns_destroy(shtns_cfg);		///< free memory of given config, which cannot be used afterwards.
 void shtns_unset_grid(shtns_cfg);	///< unset the grid.
 
-void shtns_verbose(int);			///< controls output during initialization: 0=no output (default), 1=some output, 2=degug (if compiled in)
-void shtns_print_version(void);		///< print version information to stdout.
-void shtns_print_cfg(shtns_cfg);	///< print information about given config to stdout.
 //@}
 
 /// \name special values

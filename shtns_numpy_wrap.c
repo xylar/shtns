@@ -5428,6 +5428,39 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_set_verbosity(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  int arg1 ;
+  int val1 ;
+  int ecode1 = 0 ;
+  PyObject * obj0 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:set_verbosity",&obj0)) SWIG_fail;
+  ecode1 = SWIG_AsVal_int(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "set_verbosity" "', argument " "1"" of type '" "int""'");
+  } 
+  arg1 = (int)(val1);
+  shtns_verbose(arg1);
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_print_version(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  
+  if (!PyArg_ParseTuple(args,(char *)":print_version")) SWIG_fail;
+  shtns_print_version();
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 static PyMethodDef SwigMethods[] = {
 	 { (char *)"SWIG_PyInstanceMethod_New", (PyCFunction)SWIG_PyInstanceMethod_New, METH_O, NULL},
 	 { (char *)"sht_nlm_get", _wrap_sht_nlm_get, METH_VARARGS, (char *)"sht_nlm_get(sht self) -> unsigned int const"},
@@ -5494,6 +5527,8 @@ static PyMethodDef SwigMethods[] = {
 		""},
 	 { (char *)"sht_swigregister", sht_swigregister, METH_VARARGS, NULL},
 	 { (char *)"nlm_calc", _wrap_nlm_calc, METH_VARARGS, (char *)"nlm_calc(long lmax, long mmax, long mres) -> long"},
+	 { (char *)"set_verbosity", _wrap_set_verbosity, METH_VARARGS, (char *)"set_verbosity(int arg1)"},
+	 { (char *)"print_version", _wrap_print_version, METH_VARARGS, (char *)"print_version()"},
 	 { NULL, NULL, 0, NULL }
 };
 

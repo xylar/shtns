@@ -323,6 +323,7 @@ class sht(_object):
     	z = synth(alm) : compute the spatial representation of the scalar alm
     	"""
     	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+    	if self.lmax != self.mmax: raise RuntimeError("complex SH requires lmax=mmax and mres=1.")
     	if alm.size != (self.lmax+1)**2: raise RuntimeError("spectral array has wrong size.")
     	if alm.dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
     	if alm.flags.contiguous == False: alm = alm.copy()		# contiguous array required.
@@ -336,12 +337,41 @@ class sht(_object):
     	alm = analys(z) : compute the spherical harmonic representation of the complex scalar z
     	"""
     	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+    	if self.lmax != self.mmax: raise RuntimeError("complex SH requires lmax=mmax and mres=1.")
     	if z.shape != self.spat_shape: raise RuntimeError("spatial array has wrong shape.")
     	if z.dtype.num != np.dtype('complex128').num: raise RuntimeError("spatial array should be dtype=complex128.")
     	if z.flags.contiguous == False: z = z.copy()		# contiguous array required.
     	alm = np.empty((self.lmax+1)**2, dtype=complex)
     	self.spat_cplx_to_SH(z,alm)
     	return alm
+
+    def zidx(self, l,m):
+    	"""
+    	zidx(sht self, int l, int m) -> int : compute the index l*(l+1)+m in a complex spherical harmonic expansion
+    	"""
+    	l = np.asarray(l)
+    	m = np.asarray(m)
+    	if (l>self.lmax).any() or (abs(m)>l).any() : raise RuntimeError("invalid range for l,m")
+    	return l*(l+1)+m
+
+    def zlm(self, idx):
+    	"""
+    	zlm(sht self, int idx) -> (int,int) : returns the l and m corresponding to the given index in complex spherical harmonic expansion
+    	"""
+    	idx = np.asarray(idx)
+    	if (idx >= (self.lmax+1)**2).any() or (idx < 0).any() : raise RuntimeError("invalid range for l,m")
+    	l = np.sqrt(idx).astype(int)
+    	m = idx - l*(l+1)
+    	return l,m
+
+    def spec_array_cplx(self):
+    	"""return a numpy array that can hold the spectral representation of a complex scalar spatial field."""
+    	return np.zeros((self.lmax+1)**2, dtype=complex)
+
+    def spat_array_cplx(self):
+    	"""return a numpy array of 2D complex spatial field."""
+    	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
+    	return np.zeros(self.spat_shape, dtype=complex128)
 
     def SH_to_point(self, *args):
         """SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"""
@@ -420,6 +450,14 @@ sht_swigregister(sht)
 def nlm_calc(*args):
   """nlm_calc(long lmax, long mmax, long mres) -> long"""
   return _shtns.nlm_calc(*args)
+
+def set_verbosity(*args):
+  """set_verbosity(int arg1)"""
+  return _shtns.set_verbosity(*args)
+
+def print_version():
+  """print_version()"""
+  return _shtns.print_version()
 # This file is compatible with both classic and new-style classes.
 
 
