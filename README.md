@@ -69,6 +69,13 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v2.6.1  (17 Dec 2014)
+	- new functions in python interface to control console output.
+	- fix: `spat_cplx_to_SH()` and `SH_to_spat_cplx()` were missing
+	  a (-1)^m for m<0 [issue #16].
+	- fix: segfault in `spat_to_SH_ml()` [issue #15].
+	- fix a few compilation issues.
+
 * v2.6  (24 Oct 2014)
 	- support for IBM Blue Gene/Q (QPX) with [bgclang](http://trac.alcf.anl.gov/projects/llvm-bgq).
           Configure with `./configure --enable-many-core CC=bgclang`

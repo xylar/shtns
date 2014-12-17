@@ -644,7 +644,7 @@ void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 	double *re, *im;
 	cplx *rlm, *ilm;
 
-	if (MRES != 1) shtns_runerr("complex SH: only mres=1 supported.");
+	if (MMAX != LMAX) shtns_runerr("complex SH requires lmax=mmax and mres=1.");
 
 	// alloc temporary fields
 	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
@@ -696,7 +696,7 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 	double *re, *im;
 	cplx *rlm, *ilm;
 
-	if (MRES != 1) shtns_runerr("complex SH: only mres=1 supported.");
+	if (MMAX != LMAX) shtns_runerr("complex SH requires lmax=mmax and mres=1.");
 
 	// alloc temporary fields
 	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
