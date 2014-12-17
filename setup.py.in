@@ -12,12 +12,14 @@ if len(libdir) == 0:
 else:
 	libdir = [libdir+"/lib"]
 cargs = "@OPENMP_CFLAGS@"
+largs = "@LDFLAGS@"
 libs = "@LIBS@"
 libslist = libs.replace('-l','').split()	# transform to list of libraries
 
 shtns_module = Extension('_shtns', sources=['shtns_numpy_wrap.c'],
 	extra_objects=shtns_o, depends=shtns_o,
 	extra_compile_args=cargs.split(),
+	extra_link_args=largs.split(),
 	library_dirs=libdir,
 	libraries=libslist,
 	include_dirs=[numpy_inc])
