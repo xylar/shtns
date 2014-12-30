@@ -611,21 +611,26 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 /// - Compute analysis recurrence coefficients if necessary
 		if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
 			lm = im*(2*LMAX - (im-1)*MRES);
-			for (l=0; l<2*(LMAX-m); l++)  blm[lm+l] = alm[lm+l];		// copy
 			t1 = 1.0;
+			t2 = alm[lm+1];
 			if (norm == sht_schmidt) {
 				t1 = 2*m+1;
-				blm[lm+1] *= (2*m+3)/t1;
+				t2 *= (2*m+3)/t1;
 			}
 			if (m>0) t1 /= mpos_renorm;
-			blm[lm] *= t1;
+			blm[lm] = alm[lm]*t1;
+			blm[lm+1] = t2;
 			lm+=2;
 			for (l=m+2; l<=LMAX; ++l) {
+				t1 = alm[lm];
+				t2 = alm[lm+1];
 				if (norm == sht_schmidt) {
-					t1 = 2*l+1;
-					blm[lm] *= t1/(2*l-3);
-					blm[lm+1] *= t1/(2*l-1);
+					double t3 = 2*l+1;
+					t1 *= t3/(2*l-3);
+					t2 *= t3/(2*l-1);
 				}
+				blm[lm] = t1;
+				blm[lm+1] = t2;
 				lm+=2;
 			}
 		}

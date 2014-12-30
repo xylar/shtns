@@ -69,6 +69,9 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v2.6.2  (30 Dec 2014)
+	- fix regression: Schmidt normalized analysis failed since v2.6 in some cases.
+
 * v2.6.1  (17 Dec 2014)
 	- new functions in python interface to control console output.
 	- fix: `spat_cplx_to_SH()` and `SH_to_spat_cplx()` were missing
