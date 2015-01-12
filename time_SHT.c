@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2014 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2015 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@ujf-grenoble.fr
@@ -714,6 +714,8 @@ int main(int argc, char *argv[])
 	if ((MMAX > 0)&&(MRES==1))
 		Slm[LiM(shtns, 1,1)] = sh11_st(shtns);
 //	write_vect("ylm0",Slm, NLM*2);
+//	SH_to_spat_ml(shtns, 0,Slm, Sh, LMAX);
+//	spat_to_SH_ml(shtns, 0,Sh, Slm, LMAX);
 	SH_to_spat(shtns, Slm,Sh);
 	write_mx("spat",Sh,NPHI,NLAT);
 	if (vector) {

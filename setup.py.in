@@ -33,4 +33,5 @@ setup(name='@PACKAGE_NAME@',
 	url='https://bitbucket.org/nschaeff/shtns',
 	ext_modules=[shtns_module],
 	py_modules=["shtns"],
+	requires=["numpy"],
 	)
