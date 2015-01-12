@@ -3,6 +3,7 @@
 
 AC_PREREQ([2.62])
 AC_INIT([SHTns],[2.6.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
 target="libshtns.a"		# by default, build the library.
@@ -83,6 +84,13 @@ AS_IF([test "x$enable_mic" != "xyes"], [
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-pointer"])
 AX_CHECK_COMPILE_FLAG([-std=gnu99],[CFLAGS="$CFLAGS -std=gnu99"])
+
+# with intel compiler, we should not use -O3 (bad performance with icc14 and icc15)
+AC_EGREP_CPP(icc,
+  [#ifdef __INTEL_COMPILER
+   icc
+   #endif
+  ], [shtcc_flags="-O2"], [shtcc_flags="-O3"])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h])
@@ -246,5 +254,6 @@ AC_SUBST([target])
 AC_SUBST([install])
 AC_SUBST([objs])
 AC_SUBST([libname])
+AC_SUBST([shtcc_flags])
 AC_CONFIG_FILES([Makefile setup.py])
 AC_OUTPUT

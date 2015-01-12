@@ -13,7 +13,7 @@ go= $(CFLAGS) -D_GNU_SOURCE
 
 
 # compiler command with options for the sht codelets
-shtcc = $(CC) $(go) -O3
+shtcc = $(CC) $(go) @shtcc_flags@
 # compiler command with options for other source (initialization, ...)
 cc = $(CC) $(go) -O2
 
