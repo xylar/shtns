@@ -184,6 +184,16 @@ void shtns_spat_to_sh_(double *Vr, cplx *Qlm) {
 }
 
 /// \ingroup fortapi
+void shtns_sh_to_spat_cplx_(cplx *alm, cplx *z) {
+    SH_to_spat_cplx(sht_data, alm, z);
+}
+
+/// \ingroup fortapi
+void shtns_spat_cplx_to_sh_(cplx *z, cplx *alm) {
+    spat_cplx_to_SH(sht_data, z, alm);
+}
+
+/// \ingroup fortapi
 void shtns_sphtor_to_spat_(cplx *Slm, cplx *Tlm, double *Vt, double *Vp) {
 	((pf4l)sht_data->ftable[SHT_STD][SHT_TYP_VSY])(sht_data, Slm, Tlm, Vt, Vp, sht_data->lmax);
 }
