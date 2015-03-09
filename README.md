@@ -69,6 +69,10 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v2.6.3  (9 Mar 2015)
+	- better default compilation flags for icc.
+	- complex transforms added to Fortran API (thanks to Bertrand Putigny)
+
 * v2.6.2  (30 Dec 2014)
 	- fix regression: Schmidt normalized analysis failed since v2.6 in some cases.
 

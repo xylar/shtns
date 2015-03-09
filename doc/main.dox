@@ -217,8 +217,8 @@ The details of the storage may depend on the algorithm, and to access a particul
 
 Hence \c Alm[LM(l,m)] is the (complex) SH coefficient of degree \e l and order \e m.
 
-\note Since SHTns only deals with real spatial data, the Spherical Harmonic coefficients with negative \e m are the complex conjugate of the
-positive \e m coefficients : \f$ A_l^{-m} = (A_l^m)^*\f$. For efficiency purposes, only the coefficients with positive \e m are stored.
+\note Since SHTns only deals with real spatial data, the Spherical Harmonic coefficients with negative \e m are related to the complex conjugate of the
+positive \e m coefficients : \f$ A_l^{-m} = (-1)^{m} (A_l^m)^*\f$. For efficiency purposes, only the coefficients with positive \e m are stored.
 
 \note There is no test on bounds, so that LM(l,m) with \e l or \e m that is not described, will give undefined result
 (in particular for an \e m that is not a multiple of \c MRES)
@@ -316,7 +316,7 @@ in canonical spherical coordinates cannot be transformed as scalars, because the
 under rotation for example (actually only the radial component does).
 
 To overcome this, we use the following decomposition:
-\f[ \mathbf{v} = Q(\theta,\phi) \mathbf{e_r}+ r \nabla S(\theta,\phi) + \nabla \times ( T(\theta,\phi) \mathbf{r} ) \f]
+\f[ \mathbf{v} = Q(\theta,\phi) \mathbf{e_r}+ r \nabla S(\theta,\phi) - \mathbf{r} \times \nabla T(\theta,\phi) \f]
 where Q, S and T are respectively the radial, spheroidal and toroidal scalar fields. We have explicitely:
 \f[ \mathbf{v} = \left( \begin{array}{rcl}
 Q  & & \\ 
