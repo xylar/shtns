@@ -62,7 +62,7 @@ SHT/spat_to_SH_mic.c : SHT/mic_spat_to_SH.gen.c
 	$(MAKE) spat_to_SH_mic.c -C SHT SFX=mic SED=$(SED)
 
 # objects :
-sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c $(hfiles)
+sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c sht_com.c $(hfiles)
 	$(cc) -c $< -o $@
 
 sht_mem.o : sht_mem.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c

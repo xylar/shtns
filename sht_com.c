@@ -266,6 +266,47 @@ void shtns_tor_to_spat_l_(cplx *Tlm, double *Vt, double *Vp, int* ltr) {
 }
 
 
+	// fixed m, variable l-truncation (no fft, aka Legendre transform)
+/// \ingroup fortapi
+void shtns_sh_to_spat_ml_(int *im, cplx *Qlm, cplx *Vr, int *ltr) {
+	((pf2ml)sht_data->ftable[SHT_M][SHT_TYP_SSY])(sht_data, *im, Qlm, Vr, *ltr);
+}
+
+/// \ingroup fortapi
+void shtns_spat_to_sh_ml_(int *im, cplx *Vr, cplx *Qlm, int *ltr) {
+	((pf2ml)sht_data->ftable[SHT_M][SHT_TYP_SAN])(sht_data, *im, Vr, Qlm, *ltr);
+}
+
+/// \ingroup fortapi
+void shtns_sphtor_to_spat_ml_(int *im, cplx *Slm, cplx *Tlm, cplx *Vt, cplx *Vp, int *ltr) {
+	((pf4ml)sht_data->ftable[SHT_M][SHT_TYP_VSY])(sht_data, *im, Slm, Tlm, Vt, Vp, *ltr);
+}
+
+/// \ingroup fortapi
+void shtns_spat_to_sphtor_ml_(int *im, cplx *Vt, cplx *Vp, cplx *Slm, cplx *Tlm, int *ltr) {
+	((pf4ml)sht_data->ftable[SHT_M][SHT_TYP_VAN])(sht_data, *im, Vt, Vp, Slm, Tlm, *ltr);
+}
+
+/// \ingroup fortapi
+void shtns_qst_to_spat_ml_(int *im, cplx *Qlm, cplx *Slm, cplx *Tlm, cplx *Vr, cplx *Vt, cplx *Vp, int *ltr) {
+	((pf6ml)sht_data->ftable[SHT_M][SHT_TYP_3SY])(sht_data, *im, Qlm, Slm, Tlm, Vr, Vt, Vp, *ltr);
+}
+
+/// \ingroup fortapi
+void shtns_spat_to_qst_ml_(int *im, cplx *Vr, cplx *Vt, cplx *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, int *ltr) {
+	((pf6ml)sht_data->ftable[SHT_M][SHT_TYP_3AN])(sht_data, *im, Vr, Vt, Vp, Qlm, Slm, Tlm, *ltr);
+}
+
+/// \ingroup fortapi
+void shtns_tor_to_spat_ml_(int *im, cplx *Tlm, cplx *Vt, cplx *Vp, int *ltr) {
+	((pf3ml)sht_data->ftable[SHT_M][SHT_TYP_GTO])(sht_data, *im, Tlm, Vt, Vp, *ltr);
+}
+
+/// \ingroup fortapi
+void shtns_sph_to_spat_ml_(int *im, cplx *Slm, cplx *Vt, cplx *Vp, int *ltr) {
+	((pf3ml)sht_data->ftable[SHT_M][SHT_TYP_GSP])(sht_data, *im, Slm, Vt, Vp, *ltr);
+}
+
 
 //@}
 #endif
