@@ -1830,7 +1830,7 @@ int config_load(shtns_cfg shtns, int req_flags)
 	if (fcfg != NULL) {
 		int i=0;
 		while(1) {
-			fscanf(fcfg, "%30s %8s %d %d %d %d %d %d %d %d %d %d",version, simd, &lmax2, &mmax2, &mres2, &nphi2, &nlat2, &grid2, &nthreads2, &req_flags2, &nlorder2, &mtr_dct2);
+			fscanf(fcfg, "%30s %7s %d %d %d %d %d %d %d %d %d %d",version, simd, &lmax2, &mmax2, &mres2, &nphi2, &nlat2, &grid2, &nthreads2, &req_flags2, &nlorder2, &mtr_dct2);
 			for (int iv=0; iv<SHT_NVAR; iv++) {
 				fscanf(fcfg, "%7s", alg);
 				for (int it=0; it<SHT_NTYP; it++) {
