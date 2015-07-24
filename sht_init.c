@@ -189,6 +189,7 @@ static void init_sht_array_func(shtns_cfg shtns)
 		for (int j=0; j<=alg_lim; j++) {
 			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
+			memcpy(sht_func[SHT_M][SHT_FLY1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);
 		}
 	  #ifdef SHTNS_DCT
 		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct_m0, sizeof(void*)*SHT_NTYP);
