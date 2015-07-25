@@ -69,6 +69,10 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v2.6.4  (24 Jul 2015)
+	- a critical bugfix (segfault of fixed-m tranforms when mmax=0).
+	- fixed-m Legendre transforms added to Fortran API.
+
 * v2.6.3  (9 Mar 2015)
 	- better default compilation flags for icc.
 	- complex transforms added to Fortran API (thanks to Bertrand Putigny)
