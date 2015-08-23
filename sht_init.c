@@ -1957,10 +1957,10 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 				shtns->li = s2->li;		shtns->mi = s2->mi;
 				for (im=0; im<=mmax; im++)	shtns->lmidx[im] = s2->lmidx[im];
 				larrays_ok = 1;
-			}
-			if ( (s2->lmax >= lmax) && (s2->norm == norm) ) {		// we can reuse the legendre tables.
-				shtns->alm = s2->alm;		shtns->blm = s2->blm;
-				legendre_ok = 1;
+				if (s2->norm == norm) {		// we can reuse the legendre tables.
+					shtns->alm = s2->alm;		shtns->blm = s2->blm;
+					legendre_ok = 1;
+				}
 			}
 		}
 		if (s2->lmax >= lmax) {		// we can reuse l_2
