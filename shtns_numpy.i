@@ -34,6 +34,7 @@
 
 %{
 
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
 #include "sht_private.h"
 
@@ -62,13 +63,13 @@ static int check_spatial(int i, PyObject *a, int size) {
 	if (!PyArray_Check(a)) {
 		throw_exception(SWIG_TypeError,i,msg_numpy_arr);		return 0;
 	}
-	if (PyArray_TYPE(a) != PyArray_DOUBLE) {
+	if (PyArray_TYPE((PyArrayObject *) a) != NPY_DOUBLE) {
 		throw_exception(SWIG_TypeError,i,"spatial array must consist of float.");		return 0;
 	}
-	if (!PyArray_ISCONTIGUOUS(a)) {
+	if (!PyArray_ISCONTIGUOUS((PyArrayObject *) a)) {
 		throw_exception(SWIG_RuntimeError,i,"spatial array not contiguous. Use 'b=a.copy()' to copy a to a contiguous array b.");		return 0;
 	}
-	if (PyArray_SIZE(a) != size) {
+	if (PyArray_SIZE((PyArrayObject *) a) != size) {
 		throw_exception(SWIG_RuntimeError,i,"spatial array has wrong size");		return 0;
 	}
 	return 1;
@@ -78,28 +79,32 @@ static int check_spectral(int i, PyObject *a, int size) {
 	if (!PyArray_Check(a)) {
 		throw_exception(SWIG_RuntimeError,i,msg_numpy_arr);		return 0;
 	}
-	if (PyArray_TYPE(a) != PyArray_CDOUBLE) {
+	if (PyArray_TYPE((PyArrayObject *) a) != NPY_CDOUBLE) {
 		throw_exception(SWIG_RuntimeError,i,"spectral array must consist of complex float. Create with: 'sh.spec_array()'");		return 0;
 	}
-	if (!PyArray_ISCONTIGUOUS(a)) {
+	if (!PyArray_ISCONTIGUOUS((PyArrayObject *) a)) {
 		throw_exception(SWIG_RuntimeError,i,"spactral array not contiguous. Use .copy() to copy to a contiguous array.");		return 0;
 	}
-	if (PyArray_SIZE(a) != size) {
+	if (PyArray_SIZE((PyArrayObject *) a) != size) {
 		throw_exception(SWIG_RuntimeError,i,"spectral array has wrong size");		return 0;
 	}
 	return 1;
 }
 
-inline PyObject* SpecArray_New(int size) {
-	npy_intp dims = size;
-	npy_intp strides = sizeof(cplx);
-	return PyArray_New(&PyArray_Type, 1, &dims, PyArray_CDOUBLE, &strides, NULL, strides, 0, NULL);	
+inline static void* PyArray_Data(PyObject *a) {
+	return PyArray_DATA((PyArrayObject*) a);
 }
 
-inline PyObject* SpatArray_New(int size) {
+inline static PyObject* SpecArray_New(int size) {
+	npy_intp dims = size;
+	npy_intp strides = sizeof(cplx);
+	return PyArray_New(&PyArray_Type, 1, &dims, NPY_CDOUBLE, &strides, NULL, strides, 0, NULL);	
+}
+
+inline static PyObject* SpatArray_New(int size) {
 	npy_intp dims = size;
 	npy_intp strides = sizeof(double);
-	return PyArray_New(&PyArray_Type, 1, &dims, PyArray_DOUBLE, &strides, NULL, strides, 0, NULL);	
+	return PyArray_New(&PyArray_Type, 1, &dims, NPY_DOUBLE, &strides, NULL, strides, 0, NULL);	
 }
 
 %}
@@ -217,7 +222,7 @@ inline PyObject* SpatArray_New(int size) {
 			return NULL;
 		}
 		obj = SpatArray_New($self->nlat);
-		ct = (double*) PyArray_DATA(obj);
+		ct = (double*) PyArray_Data(obj);
 		for (i=0; i<$self->nlat; i++)		ct[i] = $self->ct[i];		// copy
 		return obj;
 	}
@@ -232,17 +237,17 @@ inline PyObject* SpatArray_New(int size) {
 			return NULL;
 		}
 		obj = SpatArray_New($self->nlat_2);
-		shtns_gauss_wts($self, PyArray_DATA(obj));
+		shtns_gauss_wts($self, PyArray_Data(obj));
 		return obj;
 	}
 	PyObject* mul_ct_matrix() {
 		PyObject *mx = SpatArray_New(2*$self->nlm);
-		mul_ct_matrix($self, PyArray_DATA(mx));
+		mul_ct_matrix($self, PyArray_Data(mx));
 		return mx;
 	}
 	PyObject* st_dt_matrix() {
 		PyObject *mx = SpatArray_New(2*$self->nlm);
-		st_dt_matrix($self, PyArray_DATA(mx));
+		st_dt_matrix($self, PyArray_Data(mx));
 		return mx;
 	}
 
@@ -284,56 +289,56 @@ inline PyObject* SpatArray_New(int size) {
 	/* scalar transforms */
 	void spat_to_SH(PyObject *Vr, PyObject *Qlm) {
 		if (check_spatial(1,Vr, $self->nspat) && check_spectral(2,Qlm, $self->nlm))
-			spat_to_SH($self, PyArray_DATA(Vr), PyArray_DATA(Qlm));
+			spat_to_SH($self, PyArray_Data(Vr), PyArray_Data(Qlm));
 	}
 	void SH_to_spat(PyObject *Qlm, PyObject *Vr) {
 		if (check_spatial(2,Vr, $self->nspat) && check_spectral(1,Qlm, $self->nlm))
-			SH_to_spat($self, PyArray_DATA(Qlm), PyArray_DATA(Vr));
+			SH_to_spat($self, PyArray_Data(Qlm), PyArray_Data(Vr));
 	}
 	/* complex transforms */
 	void spat_cplx_to_SH(PyObject *z, PyObject *alm) {
 		int n = $self->lmax + 1;
 		if (check_spectral(1,z, $self->nspat) && check_spectral(2,alm, n*n))
-			spat_cplx_to_SH($self, PyArray_DATA(z), PyArray_DATA(alm));
+			spat_cplx_to_SH($self, PyArray_Data(z), PyArray_Data(alm));
 	}
 	void SH_to_spat_cplx(PyObject *alm, PyObject *z) {
 		int n = $self->lmax + 1;
 		if (check_spectral(2,z, $self->nspat) && check_spectral(1,alm, n*n))
-			SH_to_spat_cplx($self, PyArray_DATA(alm), PyArray_DATA(z));
+			SH_to_spat_cplx($self, PyArray_Data(alm), PyArray_Data(z));
 	}
 	/*void SH_to_spat_grad(PyObject *alm, PyObject *gt, PyObject *gp) {
 		if (check_spatial(3,gp, $self->nspat) && check_spatial(2,gt, $self->nspat) && check_spectral(1,alm, $self->nlm))
-			SH_to_spat_grad($self, PyArray_DATA(alm), PyArray_DATA(gt), PyArray_DATA(gp));
+			SH_to_spat_grad($self, PyArray_Data(alm), PyArray_Data(gt), PyArray_Data(gp));
 	}*/
 
 	/* 2D vectors */
 	void spat_to_SHsphtor(PyObject *Vt, PyObject *Vp, PyObject *Slm, PyObject *Tlm) {
 		if (check_spatial(1,Vt, $self->nspat) && check_spatial(2,Vp, $self->nspat) && check_spectral(3,Slm, $self->nlm) && check_spectral(4,Tlm, $self->nlm))
-			spat_to_SHsphtor($self, PyArray_DATA(Vt), PyArray_DATA(Vp), PyArray_DATA(Slm), PyArray_DATA(Tlm));
+			spat_to_SHsphtor($self, PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Slm), PyArray_Data(Tlm));
 	}
 	void SHsphtor_to_spat(PyObject *Slm, PyObject *Tlm, PyObject *Vt, PyObject *Vp) {
 		if (check_spatial(3,Vt, $self->nspat) && check_spatial(4,Vp, $self->nspat) && check_spectral(1,Slm, $self->nlm) && check_spectral(2,Tlm, $self->nlm))
-			SHsphtor_to_spat($self, PyArray_DATA(Slm), PyArray_DATA(Tlm), PyArray_DATA(Vt), PyArray_DATA(Vp));
+			SHsphtor_to_spat($self, PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp));
 	}
 	void SHsph_to_spat(PyObject *Slm, PyObject *Vt, PyObject *Vp) {
 		if (check_spatial(2,Vt, $self->nspat) && check_spatial(3,Vp, $self->nspat) && check_spectral(1,Slm, $self->nlm))
-		SHsph_to_spat($self, PyArray_DATA(Slm), PyArray_DATA(Vt), PyArray_DATA(Vp));
+		SHsph_to_spat($self, PyArray_Data(Slm), PyArray_Data(Vt), PyArray_Data(Vp));
 	}
 	void SHtor_to_spat(PyObject *Tlm, PyObject *Vt, PyObject *Vp) {
 		if (check_spatial(2,Vt, $self->nspat) && check_spatial(3,Vp, $self->nspat) && check_spectral(1,Tlm, $self->nlm))
-		SHtor_to_spat($self, PyArray_DATA(Tlm), PyArray_DATA(Vt), PyArray_DATA(Vp));
+		SHtor_to_spat($self, PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp));
 	}
 
 	/* 3D vectors */
 	void spat_to_SHqst(PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *Qlm, PyObject *Slm, PyObject *Tlm) {
 		if (check_spatial(1,Vr, $self->nspat) && check_spatial(2,Vt, $self->nspat) && check_spatial(3,Vp, $self->nspat)
 			&& check_spectral(4,Qlm, $self->nlm) && check_spectral(5,Slm, $self->nlm) && check_spectral(6,Tlm, $self->nlm))
-		spat_to_SHqst($self, PyArray_DATA(Vr), PyArray_DATA(Vt), PyArray_DATA(Vp), PyArray_DATA(Qlm), PyArray_DATA(Slm), PyArray_DATA(Tlm));
+		spat_to_SHqst($self, PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm));
 	}
 	void SHqst_to_spat(PyObject *Qlm, PyObject *Slm, PyObject *Tlm, PyObject *Vr, PyObject *Vt, PyObject *Vp) {
 		if (check_spatial(4,Vr, $self->nspat) && check_spatial(5,Vt, $self->nspat) && check_spatial(6,Vp, $self->nspat)
 			&& check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Slm, $self->nlm) && check_spectral(3,Tlm, $self->nlm))
-		SHqst_to_spat($self, PyArray_DATA(Qlm), PyArray_DATA(Slm), PyArray_DATA(Tlm), PyArray_DATA(Vr), PyArray_DATA(Vt), PyArray_DATA(Vp));
+		SHqst_to_spat($self, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp));
 	}
 
 	%pythoncode %{
@@ -470,7 +475,7 @@ inline PyObject* SpatArray_New(int size) {
 
 	/* local evaluations */
 	double SH_to_point(PyObject *Qlm, double cost, double phi) {
-		if (check_spectral(1,Qlm, $self->nlm))	return SH_to_point($self, PyArray_DATA(Qlm), cost, phi);
+		if (check_spectral(1,Qlm, $self->nlm))	return SH_to_point($self, PyArray_Data(Qlm), cost, phi);
 		return 0.0;
 	}
 	%apply double *OUTPUT { double *vr };
@@ -478,12 +483,12 @@ inline PyObject* SpatArray_New(int size) {
 	%apply double *OUTPUT { double *vp };
 	void SH_to_grad_point(PyObject *DrSlm, PyObject *Slm, double cost, double phi, double *vr, double *vt, double *vp) {
 		if (check_spectral(1,DrSlm, $self->nlm) && check_spectral(2,Slm, $self->nlm))
-			SH_to_grad_point($self, PyArray_DATA(DrSlm), PyArray_DATA(Slm), cost, phi, vr, vt, vp);
+			SH_to_grad_point($self, PyArray_Data(DrSlm), PyArray_Data(Slm), cost, phi, vr, vt, vp);
 	}
 	void SHqst_to_point(PyObject *Qlm, PyObject *Slm, PyObject *Tlm,
 					double cost, double phi, double *vr, double *vt, double *vp) {
 		if (check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Slm, $self->nlm) && check_spectral(3,Tlm, $self->nlm))
-			SHqst_to_point($self, PyArray_DATA(Qlm), PyArray_DATA(Slm), PyArray_DATA(Tlm), cost, phi, vr, vt, vp);
+			SHqst_to_point($self, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), cost, phi, vr, vt, vp);
 	}
 	%clear double *vr;
 	%clear double *vt;
@@ -493,7 +498,7 @@ inline PyObject* SpatArray_New(int size) {
 	PyObject* Zrotate(PyObject *Qlm, double alpha) {
 		if (check_spectral(1,Qlm, $self->nlm)) {
 			PyObject *Rlm = SpecArray_New($self->nlm);
-			SH_Zrotate($self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
+			SH_Zrotate($self, PyArray_Data(Qlm), alpha, PyArray_Data(Rlm));
 			return Rlm;
 		}
 		return NULL;
@@ -504,7 +509,7 @@ inline PyObject* SpatArray_New(int size) {
 		}
 		if (check_spectral(1,Qlm, $self->nlm)) {
 			PyObject *Rlm = SpecArray_New($self->nlm);
-			SH_Yrotate($self, PyArray_DATA(Qlm), alpha, PyArray_DATA(Rlm));
+			SH_Yrotate($self, PyArray_Data(Qlm), alpha, PyArray_Data(Rlm));
 			return Rlm;
 		}
 		return NULL;
@@ -515,7 +520,7 @@ inline PyObject* SpatArray_New(int size) {
 		}
 		if (check_spectral(1,Qlm, $self->nlm)) {
 			PyObject *Rlm = SpecArray_New($self->nlm);
-			SH_Yrotate90($self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
+			SH_Yrotate90($self, PyArray_Data(Qlm), PyArray_Data(Rlm));
 			return Rlm;
 		}
 		return NULL;
@@ -526,7 +531,7 @@ inline PyObject* SpatArray_New(int size) {
 		}
 		if (check_spectral(1,Qlm, $self->nlm)) {
 			PyObject *Rlm = SpecArray_New($self->nlm);
-			SH_Xrotate90($self, PyArray_DATA(Qlm), PyArray_DATA(Rlm));
+			SH_Xrotate90($self, PyArray_Data(Qlm), PyArray_Data(Rlm));
 			return Rlm;
 		}
 		return NULL;
@@ -536,7 +541,7 @@ inline PyObject* SpatArray_New(int size) {
 	PyObject* SH_mul_mx(PyObject *mx, PyObject *Qlm) {
 		if (check_spectral(2,Qlm, $self->nlm) && check_spatial(1, mx, 2* $self->nlm)) {
 			PyObject *Rlm = SpecArray_New($self->nlm);
-			SH_mul_mx($self, PyArray_DATA(mx), PyArray_DATA(Qlm), PyArray_DATA(Rlm));
+			SH_mul_mx($self, PyArray_Data(mx), PyArray_Data(Qlm), PyArray_Data(Rlm));
 			return Rlm;
 		}
 		return NULL;
@@ -546,44 +551,44 @@ inline PyObject* SpatArray_New(int size) {
 	void spat_to_SH_m(PyObject *Vr, PyObject *Qlm, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;
 		if ((im_ >= 0) && check_spectral(1,Vr, $self->nlat) && check_spectral(2,Qlm, ltr+1 - im_*$self->mres))
-			spat_to_SH_ml($self, im_, PyArray_DATA(Vr), PyArray_DATA(Qlm), ltr);
+			spat_to_SH_ml($self, im_, PyArray_Data(Vr), PyArray_Data(Qlm), ltr);
 	}
 	void SH_to_spat_m(PyObject *Qlm, PyObject *Vr, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;
 		if ((im_ >= 0) && check_spectral(2,Vr, $self->nlat) && check_spectral(1,Qlm, ltr+1 - im_*$self->mres))
-			SH_to_spat_ml($self, im_, PyArray_DATA(Qlm), PyArray_DATA(Vr), ltr);
+			SH_to_spat_ml($self, im_, PyArray_Data(Qlm), PyArray_Data(Vr), ltr);
 	}
 	void spat_to_SHsphtor_m(PyObject *Vt, PyObject *Vp, PyObject *Slm, PyObject *Tlm, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
 		if ((im_ >= 0) && check_spectral(1,Vt, $self->nlat) && check_spectral(2,Vp, $self->nlat) && check_spectral(3,Slm, nelem) && check_spectral(4,Tlm, nelem))
-			spat_to_SHsphtor_ml($self, im_, PyArray_DATA(Vt), PyArray_DATA(Vp), PyArray_DATA(Slm), PyArray_DATA(Tlm), ltr);
+			spat_to_SHsphtor_ml($self, im_, PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Slm), PyArray_Data(Tlm), ltr);
 	}
 	void SHsphtor_to_spat_m(PyObject *Slm, PyObject *Tlm, PyObject *Vt, PyObject *Vp, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
 		if ((im_ >= 0) && check_spectral(3,Vt, $self->nlat) && check_spectral(4,Vp, $self->nlat) && check_spectral(1,Slm, nelem) && check_spectral(2,Tlm, nelem))
-			SHsphtor_to_spat_ml($self, im_, PyArray_DATA(Slm), PyArray_DATA(Tlm), PyArray_DATA(Vt), PyArray_DATA(Vp), ltr);
+			SHsphtor_to_spat_ml($self, im_, PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 	void SHsph_to_spat_m(PyObject *Slm, PyObject *Vt, PyObject *Vp, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
 		if ((im_ >= 0) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat) && check_spectral(1,Slm, nelem))
-		SHsph_to_spat_ml($self, im_, PyArray_DATA(Slm), PyArray_DATA(Vt), PyArray_DATA(Vp), ltr);
+		SHsph_to_spat_ml($self, im_, PyArray_Data(Slm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 	void SHtor_to_spat_m(PyObject *Tlm, PyObject *Vt, PyObject *Vp, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
 		if ((im_ >= 0) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat) && check_spectral(1,Tlm, nelem))
-		SHtor_to_spat_ml($self, im_, PyArray_DATA(Tlm), PyArray_DATA(Vt), PyArray_DATA(Vp), ltr);
+		SHtor_to_spat_ml($self, im_, PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 	void spat_to_SHqst_m(PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *Qlm, PyObject *Slm, PyObject *Tlm, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
 		if ((im_ >= 0) && check_spectral(1,Vr, $self->nlat) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat)
 			&& check_spectral(4,Qlm, nelem) && check_spectral(5,Slm, nelem) && check_spectral(6,Tlm, nelem))
-		spat_to_SHqst_ml($self, im_, PyArray_DATA(Vr), PyArray_DATA(Vt), PyArray_DATA(Vp), PyArray_DATA(Qlm), PyArray_DATA(Slm), PyArray_DATA(Tlm), ltr);
+		spat_to_SHqst_ml($self, im_, PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), ltr);
 	}
 	void SHqst_to_spat_m(PyObject *Qlm, PyObject *Slm, PyObject *Tlm, PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
 		if ((im_ >= 0) && check_spectral(4,Vr, $self->nlat) && check_spectral(5,Vt, $self->nlat) && check_spectral(6,Vp, $self->nlat)
 			&& check_spectral(1,Qlm, nelem) && check_spectral(2,Slm, nelem) && check_spectral(3,Tlm, nelem))
-		SHqst_to_spat_ml($self, im_, PyArray_DATA(Qlm), PyArray_DATA(Slm), PyArray_DATA(Tlm), PyArray_DATA(Vr), PyArray_DATA(Vt), PyArray_DATA(Vp), ltr);
+		SHqst_to_spat_ml($self, im_, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 
 };

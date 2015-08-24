@@ -69,7 +69,11 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
-* v2.6.4  (24 Jul 2015)
+* v2.6.5  (24 Aug 2015)
+	- critical bugfix (multiple transforms of different lmax failed sometimes).
+	- faster DCT initialization when using multiple threads.
+
+* v2.6.4  (25 Jul 2015)
 	- a critical bugfix (segfault of fixed-m tranforms when mmax=0).
 	- fixed-m Legendre transforms added to Fortran API.
 
@@ -146,7 +150,7 @@ CHANGE LOG:
 
 * v2.2.3  (24 Jun 2012)
 	- critical bugfix: `SHtor_to_spat()` and `SHsph_to_spat()` gave wrong results
-	  for mmax>0 with on-the-fly transoforms.
+	  for mmax>0 with on-the-fly transforms.
 	- minor bugfix in Python interface.
 
 * v2.2.2  (21 Jun 2012)
