@@ -1928,6 +1928,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
 		shtns->ct = NULL;	shtns->st = NULL;
 		shtns->nphi = 0;	shtns->nlat = 0;	shtns->nlat_2 = 0;		shtns->nspat = 0;	// public data
+		shtns->ylm_lat = NULL;	shtns->ct_lat = 2.0;	shtns->ifft_lat = NULL;		shtns->nphi_lat = 0;	// _to_lat data
 	}
 
 	// copy sizes.

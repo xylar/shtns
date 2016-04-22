@@ -359,8 +359,6 @@ double SH_to_point(shtns_cfg shtns, cplx *Qlm, double cost, double phi)
 		}
 		vr0 += vr1;
 	if (MTR>0) {
-		cplx eip, eimp;
-		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
 		im = 1;  do {
 			m = im*MRES;
 			legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
@@ -370,8 +368,7 @@ double SH_to_point(shtns_cfg shtns, cplx *Qlm, double cost, double phi)
 				vrm0 += vdup(yl[l]) * Ql[l];
 				vrm1 += vdup(yl[l+1]) * Ql[l+1];
 			}
-//			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
-			eimp *= eip;			// not so accurate, but it should be enough for rendering uses.
+			cplx eimp = 2.*(cos(m*phi) + I*sin(m*phi));		// we need something accurate here.
 			vrm0 += vrm1;
 			if (l==LTR) {
 				vrm0 += vdup(yl[l]) * Ql[l];
@@ -399,14 +396,11 @@ void SH_to_grad_point(shtns_cfg shtns, cplx *DrSlm, cplx *Slm, double cost, doub
 			vtt += dtyl[l] * creal( Slm[l] );
 		}
 	if (MTR>0) {
-		cplx eip, eimp, imeimp;
-		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
 		im=1;  do {
 			m = im*MRES;
 			legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
-//			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
-			eimp *= eip;		// not so accurate, but it should be enough for rendering uses.
-			imeimp = eimp*m*I;
+			cplx eimp = 2.*(cos(m*phi) + I*sin(m*phi));
+			cplx imeimp = eimp*m*I;
 			l = LiM(shtns, 0,im);
 			v2d* Ql = (v2d*) &DrSlm[l];		v2d* Sl = (v2d*) &Slm[l];
 			v2d qm = vdup(0.0);
@@ -446,14 +440,11 @@ void SHqst_to_point(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double cos
 			vpp -= dtyl[l] * creal( Tlm[l] );
 		}
 	if (MTR>0) {
-		cplx eip, eimp, imeimp;
-		eip = cos(phi*MRES) + I*sin(phi*MRES);	eimp = 2.0;
 		im=1;  do {
 			m = im*MRES;
 			legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
-//			eimp = 2.*(cos(m*phi) + I*sin(m*phi));
-			eimp *= eip;		// not so accurate, but it should be enough for rendering uses.
-			imeimp = eimp*m*I;
+			cplx eimp = 2.*(cos(m*phi) + I*sin(m*phi));
+			cplx imeimp = eimp*m*I;
 			l = LiM(shtns, 0,im);
 			v2d* Ql = (v2d*) &Qlm[l];	v2d* Sl = (v2d*) &Slm[l];	v2d* Tl = (v2d*) &Tlm[l];
 			v2d qm = vdup(0.0);
@@ -484,66 +475,66 @@ void SHqst_to_point(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double cos
 #undef MTR
 
 
-
 /*
 	SYNTHESIS AT A GIVEN LATITUDE
 	(does not require a previous call to shtns_set_grid)
 */
 
-fftw_plan ifft_lat = NULL;		///< fftw plan for SHqst_to_lat
-int nphi_lat = 0;			///< nphi of previous SHqst_to_lat
-double* ylm_lat = NULL;
-double* dylm_lat;
-double ct_lat = 2.0;
-double st_lat;
-
 /// synthesis at a given latitude, on nphi equispaced longitude points.
-/// vr, vt, and vp arrays must have nphi+2 doubles allocated (fftw requirement).
-/// It does not require a previous call to shtns_set_grid, but it is NOT thread-safe.
+/// vr, vt, and vp arrays must have nphi doubles allocated.
+/// It does not require a previous call to shtns_set_grid, but it is NOT thread-safe, 
+/// unless called with a different shtns_cfg
 /// \ingroup local
 void SHqst_to_lat(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr)
 {
 	cplx vst, vtt, vsp, vtp, vrr;
 	cplx *vrc, *vtc, *vpc;
-	long int m, l, j;
+	double* ylm_lat;
+	double* dylm_lat;
+	double st_lat;
 
 	if (ltr > LMAX) ltr=LMAX;
 	if (mtr > MMAX) mtr=MMAX;
 	if (mtr*MRES > ltr) mtr=ltr/MRES;
 	if (mtr*2*MRES >= nphi) mtr = (nphi-1)/(2*MRES);
 
-	vrc = (cplx *) vr;
-	vtc = (cplx *) vt;
-	vpc = (cplx *) vp;
+	ylm_lat = shtns->ylm_lat;
+	if (ylm_lat == NULL) {		// alloc memory for Legendre functions ?
+		ylm_lat = (double *) malloc(sizeof(double)* 2*NLM);
+		shtns->ylm_lat = ylm_lat;
+	}
+	dylm_lat = ylm_lat + NLM;
 
-	if ((nphi != nphi_lat)||(ifft_lat == NULL)) {
-		if (ifft_lat != NULL) fftw_destroy_plan(ifft_lat);
-		#ifdef OMP_FFTW
-			fftw_plan_with_nthreads(1);
-		#endif
-		ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, FFTW_ESTIMATE);
-		nphi_lat = nphi;
-	}
-	if (ylm_lat == NULL) {
-		ylm_lat = (double *) malloc(sizeof(double)* NLM*2);
-		dylm_lat = ylm_lat + NLM;
-	}
-	if (cost != ct_lat) {		// don't recompute if same latitude (ie equatorial disc rendering)
-		st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)
-		for (m=0,j=0; m<=mtr; ++m) {
+	st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)
+	if (cost != shtns->ct_lat) {		// compute Legendre functions ?
+		shtns->ct_lat = cost;
+		for (int m=0,j=0; m<=mtr; ++m) {
 			legendre_sphPlm_deriv_array(shtns, ltr, m, cost, st_lat, &ylm_lat[j], &dylm_lat[j]);
 			j += LMAX -m*MRES +1;
 		}
 	}
 
-	for (m = 0; m<nphi/2+1; ++m) {	// init with zeros
+	vrc = (cplx*) fftw_malloc(sizeof(double) * 3*(nphi+2));
+	vtc = vrc + (nphi/2+1);
+	vpc = vtc + (nphi/2+1);
+
+	if (nphi != shtns->nphi_lat) {		// compute FFTW plan ?
+		if (shtns->ifft_lat) fftw_destroy_plan(shtns->ifft_lat);
+		#ifdef OMP_FFTW
+			fftw_plan_with_nthreads(1);
+		#endif
+		shtns->ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, FFTW_ESTIMATE);
+		shtns->nphi_lat = nphi;
+	}
+
+	for (int m = 0; m<nphi/2+1; ++m) {	// init with zeros
 		vrc[m] = 0.0;	vtc[m] = 0.0;	vpc[m] = 0.0;
 	}
-	j=0;
-	m=0;
+	long j=0;
+	int m=0;
 		vrr=0;	vtt=0;	vst=0;
-		for(l=m; l<=ltr; ++l, ++j) {
+		for(int l=m; l<=ltr; ++l, ++j) {
 			vrr += ylm_lat[j] * creal(Qlm[j]);
 			vst += dylm_lat[j] * creal(Slm[j]);
 			vtt += dylm_lat[j] * creal(Tlm[j]);
@@ -552,9 +543,9 @@ void SHqst_to_lat(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double cost,
 		vrc[m] = vrr;
 		vtc[m] =  vst;	// Vt =   dS/dt
 		vpc[m] = -vtt;	// Vp = - dT/dt
-	for (m=MRES; m<=mtr*MRES; m+=MRES) {
+	for (int m=MRES; m<=mtr*MRES; m+=MRES) {
 		vrr=0;	vtt=0;	vst=0;	vsp=0;	vtp=0;
-		for(l=m; l<=ltr; ++l, ++j) {
+		for(int l=m; l<=ltr; ++l, ++j) {
 			vrr += ylm_lat[j] * Qlm[j];
 			vst += dylm_lat[j] * Slm[j];
 			vtt += dylm_lat[j] * Tlm[j];
@@ -566,71 +557,79 @@ void SHqst_to_lat(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double cost,
 		vtc[m] = I*m*vtp + vst;	// Vt = I.m/sint *T  + dS/dt
 		vpc[m] = I*m*vsp - vtt;	// Vp = I.m/sint *S  - dT/dt
 	}
-	fftw_execute_dft_c2r(ifft_lat,vrc,vr);
-	fftw_execute_dft_c2r(ifft_lat,vtc,vt);
-	fftw_execute_dft_c2r(ifft_lat,vpc,vp);
-//	free(ylm_lat);
+	fftw_execute_dft_c2r(shtns->ifft_lat,vrc,vr);
+	fftw_execute_dft_c2r(shtns->ifft_lat,vtc,vt);
+	fftw_execute_dft_c2r(shtns->ifft_lat,vpc,vp);
+	fftw_free(vrc);
 }
 
 /// synthesis at a given latitude, on nphi equispaced longitude points.
-/// vr arrays must have nphi+2 doubles allocated (fftw requirement).
-/// It does not require a previous call to shtns_set_grid, but it is NOT thread-safe.
+/// vr arrays must have nphi doubles allocated.
+/// It does not require a previous call to shtns_set_grid, but it is NOT thread-safe,
+/// unless called with a different shtns_cfg
 /// \ingroup local
 void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 					double *vr, int nphi, int ltr, int mtr)
 {
 	cplx vrr;
 	cplx *vrc;
-	long int m, l, j;
+	double* ylm_lat;
+	double* dylm_lat;
+	double st_lat;
 
 	if (ltr > LMAX) ltr=LMAX;
 	if (mtr > MMAX) mtr=MMAX;
 	if (mtr*MRES > ltr) mtr=ltr/MRES;
 	if (mtr*2*MRES >= nphi) mtr = (nphi-1)/(2*MRES);
 
-	vrc = (cplx *) vr;
-
-	if ((nphi != nphi_lat)||(ifft_lat == NULL)) {
-		if (ifft_lat != NULL) fftw_destroy_plan(ifft_lat);
-		#ifdef OMP_FFTW
-			fftw_plan_with_nthreads(1);
-		#endif
-		ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, FFTW_ESTIMATE);
-		nphi_lat = nphi;
-	}
+	ylm_lat = shtns->ylm_lat;
 	if (ylm_lat == NULL) {
-		ylm_lat = (double *) malloc(sizeof(double)* NLM*2);
-		dylm_lat = ylm_lat + NLM;
+		ylm_lat = (double *) malloc(sizeof(double)* 2*NLM);
+		shtns->ylm_lat = ylm_lat;
 	}
-	if (cost != ct_lat) {		// don't recompute if same latitude (ie equatorial disc rendering)
-		st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)
-		for (m=0,j=0; m<=mtr; ++m) {
+	dylm_lat = ylm_lat + NLM;
+
+	st_lat = sqrt((1.-cost)*(1.+cost));	// sin(theta)
+	if (cost != shtns->ct_lat) {
+		shtns->ct_lat = cost;
+		for (int m=0,j=0; m<=mtr; ++m) {
 			legendre_sphPlm_deriv_array(shtns, ltr, m, cost, st_lat, &ylm_lat[j], &dylm_lat[j]);
 			j += LMAX -m*MRES +1;
 		}
 	}
 
-	for (m = 0; m<nphi/2+1; ++m) {	// init with zeros
+	vrc = (cplx*) fftw_malloc(sizeof(double) * (nphi+2));
+
+	if (nphi != shtns->nphi_lat) {
+		if (shtns->ifft_lat) fftw_destroy_plan(shtns->ifft_lat);
+		#ifdef OMP_FFTW
+			fftw_plan_with_nthreads(1);
+		#endif
+		shtns->ifft_lat = fftw_plan_dft_c2r_1d(nphi, vrc, vr, FFTW_ESTIMATE);
+		shtns->nphi_lat = nphi;
+	}
+
+	for (int m = 0; m<nphi/2+1; ++m) {	// init with zeros
 		vrc[m] = 0.0;
 	}
-	j=0;
-	m=0;
+	long j=0;
+	int m=0;
 		vrr=0;
-		for(l=m; l<=ltr; ++l, ++j) {
+		for(int l=m; l<=ltr; ++l, ++j) {
 			vrr += ylm_lat[j] * creal(Qlm[j]);
 		}
 		j += (LMAX-ltr);
 		vrc[m] = vrr;
-	for (m=MRES; m<=mtr*MRES; m+=MRES) {
+	for (int m=MRES; m<=mtr*MRES; m+=MRES) {
 		vrr=0;
-		for(l=m; l<=ltr; ++l, ++j) {
+		for(int l=m; l<=ltr; ++l, ++j) {
 			vrr += ylm_lat[j] * Qlm[j];
 		}
 		j+=(LMAX-ltr);
 		vrc[m] = vrr*st_lat;
 	}
-	fftw_execute_dft_c2r(ifft_lat,vrc,vr);
-//	free(ylm_lat);
+	fftw_execute_dft_c2r(shtns->ifft_lat,vrc,vr);
+	fftw_free(vrc);
 }
 
 

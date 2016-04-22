@@ -105,7 +105,7 @@ clean :
 # build a python interface using SWIG.
 # use it with "from shtns import *" in a python program/shell
 _shtns.so : shtns_numpy_wrap.c Makefile $(hfiles) $(objs)
-	$(PYTHON) setup.py build
+	CC="$(CC)" $(PYTHON) setup.py build
 	@echo "*****************************************************************************************"
 	@echo "*** Now, for system wide install, run 'make install' as root.                           *"
 	@echo "*** Otherwise run '$(PYTHON) setup.py install --user' to install for current user only. *"

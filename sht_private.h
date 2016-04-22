@@ -141,6 +141,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *zlm_dct0;	// matrix for direct transform (analysis), only m=0
 	double *dzlm_dct0;
 
+	/* _to_lat stuff */
+	double* ylm_lat;
+	double ct_lat;
+	fftw_plan ifft_lat;		///< fftw plan for SHqst_to_lat
+	int nphi_lat;			///< nphi of previous SHqst_to_lat
+
 	/* other misc informations */
 	unsigned char nlorder;	// order of non-linear terms to be resolved by SH transform.
 	unsigned char grid;		// store grid type.

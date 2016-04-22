@@ -175,6 +175,9 @@ inline static PyObject* SpatArray_New(int size) {
 		self.cos_theta.flags.writeable = False
 		## shape of a spatial array for the grid (tuple of 2 values).
 		self.spat_shape = tuple(self.__spat_shape())
+		if self.nphi == 1:		# override spatial shape when nphi==1
+			self.spat_shape = (self.nlat, 1)
+			if flags & SHT_THETA_CONTIGUOUS: self.spat_shape = (1, self.nlat)
 	%}
 	%apply int *OUTPUT { int *nlat_out };
 	%apply int *OUTPUT { int *nphi_out };
@@ -493,6 +496,18 @@ inline static PyObject* SpatArray_New(int size) {
 	%clear double *vr;
 	%clear double *vt;
 	%clear double *vp;
+	
+	/* _to_lat */
+	void SH_to_lat(PyObject *Qlm, double cost, PyObject *Vr) {
+		if (check_spatial(3,Vr, PyArray_SIZE((PyArrayObject *) Vr)) && check_spectral(1,Qlm, $self->nlm))
+			SH_to_lat($self, PyArray_Data(Qlm), cost, PyArray_Data(Vr), PyArray_SIZE((PyArrayObject *) Vr), $self->lmax, $self->mmax);
+	}
+	void SHqst_to_lat(PyObject *Qlm, PyObject *Slm, PyObject *Tlm, double cost, PyObject *Vr, PyObject *Vt, PyObject *Vp) {
+		int nphi = PyArray_SIZE((PyArrayObject *) Vr);
+		if (check_spatial(5,Vr, nphi) && check_spatial(6,Vt, nphi) && check_spatial(7,Vp, nphi)
+			&& check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Slm, $self->nlm) && check_spectral(3,Tlm, $self->nlm))
+			SHqst_to_lat($self, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), cost, PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), nphi, $self->lmax, $self->mmax);
+	}
 
 	/* rotation of SH representations (experimental) */
 	PyObject* Zrotate(PyObject *Qlm, double alpha) {
