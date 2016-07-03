@@ -249,6 +249,10 @@ AC_CHECK_FUNCS([fftw_cost])
    AC_MSG_RESULT($rtc_ok)
 ### end cycle.h ###
 
+#### for the Fortran example ####
+AC_PROG_FC
+#### end Fortran #####
+
 echo "prefix=$prefix"
 AC_SUBST([target])
 AC_SUBST([install])

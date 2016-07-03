@@ -16,6 +16,7 @@ go= $(CFLAGS) -D_GNU_SOURCE
 shtcc = $(CC) $(go) @shtcc_flags@
 # compiler command with options for other source (initialization, ...)
 cc = $(CC) $(go) -O2
+fc = @FC@ $(go) -O2
 
 hfiles = sht_private.h sht_config.h shtns.h
 objs = sht_init.o @objs@
@@ -88,7 +89,7 @@ SHT_example : examples/SHT_example.c $(libname) shtns.h
 	$(cc) examples/SHT_example.c -I. ./$(libname) $(LIBS) -o SHT_example
 
 SHT_fort_ex : examples/SHT_example.f $(libname) shtns.f
-	gfortran -L$(PREFIX)/lib -I$(PREFIX)/include -I. -fdefault-real-8 examples/SHT_example.f ./$(libname) $(LIBS) -lc -o SHT_fort_ex
+	$(fc) -L$(PREFIX)/lib -I$(PREFIX)/include -I. -fdefault-real-8 examples/SHT_example.f ./$(libname) $(LIBS) -lc -o SHT_fort_ex
 
 #documentation :
 docs :

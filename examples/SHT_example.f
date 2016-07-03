@@ -99,6 +99,9 @@
       enddo
 
 ! Legendre transform (fixed m, no fft):
+! we need a larger spatial grid for these functions to work (nlat >= 16)
+      nlat = 32 
+      call shtns_init_sh_gauss(layout, lmax, mmax, mres, nlat, nphi)
       m = 1*mres
       call shtns_lmidx(lm, m, m)
       Slm(lm+1) = 1.0
