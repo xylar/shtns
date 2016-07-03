@@ -33,7 +33,7 @@ AC_ARG_ENABLE([f77],
 AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX or MIC)]))
 AC_ARG_ENABLE([dct],
-	AS_HELP_STRING([--disable-dct], [Do not use DCT, removes support for regular grids.]))
+	AS_HELP_STRING([--enable-dct], [Enables support for regular grids using DCT (deprecated).]))
 AC_ARG_ENABLE([mem],
 	AS_HELP_STRING([--disable-mem], [Do not use matrix precomputed and stored in memory. Implies --disable-dct.]))
 
@@ -191,7 +191,7 @@ AS_IF([test "x$enable_python" != "xno"], [
 ])
 
 # Checks related to long double
-AS_IF([test "x$enable_long_double" = "xyes"], [
+AS_IF([test "x$enable_long_double" == "xyes"], [
 	AC_TYPE_LONG_DOUBLE_WIDER])
 
 # Disable Fortran interface ?
@@ -209,7 +209,7 @@ AS_IF([test "x$enable_mem" != "xno"], [
 	AC_DEFINE([SHTNS_MEM],[1],[Include algorithms using precomputed matrix stored in memory)])
 	objs="$objs sht_mem.o"		# compile dct transforms
 	# Disable DCT ?
-	AS_IF([test "x$enable_dct" != "xno"], [
+	AS_IF([test "x$enable_dct" == "xyes"], [
 		AC_DEFINE([SHTNS_DCT],[1],[Include DCT support (Fejer quadrature on regular grids)])
 		objs="$objs sht_dct.o"		# compile dct transforms
 	])

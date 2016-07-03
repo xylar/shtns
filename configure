@@ -1333,7 +1333,8 @@ Optional Features:
   --disable-f77           Do not include F77 wrapper to call SHTns library
                           from Fortran
   --disable-simd          Do not use vector extensions (SSE2, AVX or MIC)
-  --disable-dct           Do not use DCT, removes support for regular grids.
+  --enable-dct            Enables support for regular grids using DCT
+                          (deprecated).
   --disable-mem           Do not use matrix precomputed and stored in memory.
                           Implies --disable-dct.
   --disable-openmp        do not use OpenMP
@@ -4303,7 +4304,7 @@ fi
 fi
 
 # Checks related to long double
-if test "x$enable_long_double" = "xyes"; then :
+if test "x$enable_long_double" == "xyes"; then :
 
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for long double with more range or precision than double" >&5
@@ -4385,7 +4386,7 @@ $as_echo "#define SHTNS_MEM 1" >>confdefs.h
 
 	objs="$objs sht_mem.o"		# compile dct transforms
 	# Disable DCT ?
-	if test "x$enable_dct" != "xno"; then :
+	if test "x$enable_dct" == "xyes"; then :
 
 
 $as_echo "#define SHTNS_DCT 1" >>confdefs.h

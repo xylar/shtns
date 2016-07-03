@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2015 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2016 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@ujf-grenoble.fr
@@ -431,6 +431,7 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 
 
 /// \internal free arrays allocated by init_SH_dct
+#ifdef SHTNS_DCT
 static void free_SH_dct(shtns_cfg shtns)
 {
 	if (shtns->zlm_dct0 == NULL) return;
@@ -446,11 +447,14 @@ static void free_SH_dct(shtns_cfg shtns)
 	if (ref_count(shtns, &shtns->dct_m0) == 1)  fftw_destroy_plan(shtns->dct_m0);
 	shtns->idct = NULL;		shtns->dct_m0 = NULL;
 }
+#endif
 
 /// \internal free arrays allocated by alloc_SHTarrays.
 static void free_SHTarrays(shtns_cfg shtns)
 {
+  #ifdef SHTNS_DCT
 	free_SH_dct(shtns);
+  #endif
 	free_unused(shtns, &shtns->ylm);
 	free_unused(shtns, &shtns->dylm);
 	free_unused(shtns, &shtns->zlm);
@@ -499,7 +503,9 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	shtns->k_stride_a = 1;		shtns->m_stride_a = NLAT;		// default strides
 
 	shtns->fft = NULL;		shtns->ifft = NULL;
+	#ifdef SHTNS_DCT
 	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
+	#endif
 
 	shtns->nspat = NPHI * NLAT;		// default spatial size
 
@@ -1584,7 +1590,9 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 	int otf_analys = (shtns->wg != NULL);			// on-the-fly analysis supported.
 
 	if (NLAT < VSIZE2*4) return(0.0);			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow) and DCT not efficient for low NLAT.
+	#ifdef SHTNS_DCT
 	if ((dct_mtr != 0) && (shtns->ykm_dct == NULL)) return(0.0);		// no dct available : do nothing.
+	#endif
 
 	size_t nspat = sizeof(double) * NSPAT_ALLOC(shtns);
 	size_t nspec = sizeof(cplx)* NLM;
@@ -1771,7 +1779,9 @@ void shtns_print_cfg(shtns_cfg shtns)
 
 	switch(shtns->grid) {
 		case GRID_GAUSS : printf("Gauss grid");	 break;
+		#ifdef SHTNS_DCT
 		case GRID_REGULAR : printf("Regular grid (mtr_dct=%d)",shtns->mtr_dct);	 break;
+		#endif
 		case GRID_POLES : printf("Regular grid including poles");  break;
 		default : printf("Unknown grid");
 	}
@@ -1791,7 +1801,7 @@ int config_save(shtns_cfg shtns, int req_flags)
 	
 	if (shtns->ct == NULL) return -1;		// no grid set
 
-	if ((shtns->nphi > 1)||(shtns->mtr_dct >= 0)) {
+	if ((shtns->nphi > 1)||(MTR_DCT >= 0)) {
 		FILE* f = fopen("shtns_cfg_fftw","w");
 		if (f != NULL) {
 			fftw_export_wisdom_to_file(f);
@@ -1801,7 +1811,7 @@ int config_save(shtns_cfg shtns, int req_flags)
 
 	FILE *fcfg = fopen("shtns_cfg","a");
 	if (fcfg != NULL) {
-		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",PACKAGE_VERSION, _SIMD_NAME_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, shtns->mtr_dct);
+		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",PACKAGE_VERSION, _SIMD_NAME_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, MTR_DCT);
 		fprint_ftable(fcfg, shtns->ftable);
 		fprintf(fcfg,"\n");
 		fclose(fcfg);
@@ -2059,7 +2069,9 @@ void shtns_unset_grid(shtns_cfg shtns)
 {
 	if (ref_count(shtns, &shtns->wg) == 1)	VFREE(shtns->wg);
 	shtns->wg = NULL;
+  #ifdef SHTNS_DCT
 	free_SH_dct(shtns);
+  #endif
 	free_SHTarrays(shtns);
 	shtns->nlat = 0;	shtns->nlat_2 = 0;
 	shtns->nphi = 0;	shtns->nspat = 0;
@@ -2138,7 +2150,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 */
 	shtns->nspat = 0;
 	shtns->nlorder = nl_order;
+	#ifdef SHTNS_DCT
 	shtns->mtr_dct = -1;		// dct switched off completely.
+	#endif
 	layout = flags & 0xFFFF00;
 	flags = flags & 255;	// clear higher bits.
 
@@ -2220,7 +2234,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		}
 	}
 	planFFT(shtns, layout, on_the_fly);		// initialize fftw
+	#ifdef SHTNS_DCT
 	shtns->zlm_dct0 = NULL;		// used as a flag.
+	#endif
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
 
   #ifdef SHTNS_DCT

@@ -133,6 +133,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
 
 	/* DCT stuff */
+  #ifdef SHTNS_DCT
 	short mtr_dct;			///< m truncation for dct. -1 means no dct at all.
 	unsigned short klim;	///< Limit to k for non-linear terms (dct)
 	fftw_plan idct, dct_m0;			// (I)DCT
@@ -140,6 +141,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	struct DtDp** dykm_dct;	// theta and phi derivative of Ykm matrix.
 	double *zlm_dct0;	// matrix for direct transform (analysis), only m=0
 	double *dzlm_dct0;
+  #endif
 
 	/* _to_lat stuff */
 	double* ylm_lat;
@@ -165,8 +167,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 #define NPHI shtns->nphi
 #define MMAX shtns->mmax
 #define MRES shtns->mres
-#define MTR_DCT shtns->mtr_dct
 #define SHT_NL_ORDER shtns->nlorder
+#ifdef SHTNS_DCT
+  #define MTR_DCT shtns->mtr_dct
+#else
+  #define MTR_DCT -1
+#endif
 
 // define index in alm/blm matrices
 #define ALM_IDX(shtns, im) ( (im)*(2*shtns->lmax - ((im)-1)*shtns->mres) )
