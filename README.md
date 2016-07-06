@@ -21,7 +21,6 @@ FEATURES:
 - support for SSE2, SSE3, **AVX, AVX2** vectorization, as well as Xeon Phi and
   Blue Gene/Q.
 - **parallel transforms with OpenMP** (for Gauss grid only).
-- an algorithm using DCT for regular nodes (generalized Fejer quadrature).
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).
 - ability to choose the optimal spatial sizes for a given spectral truncation.
 - **on-the-fly transforms** : saving memory and bandwidth, they are even faster
@@ -68,6 +67,13 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
+
+* v2.6.6  (6 Jul 2016)
+	- Improved `SH_to_lat()` function, now also included in the Python interface.
+	- Regular grid and DCT-based transform are deprecated and disabled by
+	   default (enable with --enable-dct).
+	- Fortran example: fixes segfault and compilation issues.
+	- configure script now accepts `FC=` to specify Fortran compiler.
 
 * v2.6.5  (24 Aug 2015)
 	- critical bugfix (multiple transforms of different lmax failed sometimes) [issue #20].

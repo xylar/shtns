@@ -1,9 +1,9 @@
 #!/usr/bin/python
 #
-#  Copyright (c) 2010-2015 Centre National de la Recherche Scientifique.
+#  Copyright (c) 2010-2016 Centre National de la Recherche Scientifique.
 #  written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
 #  
-#  nathanael.schaeffer@ujf-grenoble.fr
+#  nathanael.schaeffer@univ-grenoble-alpes.fr
 #  
 #  This software is governed by the CeCILL license under French law and
 #  abiding by the rules of distribution of free software. You can use,
