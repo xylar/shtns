@@ -632,6 +632,9 @@ void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 	fftw_free(vrc);
 }
 
+// SPAT_CPLX transform indexing scheme:
+// if (l<=MMAX) : l*(l+1) + m
+// if (l>=MMAX) : l*(2*mmax+1) - mmax*mmax + m
 
 /// complex scalar transform.
 /// in: complex spatial field.
@@ -643,7 +646,7 @@ void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 	double *re, *im;
 	cplx *rlm, *ilm;
 
-	if (MMAX != LMAX) shtns_runerr("complex SH requires lmax=mmax and mres=1.");
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
 
 	// alloc temporary fields
 	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
@@ -664,14 +667,14 @@ void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 	int ll = 0;
 	int lm = 0;
 	for (int l=0; l<=LMAX; l++) {
-		ll += 2*l;		// ll = l*(l+1)
+		ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
 		alm[ll] = creal(rlm[lm]) + I*creal(ilm[lm]);		// m=0
 		lm++;
 	}
 	for (int m=1; m<=MMAX; m++) {
 		ll = (m-1)*m;
 		for (int l=m; l<=LMAX; l++) {
-			ll += 2*l;		// ll = l*(l+1)
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
 			cplx rr = rlm[lm];
 			cplx ii = ilm[lm];
 			alm[ll+m] = rr + I*ii;			// m>0
@@ -695,7 +698,7 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 	double *re, *im;
 	cplx *rlm, *ilm;
 
-	if (MMAX != LMAX) shtns_runerr("complex SH requires lmax=mmax and mres=1.");
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
 
 	// alloc temporary fields
 	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
@@ -707,7 +710,7 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 	int ll = 0;
 	int lm = 0;
 	for (int l=0; l<=LMAX; l++) {
-		ll += 2*l;		// ll = l*(l+1)
+		ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
 		rlm[lm] = creal(alm[ll]);		// m=0
 		ilm[lm] = cimag(alm[ll]);
 		lm++;
@@ -717,7 +720,7 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 		ll = (m-1)*m;
 		half_parity = -half_parity;		// (-1)^m * 0.5
 		for (int l=m; l<=LMAX; l++) {
-			ll += 2*l;		// ll = l*(l+1)
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
 			cplx b = alm[ll-m] * half_parity;		// (-1)^m for m negative.
 			cplx a = alm[ll+m] * 0.5;
 			rlm[lm] = (conj(b) + a);		// real part
