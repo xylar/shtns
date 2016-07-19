@@ -15,8 +15,11 @@
  * 
  */
 
+/** \file sht_com.c
+ * \brief Common spherical harmonic tranforms
+ */
 
-// common sht functions and api calls
+/// common sht functions and api calls
 
 /* regular transforms */
 

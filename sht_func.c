@@ -15,7 +15,7 @@
  * 
  */
 
-/** \internal \file sht_rot.c
+/** \internal \file sht_func.c
  * \brief Rotation of Spherical Harmonics.
  */
 
@@ -42,11 +42,9 @@ void SH_Zrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
 	if (Rlm != Qlm) {		// copy m=0 which does not change.
 		l=0;	do { Rlm[l] = Qlm[l]; } while(++l <= lmax);
 	}
-	if (mmax > 0) {
-		im=1; do {
-			cplx eima = cos(im*mres*alpha) - I*sin(im*mres*alpha);		// rotate reference frame by angle -alpha
-			for (l=im*mres; l<=lmax; ++l)	Rlm[LiM(shtns, l, im)] = Qlm[LiM(shtns, l, im)] * eima;
-		} while(++im <= mmax);
+	for (int im=1; im<=mmax; im++) {
+		cplx eima = cos(im*mres*alpha) - I*sin(im*mres*alpha);		// rotate reference frame by angle -alpha
+		for (l=im*mres; l<=lmax; ++l)	Rlm[LiM(shtns, l, im)] = Qlm[LiM(shtns, l, im)] * eima;
 	}
 }
 
@@ -635,6 +633,58 @@ void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 // SPAT_CPLX transform indexing scheme:
 // if (l<=MMAX) : l*(l+1) + m
 // if (l>=MMAX) : l*(2*mmax+1) - mmax*mmax + m
+///\internal
+inline void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
+{
+	// combine into complex coefficients
+	unsigned ll = 0;
+	unsigned lm = 0;
+	for (unsigned l=0; l<=LMAX; l++) {
+		ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+		Zlm[ll] = creal(Rlm[lm]) + I*creal(Ilm[lm]);		// m=0
+		lm++;
+	}
+	for (unsigned m=1; m<=MMAX; m++) {
+		ll = (m-1)*m;
+		for (unsigned l=m; l<=LMAX; l++) {
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+			cplx rr = Rlm[lm];
+			cplx ii = Ilm[lm];
+			Zlm[ll+m] = rr + I*ii;			// m>0
+			rr = conj(rr) + I*conj(ii);		// m<0, m even
+			if (m&1) rr = -rr;				// m<0, m odd
+			Zlm[ll-m] = rr;
+			lm++;
+		}
+	}
+}
+
+///\internal
+inline void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
+{
+	// extract complex coefficients corresponding to real and imag
+	unsigned ll = 0;
+	unsigned lm = 0;
+	for (unsigned l=0; l<=LMAX; l++) {
+		ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+		Rlm[lm] = creal(Zlm[ll]);		// m=0
+		Ilm[lm] = cimag(Zlm[ll]);
+		lm++;
+	}
+	double half_parity = 0.5;
+	for (unsigned m=1; m<=MMAX; m++) {
+		ll = (m-1)*m;
+		half_parity = -half_parity;		// (-1)^m * 0.5
+		for (unsigned l=m; l<=LMAX; l++) {
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+			cplx b = Zlm[ll-m] * half_parity;		// (-1)^m for m negative.
+			cplx a = Zlm[ll+m] * 0.5;
+			Rlm[lm] = (conj(b) + a);		// real part
+			Ilm[lm] = (conj(b) - a)*I;		// imag part
+			lm++;
+		}
+	}
+}
 
 /// complex scalar transform.
 /// in: complex spatial field.
@@ -664,26 +714,7 @@ void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 	spat_to_SH(shtns, im, ilm);
 
 	// combine into complex coefficients
-	int ll = 0;
-	int lm = 0;
-	for (int l=0; l<=LMAX; l++) {
-		ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-		alm[ll] = creal(rlm[lm]) + I*creal(ilm[lm]);		// m=0
-		lm++;
-	}
-	for (int m=1; m<=MMAX; m++) {
-		ll = (m-1)*m;
-		for (int l=m; l<=LMAX; l++) {
-			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-			cplx rr = rlm[lm];
-			cplx ii = ilm[lm];
-			alm[ll+m] = rr + I*ii;			// m>0
-			rr = conj(rr) + I*conj(ii);		// m<0, m even
-			if (m&1) rr = -rr;				// m<0, m odd
-			alm[ll-m] = rr;
-			lm++;
-		}
-	}
+	SH_2real_to_cplx(shtns, rlm, ilm, alm);
 
 	VFREE(re);
 }
@@ -707,27 +738,7 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 	ilm = rlm + NLM;
 
 	// extract complex coefficients corresponding to real and imag
-	int ll = 0;
-	int lm = 0;
-	for (int l=0; l<=LMAX; l++) {
-		ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-		rlm[lm] = creal(alm[ll]);		// m=0
-		ilm[lm] = cimag(alm[ll]);
-		lm++;
-	}
-	double half_parity = 0.5;
-	for (int m=1; m<=MMAX; m++) {
-		ll = (m-1)*m;
-		half_parity = -half_parity;		// (-1)^m * 0.5
-		for (int l=m; l<=LMAX; l++) {
-			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-			cplx b = alm[ll-m] * half_parity;		// (-1)^m for m negative.
-			cplx a = alm[ll+m] * 0.5;
-			rlm[lm] = (conj(b) + a);		// real part
-			ilm[lm] = (conj(b) - a)*I;		// imag part
-			lm++;
-		}
-	}
+	SH_cplx_to_2real(shtns, alm, rlm, ilm);
 
 	// perform two real transforms:
 	SH_to_spat(shtns, rlm, re);
@@ -739,6 +750,132 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 
 	VFREE(re);
 }
+
+void SH_cplx_Xrotate90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm)
+{
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	cplx* rlm = (cplx*) VMALLOC( NLM*2*sizeof(cplx) );
+	cplx* ilm = rlm + NLM;
+
+	// extract complex coefficients corresponding to real and imag
+	SH_cplx_to_2real(shtns, Qlm, rlm, ilm);
+
+	// perform two real rotations:
+	SH_Xrotate90(shtns, rlm, rlm);
+	SH_Xrotate90(shtns, ilm, ilm);
+
+	// combine back into complex coefficients
+	SH_2real_to_cplx(shtns, rlm, ilm, Rlm);
+
+	VFREE(rlm);
+}
+
+void SH_cplx_Yrotate90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm)
+{
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	cplx* rlm = (cplx*) VMALLOC( NLM*2*sizeof(cplx) );
+	cplx* ilm = rlm + NLM;
+
+	// extract complex coefficients corresponding to real and imag
+	SH_cplx_to_2real(shtns, Qlm, rlm, ilm);
+
+	// perform two real rotations:
+	SH_Yrotate90(shtns, rlm, rlm);
+	SH_Yrotate90(shtns, ilm, ilm);
+
+	// combine back into complex coefficients
+	SH_2real_to_cplx(shtns, rlm, ilm, Rlm);
+
+	VFREE(rlm);
+}
+
+/// complex scalar rotation around Y
+/// in: Qlm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
+/// out: Qlm[l*(l+1)+m] is the rotated SH coefficients of order l and degree m (with -l <= m <= l)
+void SH_cplx_Yrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
+{
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	cplx* rlm = (cplx*) VMALLOC( NLM*2*sizeof(cplx) );
+	cplx* ilm = rlm + NLM;
+
+	// extract complex coefficients corresponding to real and imag
+	SH_cplx_to_2real(shtns, Qlm, rlm, ilm);
+
+	// perform two real rotations:
+	SH_Yrotate(shtns, rlm, alpha, rlm);
+	SH_Yrotate(shtns, ilm, alpha, ilm);
+
+	// combine back into complex coefficients
+	SH_2real_to_cplx(shtns, rlm, ilm, Rlm);
+
+	VFREE(rlm);
+}
+
+/// complex scalar rotation around Z
+/// in: Qlm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
+/// out: Qlm[l*(l+1)+m] is the rotated SH coefficients of order l and degree m (with -l <= m <= l)
+void SH_cplx_Zrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
+{
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	cplx* rlm = (cplx*) VMALLOC( NLM*2*sizeof(cplx) );
+	cplx* ilm = rlm + NLM;
+
+	// extract complex coefficients corresponding to real and imag
+	SH_cplx_to_2real(shtns, Qlm, rlm, ilm);
+
+	// perform two real rotations:
+	SH_Zrotate(shtns, rlm, alpha, rlm);
+	SH_Zrotate(shtns, ilm, alpha, ilm);
+
+	// combine back into complex coefficients
+	SH_2real_to_cplx(shtns, rlm, ilm, Rlm);
+
+	VFREE(rlm);
+}
+
+/*
+/// Rotate a SH representation of complex field Qlm around the z-axis by angle alpha (in radians),
+/// which is the same as rotating the reference frame by angle -alpha.
+/// Result is stored in Rlm (which can be the same array as Qlm).
+void SH_cplx_Zrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
+{
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	cplx* eima = (cplx*) VMALLOC( (2*MMAX+1)*sizeof(cplx) );
+	eima += MMAX;
+	eima[0] = 1.0;
+	for (int m=1; m<=MMAX; m++) {		// precompute the complex numbers
+		double cma = cos(m*alpha);
+		double sma = sin(m*alpha);
+		eima[m]  = cma - I*sma;
+		eima[-m] = cma + I*sma;
+	}
+
+	unsigned ll=0;
+	for (unsigned l=0; l<=MMAX; l++) {
+		for (int m=-l; m<=l; m++) {
+			Rlm[ll] = Qlm[ll] * eima[m];
+			ll++;
+		}
+	}
+	for (unsigned l=MMAX+1; l<=LMAX; l++) {
+		for (int m=-MMAX; m<=MMAX; m++) {
+			Rlm[ll] = Qlm[ll] * eima[m];
+			ll++;
+		}
+	}
+
+	VFREE(eima);
+}
+*/
 
 /*
 void SH_to_spat_grad(shtns_cfg shtns, cplx *alm, double *gt, double *gp)

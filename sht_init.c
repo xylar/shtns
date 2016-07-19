@@ -2586,6 +2586,48 @@ void shtns_qst_to_point_(double *vr, double *vt, double *vp,
 }
 //@}
 
+void shtns_sh_zrotate_(cplx* Qlm, double* alpha, cplx* Rlm)
+{
+	SH_Zrotate(sht_data, Qlm, *alpha, Rlm);
+}
+
+void shtns_sh_yrotate_(cplx* Qlm, double* alpha, cplx* Rlm)
+{
+	SH_Yrotate(sht_data, Qlm, *alpha, Rlm);
+}
+
+void shtns_sh_xrotate90_(cplx *Qlm, cplx *Rlm)
+{
+	SH_Xrotate90(sht_data, Qlm, Rlm);
+}
+
+void shtns_sh_yrotate90_(cplx *Qlm, cplx *Rlm)
+{
+	SH_Yrotate90(sht_data, Qlm, Rlm);
+}
+
+void shtns_sh_cplx_zrotate_(cplx* Qlm, double* alpha, cplx* Rlm)
+{
+	SH_cplx_Zrotate(sht_data, Qlm, *alpha, Rlm);
+}
+
+void shtns_sh_cplx_yrotate_(cplx* Qlm, double* alpha, cplx* Rlm)
+{
+	SH_cplx_Yrotate(sht_data, Qlm, *alpha, Rlm);
+}
+
+void shtns_sh_cplx_xrotate90_(cplx *Qlm, cplx *Rlm)
+{
+	SH_cplx_Xrotate90(sht_data, Qlm, Rlm);
+}
+
+void shtns_sh_cplx_yrotate90_(cplx *Qlm, cplx *Rlm)
+{
+	SH_cplx_Yrotate90(sht_data, Qlm, Rlm);
+}
+
+
+
 
 //@}
 
