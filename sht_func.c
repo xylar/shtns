@@ -634,7 +634,7 @@ void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 // if (l<=MMAX) : l*(l+1) + m
 // if (l>=MMAX) : l*(2*mmax+1) - mmax*mmax + m
 ///\internal
-inline void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
+void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
 {
 	// combine into complex coefficients
 	unsigned ll = 0;
@@ -660,7 +660,7 @@ inline void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
 }
 
 ///\internal
-inline void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
+void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
 {
 	// extract complex coefficients corresponding to real and imag
 	unsigned ll = 0;

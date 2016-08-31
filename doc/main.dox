@@ -180,7 +180,7 @@ is the same as the \ref theta_fast layout, except that it requires you to alloca
 memory for a field than the NLAT*NPHI double values.
 Namely NLAT*(NPHI/2+1)*2 doubles are required (instead of NLAT*NPHI) to be able tu use the in-place FFT of FFTW.
 
-In Fortran this means you will allocate data as if the phi direction had (NPHI/2+1)*2 points instead fo NPHI.
+In Fortran this means you will allocate data as if the phi direction had (NPHI/2+1)*2 points instead of NPHI.
 The additional space, is located at the end of the useful data, and you don't need to worry about it.
 
 To instruct \ref shtns_init that your spatial data has been set up using this layout, use \ref SHT_NATIVE_LAYOUT.
@@ -201,30 +201,49 @@ of required \c double is \ref NSPAT_ALLOC = NLAT*(NPHI/2+1)*2. The first NLAT*NP
 
 \section spec_data Spherical Harmonic coefficients layout
 
-<b>The collection of Alm (spherical harmonics coefficient of degree \e l and order \e m) is stored in an array of \c complex \c double floating point values.</b>
-The spherical harmonic truncation is defined by a call to \ref shtns_init or to \ref shtns_create which returns an \c shtns_cfg object (pointer to \ref shtns_info)
-from which the the size of the array, \ref shtns_info.nlm, can be read (see examples).
-
 The field \em A is decomposed on the basis of spherical harmonics Ylm (degree \e l, order \e m) :
 \f[ A(\theta,\phi) = \sum_{l,m} A_l^m Y_l^m(\theta,\phi)\f]
 The series is truncated at degree LMAX and order MMAX*MRES,
 and only order that are multiple of MRES are described.
 
+\subsection spat_real For real-valued spatial data A
+
+<b>The collection of Alm (spherical harmonics coefficient of degree \e l and order \e m) is stored in an array of \c complex \c double floating point values.</b>
+The spherical harmonic truncation is defined by a call to \ref shtns_init or to \ref shtns_create which returns an \c shtns_cfg object (pointer to \ref shtns_info)
+from which the the size of the array, \ref shtns_info.nlm, can be read (see examples).
+
 The NLM coefficients Alm are stored in a one-dimensional array, grouped by \e m.\n
 The details of the storage may depend on the algorithm, and to access a particular coefficient, you should always use the following macros :
- - \ref LM(l,m) gives the index in the array for coefficient of degree \e l and order \e m.
- - \ref LiM(l,im) gives the index in the array for coefficient of degree \e l and order \e im*MRES.
 
-Hence \c Alm[LM(l,m)] is the (complex) SH coefficient of degree \e l and order \e m.
+\subsubsection c_real From C
+ - \ref LM(shtns, l,m) gives the index in the array for coefficient of degree \e l and order \e m.
+ - \ref LiM(shtns l,im) gives the index in the array for coefficient of degree \e l and order \e im*MRES.
 
-\note Since SHTns only deals with real spatial data, the Spherical Harmonic coefficients with negative \e m are related to the complex conjugate of the
+Hence \c Alm[LM(shtns,l,m)] is the (complex) SH coefficient of degree \e l and order \e m.
+ 
+
+\subsubsection f_real From Fortran
+ - call shtns_lmidx(lm, l, m), will return the index \e lm for degree \e l and order \e m
+
+\note For real spatial data, the Spherical Harmonic coefficients with negative \e m are related to the complex conjugate of the
 positive \e m coefficients : \f$ A_l^{-m} = (-1)^{m} (A_l^m)^*\f$. For efficiency purposes, only the coefficients with positive \e m are stored.
 
-\note There is no test on bounds, so that LM(l,m) with \e l or \e m that is not described, will give undefined result
+\note There is no test on bounds, so that LM(shtns, l,m) with \e l or \e m that is not described, will give undefined result
 (in particular for an \e m that is not a multiple of \c MRES)
 
 To perform loops on all coefficients, use the macros \ref LM_LOOP and \ref LM_L_LOOP
 in combination of the arrays \ref shtns_info.li which give the degree \e l and functions of it for any array index.
+
+\subsection spat_cplx For complex-valued spatial data
+
+Complex spatial data can be transformed using \ref spat_cplx_to_SH and \ref SH_to_spat_cplx 
+The indexing of the spectral coefficients in \e Alm is then different from the real-valued data.
+In addition, all \e l and \e m are present.
+Indeed to access coefficient of degree \e l and \e m, we use
+\code Alm[l*(l+1)+m]  \endcode
+or
+\code Alm(l*(l+1)+m+1) \endcode
+from C or Fortran respectively.
 
 \section Allocation
 Allocation for a SH description is simply done with :
