@@ -50,6 +50,41 @@ void SH_Zrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
 
 //@}
 
+/// \internal initialize pseudo-spectral rotations
+static void SH_rotK90_init(shtns_cfg shtns)
+{
+	cplx *q;
+	double *q0;
+	int nfft, nrembed, ncembed;
+
+	const int lmax = shtns->lmax;
+	const int ntheta = ((lmax+2)>>1)*2;
+
+	// generate the equispaced grid for synthesis
+	shtns->ct_rot = VMALLOC( sizeof(double)*ntheta );
+	shtns->st_1_rot = shtns->ct_rot + (ntheta/2);
+	for (int k=0; k<ntheta/2; ++k) {
+		double cost = cos(((0.5*M_PI)*(2*k+1))/ntheta);
+		double sint = sqrt((1.0-cost)*(1.0+cost));
+		shtns->ct_rot[k] =   cost;
+		shtns->st_1_rot[k] = 1.0/sint;
+	}
+
+	// plan FFT
+	size_t sze = 2* sizeof(double)*(2*ntheta+2)*lmax;
+	q0 = VMALLOC(sze);		// alloc.
+	#ifdef OMP_FFTW
+		int k = (lmax < 63) ? 1 : shtns->nthreads;
+		fftw_plan_with_nthreads(k);
+	#endif
+	q = (cplx*) q0;		// in-place FFT
+	nfft = 2*ntheta;	nrembed = nfft+2;		ncembed = nrembed/2;
+	shtns->fft_rot = fftw_plan_many_dft_r2c(1, &nfft, 2*lmax, q0, &nrembed, 2*lmax, 1, q, &ncembed, 2*lmax, 1, FFTW_MEASURE);
+
+	VFREE(q0);
+	shtns->npts_rot = ntheta;		// save ntheta, and mark as initialized.
+}
+
 /** \internal rotation kernel used by SH_Yrotate90(), SH_Xrotate90() and SH_rotate().
  Algorithm based on the pseudospectral rotation[1] :
  - rotate around Z by angle dphi0.
@@ -59,17 +94,12 @@ void SH_Zrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
  [1] Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" Journal of Computational Physics. **/
 static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, double dphi1)
 {
-	fftw_plan fft;
-	cplx *q;
-	double *q0;
-	long int k, m, l;
-	int lmax, ntheta;
-	int nrembed, ncembed;
+	if (shtns->npts_rot == 0)	SH_rotK90_init(shtns);
 
-	lmax = shtns->lmax;
-	ntheta = ((lmax+2)>>1)*2;
-	m = 2* sizeof(double)*(2*ntheta+2)*lmax;
-	q0 = VMALLOC(m);		// alloc.
+	const int lmax = shtns->lmax;
+	const int ntheta = shtns->npts_rot;
+	size_t sze = 2* sizeof(double)*(2*ntheta+2)*lmax;
+	double* const q0 = VMALLOC(sze);		// alloc.
 
 	// rotate around Z by dphi0
 	if (dphi0 != 0.0) {
@@ -79,17 +109,17 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 		Rlm[0] = Qlm[0];		// l=0 is rotation invariant.
 	}
 
-  #pragma omp parallel private(k,m,l) num_threads(shtns->nthreads)
+  #pragma omp parallel num_threads(shtns->nthreads)
   {
 	double yl[lmax+1];
 	// compute q(l) on the meridian phi=0 and phi=pi. (rotate around X)
 	#pragma omp for schedule(static)
-	for (k=0; k<ntheta/2; ++k) {
-		double cost= cos(((0.5*M_PI)*(2*k+1))/ntheta);
-		double sint_1 = 1.0/sqrt((1.0-cost)*(1.0+cost));
-		m=0;
+	for (long int k=0; k<ntheta/2; ++k) {
+		double cost = shtns->ct_rot[k];			// cos(theta)
+		double sint_1 = shtns->st_1_rot[k];		// 1/sin(theta)
+		long m=0;
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
-			for (l=1; l<=lmax; ++l) {
+			for (long l=1; l<=lmax; ++l) {
 				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
 				q0[k*2*lmax +2*(l-1)] = qr;		// m even
 				q0[k*2*lmax +2*(l-1)+1] = 0.0;	// m even
@@ -97,12 +127,12 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 				q0[(ntheta+k)*2*lmax +2*(l-1)+1] = 0.0;	// m odd initialized to 0
 			}
 		#if _GCC_VEC_ && __SSE2__
-		for (m=1; m<=lmax; ++m) {
+		for (long m=1; m<=lmax; ++m) {
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
 			s2d m_st = vset(2.0, 2*m*sint_1);		// *2 for m>0
 			v2d* qk = ((v2d*)q0) + k*lmax;
 			if (m&1)	qk = ((v2d*)q0) + (ntheta+k)*lmax;		// store even and odd m separately.
-			for (l=m; l<=lmax; ++l) {
+			for (long l=m; l<=lmax; ++l) {
 				v2d qc = ((v2d*)Qlm)[LiM(shtns, l, m)] * vdup(yl[l]) * m_st;	// (q0, dq0)
 				qk[l-1]  += qc;
 			}
@@ -110,9 +140,9 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 		// construct rest of ring using symmetries
 		s2d sgnflip = SIGN_MASK_2;
 		s2d sgnl = sgnflip;
-		for (int l=1; l<=lmax; ++l) {
-			v2d qce = ((v2d*)q0)[k*lmax +(l-1)];
-			v2d qco = ((v2d*)q0)[(ntheta+k)*lmax +(l-1)];
+		for (long l=1; l<=lmax; ++l) {
+			v2d qce = ((v2d*)q0)[k*lmax +(l-1)];				// m even
+			v2d qco = ((v2d*)q0)[(ntheta+k)*lmax +(l-1)];		// m odd
 			((v2d*)q0)[k*lmax +(l-1)] = _mm_xor_pd(SIGN_MASK_HI, qce+qco);
 			((v2d*)q0)[(ntheta+k)*lmax +(l-1)] = _mm_xor_pd(sgnl, qce+qco);		// * (-1)^l
 			((v2d*)q0)[(2*ntheta-1-k)*lmax +(l-1)] = qce-qco;
@@ -121,24 +151,24 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 		}
 		#else
 		double sgnm = 1.0;
-		for (int m=1; m<=lmax; ++m) {
+		for (long m=1; m<=lmax; ++m) {
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
 			double* qk = q0 + k*2*lmax;
 			if (m&1)	qk = q0 + (ntheta+k)*2*lmax;		// store even and odd m separately.
-			for (int l=m; l<=lmax; ++l) {
+			for (long l=m; l<=lmax; ++l) {
 				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
 				double qi = cimag(Qlm[LiM(shtns, l, m)]) * m*yl[l]*sint_1;
-				qr += qr;	qi += qi;		// x2 for m>0
+				qr += qr;	qi += qi;		// *2 for m>0
 				qk[2*(l-1)]   += qr;		// q0
 				qk[2*(l-1)+1] += qi;		// dq0
 			}
 		}
 		// construct rest of ring using symmetries
 		double signl = -1.0;
-		for (int l=1; l<=lmax; ++l) {
-			double qre = q0[k*2*lmax +2*(l-1)];
+		for (long l=1; l<=lmax; ++l) {
+			double qre = q0[k*2*lmax +2*(l-1)];				// m even
 			double qie = q0[k*2*lmax +2*(l-1)+1];
-			double qro = q0[(ntheta+k)*2*lmax +2*(l-1)];
+			double qro = q0[(ntheta+k)*2*lmax +2*(l-1)];	// m odd
 			double qio = q0[(ntheta+k)*2*lmax +2*(l-1)+1];
 			q0[k*2*lmax +2*(l-1)]   = qre + qro;
 			q0[k*2*lmax +2*(l-1)+1] = -(qie + qio);
@@ -155,32 +185,26 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
   }
 
 	// perform FFT
-	#ifdef OMP_FFTW
-		k = (lmax < 63) ? 1 : shtns->nthreads;
-		fftw_plan_with_nthreads(k);
-	#endif
-	q = (cplx*) q0;
-	ntheta*=2;		nrembed = ntheta+2;		ncembed = nrembed/2;
-	fft = fftw_plan_many_dft_r2c(1, &ntheta, 2*lmax, q0, &nrembed, 2*lmax, 1, q, &ncembed, 2*lmax, 1, FFTW_ESTIMATE);
-	fftw_execute_dft_r2c(fft, q0, q);
-	fftw_destroy_plan(fft);
+	cplx* q = (cplx*) q0;		// in-place FFT
+	fftw_execute_dft_r2c(shtns->fft_rot, q0, q);
 
+	const int nphi = 2*ntheta;
 	double yl[lmax+1];		double dyl[lmax+1];
-	m=0;
+	long m=0;		long l;
 		//legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
 		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, yl+m, dyl+m);
 		for (l=1; l<lmax; l+=2) {
-			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*ntheta);
-			Rlm[LiM(shtns, l+1,m)] =  creal(q[m*2*lmax +2*l])/(yl[l+1]*ntheta);
+			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*nphi);
+			Rlm[LiM(shtns, l+1,m)] =  creal(q[m*2*lmax +2*l])/(yl[l+1]*nphi);
 		}
 		if (l==lmax) {
-			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*ntheta);
+			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*nphi);
 		}
-	dphi1 += M_PI/ntheta;	// shift rotation angle by angle of first synthesis latitude.
+	dphi1 += M_PI/nphi;	// shift rotation angle by angle of first synthesis latitude.
 	for (m=1; m<=lmax; ++m) {
 		//legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
 		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, yl+m, dyl+m);
-		cplx eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/(ntheta);
+		cplx eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/nphi;
 		for (l=m; l<lmax; l+=2) {
 			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./yl[l]);
 			Rlm[LiM(shtns, l+1,m)] =  eimdp*q[m*2*lmax +2*l+1]*(-1./dyl[l+1]);

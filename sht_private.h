@@ -132,6 +132,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
 
+	/* rotation stuff */
+	fftw_plan fft_rot;		// Fourier transform for rotations
+	int npts_rot;			// number of physical points needed
+	double* ct_rot;			// cos(theta) array
+	double* st_1_rot;			// sin(theta) array
+
 	/* DCT stuff */
   #ifdef SHTNS_DCT
 	short mtr_dct;			///< m truncation for dct. -1 means no dct at all.
