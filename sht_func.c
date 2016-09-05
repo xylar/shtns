@@ -69,7 +69,7 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 	lmax = shtns->lmax;
 	ntheta = ((lmax+2)>>1)*2;
 	m = 2* sizeof(double)*(2*ntheta+2)*lmax;
-	q0 = VMALLOC(m);		memset(q0, 0, m);		// alloc & zero out.
+	q0 = VMALLOC(m);		// alloc.
 
 	// rotate around Z by dphi0
 	if (dphi0 != 0.0) {
@@ -89,53 +89,66 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 		double sint_1 = 1.0/sqrt((1.0-cost)*(1.0+cost));
 		m=0;
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
-			double sgnt = -1.0;
 			for (l=1; l<=lmax; ++l) {
 				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
-				q0[k*2*lmax +2*(l-1)] = qr;
-				q0[(ntheta-1-k)*2*lmax +2*(l-1)] = sgnt*qr;
-				q0[(ntheta+k)*2*lmax +2*(l-1)] = sgnt*qr;
-				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)] = qr;
-				sgnt *= -1.0;
+				q0[k*2*lmax +2*(l-1)] = qr;		// m even
+				q0[k*2*lmax +2*(l-1)+1] = 0.0;	// m even
+				q0[(ntheta+k)*2*lmax +2*(l-1)] = 0.0;	// m odd initialized to 0
+				q0[(ntheta+k)*2*lmax +2*(l-1)+1] = 0.0;	// m odd initialized to 0
 			}
 		#if _GCC_VEC_ && __SSE2__
-		s2d sgnm = SIGN_MASK_HI;
-		s2d sgnflip = SIGN_MASK_2;
 		for (m=1; m<=lmax; ++m) {
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
-			s2d sgnt = vdup(0.0);
-			s2d m_st = vset(2.0, -2*m*sint_1);		// x2 for m>0
-			sgnm = _mm_xor_pd(sgnm, sgnflip);	// (-1)^m
+			s2d m_st = vset(2.0, 2*m*sint_1);		// *2 for m>0
+			v2d* qk = ((v2d*)q0) + k*lmax;
+			if (m&1)	qk = ((v2d*)q0) + (ntheta+k)*lmax;		// store even and odd m separately.
 			for (l=m; l<=lmax; ++l) {
 				v2d qc = ((v2d*)Qlm)[LiM(shtns, l, m)] * vdup(yl[l]) * m_st;	// (q0, dq0)
-				((v2d*)q0)[k*lmax +(l-1)] += qc;
-				((v2d*)q0)[(ntheta-1-k)*lmax +(l-1)] += (v2d)_mm_xor_pd(sgnt, qc);
-				qc = _mm_xor_pd(sgnm, qc);
-				((v2d*)q0)[(ntheta+k)*lmax +(l-1)] += (v2d)_mm_xor_pd( sgnt, qc );
-				((v2d*)q0)[(2*ntheta-1-k)*lmax +(l-1)] += qc;
-				sgnt = _mm_xor_pd(sgnt, sgnflip);	// (-1)^(l+m)
+				qk[l-1]  += qc;
 			}
+		}
+		// construct rest of ring using symmetries
+		s2d sgnflip = SIGN_MASK_2;
+		s2d sgnl = sgnflip;
+		for (int l=1; l<=lmax; ++l) {
+			v2d qce = ((v2d*)q0)[k*lmax +(l-1)];
+			v2d qco = ((v2d*)q0)[(ntheta+k)*lmax +(l-1)];
+			((v2d*)q0)[k*lmax +(l-1)] = _mm_xor_pd(SIGN_MASK_HI, qce+qco);
+			((v2d*)q0)[(ntheta+k)*lmax +(l-1)] = _mm_xor_pd(sgnl, qce+qco);		// * (-1)^l
+			((v2d*)q0)[(2*ntheta-1-k)*lmax +(l-1)] = qce-qco;
+			((v2d*)q0)[(ntheta-1-k)*lmax +(l-1)] = _mm_xor_pd(SIGN_MASK_HI, _mm_xor_pd(sgnl, qce-qco));	// (-1)^(l-m)
+			sgnl = _mm_xor_pd(sgnl, sgnflip);		// (-1)^l
 		}
 		#else
 		double sgnm = 1.0;
-		for (m=1; m<=lmax; ++m) {
+		for (int m=1; m<=lmax; ++m) {
 			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
-			double sgnt = 1.0;
-			sgnm *= -1.0;
-			for (l=m; l<=lmax; ++l) {
+			double* qk = q0 + k*2*lmax;
+			if (m&1)	qk = q0 + (ntheta+k)*2*lmax;		// store even and odd m separately.
+			for (int l=m; l<=lmax; ++l) {
 				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
 				double qi = cimag(Qlm[LiM(shtns, l, m)]) * m*yl[l]*sint_1;
 				qr += qr;	qi += qi;		// x2 for m>0
-				q0[k*2*lmax +2*(l-1)] += qr;						// q0
-				q0[k*2*lmax +2*(l-1)+1] -= qi;						// dq0
-				q0[(ntheta-1-k)*2*lmax +2*(l-1)] += sgnt*qr;
-				q0[(ntheta-1-k)*2*lmax +2*(l-1)+1] -= sgnt*qi;
-				q0[(ntheta+k)*2*lmax +2*(l-1)] += (sgnm*sgnt)*qr;
-				q0[(ntheta+k)*2*lmax +2*(l-1)+1] += (sgnm*sgnt)*qi;
-				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)] += sgnm*qr;
-				q0[(2*ntheta-1-k)*2*lmax +2*(l-1)+1] += sgnm*qi;
-				sgnt *= -1.0;
+				qk[2*(l-1)]   += qr;		// q0
+				qk[2*(l-1)+1] += qi;		// dq0
 			}
+		}
+		// construct rest of ring using symmetries
+		double signl = -1.0;
+		for (int l=1; l<=lmax; ++l) {
+			double qre = q0[k*2*lmax +2*(l-1)];
+			double qie = q0[k*2*lmax +2*(l-1)+1];
+			double qro = q0[(ntheta+k)*2*lmax +2*(l-1)];
+			double qio = q0[(ntheta+k)*2*lmax +2*(l-1)+1];
+			q0[k*2*lmax +2*(l-1)]   = qre + qro;
+			q0[k*2*lmax +2*(l-1)+1] = -(qie + qio);
+			q0[(ntheta+k)*2*lmax +2*(l-1)]   = (qre+qro) * signl;				// * (-1)^l
+			q0[(ntheta+k)*2*lmax +2*(l-1)+1] = (qie+qio) * signl;
+			q0[(2*ntheta-1-k)*2*lmax +2*(l-1)]   = qre - qro;
+			q0[(2*ntheta-1-k)*2*lmax +2*(l-1)+1] = qie - qio;
+			q0[(ntheta-1-k)*2*lmax +2*(l-1)]   = (qre - qro) * signl;				// (-1)^(l-m)
+			q0[(ntheta-1-k)*2*lmax +2*(l-1)+1] = (qio - qie) * signl;
+			signl *= -1.0;
 		}
 		#endif
 	}
