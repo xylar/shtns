@@ -58,16 +58,17 @@ static void SH_rotK90_init(shtns_cfg shtns)
 	int nfft, nrembed, ncembed;
 
 	const int lmax = shtns->lmax;
-	const int ntheta = ((lmax+2)>>1)*2;
+	const int fac = 2*VSIZE2;		// we need a multiple of 2*VSIZE2 ...
+	const int ntheta = fft_int( ((lmax+fac)/fac) , 7) * fac;		// ... and also an fft-friendly value
 
 	// generate the equispaced grid for synthesis
 	shtns->ct_rot = VMALLOC( sizeof(double)*ntheta );
-	shtns->st_1_rot = shtns->ct_rot + (ntheta/2);
+	shtns->st_rot = shtns->ct_rot + (ntheta/2);
 	for (int k=0; k<ntheta/2; ++k) {
 		double cost = cos(((0.5*M_PI)*(2*k+1))/ntheta);
 		double sint = sqrt((1.0-cost)*(1.0+cost));
-		shtns->ct_rot[k] =   cost;
-		shtns->st_1_rot[k] = 1.0/sint;
+		shtns->ct_rot[k] = cost;
+		shtns->st_rot[k] = sint;
 	}
 
 	// plan FFT
@@ -109,80 +110,174 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 		Rlm[0] = Qlm[0];		// l=0 is rotation invariant.
 	}
 
-  #pragma omp parallel num_threads(shtns->nthreads)
-  {
-	double yl[lmax+1];
-	// compute q(l) on the meridian phi=0 and phi=pi. (rotate around X)
-	#pragma omp for schedule(static)
-	for (long int k=0; k<ntheta/2; ++k) {
-		double cost = shtns->ct_rot[k];			// cos(theta)
-		double sint_1 = shtns->st_1_rot[k];		// 1/sin(theta)
-		long m=0;
-			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
+#define NWAY 1
+		rnd* const qve = (rnd*) VMALLOC( sizeof(rnd)*NWAY*4*lmax );	// vector buffer
+		rnd* const qvo = qve + NWAY*2*lmax;		// for odd m
+		double* const ct = shtns->ct_rot;
+		double* const st = shtns->st_rot;
+		double* const alm = shtns->alm;
+		const long nk = ntheta/(2*VSIZE2);		// ntheta is a multiple of (2*VSIZE2)
+		long k = 0;
+		do {
+			rnd cost[NWAY], y0[NWAY], y1[NWAY];
+			long l=0;
+			// m=0
+			double*	al = alm;
+			for (int j=0; j<NWAY; ++j) {
+				cost[j] = vread(ct, j+k);
+				y0[j] = vall(al[0]);		// l=0  (discarded)
+			}
+			for (int j=0; j<NWAY; ++j) {
+				y1[j]  = vall(al[0]*al[1]) * cost[j];
+			}
+			al += 2;	l+=2;
+			while(l<=lmax) {
+				for (int j=0; j<NWAY; ++j) {
+					qve[ (l-2)*2*NWAY + 2*j]   = y1[j] * vall(creal(Qlm[l-1]));	// l-1
+					qve[ (l-2)*2*NWAY + 2*j+1] = vall(0.0);
+					qvo[ (l-2)*2*NWAY + 2*j]   = vall(0.0);
+					qvo[ (l-2)*2*NWAY + 2*j+1] = vall(0.0);
+					y0[j]  = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
+				}
+				for (int j=0; j<NWAY; ++j) {
+					qve[ (l-1)*2*NWAY + 2*j]   = y0[j] * vall(creal(Qlm[l]));	// l
+					qve[ (l-1)*2*NWAY + 2*j+1] = vall(0.0);
+					qvo[ (l-1)*2*NWAY + 2*j]   = vall(0.0);
+					qvo[ (l-1)*2*NWAY + 2*j+1] = vall(0.0);
+					y1[j]  = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
+				}
+				al+=4;	l+=2;
+			}
+			if (l==lmax+1) {
+				for (int j=0; j<NWAY; ++j) {
+					qve[ (l-2)*2*NWAY + 2*j]   = y1[j] * vall(creal(Qlm[l-1]));	// l-1
+					qve[ (l-2)*2*NWAY + 2*j+1] = vall(0.0);
+					qvo[ (l-2)*2*NWAY + 2*j]   = vall(0.0);
+					qvo[ (l-2)*2*NWAY + 2*j+1] = vall(0.0);
+				}
+			}
+			// m > 0
+			for (long m=1; m<=lmax; ++m) {
+				rnd* qv = qve;
+				if (m&1) qv = qvo;		// store even and odd m separately.
+				double*	al = shtns->alm + m*(2*lmax -m+1);
+				cplx* Ql = &Qlm[LiM(shtns, 0,m)];	// virtual pointer for l=0 and m
+				rnd cost[NWAY], y0[NWAY], y1[NWAY],st_m[NWAY];
+				for (int j=0; j<NWAY; ++j) {
+					cost[j] = vread(st, k+j);
+					y0[j] = vall(m);		// for the vector transform, compute ylm*m/sint
+					st_m[j] = cost[j]/y0[j];		// sin(theta)/m
+					y0[j] += y0[j];		// *2 for m>0
+				}
+				long l=m-1;
+				long int ny = 0;
+				  if ((int)lmax <= SHT_L_RESCALE_FLY) {
+					do {		// sin(theta)^(m-1)
+						if (l&1) for (int j=0; j<NWAY; ++j) y0[j] *= cost[j];
+						for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
+					} while(l >>= 1);
+				  } else {
+					long int nsint = 0;
+					do {		// sin(theta)^(m-1)		(use rescaling to avoid underflow)
+						if (l&1) {
+							for (int j=0; j<NWAY; ++j) y0[j] *= cost[j];
+							ny += nsint;
+							if (vlo(y0[0]) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
+								ny--;
+								for (int j=0; j<NWAY; ++j) y0[j] *= vall(SHT_SCALE_FACTOR);
+							}
+						}
+						for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
+						nsint += nsint;
+						if (vlo(cost[0]) < 1.0/SHT_SCALE_FACTOR) {
+							nsint--;
+							for (int j=0; j<NWAY; ++j) cost[j] *= vall(SHT_SCALE_FACTOR);
+						}
+					} while(l >>= 1);
+				  }
+				for (int j=0; j<NWAY; ++j) {
+					y0[j] *= vall(al[0]);
+					cost[j] = vread(ct, j+k);
+				}
+				for (int j=0; j<NWAY; ++j) {
+					y1[j]  = (vall(al[1])*y0[j]) *cost[j];
+				}
+				l=m;		al+=2;
+				while ((ny<0) && (l<lmax)) {		// ylm treated as zero and ignored if ny < 0
+					for (int j=0; j<NWAY; ++j) {
+						y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
+					}
+					for (int j=0; j<NWAY; ++j) {
+						y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
+					}
+					l+=2;	al+=4;
+					if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
+						++ny;
+						for (int j=0; j<NWAY; ++j) {
+							y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
+						}
+					}
+				}
+			  if (ny == 0) {
+				while (l<lmax) {
+					rnd yy[NWAY];
+					for (int j=0; j<NWAY; ++j)	yy[j] = y0[j] * st_m[j];
+					for (int j=0; j<NWAY; ++j) {
+						qv[ (l-1)*2*NWAY + 2*j]   += yy[j] * vall(creal(Ql[l]));	// l
+						qv[ (l-1)*2*NWAY + 2*j+1] += y0[j] * vall(cimag(Ql[l]));
+					}
+					for (int j=0; j<NWAY; ++j)	yy[j] = y1[j] * st_m[j];
+					for (int j=0; j<NWAY; ++j) {
+						qv[ (l)*2*NWAY + 2*j]   += yy[j] * vall(creal(Ql[l+1]));	// l+1
+						qv[ (l)*2*NWAY + 2*j+1] += y1[j] * vall(cimag(Ql[l+1]));
+					}
+					for (int j=0; j<NWAY; ++j) {
+						y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];	// l+2
+					}
+					for (int j=0; j<NWAY; ++j) {
+						y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];	// l+3
+					}
+					l+=2;	al+=4;
+				}
+				if (l==lmax) {
+					rnd yy[NWAY];
+					for (int j=0; j<NWAY; ++j)	yy[j] = y0[j] * st_m[j];
+					for (int j=0; j<NWAY; ++j) {
+						qv[ (l-1)*2*NWAY + 2*j]   += yy[j] * vall(creal(Ql[l]));	// l
+						qv[ (l-1)*2*NWAY + 2*j+1] += y0[j] * vall(cimag(Ql[l]));
+					}
+				}
+			  }
+			}
+			// construct ring using symmetries + transpose...
+			double signl = -1.0;
+			double* qse = (double*) qve;
+			double* qso = (double*) qvo;
 			for (long l=1; l<=lmax; ++l) {
-				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
-				q0[k*2*lmax +2*(l-1)] = qr;		// m even
-				q0[k*2*lmax +2*(l-1)+1] = 0.0;	// m even
-				q0[(ntheta+k)*2*lmax +2*(l-1)] = 0.0;	// m odd initialized to 0
-				q0[(ntheta+k)*2*lmax +2*(l-1)+1] = 0.0;	// m odd initialized to 0
+				for (int j=0; j<NWAY; j++) {
+					for (int i=0; i<VSIZE2; i++) {
+						double qre = qse[(l-1)*2*NWAY*VSIZE2 + 2*j*VSIZE2 + i];		// m even
+						double qie = qse[(l-1)*2*NWAY*VSIZE2 + (2*j+1)*VSIZE2 + i];
+						double qro = qso[(l-1)*2*NWAY*VSIZE2 + 2*j*VSIZE2 + i];		// m odd
+						double qio = qso[(l-1)*2*NWAY*VSIZE2 + (2*j+1)*VSIZE2 + i];
+						long ijk = (k+j)*VSIZE2 + i;
+						q0[ijk*2*lmax +2*(l-1)]   = qre + qro;
+						q0[ijk*2*lmax +2*(l-1)+1] = -(qie + qio);
+						q0[(ntheta+ijk)*2*lmax +2*(l-1)]   = (qre+qro) * signl;				// * (-1)^l
+						q0[(ntheta+ijk)*2*lmax +2*(l-1)+1] = (qie+qio) * signl;
+						q0[(2*ntheta-1-ijk)*2*lmax +2*(l-1)]   = qre - qro;
+						q0[(2*ntheta-1-ijk)*2*lmax +2*(l-1)+1] = qie - qio;
+						q0[(ntheta-1-ijk)*2*lmax +2*(l-1)]   = (qre - qro) * signl;				// (-1)^(l-m)
+						q0[(ntheta-1-ijk)*2*lmax +2*(l-1)+1] = (qio - qie) * signl;
+					}
+				}
+				signl *= -1.0;
 			}
-		#if _GCC_VEC_ && __SSE2__
-		for (long m=1; m<=lmax; ++m) {
-			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
-			s2d m_st = vset(2.0, 2*m*sint_1);		// *2 for m>0
-			v2d* qk = ((v2d*)q0) + k*lmax;
-			if (m&1)	qk = ((v2d*)q0) + (ntheta+k)*lmax;		// store even and odd m separately.
-			for (long l=m; l<=lmax; ++l) {
-				v2d qc = ((v2d*)Qlm)[LiM(shtns, l, m)] * vdup(yl[l]) * m_st;	// (q0, dq0)
-				qk[l-1]  += qc;
-			}
-		}
-		// construct rest of ring using symmetries
-		s2d sgnflip = SIGN_MASK_2;
-		s2d sgnl = sgnflip;
-		for (long l=1; l<=lmax; ++l) {
-			v2d qce = ((v2d*)q0)[k*lmax +(l-1)];				// m even
-			v2d qco = ((v2d*)q0)[(ntheta+k)*lmax +(l-1)];		// m odd
-			((v2d*)q0)[k*lmax +(l-1)] = _mm_xor_pd(SIGN_MASK_HI, qce+qco);
-			((v2d*)q0)[(ntheta+k)*lmax +(l-1)] = _mm_xor_pd(sgnl, qce+qco);		// * (-1)^l
-			((v2d*)q0)[(2*ntheta-1-k)*lmax +(l-1)] = qce-qco;
-			((v2d*)q0)[(ntheta-1-k)*lmax +(l-1)] = _mm_xor_pd(SIGN_MASK_HI, _mm_xor_pd(sgnl, qce-qco));	// (-1)^(l-m)
-			sgnl = _mm_xor_pd(sgnl, sgnflip);		// (-1)^l
-		}
-		#else
-		double sgnm = 1.0;
-		for (long m=1; m<=lmax; ++m) {
-			legendre_sphPlm_array(shtns, lmax, m, cost, yl+m);
-			double* qk = q0 + k*2*lmax;
-			if (m&1)	qk = q0 + (ntheta+k)*2*lmax;		// store even and odd m separately.
-			for (long l=m; l<=lmax; ++l) {
-				double qr = creal(Qlm[LiM(shtns, l, m)]) * yl[l];
-				double qi = cimag(Qlm[LiM(shtns, l, m)]) * m*yl[l]*sint_1;
-				qr += qr;	qi += qi;		// *2 for m>0
-				qk[2*(l-1)]   += qr;		// q0
-				qk[2*(l-1)+1] += qi;		// dq0
-			}
-		}
-		// construct rest of ring using symmetries
-		double signl = -1.0;
-		for (long l=1; l<=lmax; ++l) {
-			double qre = q0[k*2*lmax +2*(l-1)];				// m even
-			double qie = q0[k*2*lmax +2*(l-1)+1];
-			double qro = q0[(ntheta+k)*2*lmax +2*(l-1)];	// m odd
-			double qio = q0[(ntheta+k)*2*lmax +2*(l-1)+1];
-			q0[k*2*lmax +2*(l-1)]   = qre + qro;
-			q0[k*2*lmax +2*(l-1)+1] = -(qie + qio);
-			q0[(ntheta+k)*2*lmax +2*(l-1)]   = (qre+qro) * signl;				// * (-1)^l
-			q0[(ntheta+k)*2*lmax +2*(l-1)+1] = (qie+qio) * signl;
-			q0[(2*ntheta-1-k)*2*lmax +2*(l-1)]   = qre - qro;
-			q0[(2*ntheta-1-k)*2*lmax +2*(l-1)+1] = qie - qio;
-			q0[(ntheta-1-k)*2*lmax +2*(l-1)]   = (qre - qro) * signl;				// (-1)^(l-m)
-			q0[(ntheta-1-k)*2*lmax +2*(l-1)+1] = (qio - qie) * signl;
-			signl *= -1.0;
-		}
-		#endif
-	}
-  }
+			k += NWAY;
+		} while (k<nk);
+	VFREE(qve);
+#undef NWAY
+
 
 	// perform FFT
 	cplx* q = (cplx*) q0;		// in-place FFT

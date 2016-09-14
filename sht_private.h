@@ -134,9 +134,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	/* rotation stuff */
 	fftw_plan fft_rot;		// Fourier transform for rotations
-	int npts_rot;			// number of physical points needed
+	unsigned npts_rot;		// number of physical points needed
 	double* ct_rot;			// cos(theta) array
-	double* st_1_rot;			// sin(theta) array
+	double* st_rot;			// sin(theta) array
 
 	/* DCT stuff */
   #ifdef SHTNS_DCT

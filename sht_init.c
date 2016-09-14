@@ -92,6 +92,43 @@ long nlm_calc(long lmax, long mmax, long mres)
 #include "sht_legendre.c"
 
 
+/// \internal return the smallest power of 2 larger than n.
+static int next_power_of_2(int n)
+{
+	int f = 1;
+	if ( (n<=0) || (n>(1<<(sizeof(int)*8-2))) ) return 0;
+	while (f<n) f*=2;
+	return f;
+}
+
+/// \internal find the closest integer that is larger than n and that contains only prime factors up to fmax.
+/// fmax is 7 for optimal FFTW fourier transforms.
+/// return only even integers for n>fmax.
+static int fft_int(int n, int fmax)
+{
+	int k,f;
+
+	if (n<=fmax) return n;
+	if (fmax<2) return 0;
+	if (fmax==2) return next_power_of_2(n);
+
+	n -= 2-(n&1);		// only even n
+	do {
+		n+=2;	f=2;
+		while ((2*f <= n) && ((n&f)==0)) f *= 2;		// no divisions for factor 2.
+		k=3;
+		while ((k<=fmax) &&  (k*f <= n)) {
+			while ((k*f <= n) && (n%(k*f)==0)) f *= k;
+			k+=2;
+		}
+	} while (f != n);
+
+	k = next_power_of_2(n);			// what is the closest power of 2 ?
+	if ((k-n)*33 < n) return k;		// rather choose power of 2 if not too far (3%)
+
+	return n;
+}
+
 /*	SHT FUNCTIONS  */
 #include "sht_func.c"
 
@@ -225,44 +262,6 @@ static void init_sht_array_func(shtns_cfg shtns)
 	#else
 	set_sht_fly(shtns, 0);
 	#endif
-}
-
-
-/// \internal return the smallest power of 2 larger than n.
-static int next_power_of_2(int n)
-{
-	int f = 1;
-	if ( (n<=0) || (n>(1<<(sizeof(int)*8-2))) ) return 0;
-	while (f<n) f*=2;
-	return f;
-}
-
-/// \internal find the closest integer that is larger than n and that contains only factors up to fmax.
-/// fmax is 7 for optimal FFTW fourier transforms.
-/// return only even integers for n>fmax.
-static int fft_int(int n, int fmax)
-{
-	int k,f;
-
-	if (n<=fmax) return n;
-	if (fmax<2) return 0;
-	if (fmax==2) return next_power_of_2(n);
-
-	n -= 2-(n&1);		// only even n
-	do {
-		n+=2;	f=2;
-		while ((2*f <= n) && ((n&f)==0)) f *= 2;		// no divisions for factor 2.
-		k=3;
-		while ((k<=fmax) &&  (k*f <= n)) {
-			while ((k*f <= n) && (n%(k*f)==0)) f *= k;
-			k+=2;
-		}
-	} while (f != n);
-
-	k = next_power_of_2(n);			// what is the closest power of 2 ?
-	if ((k-n)*33 < n) return k;		// rather choose power of 2 if not too far (3%)
-
-	return n;
 }
 
 
