@@ -57,8 +57,10 @@ static void SH_rotK90_init(shtns_cfg shtns)
 	double *q0;
 	int nfft, nrembed, ncembed;
 
+#define NWAY 2
+
 	const int lmax = shtns->lmax;
-	const int fac = 2*VSIZE2;		// we need a multiple of 2*VSIZE2 ...
+	const int fac = 2*VSIZE2*NWAY;		// we need a multiple of 2*VSIZE2*NWAY ...
 	const int ntheta = fft_int( ((lmax+fac)/fac) , 7) * fac;		// ... and also an fft-friendly value
 
 	// generate the equispaced grid for synthesis
@@ -110,7 +112,6 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 		Rlm[0] = Qlm[0];		// l=0 is rotation invariant.
 	}
 
-#define NWAY 1
 		rnd* const qve = (rnd*) VMALLOC( sizeof(rnd)*NWAY*4*lmax );	// vector buffer
 		rnd* const qvo = qve + NWAY*2*lmax;		// for odd m
 		double* const ct = shtns->ct_rot;
@@ -284,28 +285,31 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 	fftw_execute_dft_r2c(shtns->fft_rot, q0, q);
 
 	const int nphi = 2*ntheta;
-	double yl[lmax+1];		double dyl[lmax+1];
-	long m=0;		long l;
-		//legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
-		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, yl+m, dyl+m);
+	double ydyl[lmax+1];
+	long m=0;		long lm=1;		// start at l=1,m=0
+	long l;
+		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, ydyl+m);
 		for (l=1; l<lmax; l+=2) {
-			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*nphi);
-			Rlm[LiM(shtns, l+1,m)] =  creal(q[m*2*lmax +2*l])/(yl[l+1]*nphi);
+			Rlm[lm] =  -creal(q[m*2*lmax +2*(l-1)+1])/(ydyl[l]*nphi);
+			Rlm[lm+1] =  creal(q[m*2*lmax +2*l])/(ydyl[l+1]*nphi);
+			lm+=2;
 		}
 		if (l==lmax) {
-			Rlm[LiM(shtns, l,m)] =  -creal(q[m*2*lmax +2*(l-1)+1])/(dyl[l]*nphi);
+			Rlm[lm] =  -creal(q[m*2*lmax +2*(l-1)+1])/(ydyl[l]*nphi);
+			lm+=1;
 		}
 	dphi1 += M_PI/nphi;	// shift rotation angle by angle of first synthesis latitude.
 	for (m=1; m<=lmax; ++m) {
-		//legendre_sphPlm_deriv_array(shtns, lmax, m, 0.0, 1.0, yl+m, dyl+m);
-		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, yl+m, dyl+m);
+		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, ydyl+m);
 		cplx eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/nphi;
 		for (l=m; l<lmax; l+=2) {
-			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./yl[l]);
-			Rlm[LiM(shtns, l+1,m)] =  eimdp*q[m*2*lmax +2*l+1]*(-1./dyl[l+1]);
+			Rlm[lm] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./ydyl[l]);
+			Rlm[lm+1] =  eimdp*q[m*2*lmax +2*l+1]*(-1./ydyl[l+1]);
+			lm+=2;
 		}
 		if (l==lmax) {
-			Rlm[LiM(shtns, l,m)] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./yl[l]);
+			Rlm[lm] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./ydyl[l]);
+			lm++;
 		}
 	}
 	VFREE(q0);

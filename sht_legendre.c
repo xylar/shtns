@@ -489,8 +489,9 @@ done:
 }
 #endif
 
-/// same as legendre_sphPlm_deriv_array for x=0 and sint=1 (equator)
-static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, const int im, double *yl, double *dyl)
+/// Same as legendre_sphPlm_deriv_array for x=0 and sint=1 (equator).
+/// Depending on the parity of l, either ylm or dylm/dtheta is zero. So we store only the non-zero values.
+static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, const int im, double *ydyl)
 {
 	double *al;
 	int l,m;
@@ -502,27 +503,26 @@ static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, con
 #endif
 
 	al = alm_im(shtns, im);
-	yl -= m;	dyl -= m;			// shift pointers
+	ydyl -= m;			// shift pointer
 
 	y0 = al[0];
-	yl[m] = y0; 	dyl[m] = 0.0;		// l=m
+	ydyl[m] = y0;		// l=m
 	if (lmax==m) return;		// done.
 
 	dy1 = -al[1]*y0;
-	yl[m+1] = 0.0; 	dyl[m+1] = dy1;		// l=m+1
+	ydyl[m+1] = dy1;		// l=m+1
 	if (lmax==m+1) return;		// done.
 
 	l=m+2;	al+=2;
 	while (l < lmax) {
 		y0 = al[0]*y0;
 		dy1 = al[2]*dy1 - al[3]*y0;
-		yl[l] = y0;		dyl[l] = 0.0;
-		yl[l+1] = 0.0;	dyl[l+1] = dy1;
+		ydyl[l]   = y0;
+		ydyl[l+1] = dy1;
 		l+=2;	al+=4;
 	}
 	if (l==lmax) {
-		yl[l] = al[0]*y0;
-		dyl[l] = 0.0;
+		ydyl[l] = al[0]*y0;
 	}
 }
 

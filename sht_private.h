@@ -351,13 +351,16 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 
 #if _GCC_VEC_ && __SSE2__
-	#define MIN_ALIGNMENT 16
 	#define VSIZE 2
 	typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
 	typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
 	#ifdef __AVX__
+		#define MIN_ALIGNMENT 32
 		#define VSIZE2 4
 		#include <immintrin.h>
+		// Allocate memory aligned on 32 bytes for AVX
+		#define VMALLOC(s)	_mm_malloc(s, MIN_ALIGNMENT)
+		#define VFREE(s)	_mm_free(s)
 		#define _SIMD_NAME_ "avx"
 		typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 4 doubles.
 		#define vall(x) ((rnd) _mm256_set1_pd(x))
@@ -396,8 +399,13 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[NLAT-3-(idx)*4] = _mm256_extractf128_pd(aa, 1);	\
 			((s2d*)mem)[NLAT-4-(idx)*4] = _mm256_extractf128_pd(bb, 1);	}
 	#else
+		#define MIN_ALIGNMENT 16
 		#define VSIZE2 2
 		typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 2 doubles.
+		// Allocate memory aligned on 16 bytes for SSE2 (fftw_malloc works only if fftw was compiled with --enable-sse2)
+		// in 64 bit systems, malloc should be 16 bytes aligned anyway.
+		#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : _mm_malloc(s, MIN_ALIGNMENT) )
+		#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : _mm_free(s) )
 		#ifdef __SSE3__
 			#include <pmmintrin.h>
 			#define _SIMD_NAME_ "sse3"
@@ -471,11 +479,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define vlo_to_dbl(a) _mm_cvtsd_f64(a)
 		#define vhi_to_dbl(a) _mm_cvtsd_f64(_mm_unpackhi_pd(a,a))
 	#endif
-
-	// Allocate memory aligned on 16 bytes for SSE2 (fftw_malloc works only if fftw was compiled with --enable-sse2)
-	// in 64 bit systems, malloc should be 16 bytes aligned anyway.
-	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : _mm_malloc(s, MIN_ALIGNMENT) )
-	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : _mm_free(s) )
 #endif
 
 
