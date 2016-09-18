@@ -56,8 +56,10 @@ static void SH_rotK90_init(shtns_cfg shtns)
 	cplx *q;
 	double *q0;
 	int nfft, nrembed, ncembed;
+	
+//	if ((shtns->mres != 1) || (shtns->mmax != shtns->lmax)) runerr("Arbitrary rotations require lmax=mmax and mres=1");
 
-#define NWAY 2
+#define NWAY 4
 
 	const int lmax = shtns->lmax;
 	const int fac = 2*VSIZE2*NWAY;		// we need a multiple of 2*VSIZE2*NWAY ...
@@ -99,18 +101,31 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 {
 	if (shtns->npts_rot == 0)	SH_rotK90_init(shtns);
 
+//	ticks tik0, tik1, tik2, tik3;
+
 	const int lmax = shtns->lmax;
 	const int ntheta = shtns->npts_rot;
 	size_t sze = 2* sizeof(double)*(2*ntheta+2)*lmax;
 	double* const q0 = VMALLOC(sze);		// alloc.
 
-	// rotate around Z by dphi0
-	if (dphi0 != 0.0) {
-		SH_Zrotate(shtns, Qlm, dphi0, Rlm);
-		Qlm = Rlm;
-	} else {
-		Rlm[0] = Qlm[0];		// l=0 is rotation invariant.
+	// rotate around Z by dphi0,  and also pre-multiply imaginary parts by m
+	if (Rlm != Qlm) {		// copy m=0 which does not change.
+		long l=0;	do { Rlm[l] = Qlm[l]; } while(++l <= lmax);
 	}
+	for (int m=1; m<=lmax; m++) {
+		cplx eima = cos(m*dphi0) - I*sin(m*dphi0);		// rotate reference frame by angle -dphi0
+		long lm = LiM(shtns,m,m);
+		double em = m;
+		for (long l=m; l<=lmax; ++l) {
+			cplx qrot = Qlm[lm] * eima;
+			((double*)Rlm)[2*lm]   = creal(qrot);
+			((double*)Rlm)[2*lm+1] = cimag(qrot) * em;		// multiply every imaginary part by m  (part of im/sin(theta)*Ylm)
+			lm++;
+		}
+	}
+	Qlm = Rlm;
+
+//	tik0 = getticks();
 
 		rnd* const qve = (rnd*) VMALLOC( sizeof(rnd)*NWAY*4*lmax );	// vector buffer
 		rnd* const qvo = qve + NWAY*2*lmax;		// for odd m
@@ -163,12 +178,10 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 				if (m&1) qv = qvo;		// store even and odd m separately.
 				double*	al = shtns->alm + m*(2*lmax -m+1);
 				cplx* Ql = &Qlm[LiM(shtns, 0,m)];	// virtual pointer for l=0 and m
-				rnd cost[NWAY], y0[NWAY], y1[NWAY],st_m[NWAY];
+				rnd cost[NWAY], y0[NWAY], y1[NWAY];
 				for (int j=0; j<NWAY; ++j) {
 					cost[j] = vread(st, k+j);
-					y0[j] = vall(m);		// for the vector transform, compute ylm*m/sint
-					st_m[j] = cost[j]/y0[j];		// sin(theta)/m
-					y0[j] += y0[j];		// *2 for m>0
+					y0[j] = vall(2.0);		// *2 for m>0
 				}
 				long l=m-1;
 				long int ny = 0;
@@ -221,16 +234,15 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 				}
 			  if (ny == 0) {
 				while (l<lmax) {
-					rnd yy[NWAY];
-					for (int j=0; j<NWAY; ++j)	yy[j] = y0[j] * st_m[j];
+					rnd qr = vall(creal(Ql[l]));		rnd qi = vall(cimag(Ql[l]));
 					for (int j=0; j<NWAY; ++j) {
-						qv[ (l-1)*2*NWAY + 2*j]   += yy[j] * vall(creal(Ql[l]));	// l
-						qv[ (l-1)*2*NWAY + 2*j+1] += y0[j] * vall(cimag(Ql[l]));
+						qv[ (l-1)*2*NWAY + 2*j]   += y0[j] * qr;	// l
+						qv[ (l-1)*2*NWAY + 2*j+1] += y0[j] * qi;
 					}
-					for (int j=0; j<NWAY; ++j)	yy[j] = y1[j] * st_m[j];
+					qr = vall(creal(Ql[l+1]));		qi = vall(cimag(Ql[l+1]));
 					for (int j=0; j<NWAY; ++j) {
-						qv[ (l)*2*NWAY + 2*j]   += yy[j] * vall(creal(Ql[l+1]));	// l+1
-						qv[ (l)*2*NWAY + 2*j+1] += y1[j] * vall(cimag(Ql[l+1]));
+						qv[ (l)*2*NWAY + 2*j]   += y1[j] * qr;	// l+1
+						qv[ (l)*2*NWAY + 2*j+1] += y1[j] * qi;
 					}
 					for (int j=0; j<NWAY; ++j) {
 						y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];	// l+2
@@ -241,11 +253,10 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 					l+=2;	al+=4;
 				}
 				if (l==lmax) {
-					rnd yy[NWAY];
-					for (int j=0; j<NWAY; ++j)	yy[j] = y0[j] * st_m[j];
+					rnd qr = vall(creal(Ql[l]));		rnd qi = vall(cimag(Ql[l]));
 					for (int j=0; j<NWAY; ++j) {
-						qv[ (l-1)*2*NWAY + 2*j]   += yy[j] * vall(creal(Ql[l]));	// l
-						qv[ (l-1)*2*NWAY + 2*j+1] += y0[j] * vall(cimag(Ql[l]));
+						qv[ (l-1)*2*NWAY + 2*j]   += y0[j] * qr;	// l
+						qv[ (l-1)*2*NWAY + 2*j+1] += y0[j] * qi;
 					}
 				}
 			  }
@@ -262,6 +273,7 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 						double qro = qso[(l-1)*2*NWAY*VSIZE2 + 2*j*VSIZE2 + i];		// m odd
 						double qio = qso[(l-1)*2*NWAY*VSIZE2 + (2*j+1)*VSIZE2 + i];
 						long ijk = (k+j)*VSIZE2 + i;
+						qre *= st[ijk];			qro *= st[ijk];		// mulitply real part by sin(theta)  [to get Ylm from Ylm/sin(theta)]
 						q0[ijk*2*lmax +2*(l-1)]   = qre + qro;
 						q0[ijk*2*lmax +2*(l-1)+1] = -(qie + qio);
 						q0[(ntheta+ijk)*2*lmax +2*(l-1)]   = (qre+qro) * signl;				// * (-1)^l
@@ -279,10 +291,13 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 	VFREE(qve);
 #undef NWAY
 
+//	tik1 = getticks();
 
 	// perform FFT
 	cplx* q = (cplx*) q0;		// in-place FFT
 	fftw_execute_dft_r2c(shtns->fft_rot, q0, q);
+
+//	tik2 = getticks();
 
 	const int nphi = 2*ntheta;
 	double ydyl[lmax+1];
@@ -313,6 +328,10 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 		}
 	}
 	VFREE(q0);
+
+//	tik3 = getticks();
+//	printf("    tick ratio : %.3f  %.3f  %.3f\n", elapsed(tik1,tik0)/elapsed(tik3,tik0), elapsed(tik2,tik1)/elapsed(tik3,tik0), elapsed(tik3,tik2)/elapsed(tik3,tik0));
+
 }
 
 
