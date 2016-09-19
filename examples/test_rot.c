@@ -59,6 +59,32 @@ void write_shell(char *fn, double *V)
 	fprintf(fp,"\n");	fclose(fp);
 }
 
+#ifdef __MACH__		// Mac OSX : clock_gettime is not implemented
+#include <sys/time.h>
+#ifndef CLOCK_MONOTONIC
+  #define CLOCK_MONOTONIC 0
+#endif
+#ifndef CLOCK_REALTIME
+  #define CLOCK_REALTIME 0
+#endif
+int clock_gettime(int ignored, struct timespec* t) {
+    struct timeval now;
+    int rv = gettimeofday(&now, NULL);
+    if (rv) return rv;
+    t->tv_sec  = now.tv_sec;
+    t->tv_nsec = now.tv_usec * 1000;
+    return 0;
+}
+#endif
+
+double tdiff(struct timespec *start, struct timespec *end)
+{
+	double ns = 1.e9 * ((long) end->tv_sec - (long) start->tv_sec);
+	ns += ((long) end->tv_nsec - (long) start->tv_nsec);
+	return ns * (1.e-6);	// time in ms.
+}
+
+
 int main(int argc, char *argv[])
 {
 	complex double t1, t2;
@@ -79,11 +105,16 @@ int main(int argc, char *argv[])
 	MRES=1;
 	NLAT=12;
 	NPHI=16;
+	if (argc > 1) {
+		MMAX=LMAX = atoi(argv[1]);
+		NLAT = 0;	NPHI = 0;  // auto
+	}
 
 	shtns_use_threads(0);
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
 	NLM = shtns->nlm;
 	shtns_set_grid_auto(shtns, sht_quick_init, 0.0, 1e-10, &NLAT, &NPHI);
+	
 	shtns_print_cfg(shtns);
 
 	ShF = (complex double *) fftw_malloc( 4*(NPHI/2+1) * NLAT * sizeof(complex double));
@@ -100,11 +131,20 @@ int main(int argc, char *argv[])
 	Qlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 
 
+	struct timespec ti1, ti2;
 	double mx[3][3];
 
 	for (l=0; l<NLM; l++) 	Qlm[l] = 0.0;
 	Qlm[LiM(shtns, 1, 0)] = 1.0;
-	SH_Xrotate90(shtns, Qlm, Slm);
+	
+	SH_Xrotate90(shtns, Qlm, Slm);		// warm-up + precomputations, including FFTW plan
+	clock_gettime(CLOCK_MONOTONIC, &ti1);
+	for (int k=0; k<10; k++)
+		SH_Xrotate90(shtns, Qlm, Slm);
+	clock_gettime(CLOCK_MONOTONIC, &ti2);
+	double ts2 = tdiff(&ti1, &ti2);
+	printf("time for Xrotate90 = %g ms\n", ts2*0.1);
+//	return 0;
 	mx[0][0] = Slm[LiM(shtns, 1, 0)];
 	mx[1][0] = creal(Slm[LiM(shtns, 1, 1)]);
 	mx[2][0] = cimag(Slm[LiM(shtns, 1, 1)]);
@@ -131,8 +171,11 @@ int main(int argc, char *argv[])
 	
 	for (l=0; l<NLM; l++) 	{Qlm[l] = 0.0;	Slm[l] = 0.0;}
 //	Qlm[0] = 1000.;
-//	Qlm[LiM(shtns, 2, 0)] = 1.0;
+	Qlm[LiM(shtns, 2, 1)] = 1.0;
 	Qlm[LiM(shtns, 1, 1)] = I;	//0.1 + I*0.05;
+	Qlm[LiM(shtns, 3, 1)] = 0.1 + I*0.05;
+	Qlm[LiM(shtns, 4, 2)] = 0.5 + I*0.5;
+	Qlm[LiM(shtns, 5, 2)] = 1.0;
 	
 	SH_to_spat(shtns, Qlm, Sh);
 	write_shell("q0",Sh);
@@ -158,7 +201,8 @@ int main(int argc, char *argv[])
 	for (l=0; l<=LMAX; l++) {
 		double norm0=0;		double normR=0;
 		for (m=0; m<=l; m++) {
-			printf("l=%d, m=%d,  Q=%f,%f,  \t  S=%f,%f\n",l,m, creal(Qlm[LiM(shtns,l,m)]), cimag(Qlm[LiM(shtns,l,m)]),
+			if (LMAX < 32)
+				printf("l=%d, m=%d,  Q=%f,%f,  \t  S=%f,%f\n",l,m, creal(Qlm[LiM(shtns,l,m)]), cimag(Qlm[LiM(shtns,l,m)]),
 			creal(Slm[LiM(shtns,l,m)]), cimag(Slm[LiM(shtns,l,m)]));
 			double e0 = creal(Qlm[LiM(shtns,l,m)])*creal(Qlm[LiM(shtns,l,m)]) + cimag(Qlm[LiM(shtns,l,m)])*cimag(Qlm[LiM(shtns,l,m)]);
 			double eR = creal(Slm[LiM(shtns,l,m)])*creal(Slm[LiM(shtns,l,m)]) + cimag(Slm[LiM(shtns,l,m)])*cimag(Slm[LiM(shtns,l,m)]);			
@@ -168,7 +212,7 @@ int main(int argc, char *argv[])
 			norm0 += e0;
 			normR += eR;
 		}
-		printf("norm0 = %f, norm1 = %f\n", sqrt(norm0), sqrt(normR));
+		if (LMAX < 32) printf("norm0 = %f, norm1 = %f\n", sqrt(norm0), sqrt(normR));
 	}
 
 
@@ -180,7 +224,8 @@ int main(int argc, char *argv[])
 	for (l=0; l<=LMAX; l++) {
 		double norm0=0;		double normR=0;
 		for (m=0; m<=l; m++) {
-			printf("l=%d, m=%d,  Q=%f,%f,  \t  S=%f,%f\n",l,m, creal(Qlm[LiM(shtns,l,m)]), cimag(Qlm[LiM(shtns,l,m)]),
+			if (LMAX < 32)
+				printf("l=%d, m=%d,  Q=%f,%f,  \t  S=%f,%f\n",l,m, creal(Qlm[LiM(shtns,l,m)]), cimag(Qlm[LiM(shtns,l,m)]),
 			creal(Tlm[LiM(shtns,l,m)]), cimag(Tlm[LiM(shtns,l,m)]));
 			double e0 = creal(Qlm[LiM(shtns,l,m)])*creal(Qlm[LiM(shtns,l,m)]) + cimag(Qlm[LiM(shtns,l,m)])*cimag(Qlm[LiM(shtns,l,m)]);
 			double eR = creal(Tlm[LiM(shtns,l,m)])*creal(Tlm[LiM(shtns,l,m)]) + cimag(Tlm[LiM(shtns,l,m)])*cimag(Tlm[LiM(shtns,l,m)]);			
@@ -190,7 +235,7 @@ int main(int argc, char *argv[])
 			norm0 += e0;
 			normR += eR;
 		}
-		printf("norm0 = %f, norm1 = %f\n", sqrt(norm0), sqrt(normR));
+		if (LMAX < 32) printf("norm0 = %f, norm1 = %f\n", sqrt(norm0), sqrt(normR));
 	}
 
 }

@@ -76,7 +76,7 @@ static void SH_rotK90_init(shtns_cfg shtns)
 	}
 
 	// plan FFT
-	size_t sze = 2* sizeof(double)*(2*ntheta+2)*lmax;
+	size_t sze = sizeof(double)*(2*ntheta+2)*lmax;
 	q0 = VMALLOC(sze);		// alloc.
 	#ifdef OMP_FFTW
 		int k = (lmax < 63) ? 1 : shtns->nthreads;
@@ -84,7 +84,7 @@ static void SH_rotK90_init(shtns_cfg shtns)
 	#endif
 	q = (cplx*) q0;		// in-place FFT
 	nfft = 2*ntheta;	nrembed = nfft+2;		ncembed = nrembed/2;
-	shtns->fft_rot = fftw_plan_many_dft_r2c(1, &nfft, 2*lmax, q0, &nrembed, 2*lmax, 1, q, &ncembed, 2*lmax, 1, FFTW_MEASURE);
+	shtns->fft_rot = fftw_plan_many_dft_r2c(1, &nfft, lmax, q0, &nrembed, lmax, 1, q, &ncembed, lmax, 1, FFTW_MEASURE);
 
 	VFREE(q0);
 	shtns->npts_rot = ntheta;		// save ntheta, and mark as initialized.
@@ -99,13 +99,13 @@ static void SH_rotK90_init(shtns_cfg shtns)
  [1] Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" Journal of Computational Physics. **/
 static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, double dphi1)
 {
-	if (shtns->npts_rot == 0)	SH_rotK90_init(shtns);
+//	if (shtns->npts_rot == 0)	SH_rotK90_init(shtns);
 
 //	ticks tik0, tik1, tik2, tik3;
 
 	const int lmax = shtns->lmax;
 	const int ntheta = shtns->npts_rot;
-	size_t sze = 2* sizeof(double)*(2*ntheta+2)*lmax;
+	size_t sze = sizeof(double)*(2*ntheta+2)*lmax;
 	double* const q0 = VMALLOC(sze);		// alloc.
 
 	// rotate around Z by dphi0,  and also pre-multiply imaginary parts by m
@@ -273,15 +273,13 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 						double qro = qso[(l-1)*2*NWAY*VSIZE2 + 2*j*VSIZE2 + i];		// m odd
 						double qio = qso[(l-1)*2*NWAY*VSIZE2 + (2*j+1)*VSIZE2 + i];
 						long ijk = (k+j)*VSIZE2 + i;
-						qre *= st[ijk];			qro *= st[ijk];		// mulitply real part by sin(theta)  [to get Ylm from Ylm/sin(theta)]
-						q0[ijk*2*lmax +2*(l-1)]   = qre + qro;
-						q0[ijk*2*lmax +2*(l-1)+1] = -(qie + qio);
-						q0[(ntheta+ijk)*2*lmax +2*(l-1)]   = (qre+qro) * signl;				// * (-1)^l
-						q0[(ntheta+ijk)*2*lmax +2*(l-1)+1] = (qie+qio) * signl;
-						q0[(2*ntheta-1-ijk)*2*lmax +2*(l-1)]   = qre - qro;
-						q0[(2*ntheta-1-ijk)*2*lmax +2*(l-1)+1] = qie - qio;
-						q0[(ntheta-1-ijk)*2*lmax +2*(l-1)]   = (qre - qro) * signl;				// (-1)^(l-m)
-						q0[(ntheta-1-ijk)*2*lmax +2*(l-1)+1] = (qio - qie) * signl;
+						qre *= st[ijk];			qro *= st[ijk];		// multiply real part by sin(theta)  [to get Ylm from Ylm/sin(theta)]
+						// because qr and qi map on different parities with respect to the future Fourier tranform, we can add them !!
+						// note that this may result in leak between even and odd m's if their amplitude is widely different.
+						q0[ijk*lmax +(l-1)]              =  (qre + qro) - (qie + qio);
+						q0[(ntheta+ijk)*lmax +(l-1)]     = ((qre + qro) + (qie + qio)) * signl;				// * (-1)^l
+						q0[(2*ntheta-1-ijk)*lmax +(l-1)] =  (qre - qro) + (qie - qio);
+						q0[(ntheta-1-ijk)*lmax +(l-1)]   = ((qre - qro) - (qie - qio)) * signl;				// (-1)^(l-m)
 					}
 				}
 				signl *= -1.0;
@@ -305,12 +303,12 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 	long l;
 		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, ydyl+m);
 		for (l=1; l<lmax; l+=2) {
-			Rlm[lm] =  -creal(q[m*2*lmax +2*(l-1)+1])/(ydyl[l]*nphi);
-			Rlm[lm+1] =  creal(q[m*2*lmax +2*l])/(ydyl[l+1]*nphi);
+			Rlm[lm] =  -creal(q[m*lmax +(l-1)])/(ydyl[l]*nphi);
+			Rlm[lm+1] =  creal(q[m*lmax +l])/(ydyl[l+1]*nphi);
 			lm+=2;
 		}
 		if (l==lmax) {
-			Rlm[lm] =  -creal(q[m*2*lmax +2*(l-1)+1])/(ydyl[l]*nphi);
+			Rlm[lm] =  -creal(q[m*lmax +(l-1)])/(ydyl[l]*nphi);
 			lm+=1;
 		}
 	dphi1 += M_PI/nphi;	// shift rotation angle by angle of first synthesis latitude.
@@ -318,12 +316,12 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 		legendre_sphPlm_deriv_array_equ(shtns, lmax, m, ydyl+m);
 		cplx eimdp = (cos(m*dphi1) - I*sin(m*dphi1))/nphi;
 		for (l=m; l<lmax; l+=2) {
-			Rlm[lm] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./ydyl[l]);
-			Rlm[lm+1] =  eimdp*q[m*2*lmax +2*l+1]*(-1./ydyl[l+1]);
+			Rlm[lm] =  eimdp*q[m*lmax +(l-1)]*(1./ydyl[l]);
+			Rlm[lm+1] =  eimdp*q[m*lmax +l]*(-1./ydyl[l+1]);
 			lm+=2;
 		}
 		if (l==lmax) {
-			Rlm[lm] =  eimdp*q[m*2*lmax +2*(l-1)]*(1./ydyl[l]);
+			Rlm[lm] =  eimdp*q[m*lmax +(l-1)]*(1./ydyl[l]);
 			lm++;
 		}
 	}

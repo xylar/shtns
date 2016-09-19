@@ -2016,6 +2016,9 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	shtns->Y11_st = shtns->Y10_ct * sqrt(0.5/mpos_renorm);
 	if (with_cs_phase)	shtns->Y11_st *= -1.0;		// correct Condon-Shortley phase
 
+// initialize rotations along arbitrary axes (if applicable).
+	if ((lmax == mmax) && (mres == 1))	SH_rotK90_init(shtns);
+
 // save a pointer to this setup and return.
 	shtns->next = sht_data;		// reference of previous setup (may be NULL).
 	sht_data = shtns;			// keep track of new setup.
