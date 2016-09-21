@@ -134,17 +134,45 @@ int main(int argc, char *argv[])
 	struct timespec ti1, ti2;
 	double mx[3][3];
 
+	// first we time-it and evaluate accuracy:
+	for (l=0; l<NLM; l++) {	Qlm[l] = 0.0;		Slm[l] = 0.0; }
+
+
+// test case...
+	printf("generating random test case...\n");
+	t = 1.0 / (RAND_MAX/2);
+	for (int i=0;i<NLM;i++) {
+		Qlm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+	}
+	for (int i=0;i<=LMAX;i++)	Qlm[i] = creal(Qlm[i]);		// m=0 is REAL
+	
+	SH_Xrotate90(shtns, Qlm, Slm);		// warm-up + precomputations, including FFTW plan
+	clock_gettime(CLOCK_MONOTONIC, &ti1);
+	for (int k=0; k<7; k++)
+		SH_Xrotate90(shtns, Qlm, Slm);		// 7 times the same rotation
+	for (int k=0; k<3; k++)
+		SH_Xrotate90(shtns, Slm, Slm);		// 3 times rotation of the same field, should lead to Slm=Qlm
+	clock_gettime(CLOCK_MONOTONIC, &ti2);
+	double ts2 = tdiff(&ti1, &ti2);
+	printf("time for Xrotate90 = %g ms\n", ts2/10);
+
+	// evaluate error:
+	double emax = 0.0;		int imax = 0;
+	double esum = 0.0;
+	for (int i=0;i<NLM;i++) {
+		double qr = creal(Qlm[i]);		double qi = cimag(Qlm[i]);
+		double sr = creal(Slm[i]);		double si = cimag(Slm[i]);
+		double e = (sr-qr)*(sr-qr) + (si-qi)*(si-qi);
+		if (e > emax) { emax = e;  imax=i; }
+		esum += e;
+	}
+	printf("after 4 90° rotations along X:    rms error = %.3g,   max error = %.3g (lm=%d)\n", sqrt(esum/NLM), sqrt(emax), imax);
+
+// restart with 0
 	for (l=0; l<NLM; l++) 	Qlm[l] = 0.0;
 	Qlm[LiM(shtns, 1, 0)] = 1.0;
 	
 	SH_Xrotate90(shtns, Qlm, Slm);		// warm-up + precomputations, including FFTW plan
-	clock_gettime(CLOCK_MONOTONIC, &ti1);
-	for (int k=0; k<10; k++)
-		SH_Xrotate90(shtns, Qlm, Slm);
-	clock_gettime(CLOCK_MONOTONIC, &ti2);
-	double ts2 = tdiff(&ti1, &ti2);
-	printf("time for Xrotate90 = %g ms\n", ts2*0.1);
-//	return 0;
 	mx[0][0] = Slm[LiM(shtns, 1, 0)];
 	mx[1][0] = creal(Slm[LiM(shtns, 1, 1)]);
 	mx[2][0] = cimag(Slm[LiM(shtns, 1, 1)]);

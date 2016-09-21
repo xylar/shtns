@@ -140,11 +140,11 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 			// m=0
 			double*	al = alm;
 			for (int j=0; j<NWAY; ++j) {
+				y0[j] = vall(al[0]) / vread(st, j+k);		// l=0  (discarded) DIVIDED by sin(theta) [to be consistent with m>0]
 				cost[j] = vread(ct, j+k);
-				y0[j] = vall(al[0]);		// l=0  (discarded)
 			}
 			for (int j=0; j<NWAY; ++j) {
-				y1[j]  = vall(al[0]*al[1]) * cost[j];
+				y1[j]  = vall(al[1]) * y0[j] * cost[j];
 			}
 			al += 2;	l+=2;
 			while(l<=lmax) {
