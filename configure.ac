@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[2.6.6],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[2.7],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -97,8 +97,6 @@ AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h])
 
 # Checks for libraries.
 AC_CHECK_LIB([m],[cos],,AC_MSG_ERROR([math library not found.]))
-# this library is used by time_SHT only (and not required at all on MacOSX)
-AC_CHECK_LIB([rt],[clock_gettime],,)
 
 # With Python, enable openmp by default.
 AS_IF([test "x$enable_python" != "xno"], [

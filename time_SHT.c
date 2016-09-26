@@ -23,7 +23,6 @@
 #include <string.h>
 #include <complex.h>
 #include <math.h>
-#include <time.h>
 #include "fftw3/fftw3.h"
 
 // cycle counter from FFTW
@@ -45,24 +44,7 @@ int NPHI = 0;
 int SHT_ITER = 50;		// do 50 iterations by default
 
 
-#ifdef __MACH__		// Mac OSX : clock_gettime is not implemented
 #include <sys/time.h>
-#ifndef CLOCK_MONOTONIC
-  #define CLOCK_MONOTONIC 0
-#endif
-#ifndef CLOCK_REALTIME
-  #define CLOCK_REALTIME 0
-#endif
-int clock_gettime(int ignored, struct timespec* t) {
-    struct timeval now;
-    int rv = gettimeofday(&now, NULL);
-    if (rv) return rv;
-    t->tv_sec  = now.tv_sec;
-    t->tv_nsec = now.tv_usec * 1000;
-    return 0;
-}
-#endif
-
 
 void runerr(const char * error_text)
 {
@@ -97,11 +79,12 @@ void write_mx(char *fn, double *mx, int N1, int N2)
 	fclose(fp);
 }
 
-double tdiff(struct timespec *start, struct timespec *end)
+/// for real-time performance measurements, returns time in mili-seconds.
+double tdiff(struct timeval *start, struct timeval *end)
 {
-	double ns = 1.e9 * ((long) end->tv_sec - (long) start->tv_sec);
-	ns += ((long) end->tv_nsec - (long) start->tv_nsec);
-	return ns * (1.e-6/SHT_ITER);	// time in ms.
+	double sec = ((long) end->tv_sec - (long) start->tv_sec);
+	sec += 1.e-6*((long) end->tv_usec - (long) start->tv_usec);
+	return sec * (1.e3/SHT_ITER);	// time in ms.
 }
 
 // isNaN testing that works with -ffast-math
@@ -202,23 +185,23 @@ void test_SH_point()
 {
 	long int jj,i;
 	double ts2, ta2;
-	struct timespec t1, t2;
+	struct timeval t1, t2;
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=0; jj< SHT_ITER; jj++) {
 		ta2 = SH_to_point(shtns, Slm, 0.8, 0.76);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ts2 = tdiff(&t1, &t2);
 	
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		double vr, vt, vp;
 		SHqst_to_point(shtns, Slm, Slm0, Tlm0, 0.8, 0.76, &vr, &vt, &vp);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ta2 = tdiff(&t1, &t2);
 
 	printf("   SHT_to_point time = %f ms [scalar], %f ms [3D vector]\n", ts2, ta2);
@@ -231,29 +214,29 @@ void test_SHT()
 	long int jj,i;
 	clock_t tcpu;
 	double ts, ta, ts2, ta2;
-	struct timespec t1, t2;
+	struct timeval t1, t2;
 	double gflop = 1e-6 * (NLAT*(NLM*4 +(MMAX+1)*2 + MMAX*log2(MMAX+1) + 5*NPHI*log2(NPHI)));		// Million floating point ops
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
 	tcpu = clock();
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SH_to_spat(shtns, Slm,Sh);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	tcpu = clock() - tcpu;
 	ts = tcpu / (1000.*SHT_ITER);
 	ts2 = tdiff(&t1, &t2);
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	tcpu = clock();
 	spat_to_SH(shtns, Sh,Slm);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SH(shtns, Sh,Tlm);
 	}
 	tcpu = clock() - tcpu;
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ta = tcpu / (1000.*SHT_ITER);
 	ta2 = tdiff(&t1, &t2);
   #ifdef _OPENMP
@@ -269,23 +252,23 @@ void test_SHT_m0()
 {
 	long int jj,i;
 	double ts, ta;
-	struct timespec t1, t2;
+	struct timeval t1, t2;
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHsph_to_spat(shtns, Slm,Sh,NULL);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ts = tdiff(&t1, &t2);
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	SHtor_to_spat(shtns, Slm, NULL, Sh);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		SHtor_to_spat(shtns, Slm, NULL, Sh);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ta = tdiff(&t1, &t2);
 	printf("   SHT time : \t spheroidal = %f ms \t torodial = %f ms\n", ts, ta);
 
@@ -296,24 +279,24 @@ void test_SHT_l(int ltr)
 {
 	int jj,i;
 	double ts, ta;
-	struct timespec t1, t2;
+	struct timeval t1, t2;
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
 	
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SH_to_spat_l(shtns, Slm,Sh,ltr);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ts = tdiff(&t1, &t2);
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 		spat_to_SH_l(shtns, Sh,Slm,ltr);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SH_l(shtns, Sh,Tlm,ltr);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ta = tdiff(&t1, &t2);
 	printf("   SHT time truncated at l=%d : synthesis = %f ms, analysis = %f ms\n", ltr, ts, ta);
 
@@ -325,7 +308,7 @@ void test_SHT_vect_l(int ltr)
 {
 	int jj,i;
 	double ts, ta;
-	struct timespec t1, t2;
+	struct timeval t1, t2;
 
 	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
@@ -333,19 +316,19 @@ void test_SHT_vect_l(int ltr)
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHsphtor_to_spat_l(shtns, Slm,Tlm,Sh,Th,ltr);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ts = tdiff(&t1, &t2);
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 		spat_to_SHsphtor_l(shtns, Sh,Th,Slm,Tlm, ltr);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SHsphtor_l(shtns, Sh,Th,S2,T2, ltr);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ta = tdiff(&t1, &t2);
 	printf("   vector SHT time trucated at l=%d : \t synthesis %f ms \t analysis %f ms\n", ltr, ts, ta);
 
@@ -358,7 +341,7 @@ void test_SHT_vect()
 {
 	int jj,i;
 	double ts, ta;
-	struct timespec t1, t2;
+	struct timeval t1, t2;
 
 	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
@@ -366,19 +349,19 @@ void test_SHT_vect()
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHsphtor_to_spat(shtns, Slm,Tlm,Sh,Th);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ts = tdiff(&t1, &t2);
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 		spat_to_SHsphtor(shtns, Sh,Th,Slm,Tlm);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SHsphtor(shtns, Sh,Th,S2,T2);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ta = tdiff(&t1, &t2);
 	printf("   vector SHT time (lmax=%d) : \t synthesis %f ms \t analysis %f ms\n", LMAX, ts, ta);
 
@@ -391,7 +374,7 @@ void test_SHT_vect3d_l(int ltr)
 {
 	int jj,i;
 	double ts, ta;
-	struct timespec t1, t2;
+	struct timeval t1, t2;
 	
 	complex double *Q2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
@@ -401,19 +384,19 @@ void test_SHT_vect3d_l(int ltr)
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
 	}
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHqst_to_spat_l(shtns, Qlm,Slm,Tlm,NL,Sh,Th, ltr);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ts = tdiff(&t1, &t2);
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 		spat_to_SHqst_l(shtns, NL,Sh,Th,Qlm,Slm,Tlm, ltr);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SHqst_l(shtns, NL,Sh,Th,Q2,S2,T2, ltr);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ta = tdiff(&t1, &t2);
 	printf("   3D vector SHT time : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
 
@@ -427,7 +410,7 @@ void test_SHT_vect3d()
 {
 	int jj,i;
 	double ts, ta;
-	struct timespec t1, t2;
+	struct timeval t1, t2;
 	
 	complex double *Q2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
 	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
@@ -437,19 +420,19 @@ void test_SHT_vect3d()
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
 	}
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHqst_to_spat(shtns, Qlm,Slm,Tlm,NL,Sh,Th);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ts = tdiff(&t1, &t2);
 
-	clock_gettime(CLOCK_MONOTONIC, &t1);
+	gettimeofday(&t1, NULL);
 		spat_to_SHqst(shtns, NL,Sh,Th,Qlm,Slm,Tlm);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SHqst(shtns, NL,Sh,Th,Q2,S2,T2);
 	}
-	clock_gettime(CLOCK_MONOTONIC, &t2);
+	gettimeofday(&t2, NULL);
 	ta = tdiff(&t1, &t2);
 	printf("   3D vector SHT time (lmax=%d): \t synthesis %f ms \t analysis %f ms\n", LMAX, ts, ta);
 
