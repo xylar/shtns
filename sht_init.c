@@ -1680,7 +1680,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 					}
 					if (i < SHT_FLY1) t *= 1.03;	// 3% penality for memory based transforms.
 				#ifdef _OPENMP
-					if ((i >= SHT_OMP1)||(i == SHT_SV)) t *= 1.3;	// 30% penality for openmp transforms.
+					if ((shtns->nthreads > 1) && ((i >= SHT_OMP1)||(i == SHT_SV))) t *= 1.3;	// 30% penality for openmp transforms.
 				#endif
 					if (t < t0) {	i0 = i;		t0 = t;		PRINT_VERB("*");	}
 				}
@@ -2018,6 +2018,10 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 
 // initialize rotations along arbitrary axes (if applicable).
 	if ((lmax == mmax) && (mres == 1))	SH_rotK90_init(shtns);
+
+// initialize sin(theta).d/dtheta matrix:
+	shtns->mx_stdt = (double*) VMALLOC( 2*NLM*sizeof(double) );
+	st_dt_matrix_shifted(shtns, shtns->mx_stdt);
 
 // save a pointer to this setup and return.
 	shtns->next = sht_data;		// reference of previous setup (may be NULL).

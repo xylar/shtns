@@ -213,7 +213,7 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 		l = shtns->tm[im] / VSIZE2;
-		alm = shtns->blm + im*(2*LMAX -m+MRES);
+		alm = shtns->blm + im*(2*(LMAX+1) -m+MRES);
 Q		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 Q		do {	// compute symmetric and antisymmetric parts, and reorganize data.
 Q			double an, bn, ani, bni, bs, as, bsi, asi, t;

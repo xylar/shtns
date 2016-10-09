@@ -176,7 +176,7 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 			for (long m=1; m<=lmax; ++m) {
 				rnd* qv = qve;
 				if (m&1) qv = qvo;		// store even and odd m separately.
-				double*	al = shtns->alm + m*(2*lmax -m+1);
+				double*	al = shtns->alm + m*(2*(lmax+1) -m+1);
 				cplx* Ql = &Qlm[LiM(shtns, 0,m)];	// virtual pointer for l=0 and m
 				rnd cost[NWAY], y0[NWAY], y1[NWAY];
 				for (int j=0; j<NWAY; ++j) {
@@ -393,12 +393,10 @@ void SH_Yrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
 //@{
 
 
-
-
-/// fill mx with the coefficients for multiplication by cos(theta)
+/// \internal generates the cos(theta) matrix up to lmax+1
 /// \param mx : an array of 2*NLM double that will be filled with the matrix coefficients.
-/// xq[lm] = mx[2*lm] * q[lm-1] + mx[2*lm+1] * q[lm+1];
-void mul_ct_matrix(shtns_cfg shtns, double* mx)
+/// xq[lm] = mx[2*lm-1] * q[lm-1] + mx[2*lm] * q[lm+1];			[note the shift in indices compared to the public functions]
+static void mul_ct_matrix_shifted(shtns_cfg shtns, double* mx)
 {
 	long int im,l,lm;
 	double a_1;
@@ -408,22 +406,17 @@ void mul_ct_matrix(shtns_cfg shtns, double* mx)
 		for (im=0; im<=MMAX; im++) {
 			double* al = alm_im(shtns,im);
 			long int m=im*MRES;
-			mx[2*lm] = 0.0;
 			a_1 = 1.0 / al[1];
 			l=m;
-			while(++l < LMAX) {
+			while(++l <= LMAX) {
 				al+=2;				
-				mx[2*lm+2] = a_1;
+				mx[2*lm+1] = a_1;
 				a_1 = 1.0 / al[1];
-				mx[2*lm+1] = -a_1*al[0];        // = -al[2*(lm+1)] / al[2*(lm+1)+1];
+				mx[2*lm] = -a_1*al[0];        // = -al[2*(lm+1)] / al[2*(lm+1)+1];
 				lm++;
 			}
-			if (l == LMAX) {	// the last one needs to be computed.
-				mx[2*lm+2] = a_1;
-				mx[2*lm+1] = sqrt((l+m)*(l-m))/(2*l+1);
-				lm++;
-			}
-			mx[2*lm +1] = 0.0;
+			mx[2*lm] = 0.0;
+			mx[2*lm+1] = a_1;		// coeff for lmax+1 (used in vector to scalar transform)
 			lm++;
 		}
 	} else {
@@ -431,16 +424,41 @@ void mul_ct_matrix(shtns_cfg shtns, double* mx)
 		for (im=0; im<=MMAX; im++) {
 			double* al = alm_im(shtns, im);
 			l=im*MRES;
-			mx[2*lm] = 0.0;
 			while(++l <= LMAX) {
 				a_1 = 1.0 / al[1];
-				mx[2*lm+1] = a_1;		// specific to orthonormal.
-				mx[2*lm+2] = a_1;
+				mx[2*lm] = a_1;		// specific to orthonormal.
+				mx[2*lm+1] = a_1;
 				lm++;	al+=2;
 			}
-			mx[2*lm +1] = 0.0;
+			mx[2*lm] = 0.0;
+			mx[2*lm+1] = 1.0 / al[1];		// coeff for lmax+1 (used in vector to scalar transform)
 			lm++;
 		}
+	}
+}
+
+static void st_dt_matrix_shifted(shtns_cfg shtns, double* mx)
+{
+	mul_ct_matrix_shifted(shtns, mx);
+	for (int lm=0; lm<NLM; lm++) {
+		mx[2*lm]   *= -(shtns->li[lm] + 2);		// coeff (l+1)
+		mx[2*lm+1] *=   shtns->li[lm];			// coeff (l-1)
+	}
+}
+
+
+/// fill mx with the coefficients for multiplication by cos(theta)
+/// \param mx : an array of 2*NLM double that will be filled with the matrix coefficients.
+/// xq[lm] = mx[2*lm] * q[lm-1] + mx[2*lm+1] * q[lm+1];
+void mul_ct_matrix(shtns_cfg shtns, double* mx)
+{
+	long int im,l,lm;
+	double a_1;
+	
+	mx[0] = 0.0;
+	mul_ct_matrix_shifted(shtns, mx+1);			// shift indices
+	for (int im=1; im<=MMAX; im++) {				// remove the coeff for lmax+1 (for backward compatibility)
+		mx[2*LiM(shtns, im*MRES, im)] = 0.0;
 	}
 }
 
@@ -451,8 +469,8 @@ void st_dt_matrix(shtns_cfg shtns, double* mx)
 {
 	mul_ct_matrix(shtns, mx);
 	for (int lm=0; lm<NLM; lm++) {
-		mx[2*lm]   *=   shtns->li[lm] - 1;
-		mx[2*lm+1] *= -(shtns->li[lm] + 2);
+		mx[2*lm]   *=   shtns->li[lm] - 1;		// coeff (l-1)
+		mx[2*lm+1] *= -(shtns->li[lm] + 2);		// coeff (l+1)
 	}
 }
 

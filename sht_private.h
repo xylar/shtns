@@ -121,6 +121,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
 	double *blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
 	double *l_2;	// array of size (LMAX+1) containing 1./l(l+1) for increasing integer l.
+	double *mx_stdt;	// sparse matrix for  sin(theta).d/dtheta,  couples l-1 and l+1
 
 	void* ftable[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 
@@ -181,7 +182,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 #endif
 
 // define index in alm/blm matrices
-#define ALM_IDX(shtns, im) ( (im)*(2*shtns->lmax - ((im)-1)*shtns->mres) )
+#define ALM_IDX(shtns, im) ( (im)*(2*(shtns->lmax+1) - ((im)-1)*shtns->mres) )
 
 // SHT_NORM without CS_PHASE
 #define SHT_NORM (shtns->norm & 0x0FF)

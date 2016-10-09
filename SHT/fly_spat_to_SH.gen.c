@@ -213,7 +213,7 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 		m = im*MRES;
 		l = shtns->tm[im] / VSIZE2;
 		//alm = shtns->blm[im];
-		alm += 2*(LMAX-m+MRES);
+		alm += 2*(LMAX+1-m+MRES);
 Q		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 Q		do {	// compute symmetric and antisymmetric parts, and reorganize data.
 Q			double an, bn, ani, bni, bs, as, bsi, asi, t;

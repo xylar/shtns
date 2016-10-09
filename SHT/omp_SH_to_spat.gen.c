@@ -29,7 +29,7 @@
 
 	static
 3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
-QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, v2d *BrF, const long int llim, const int imlim) {
+QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, v2d *BrF, long int llim, const int imlim) {
   #ifndef SHT_GRAD
 VX	void GEN3(_sy2,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
   #else
@@ -43,11 +43,10 @@ V	#define BT0(i) ((double *)BtF)[2*(i)]
 V	#define BP0(i) ((double *)BpF)[2*(i)]
 Q	#define qr(l) vall(creal(Ql[l]))
 Q	#define qi(l) vall(cimag(Ql[l]))
-S	#define sr(l) vall(creal(Sl[l]))
-S	#define si(l) vall(cimag(Sl[l]))
-T	#define tr(l) vall(creal(Tl[l]))
-T	#define ti(l) vall(cimag(Tl[l]))
-V	double m_1;
+V	#define vr(l) vall( ((double*) VWl)[4*(l)]   )
+V	#define vi(l) vall( ((double*) VWl)[4*(l)+1] )
+V	#define wr(l) vall( ((double*) VWl)[4*(l)+2] )
+V	#define wi(l) vall( ((double*) VWl)[4*(l)+3] )
 	unsigned im;
   #else
 Q	#define BR0(i) ((double *)BrF)[i]
@@ -58,9 +57,7 @@ T	#define BP0(i) ((double *)BpF)[i]
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
-Q	double Ql0[llim+1];
-S	double Sl0[llim];
-T	double Tl0[llim];
+V	v2d VWl[llim*2+4];
 
 	ct = shtns->ct;		st = shtns->st;
 	nk = NLAT_2;
@@ -76,6 +73,9 @@ T	double Tl0[llim];
 		if (m0 == 0)
 	#endif
 	{	//	im=0;
+Q		double Ql0[llim+1];
+S		double Sl0[llim];
+T		double Tl0[llim];
 		#ifdef SHT_GRAD
 		  #ifndef SHT_AXISYM
 			#ifdef _GCC_VEC_
@@ -191,12 +191,42 @@ V		BtF += m0*NLAT;		BpF += m0*NLAT;
 		m = im*MRES;
 		//l = LiM(shtns, 0,im);
 		l = (im*(2*(LMAX+1)-(m+MRES)))>>1;
-V		m_1 = 1.0/m;
 		//alm = shtns->alm[im];
-		alm = shtns->alm + im*(2*LMAX -m+MRES);
+		alm = shtns->alm + 2*(l+m);		// shtns->alm + im*(2*(LMAX+1) -m+MRES);
+
 Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
-S		cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
-T		cplx* Tl = &Tlm[l];
+V		{	// convert from vector SH to scalar SH
+V			double* mx = shtns->mx_stdt + 2*l;
+S			v2d* Sl = (v2d*) &Slm[l];	// virtual pointer for l=0 and im
+T			v2d* Tl = (v2d*) &Tlm[l];
+V			s2d em = vdup(m);
+S			v2d sl = Sl[m];
+T			v2d tl = Tl[m];
+V			v2d vs = vdup( 0.0 );
+V			v2d wt = vdup( 0.0 );
+V			for (int l=m; l<=llim; l++) {
+V				s2d mxu = vdup( mx[2*l] );
+V				s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
+T				vs = addi( vs ,  em*tl );
+S				wt = addi( wt ,  em*sl );
+S				v2d vs1 = mxl*sl;			// vs for next iter
+T				v2d wt1 = -mxl*tl;			// wt for next iter
+V				if (l<llim) {
+S					sl = Sl[l+1];		// kept for next iteration
+T					tl = Tl[l+1];
+S					vs += mxu*sl;
+T					wt -= mxu*tl;
+V				}
+V				VWl[2*l]   = vs;
+V				VWl[2*l+1] = wt;
+V				vs = vdup( 0.0 );		wt = vdup( 0.0 );
+S				vs = vs1;
+T				wt = wt1;
+V			}
+V			VWl[2*llim+2]   = vs;
+V			VWl[2*llim+3] = wt;
+V		}
+
 		k=0;	l=shtns->tm[im];
 	#if _GCC_VEC_
 		l>>=1;		// stay on a 16 byte boundary
@@ -221,15 +251,12 @@ V			BpF[k] = 0.0;		BpF[NLAT-l+k] = 0.0;
 		do {
 			al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
-V			rnd st2[NWAY], dy0[NWAY], dy1[NWAY];
 Q			rnd rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];
 V			rnd ter[NWAY], tei[NWAY], tor[NWAY], toi[NWAY];
 V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(st, k+j);
 				y0[j] = vall(1.0);
-V				st2[j] = cost[j]*cost[j]*vall(-m_1);
-V				y0[j] = vall(m);		// for the vector transform, compute ylm*m/sint
 			}
 Q			l=m;
 V			l=m-1;
@@ -261,7 +288,6 @@ V			l=m-1;
 			for (int j=0; j<NWAY; ++j) {
 				y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, j+k);
-V				dy0[j] = cost[j]*y0[j];
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
 			}
@@ -269,78 +295,49 @@ Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
 V				por[j] = vall(0.0);		tei[j] = vall(0.0);
 V				tor[j] = vall(0.0);		pei[j] = vall(0.0);
-V				dy1[j] = (vall(al[1])*y0[j]) *(cost[j]*cost[j] + st2[j]);		//	dy1[j] = vall(al[1])*(cost[j]*dy0[j] - y0[j]*st2[j]);
 V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
 V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
 				for (int j=0; j<NWAY; ++j) {
-					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
-V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
+					y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
 				}
 				for (int j=0; j<NWAY; ++j) {
-					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
-V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];				
+					y1[j] = (vall(al[3])*cost[j])*y0[j] + vall(al[2])*y1[j];
 				}
 				l+=2;	al+=4;
 				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 					++ny;
 					for (int j=0; j<NWAY; ++j) {
 						y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
-V						dy0[j] *= vall(1.0/SHT_SCALE_FACTOR);		dy1[j] *= vall(1.0/SHT_SCALE_FACTOR);
 					}
 				}
 			}
 		  if (ny == 0) {
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
-Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y1[j]  * qr(l+1);		roi[j] += y1[j] * qi(l+1);	}
-			#ifdef SHT_GRAD
-S				for (int j=0; j<NWAY; ++j) {	tor[j] += dy0[j] * sr(l);		pei[j] += y0[j] * sr(l);	}
-S				for (int j=0; j<NWAY; ++j) {	toi[j] += dy0[j] * si(l);		per[j] -= y0[j] * si(l);	}
-T				for (int j=0; j<NWAY; ++j) {	por[j] -= dy0[j] * tr(l);		tei[j] += y0[j] * tr(l);	}
-T				for (int j=0; j<NWAY; ++j) {	poi[j] -= dy0[j] * ti(l);		ter[j] -= y0[j] * ti(l);	}
-S				for (int j=0; j<NWAY; ++j) {	ter[j] += dy1[j] * sr(l+1);		poi[j] += y1[j] * sr(l+1);	}
-S				for (int j=0; j<NWAY; ++j) {	tei[j] += dy1[j] * si(l+1);		por[j] -= y1[j] * si(l+1);	}
-T				for (int j=0; j<NWAY; ++j) {	per[j] -= dy1[j] * tr(l+1);		toi[j] += y1[j] * tr(l+1);	}
-T				for (int j=0; j<NWAY; ++j) {	pei[j] -= dy1[j] * ti(l+1);		tor[j] -= y1[j] * ti(l+1);	}
-			#else
-V				for (int j=0; j<NWAY; ++j) {
-V					tor[j] += dy0[j] * sr(l) - y1[j]  * ti(l+1);
-V					pei[j] += y0[j]  * sr(l) - dy1[j] * ti(l+1);
-V				}
-V				for (int j=0; j<NWAY; ++j) {
-V					poi[j] -= dy0[j] * ti(l) - y1[j]  * sr(l+1);
-V					ter[j] -= y0[j]  * ti(l) - dy1[j] * sr(l+1);
-V				}
-V				for (int j=0; j<NWAY; ++j) {
-V					toi[j] += dy0[j] * si(l) + y1[j]  * tr(l+1);
-V					per[j] -= y0[j]  * si(l) + dy1[j] * tr(l+1);
-V				}
-V				for (int j=0; j<NWAY; ++j) {
-V					por[j] -= dy0[j] * tr(l) + y1[j]  * si(l+1);
-V					tei[j] += y0[j]  * tr(l) + dy1[j] * si(l+1);
-V				}
-			#endif
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
 				for (int j=0; j<NWAY; ++j) {
-V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*st2[j]) + vall(al[0])*dy0[j];
 					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 				}
+Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y1[j]  * qr(l+1);		roi[j] += y1[j] * qi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] * vi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 				for (int j=0; j<NWAY; ++j) {
-V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*st2[j]) + vall(al[2])*dy1[j];
 					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
 				}
 				l+=2;	al+=4;
 			}
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
 			if (l==llim) {
-Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j] * qr(l);		rei[j] += y0[j] * qi(l);	}
-S				for (int j=0; j<NWAY; ++j) {	tor[j] += dy0[j] * sr(l);		pei[j] += y0[j] * sr(l);	}
-S				for (int j=0; j<NWAY; ++j) {	toi[j] += dy0[j] * si(l);		per[j] -= y0[j] * si(l);	}
-T				for (int j=0; j<NWAY; ++j) {	por[j] -= dy0[j] * tr(l);		tei[j] += y0[j] * tr(l);	}
-T				for (int j=0; j<NWAY; ++j) {	poi[j] -= dy0[j] * ti(l);		ter[j] -= y0[j] * ti(l);	}
+Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] * vi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 			}
-3			for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j) * vall(m_1);
+3			for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
 3			for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
 		  }
 		#if _GCC_VEC_
