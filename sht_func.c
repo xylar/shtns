@@ -66,7 +66,7 @@ static void SH_rotK90_init(shtns_cfg shtns)
 	const int ntheta = fft_int( ((lmax+fac)/fac) , 7) * fac;		// ... and also an fft-friendly value
 
 	// generate the equispaced grid for synthesis
-	shtns->ct_rot = VMALLOC( sizeof(double)*ntheta );
+	shtns->ct_rot = malloc( sizeof(double)*ntheta );
 	shtns->st_rot = shtns->ct_rot + (ntheta/2);
 	for (int k=0; k<ntheta/2; ++k) {
 		double cost = cos(((0.5*M_PI)*(2*k+1))/ntheta);
