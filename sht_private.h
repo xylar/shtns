@@ -121,7 +121,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *alm;	// coefficient list for Legendre function recurrence (size 2*NLM)
 	double *blm;	// coefficient list for modified Legendre function recurrence for analysis (size 2*NLM)
 	double *l_2;	// array of size (LMAX+1) containing 1./l(l+1) for increasing integer l.
+	/* matrices for vector transform (to convert to scalar transforms) */
 	double *mx_stdt;	// sparse matrix for  sin(theta).d/dtheta,  couples l-1 and l+1
+	double *mx_van;		// sparse matrix for  sin(theta).d/dtheta + 2*cos(theta),  couples l-1 and l+1
 
 	void* ftable[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 
@@ -440,11 +442,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[NLAT-2-(idx)*2] = _mm_unpackhi_pd(er-or, ei-oi);	}
 	#endif
 	#ifdef __SSE3__
-		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd(b,b,1))		// a + I*b
+		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd((b),(b),1))		// a + I*b
 		#define subadd(a,b) _mm_addsub_pd(a, b)		// [al-bl, ah+bh]
 		//#define CMUL(a,b) _mm_addsub_pd(_mm_shuffle_pd(a,a,0)*b, _mm_shuffle_pd(a,a,3)*_mm_shuffle_pd(b,b,1))
 	#else
-		#define addi(a,b) ( (a) + (_mm_shuffle_pd(b,b,1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
+		#define addi(a,b) ( (a) + (_mm_shuffle_pd((b),(b),1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
 		#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
 	#endif
 

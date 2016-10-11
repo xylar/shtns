@@ -50,7 +50,7 @@ V	#define wi(l) vall( ((double*) VWl)[4*(l)+3] )
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
-Q	cplx Ql[llim+1] SSE;
+Q	cplx Ql[llim+2] SSE;
 V	cplx VWl[llim*2+4] SSE;
 
 Q	double rnr[NLAT_2 + NWAY*VSIZE2 -1] SSE;
@@ -198,6 +198,9 @@ QX			++k;
 QX		} while(k<=llim);
 
 V		{	// convert from vector SH to scalar SH
+V			// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
+V			// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
+V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Vlm(l);
 V			double* mx = shtns->mx_stdt + 2*l;
 3			cplx* Qll = &Qlm[l];
 S			cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
@@ -227,7 +230,7 @@ S				vs = vs1;
 T				wt = wt1;
 3				Ql[l-1] = Qll[l];
 V			}
-V			VWl[2*llim+2]   = vs;
+V			VWl[2*llim+2] = vs;
 V			VWl[2*llim+3] = wt;
 3			Ql[llim] = 0.0;			// allow overflow up to llim
 V		}

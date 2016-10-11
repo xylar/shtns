@@ -2019,10 +2019,6 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 // initialize rotations along arbitrary axes (if applicable).
 	if ((lmax == mmax) && (mres == 1))	SH_rotK90_init(shtns);
 
-// initialize sin(theta).d/dtheta matrix:
-	shtns->mx_stdt = (double*) VMALLOC( 2*NLM*sizeof(double) );
-	st_dt_matrix_shifted(shtns, shtns->mx_stdt);
-
 // save a pointer to this setup and return.
 	shtns->next = sht_data;		// reference of previous setup (may be NULL).
 	sht_data = shtns;			// keep track of new setup.
@@ -2178,6 +2174,17 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#ifndef SHTNS_MEM
 		on_the_fly = 1;
 	#endif
+
+	if (vector) {
+		// initialize sin(theta).d/dtheta matrix (for vector transforms)
+		shtns->mx_stdt = (double*) malloc( 2*NLM*sizeof(double) );		// for vector synthesis
+		st_dt_matrix_shifted(shtns, shtns->mx_stdt);
+		shtns->mx_van = (double*) malloc( 2*NLM*sizeof(double) );		// for vector analysis
+		mul_ct_matrix_shifted(shtns, shtns->mx_van);
+		for (long lm=0; lm<2*NLM; lm++) {		// 2*cos(theta) + sin(theta) d./dtheta = 1/sin(theta). d/dtheta(sin^2(theta) .)
+			shtns->mx_van[lm] = 2.*shtns->mx_van[lm] + shtns->mx_stdt[lm];
+		}
+	}
 
 	if (*nphi == 0) {
 		*nphi = fft_int((nl_order+1)*MMAX+1, 7);		// required fft nodes

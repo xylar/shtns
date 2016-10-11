@@ -415,24 +415,23 @@ static void mul_ct_matrix_shifted(shtns_cfg shtns, double* mx)
 				mx[2*lm] = -a_1*al[0];        // = -al[2*(lm+1)] / al[2*(lm+1)+1];
 				lm++;
 			}
-			mx[2*lm] = 0.0;
-			mx[2*lm+1] = a_1;		// coeff for lmax+1 (used in vector to scalar transform)
-			lm++;
+			if (l == LMAX+1) {	// the last one needs to be computed (used in vector to scalar transform)
+				mx[2*lm+1] = a_1;
+				mx[2*lm] = sqrt((l+m)*(l-m))/(2*l+1);		// LMAX+1
+				lm++;
+			}
 		}
 	} else {
 		lm=0;
 		for (im=0; im<=MMAX; im++) {
 			double* al = alm_im(shtns, im);
 			l=im*MRES;
-			while(++l <= LMAX) {
+			while(++l <= LMAX+1) {	// compute coeff up to LMAX+1, it fits into the 2*NLM bloc, and is needed for vector <> scalar conversions.
 				a_1 = 1.0 / al[1];
 				mx[2*lm] = a_1;		// specific to orthonormal.
 				mx[2*lm+1] = a_1;
 				lm++;	al+=2;
 			}
-			mx[2*lm] = 0.0;
-			mx[2*lm+1] = 1.0 / al[1];		// coeff for lmax+1 (used in vector to scalar transform)
-			lm++;
 		}
 	}
 }
@@ -458,8 +457,10 @@ void mul_ct_matrix(shtns_cfg shtns, double* mx)
 	mx[0] = 0.0;
 	mul_ct_matrix_shifted(shtns, mx+1);			// shift indices
 	for (int im=1; im<=MMAX; im++) {				// remove the coeff for lmax+1 (for backward compatibility)
-		mx[2*LiM(shtns, im*MRES, im)] = 0.0;
+		int lm = LiM(shtns, im*MRES, im);
+		mx[2*lm-1] = 0.0;		mx[2*lm] = 0.0;
 	}
+	mx[NLM-1] = 0.0;
 }
 
 /// fill mx with the coefficients of operator sin(theta).d/dtheta

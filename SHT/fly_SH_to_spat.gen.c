@@ -119,6 +119,9 @@ Q		} while(l<=llim);
 
 V		double* const VWl0 = (double*) VWl;
 V		{	// convert from vector SH to scalar SH
+V			// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
+V			// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
+V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Vlm(l);
 V			double* mx = shtns->mx_stdt;
 S			double sl = 0.0;		// Slm[0] = 0
 T			double tl = 0.0;		// Tlm[0] = 0
@@ -141,7 +144,7 @@ V				vs = 0.0;		wt = 0.0;
 S				vs = vs1;
 T				wt = wt1;
 V			}
-V			VWl0[2*llim+2]   = vs;
+V			VWl0[2*llim+2] = vs;
 V			VWl0[2*llim+3] = wt;
 V		}
 		k=0;	nk = NLAT_2;
@@ -239,6 +242,9 @@ V		BtF += NLAT;	BpF += NLAT;
 
 Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 V		{	// convert from vector SH to scalar SH
+V			// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
+V			// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
+V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Vlm(l);
 V			double* mx = shtns->mx_stdt + 2*l;
 S			v2d* Sl = (v2d*) &Slm[l];	// virtual pointer for l=0 and im
 T			v2d* Tl = (v2d*) &Tlm[l];
@@ -266,7 +272,7 @@ V				vs = vdup( 0.0 );		wt = vdup( 0.0 );
 S				vs = vs1;
 T				wt = wt1;
 V			}
-V			VWl[2*llim+2]   = vs;
+V			VWl[2*llim+2] = vs;
 V			VWl[2*llim+3] = wt;
 V		}
 
@@ -628,7 +634,7 @@ V				vs = vdup( 0.0 );		wt = vdup( 0.0 );
 S				vs = vs1;
 T				wt = wt1;
 V			}
-V			VWl[2*llim+2]   = vs;
+V			VWl[2*llim+2] = vs;
 V			VWl[2*llim+3] = wt;
 V		}
 
