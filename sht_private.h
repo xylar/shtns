@@ -249,6 +249,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 		return a[0] + I*a[1];
 	}
 	//#define v2d_reduce(a, b) ( reduce_add(a) +I* reduce_add(b) )
+	#define addi(a,b) ((a) + I*(b))
 
 	#define S2D_STORE(mem, idx, ev, od) \
 		vstor(mem, idx, ev+od); \

@@ -570,7 +570,7 @@ V			pei[k] = 0.0;		poi[k] = 0.0;
 
 		m = im*MRES;
 		l = shtns->tm[im] / VSIZE2;
-		alm = shtns->blm + im*(2*LMAX -m+MRES);
+		alm = shtns->blm + im*(2*(LMAX+1) -m+MRES);
 Q		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 Q		do {	// compute symmetric and antisymmetric parts.
 3			double sink = st[k];

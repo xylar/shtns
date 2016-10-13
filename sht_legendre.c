@@ -537,7 +537,7 @@ static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, con
 static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
 {
 	double *alm, *blm;
-	long int im, m, l, lm, lmax, nlm;
+	long int im, m, l, lm, lmax;
 	real t1, t2;
 
 #if HAVE_LONG_DOUBLE_WIDER
@@ -553,11 +553,10 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
 
 	lmax = LMAX+1;		// we go to one order beyond LMAX to resolve vector transforms through scalar ones.
-	nlm = nlm_calc(lmax, MMAX, MRES);
-	alm = (double *) malloc( (2*nlm)*sizeof(double) );
+	alm = (double *) malloc( (2*NLM)*sizeof(double) );		//  fits exactly into an array of 2*NLM doubles.
 	blm = alm;
 	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
-		blm = (double *) malloc( (2*nlm)*sizeof(double) );
+		blm = (double *) malloc( (2*NLM)*sizeof(double) );
 	}
 	if ((alm==0) || (blm==0)) shtns_runerr("not enough memory.");
 	shtns->alm = alm;		shtns->blm = blm;
