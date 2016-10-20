@@ -155,12 +155,6 @@ extern void* fmem_l[SHT_NTYP];
 extern void* fmem_m0[SHT_NTYP];
 extern void* fmem_m0l[SHT_NTYP];
 #endif
-#ifdef SHTNS_DCT
-extern void* fdct[SHT_NTYP];
-extern void* fdct_l[SHT_NTYP];
-extern void* fdct_m0[SHT_NTYP];
-extern void* fdct_m0l[SHT_NTYP];
-#endif
 extern void* ffly[6][SHT_NTYP];
 extern void* ffly_m[6][SHT_NTYP];
 extern void* ffly_m0[6][SHT_NTYP];
@@ -228,10 +222,6 @@ static void init_sht_array_func(shtns_cfg shtns)
 			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_M][SHT_FLY1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);
 		}
-	  #ifdef SHTNS_DCT
-		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct_m0, sizeof(void*)*SHT_NTYP);
-		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_m0l, sizeof(void*)*SHT_NTYP);
-	  #endif
 	  #ifdef SHTNS_MEM
 		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem_m0, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_m0l, sizeof(void*)*SHT_NTYP);
@@ -247,10 +237,6 @@ static void init_sht_array_func(shtns_cfg shtns)
 			memcpy(sht_func[SHT_M][SHT_OMP1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);		// no omp algo for SHT_M, use fly instead
 		  #endif
 		}
-	  #ifdef SHTNS_DCT
-		memcpy(sht_func[SHT_STD][SHT_DCT], &fdct, sizeof(void*)*SHT_NTYP);
-		memcpy(sht_func[SHT_LTR][SHT_DCT], &fdct_l, sizeof(void*)*SHT_NTYP);
-	  #endif
 	  #ifdef SHTNS_MEM
 		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_l, sizeof(void*)*SHT_NTYP);
@@ -429,31 +415,9 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 }
 
 
-/// \internal free arrays allocated by init_SH_dct
-#ifdef SHTNS_DCT
-static void free_SH_dct(shtns_cfg shtns)
-{
-	if (shtns->zlm_dct0 == NULL) return;
-
-	if (ref_count(shtns, &shtns->dzlm_dct0) == 1) VFREE(shtns->dzlm_dct0);
-	if (ref_count(shtns, &shtns->zlm_dct0) == 1)  VFREE(shtns->zlm_dct0);
-	shtns->dzlm_dct0 = NULL;	shtns->zlm_dct0 = NULL;
-
-	free_unused(shtns, &shtns->dykm_dct);
-	free_unused(shtns, &shtns->ykm_dct);
-
-	if (ref_count(shtns, &shtns->idct) == 1)    fftw_destroy_plan(shtns->idct);		// free unused dct plans
-	if (ref_count(shtns, &shtns->dct_m0) == 1)  fftw_destroy_plan(shtns->dct_m0);
-	shtns->idct = NULL;		shtns->dct_m0 = NULL;
-}
-#endif
-
 /// \internal free arrays allocated by alloc_SHTarrays.
 static void free_SHTarrays(shtns_cfg shtns)
 {
-  #ifdef SHTNS_DCT
-	free_SH_dct(shtns);
-  #endif
 	free_unused(shtns, &shtns->ylm);
 	free_unused(shtns, &shtns->dylm);
 	free_unused(shtns, &shtns->zlm);
@@ -502,9 +466,6 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	shtns->k_stride_a = 1;		shtns->m_stride_a = NLAT;		// default strides
 
 	shtns->fft = NULL;		shtns->ifft = NULL;
-	#ifdef SHTNS_DCT
-	shtns->dct_m0 = NULL;	shtns->idct = NULL;		// set dct plans to uninitialized.
-	#endif
 
 	shtns->nspat = NPHI * NLAT;		// default spatial size
 
@@ -648,80 +609,6 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	}
 	#endif
 }
-
-#ifdef SHTNS_DCT
-/// \internal initialize DCTs using FFTW. Must be called if MTR_DCT is changed.
-static int planDCT(shtns_cfg shtns)
-{
-	double *Sh;
-	int ndct = NLAT;
-	fftw_r2r_kind r2r_kind;
-	fftw_iodim dims, hdims[2];
-	double Sh0[NLAT] SSE;				// temp storage on the stack, aligned.
-
-	#ifdef OMP_FFTW
-		fftw_plan_with_nthreads(1);		// use only 1 thread here.
-	#endif
-	// Allocate dummy Spatial Fields.
-	Sh = (double *) VMALLOC((NPHI/2 +1) * NLAT*2 * sizeof(double));
-
-	if (shtns->dct_m0 == NULL) {		// allocate only once since it does not change.
-		int stride = (NPHI>1) ? 2 : 1;
-		r2r_kind = FFTW_REDFT10;		// out-of-place.
-		shtns->dct_m0 = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, stride, stride*NLAT, Sh0, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);	// out-of-place.
-		if (shtns->dct_m0 == NULL) return 0;		// dct_m0 planning failed.
-	#if SHT_VERBOSE > 2
-	if (verbose>2) {
-		printf(" *** dct_m0 plan :\n");		fftw_print_plan(shtns->dct_m0);	printf("\n");
-	}
-	#endif
-	}
-
-	if (NPHI > 1) {		// complex data for NPHI>1, recompute as it does depend on MTR_DCT
-		if (shtns->idct != NULL) fftw_destroy_plan(shtns->idct);
-
-		dims.n = NLAT;	dims.is = 2;	dims.os = 2;		// real and imaginary part.
-		hdims[0].n = MTR_DCT+1;	hdims[0].is = 2*NLAT; 	hdims[0].os = 2*NLAT;
-		hdims[1].n = 2;			hdims[1].is = 1; 	hdims[1].os = 1;
-		r2r_kind = FFTW_REDFT01;
-		shtns->idct = fftw_plan_guru_r2r(1, &dims, 2, hdims, Sh, Sh, &r2r_kind, shtns->fftw_plan_mode);
-	} else {		// NPHI == 1
-		if (shtns->idct == NULL) {
-			r2r_kind = FFTW_REDFT01;
-			shtns->idct = fftw_plan_many_r2r(1, &ndct, 1, Sh, &ndct, 1, NLAT, Sh, &ndct, 1, NLAT, &r2r_kind, shtns->fftw_plan_mode);
-		}
-	}
-
-	VFREE(Sh);
-	if (shtns->idct == NULL) return 0;		// idct planning failed.
-	#if SHT_VERBOSE > 2
-	if (verbose>2) {
-		printf(" *** idct plan :\n");	fftw_print_plan(shtns->idct);	printf("\n");
-	}
-	#endif
-	return 1;	// success.
-}
-
-/// \internal SET MTR_DCT and updates fftw_plan for DCT's
-static int Set_MTR_DCT(shtns_cfg shtns, int m)
-{
-	if ((shtns->zlm_dct0 == NULL)||(m == MTR_DCT)) return MTR_DCT;
-	if ( m < 0 ) {	// don't use dct
-		shtns->mtr_dct = -1;
-	} else {
-		if (m>MMAX) m=MMAX;
-		shtns->mtr_dct = m;
-		if (planDCT(shtns) == 0)
-			shtns->mtr_dct = -1;	// failure
-	}
-	return MTR_DCT;
-}
-
-/// \internal returns the m-truncation of DCT part of synthesis
-static int Get_MTR_DCT(shtns_cfg shtns) {
-	return MTR_DCT;
-}
-#endif		/* SHTNS_DCT */
 
 
 /// \internal Sets the value tm[im] used for polar optimiation on-the-fly.
@@ -966,374 +853,6 @@ static void init_SH_gauss(shtns_cfg shtns)
 
 #endif
 
-#ifdef SHTNS_DCT
-
-static void init_SH_dct_m(shtns_cfg shtns, double* is1, fftw_plan dct, fftw_plan idct, int analysis, const int m0, const int mstep)
-{
-	double *yk, *yk0, *dyk0, *yg;		// temp storage
-	struct DtDp *dyg, *dyk;
-	int it,im,m,l;
-	double Z[2*NLAT_2] SSE;
-	double dZt[2*NLAT_2] SSE;
-	double dZp[2*NLAT_2] SSE;		// equally spaced theta points.
-
-	double *st = shtns->st;
-	double *st_1 = shtns->st_1;
-	const int vector = (shtns->dylm != NULL);
-	const int KMAX = LMAX+1;
-
-	real iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
- 	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
-	iylm_fft_norm /= (2*NPHI*NLAT_2);
-
-// Even/Odd symmetry : ylm is even or odd across equator, as l-m is even or odd => only NLAT_2 points required.
-	// temp memory for ykm_dct.
-	yk = (double *) malloc( sizeof(double) * (KMAX+1)*(LMAX+1) );
-	dyk = (struct DtDp *) malloc( sizeof(struct DtDp)* (KMAX+1)*(LMAX+1) );
-	if ((m0==0)&&(analysis)) {
-		yk0 = (double *) malloc( sizeof(double) * (LMAX/2+1)*(2*NLAT_2) * 2 );		// temp for zlm_dct0
-		dyk0 = yk0 + (LMAX/2+1)*(2*NLAT_2);
-	}
-
-	for (im=m0; im<=MMAX; im+=mstep) {
-		m = im*MRES;
-	// go to DCT space
-		for (it=0;it<=KMAX;it+=2) {
-			for(l=m; l<=LMAX; l++) {
-				yk[(it/2)*(LMAX+1-m) + (l-m)] = 0.0;
-				dyk[(it/2)*(LMAX+1-m) + (l-m)].t = 0.0;
-				dyk[(it/2)*(LMAX+1-m) + (l-m)].p = 0.0;
-			}
-		}
-		for (l=m; l<=LMAX; l++) {
-			if (m & 1) {	// m odd
-				for (it=0; it<NLAT_2; it++) {
-					Z[it] = YLM(it, l, im) * st[it];	// P[l+1](x)	*st
-					if (vector) {
-						dZt[it] = DTYLM(it, l, im);	// P[l](x)	*1
-						dZp[it] = DPYLM(it, l, im);		// P[l-1](x)	*1
-					}
-				}
-			} else {	// m even
-				for (it=0; it<NLAT_2; it++) {
-					Z[it] = YLM(it, l, im);				// P[l](x)	*1
-					if (vector) {
-						dZt[it] = DTYLM(it, l, im) *st[it];	// P[l+1](x)	*st
-						dZp[it] = YLM(it, l, im) * m;	// P[l](x)	*st
-					}
-				}
-			}
-			if ((l-m)&1) {	// odd
-				for (it=NLAT_2; it<2*NLAT_2; it++) {
-					Z[it]   = - Z[2*NLAT_2-it-1];	// reconstruct even/odd part
-					dZt[it] =   dZt[2*NLAT_2-it-1];
-					dZp[it] = - dZp[2*NLAT_2-it-1];
-				}
-			} else {	// even
-				for (it=NLAT_2; it<2*NLAT_2; it++) {
-					Z[it] =     Z[2*NLAT_2-it-1];	// reconstruct even/odd part
-					dZt[it] = - dZt[2*NLAT_2-it-1];
-					dZp[it] =   dZp[2*NLAT_2-it-1];
-				}
-			}
-			fftw_execute_r2r(dct, Z, Z);
-			fftw_execute_r2r(dct, dZt, dZt);
-			fftw_execute_r2r(dct, dZp, dZp);
-#if SHT_VERBOSE > 1
-			if ((LMAX <= 12) && (verbose>1))
-			#pragma omp critical
-			{
-				printf("\nl=%d, m=%d ::\t", l,m);
-				for(it=0;it<2*NLAT_2;it++) printf("%e ",Z[it]/(2*NLAT));
-				printf("\n     dYt ::\t");
-				for(it=0;it<2*NLAT_2;it++) printf("%e ",dZt[it]/(2*NLAT));
-				printf("\n     dYp ::\t");
-				for(it=0;it<2*NLAT_2;it++) printf("%e ",dZp[it]/(2*NLAT));
-			}
-#endif
-			for (it=(l-m)&1; it<=l+1; it+=2) {
-				yk[(it/2)*(LMAX+1-m) + (l-m)] = Z[it]/(2*NLAT);	// and transpose
-				dyk[(it/2)*(LMAX+1-m) + (l-m)].p = dZp[it]/(2*NLAT);
-			}
-			for (it=(l+1-m)&1; it<=l+1; it+=2) {
-				dyk[(it/2)*(LMAX+1-m) + (l-m)].t = dZt[it]/(2*NLAT);
-			}
-		}
-
-	/* compute analysis coefficients (fast way)
-	 * Wklm = int(Tk*Ylm) = int(Tk.sum(i,a_ilm*Ti)) = sum(i, a_ilm* int(Tk*Ti)) = sum(i, a_ilm*Jik)
-	 * with Jik = int(Tk*Ti) = 1/(1-(k-i)^2) + 1/(1-(k+i)^2)
-	*/
-		if (analysis) {
-	#if SHT_VERBOSE > 0
-		if ((LMAX>126)&&(m0==0)&&(verbose)) {		// only one thread prints this message.
-			printf("computing weights m=%d\r",m);	fflush(stdout);
-		}
-	#endif
-		for (l=m; l<=LMAX; l++) {
-			unsigned k0,k1, k,i,d;
-			double Jik0, Jik1, yy, dyp, dyt;
-			double lnorm = iylm_fft_norm;
-
-			if (SHT_NORM == sht_schmidt)	lnorm *= (2*l+1);		// Schmidt semi-normalization
-			if ( (m>0) && (shtns->norm & SHT_REAL_NORM) )	lnorm *= 2;		// "real" norm : zlm must be doubled for m>0
-
-			k0 = (l-m)&1;	k1 = 1-k0;
-			for(k=0; k<NLAT; k++) {	Z[k] = 0.0;		dZt[k] = 0.0;	dZp[k] = 0.0; }
-			for (i=0; i<=(l+1)/2; i++) {
-				yy = yk[i*(LMAX+1-m) + (l-m)] * lnorm;
-				dyp = dyk[i*(LMAX+1-m) + (l-m)].p * lnorm/(l*(l+1));
-				dyt = dyk[i*(LMAX+1-m) + (l-m)].t * lnorm/(l*(l+1));
-				if (i+k0==0) {	yy*=0.5;	dyp*=0.5; }
-				if (i+k1==0) dyt*=0.5;
-				for (k=0; k<NLAT_2; k++) {
-					d = (k<i) ? i-k : k-i;
-					Jik0 = is1[(i+k0)+k] + is1[d];
-					Jik1 = is1[(i+k1)+k] + is1[d];
-					Z[2*k+k0] += yy * Jik0;
-					dZt[2*k+k1] += dyt * Jik1;
-					if (m&1) dZp[2*k+k0] += dyp * Jik0;
-				}
-			}
-#if SHT_VERBOSE > 1
-		if ((LMAX <= 12)&&(verbose>1))
-		#pragma omp critical
-		{
-			printf("\nl=%d, m=%d ::\t",l,m);
-			for (k=0; k<(2*NLAT_2); k++) printf("%f ",Z[k]);
-			printf("\n       dZt ::\t");
-			for (k=0; k<(2*NLAT_2); k++) printf("%f ",dZt[k]);
-			if (m&1) {
-				printf("\n       dZp ::\t");
-				for (k=0; k<(2*NLAT_2); k++) printf("%f ",dZp[k]);
-			}
-		}
-#endif
-
-			if (m == 0) {		// we store zlm in dct space for m=0
-				if (k0==0) 	{
-					yk0[((l-m)>>1)*(2*NLAT_2)] = Z[0]*0.5;         // store zlm_dct (k=0)
-					for (k=1; k<(2*NLAT_2); k++) yk0[((l-m)>>1)*(2*NLAT_2) +k] = 0.0;		// zero out.
-					k0=2;
-				}
-				for (k=k0; k<(2*NLAT_2); k+=2)
-					yk0[((l-m)>>1)*(2*NLAT_2) +k] = Z[k];             // store zlm_dct
-					
-				if (l>0) {
-					if (k1==0) 	{
-						dyk0[((l-1-m)>>1)*(2*NLAT_2)] = dZt[0]*0.5;         // store dzlm_dct (k=0)
-						for (k=1; k<(2*NLAT_2); k++) dyk0[((l-1-m)>>1)*(2*NLAT_2) +k] = 0.0;		// zero out.
-						k1=2;
-					}
-					for (k=k1; k<(2*NLAT_2); k+=2)
-						dyk0[((l-1-m)>>1)*(2*NLAT_2) +k] = dZt[k];             // store dzlm_dct
-				}
-			}
-
-			fftw_execute_r2r(idct, Z, Z);	fftw_execute_r2r(idct, dZt, dZt);
-			if (m == 0) {
-				for (it=0; it<NLAT; it++) { dZp[it] = 0.0; 	dZt[it] *= st_1[it]; }
-			} else if (m & 1) {	// m odd
-				fftw_execute_r2r(idct, dZp, dZp);
-				for (it=0; it<NLAT; it++) {	Z[it] *= st_1[it]; }
-			} else {	// m even
-				for (it=0; it<NLAT; it++) { dZp[it] = Z[it]*m/(l*(l+1)*st[it]); 	dZt[it] *= st_1[it]; }
-			}
-
-			long int l0 = (m==0) ? 1 : m;
-			long int talign = (m==0)*(NLAT_2 & 1);
-			long int sk = (l-l0)&1;
-			if (l==0) {
-				for (it=0; it<NLAT_2; it++) {
-					shtns->zlm[im][it] =  Z[it];
-				}
-			} else if ((sk == 0)&&(l == LMAX)) {
-				for (it=0; it<NLAT_2; it++) {
-					shtns->zlm[im][(l-m)*NLAT_2 + it + talign] =  Z[it];
-					if (vector) {
-						shtns->dzlm[im][(l-l0)*NLAT_2 + it].p = dZp[it];
-						shtns->dzlm[im][(l-l0)*NLAT_2 + it].t = dZt[it];
-					}
-				}
-			} else {
-				for (it=0; it<NLAT_2; it++) {
-					shtns->zlm[im][(l-m-sk)*NLAT_2 + it*2 +sk + talign] = Z[it];
-					if (vector) {
-						shtns->dzlm[im][(l-l0-sk)*NLAT_2 + it*2 +sk].p = dZp[it];
-						shtns->dzlm[im][(l-l0-sk)*NLAT_2 + it*2 +sk].t = dZt[it];
-					}
-				}
-			}
-		}
-		}
-
-		// Compact the coefficients for improved cache efficiency.
-		yg = shtns->ykm_dct[im];
-		for (it=0; it<= KMAX; it+=2) {
-			l = (it < m) ? m : it-(m&1);
-			while (l<=LMAX) {
-				yg[0] = yk[(it/2)*(LMAX+1-m) + (l-m)];
-				l++;	yg++;
-			}
-			if ((m==0) && ((LMAX & 1) == 0)) {	yg[0] = 0;		yg++;	}		// SSE2 padding.
-		}
-		if (MMAX==0) for (int j=0; j<3; j++) yg[j] = 0;		// allow some overflow.
-		if (vector) {
-			dyg = shtns->dykm_dct[im];
-			for (it=0; it<= KMAX; it+=2) {
-				l = (it-2 < m) ? m : it-2+(m&1);
-				while (l<=LMAX) {
-					dyg[0].t = dyk[(it/2)*(LMAX+1-m) + (l-m)].t;
-					dyg[0].p = dyk[(it/2)*(LMAX+1-m) + (l-m)].p;
-					l++;	dyg++;
-				}
-			}
-			if (im == 0) {		// compact and reorder m=0 dylm because .p = 0 :
-				dyg = shtns->dykm_dct[im];
-				yg = (double *) shtns->dykm_dct[im];
-				for (it=0; it<= KMAX; it+=2) {
-					dyg++;
-					for (l=it-1; l<=LMAX; l++) {
-						if (l>0) {
-							yg[0] = dyg[0].t;
-							yg++;	dyg++;
-						}
-					}
-					if (LMAX&1) {		// padding for SSE2 alignement.
-						yg[0] = 0.0;	yg++;
-					}
-				}
-			}
-		}
-	}
-	
-	// compact yk to zlm_dct0
-	if ((m0==0)&&(analysis)) {
-		long int klim = (LMAX * SHT_NL_ORDER) + 2;		// max k needed for nl-terms...
-		klim = (klim/2)*2;		// must be even...
-		if (klim > 2*NLAT_2) klim = 2*NLAT_2;		// but no more than 2*NLAT_2.
-		shtns->klim = klim;		// store for use in codelets.
-		yg = shtns->zlm_dct0;
-		for (l=0; l<=LMAX; l+=2) {
-			for (it=l; it<klim; it++) {	// for m=0, zl coeff with i<l are zeros.
-				*yg = yk0[it];
-				yg++;
-			}
-			yk0 += 2*NLAT_2;
-		}
-		if (vector) {
-			yg = shtns->dzlm_dct0;
-			for (l=1; l<=LMAX; l+=2) {
-				for (it=l-1; it<klim; it++) {	// for m=0, dzl coeff with i<l-1 are zeros.
-					*yg = dyk0[it];
-					yg++;
-				}
-				dyk0 += 2*NLAT_2;
-			}
-		}
-		free(yk0 - (2*NLAT_2)*(LMAX/2+1));
-	}
-
-	free(dyk);	free(yk);
-}
-
-/// \internal Computes the matrices required for SH transform on a regular grid (with or without DCT).
-/// \param analysis : 0 => synthesis only.
-static void init_SH_dct(shtns_cfg shtns, int analysis)
-{
-	fftw_plan dct, idct;
-	long int it,im,m,l;
-	long int sk, dsk;
-	double Z[2*NLAT_2] SSE;
-	double is1[NLAT];		// tabulate values for integrals.
-
-	const long int marray_size = sizeof(void*)*(MMAX+1) + (MIN_ALIGNMENT-1);
-	const int vector = (shtns->dylm != NULL);
-	const int KMAX = LMAX+1;
-
-	for(im=0, sk=0, dsk=0; im<=MMAX; im++) {	// how much memory to allocate for ykm_dct ?
-		m = im*MRES;
-		for (it=0; it<= KMAX; it+=2) {
-			l = (it < m) ? m : it-(m&1);
-			sk += LMAX+1 - l;
-			if ((m==0) && ((LMAX & 1) ==0)) sk++;		// SSE padding for m=0
-		}
-		for (it=0; it<= KMAX; it+=2) {
-			l = (it-2 < m) ? m : it-2+(m&1);
-			dsk += LMAX+1 - l;
-		}
-	}
-	if (MMAX == 0) sk+=3;	// allow some overflow.
-	for (l=0, it=0; l<=LMAX; l+=2)	// how much memory for zlm_dct0 ?
-		it += (2*NLAT_2 -l);
-	for (l=1, im=0; l<=LMAX; l+=2)	// how much memory for dzlm_dct0 ?
-		im += (2*NLAT_2 -l+1);
-
-#if SHT_VERBOSE > 1
-	if (verbose>1) printf("          Memory used for Ykm_dct matrices = %.3f Mb\n",sizeof(double)*(sk + 2.*dsk + it)/(1024.*1024.));
-#endif
-	shtns->ykm_dct = (double **) malloc( marray_size + sizeof(double)*sk );
-	shtns->ykm_dct[0] = (double *) PTR_ALIGN( shtns->ykm_dct + (MMAX+1) );
-	if (vector) {
-		shtns->dykm_dct = (struct DtDp **) malloc( marray_size + sizeof(struct DtDp)*dsk );
-		shtns->dykm_dct[0] = (struct DtDp *) PTR_ALIGN( shtns->dykm_dct + (MMAX+1) );
-	}
-	shtns->zlm_dct0 = (double *) VMALLOC( sizeof(double)* it );
-	if (vector) {
-		shtns->dzlm_dct0 = (double *) VMALLOC( sizeof(double)* im );
-	}
-	for (im=0; im<MMAX; im++) {
-		m = im*MRES;
-		for (it=0, sk=0; it<= KMAX; it+=2) {
-			l = (it < m) ? m : it-(m&1);
-			sk += LMAX+1 - l;
-			if ((m==0) && ((LMAX & 1) ==0)) sk++;		// SSE padding for m=0
-		}
-		for (it=0, dsk=0; it<= KMAX; it+=2) {
-			l = (it-2 < m) ? m : it-2+(m&1);
-			dsk += LMAX+1 - l;
-		}
-		shtns->ykm_dct[im+1] = shtns->ykm_dct[im] + sk;
-		if (vector)  shtns->dykm_dct[im+1] = shtns->dykm_dct[im] + dsk;
-	}
-
-#if SHT_VERBOSE > 1
-	ticks tik0, tik1;
-	tik0 = getticks();
-#endif
-
-	#ifdef OMP_FFTW
-		fftw_plan_with_nthreads(1);
-	#endif
-	dct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT10, FFTW_MEASURE );	// quick and dirty dct.
-	idct = fftw_plan_r2r_1d( 2*NLAT_2, Z, Z, FFTW_REDFT01, FFTW_MEASURE );	// quick and dirty idct.
-
-	init_SH_synth(shtns);
-
-// precomputation for scalar product of Chebychev polynomials.
-	for(it=0; it<NLAT; it++)
-		is1[it] = 1./(1. - 4.*it*it);
-
-  #ifdef _OPENMP
-	#pragma omp parallel
-	{
-		int n=omp_get_num_threads();
-		int k=omp_get_thread_num();
-		init_SH_dct_m(shtns, is1, dct, idct, analysis, k, n);
-	}
-  #else
-	init_SH_dct_m(shtns, is1, dct, idct, analysis, 0, 1);
-  #endif
-
-#if SHT_VERBOSE > 1
-	tik1 = getticks();
-	if (verbose>1) printf("\n    ticks : %.3f\n", elapsed(tik1,tik0)/(NLM*NLAT*(MMAX+1)));
-#endif
-	fftw_destroy_plan(idct);	fftw_destroy_plan(dct);
-}
-
-#endif		/* SHTNS_DCT */
-
 /// \internal Generate a gauss grid (including weights)
 static void grid_gauss(shtns_cfg shtns, double latdir)
 {
@@ -1387,51 +906,6 @@ static void grid_gauss(shtns_cfg shtns, double latdir)
 	}
 #endif
 }
-
-#ifdef SHTNS_DCT
-/// \internal Generate an equi-spaced theta grid (Chebychev points, excluding poles) for Féjer-DCT SHT.
-static void grid_dct(shtns_cfg shtns, double latdir)
-{
-	long int it;
-
-	shtns->grid = GRID_REGULAR;
-#if SHT_VERBOSE > 0
-	if (verbose) {
-		printf("        => using equaly spaced nodes with DCT acceleration\n");
-		if (NLAT <= SHT_NL_ORDER *LMAX)	printf("     !! Warning : DCT anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER);
-		if (NLAT != fft_int(NLAT,7))	printf("     !! Warning : Nlat is not optimal for FFTW !\n");
-	}
-#endif
-	if (NLAT & 1) shtns_runerr("NLAT must be even (DCT)");
-	if (NLAT <= LMAX+1) shtns_runerr("NLAT should be at least LMAX+2 (DCT)");
-
-	for (it=0; it<NLAT; it++) {		// Chebychev points : equaly spaced but skipping poles.
-		real th = M_PIl;	th = (th*(2*it+1))/(2*NLAT);
-		shtns->ct[it] = latdir * COS(th);
-		shtns->st[it] = SIN(th);
-		shtns->st_1[it] = 1.0/SIN(th);
-	}
-
-#if SHT_VERBOSE > 1
-	if (verbose>1) {
-		printf(" NLAT=%d, NLAT_2=%d\n",NLAT,NLAT_2);
-		double tmax = 0.0;
-		for (it=0;it<NLAT_2; it++) {
-			double ct = shtns->ct[it];		double st = shtns->st[it];
-			double t = fabs((ct*ct + st*st) -1.0);
-			if (t > tmax) tmax=t;
-		}
-		printf(" max st^2 + ct^2 -1 = %g\n",tmax);
-		if (NLAT_2 < 100) {
-			printf("          DCT nodes :");
-			for (it=0; it<NLAT_2; it++)
-				printf(" %g",shtns->ct[it]);
-			printf("\n");
-		}
-	}
-#endif
-}
-#endif		/* SHTNS_DCT */
 
 /// \internal Generate an equi-spaced theta grid including the poles, for synthesis only.
 static void grid_equal_polar(shtns_cfg shtns, double latdir)
@@ -1589,9 +1063,6 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 	int otf_analys = (shtns->wg != NULL);			// on-the-fly analysis supported.
 
 	if (NLAT < VSIZE2*4) return(0.0);			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow) and DCT not efficient for low NLAT.
-	#ifdef SHTNS_DCT
-	if ((dct_mtr != 0) && (shtns->ykm_dct == NULL)) return(0.0);		// no dct available : do nothing.
-	#endif
 
 	size_t nspat = sizeof(double) * NSPAT_ALLOC(shtns);
 	size_t nspec = sizeof(cplx)* NLM;
@@ -1656,8 +1127,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		if ((dct_mtr != 0) && (ityp >= 4)) break;		// dct !=0 : only scalar and vector.
 		if (ityp == 2) nloop = (nloop+1)/2;		// scalar ar done.
 		t0 = 1e100;
-		i0 = 0;
-		if (MTR_DCT < 0)     i0 = SHT_MEM;		// skip dct.
+		i0 = SHT_MEM;
 		if (on_the_fly_only) i0 = SHT_SV;		// only on-the-fly (SV is then also on-the-fly)
 		alg_end = SHT_NALG;
 		if (shtns->nthreads <= 1) alg_end = SHT_OMP1;		// no OpenMP with 1 thread.
@@ -1700,38 +1170,6 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 		}
 		if (ityp == 4) ityp++;		// skip second gradient
 	} while(++ityp < typ_lim);
-
-  #ifdef SHTNS_DCT
-	if (dct_mtr != 0) {		// find the best DCT timings...
- 		#if SHT_VERBOSE > 1
-			if (verbose>1) {  printf("finding best mtr_dct ...");	fflush(stdout);  }
-		#endif
-		minc = MMAX/20 + 1;             // don't test every single m.
-		m = -1;		i = -1;		t0 = 0.0;		// reference = no dct.
-		if (sht_func[SHT_STD][SHT_DCT][SHT_TYP_SSY] != NULL)
-			t0 += get_time(shtns, *nlp, 2, "s", shtns->ftable[SHT_STD][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-		if ( (sht_func[SHT_STD][SHT_DCT][SHT_TYP_VSY] != NULL) && (vector) )
-			t0 += get_time(shtns, nloop, 4, "v", shtns->ftable[SHT_STD][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-		tnodct = t0;
-		for (m=0; m<=MMAX; m+=minc) {
-			#if SHT_VERBOSE > 1
-				if (verbose>1) printf("\n\tm=%d :",m);
-			#endif
-			if (Set_MTR_DCT(shtns, m) >= 0) {
-				t = get_time(shtns, *nlp, 2, "sdct", sht_func[SHT_STD][SHT_DCT][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-				if (vector)
-					t += get_time(shtns, nloop, 4, "vdct", sht_func[SHT_STD][SHT_DCT][SHT_TYP_VSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
-				if (t < t0) {	t0 = t;		i = m;	PRINT_VERB("*"); }
-				PRINT_DOT
-			}
-		}
-		tdct = t0;
-		Set_MTR_DCT(shtns, i);		// the best DCT is chosen.
-		#if SHT_VERBOSE > 0
-			if (verbose) printf(" mtr_dct=%d  (%.1f%% performance gain)", MTR_DCT*MRES, 100.*(tnodct/tdct-1.));
-		#endif
-	}
-  #endif
 
 done:
 	#if SHT_VERBOSE > 0
@@ -1778,9 +1216,7 @@ void shtns_print_cfg(shtns_cfg shtns)
 
 	switch(shtns->grid) {
 		case GRID_GAUSS : printf("Gauss grid");	 break;
-		#ifdef SHTNS_DCT
-		case GRID_REGULAR : printf("Regular grid (mtr_dct=%d)",shtns->mtr_dct);	 break;
-		#endif
+//		case GRID_REGULAR : printf("Regular grid (mtr_dct=%d)",shtns->mtr_dct);	 break;
 		case GRID_POLES : printf("Regular grid including poles");  break;
 		default : printf("Unknown grid");
 	}
@@ -1800,7 +1236,7 @@ int config_save(shtns_cfg shtns, int req_flags)
 	
 	if (shtns->ct == NULL) return -1;		// no grid set
 
-	if ((shtns->nphi > 1)||(MTR_DCT >= 0)) {
+	if (shtns->nphi > 1) {
 		FILE* f = fopen("shtns_cfg_fftw","w");
 		if (f != NULL) {
 			fftw_export_wisdom_to_file(f);
@@ -1810,7 +1246,7 @@ int config_save(shtns_cfg shtns, int req_flags)
 
 	FILE *fcfg = fopen("shtns_cfg","a");
 	if (fcfg != NULL) {
-		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",PACKAGE_VERSION, _SIMD_NAME_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, MTR_DCT);
+		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",PACKAGE_VERSION, _SIMD_NAME_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, -1);
 		fprint_ftable(fcfg, shtns->ftable);
 		fprintf(fcfg,"\n");
 		fclose(fcfg);
@@ -1853,9 +1289,6 @@ int config_load(shtns_cfg shtns, int req_flags)
 				}
 			}
 			if (feof(fcfg)) break;
-			#ifndef SHTNS_DCT
-				if (mtr_dct2 <= 0)
-			#endif
 			if ((shtns->lmax == lmax2) && (shtns->mmax == mmax2) && (shtns->mres == mres2) && (shtns->nthreads == nthreads2) &&
 			  (shtns->nphi == nphi2) && (shtns->nlat == nlat2) && (shtns->grid == grid2) &&  (req_flags == req_flags2) &&
 			  (shtns->nlorder == nlorder2) && (strcmp(simd, _SIMD_NAME_)==0)) {
@@ -1867,9 +1300,6 @@ int config_load(shtns_cfg shtns, int req_flags)
 					fprint_ftable(stdout, ft2);
 					printf("\n");
 				}
-			#endif
-			#ifdef SHTNS_DCT
-				Set_MTR_DCT(shtns, mtr_dct2);		// use loaded mtr_dct
 			#endif
 				for (int iv=0; iv<SHT_NVAR; iv++)
 				for (int it=0; it<SHT_NTYP; it++)
@@ -2043,12 +1473,6 @@ shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 			shtns->lmidx[im] = base->lmidx[im];
 			shtns->tm[im] = base->tm[im];
 		}
-		#ifdef SHTNS_DCT
-		if (mmax < shtns->mtr_dct) {
-			shtns->idct = NULL;		// do not destroy the plan of the source.
-			Set_MTR_DCT(shtns, mmax);		// adjut mtr_dct if required.
-		}
-		#endif
 		if (mmax == 0) {
 			// TODO we may disable fft and replace with a phi-averaging function ...
 			// ... then switch to axisymmetric functions :
@@ -2071,9 +1495,6 @@ void shtns_unset_grid(shtns_cfg shtns)
 {
 	if (ref_count(shtns, &shtns->wg) == 1)	VFREE(shtns->wg);
 	shtns->wg = NULL;
-  #ifdef SHTNS_DCT
-	free_SH_dct(shtns);
-  #endif
 	free_SHTarrays(shtns);
 	shtns->nlat = 0;	shtns->nlat_2 = 0;
 	shtns->nphi = 0;	shtns->nspat = 0;
@@ -2154,18 +1575,13 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 */
 	shtns->nspat = 0;
 	shtns->nlorder = nl_order;
-	#ifdef SHTNS_DCT
-	shtns->mtr_dct = -1;		// dct switched off completely.
-	#endif
 	layout = flags & 0xFFFF00;
 	flags = flags & 255;	// clear higher bits.
 
 	switch (flags) {
-	  #ifndef SHTNS_DCT
 		case sht_auto :		flags = sht_gauss;	break;		// only gauss available.
 		case sht_reg_fast:
 		case sht_reg_dct:	shtns_runerr("regular grid not available (DCT required).");		break;
-	  #endif
 		case sht_gauss_fly :  flags = sht_gauss;  on_the_fly = 1;  break;
 		case sht_quick_init : flags = sht_gauss;  quick_init = 1;  break;
 		case sht_reg_poles :  analys = 0;         quick_init = 1;  break;
@@ -2249,67 +1665,8 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		}
 	}
 	planFFT(shtns, layout, on_the_fly);		// initialize fftw
-	#ifdef SHTNS_DCT
-	shtns->zlm_dct0 = NULL;		// used as a flag.
-	#endif
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
 
-  #ifdef SHTNS_DCT
-	if (flags == sht_reg_dct) {		// pure dct.
-		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
-		grid_dct(shtns, latdir);		init_SH_dct(shtns, 1);
-		OptimizeMatrices(shtns, eps);
-		Set_MTR_DCT(shtns, MMAX);
-		if (MTR_DCT != MMAX) shtns_runerr("DCT planning failed.");
-	}
-	if ((flags == sht_auto)||(flags == sht_reg_fast))
-	{
-		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
-		grid_dct(shtns, latdir);		init_SH_dct(shtns, 1);
-		OptimizeMatrices(shtns, eps);
-		if (NLAT >= SHT_MIN_NLAT_DCT) {			// dct requires large NLAT to perform well.
-			if ((layout & SHT_LOAD_SAVE_CFG) && (flags == sht_reg_fast))
-				cfg_loaded = (config_load(shtns, req_flags) > 0);
-			if (!cfg_loaded) {
-				t = choose_best_sht(shtns, &nloop, vector, 1);		// find optimal MTR_DCT.
-				if ((n_gauss > 0)&&(flags == sht_auto)) t *= ((double) n_gauss)/NLAT;	// we can revert to gauss with a smaller nlat.
-				if (t < MIN_PERF_IMPROVE_DCT) {
-					Set_MTR_DCT(shtns, -1);		// turn off DCT.
-				} else {
-					t = SHT_error(shtns, vector);
-					if (t > MIN_ACCURACY_DCT) {
-					#if SHT_VERBOSE > 0
-						if (verbose) printf("     !! Not enough accuracy (%.3g) => DCT disabled.\n",t);
-					#endif
-					#if SHT_VERBOSE < 2
-						Set_MTR_DCT(shtns, -1);		// turn off DCT.
-					#endif
-					}
-				}
-			}
-		}
-		if (MTR_DCT < 0) {			// free memory used by DCT and disables DCT.
-			free_SH_dct(shtns);			// free now useless arrays.
-			if (flags == sht_auto) {
-				flags = sht_gauss;		// switch to gauss grid, even better accuracy.
-		#if SHT_VERBOSE > 0
-				if (verbose) printf("        => switching back to Gauss Grid\n");
-		#endif
-				for (im=1; im<=MMAX; im++) {	//	im >= 1
-					m = im*MRES;
-					shtns->ylm[im]  -= shtns->tm[im]*(LMAX-m+1);		// restore pointers altered by OptimizeMatrices().
-					if (vector)  shtns->dylm[im] -= shtns->tm[im]*(LMAX-m+1);
-				}
-				if (n_gauss > 0) {		// we should use the optimal size for gauss-legendre
-					free_SHTarrays(shtns);
-					*nlat = n_gauss;
-					shtns->nlat_2 = (*nlat+1)/2;	shtns->nlat = *nlat;
-					planFFT(shtns, layout, on_the_fly);		// fft must be replanned because NLAT has changed.
-				}
-			}
-		}
-	}
-  #endif		/* SHTNS_DCT */
 	if (flags == sht_gauss)
 	{
 		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays

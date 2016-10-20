@@ -68,8 +68,6 @@ sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c sht_com.c $(hfiles)
 
 sht_mem.o : sht_mem.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c
 	$(shtcc) -c $< -o $@
-sht_dct.o : sht_dct.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c
-	$(shtcc) -c $< -o $@
 sht_fly.o : sht_fly.c Makefile $(hfiles) SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
 	$(shtcc) -c $< -o $@
 sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c

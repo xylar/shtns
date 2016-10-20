@@ -32,10 +32,8 @@ AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX or MIC)]))
-AC_ARG_ENABLE([dct],
-	AS_HELP_STRING([--enable-dct], [Enables support for regular grids using DCT (deprecated).]))
 AC_ARG_ENABLE([mem],
-	AS_HELP_STRING([--disable-mem], [Do not use matrix precomputed and stored in memory. Implies --disable-dct.]))
+	AS_HELP_STRING([--disable-mem], [Do not use matrix precomputed and stored in memory.]))
 
 dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
 dnl generated configure script that the expansion does not occur until
@@ -129,7 +127,6 @@ libname=$target		# set the libname befor checking for python.
 AS_IF([test "x$enable_mkl" = "xyes"], [
   # optionally use MKL instead of fftw3
   AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
-  enable_dct=no		# MKL does not support dct (june 2013).
   AX_CHECK_COMPILE_FLAG([-mkl], [
 	LIBS="-mkl $LIBS"	# easy way !
 	AC_CHECK_FUNC(fftw_plan_many_dft, [AC_MSG_NOTICE(["FFTW interface found in MKL, link with -mkl"])],
@@ -205,12 +202,7 @@ AS_IF([test "x$enable_simd" != "xno"], [
 # Disable MEM ?
 AS_IF([test "x$enable_mem" != "xno"], [
 	AC_DEFINE([SHTNS_MEM],[1],[Include algorithms using precomputed matrix stored in memory)])
-	objs="$objs sht_mem.o"		# compile dct transforms
-	# Disable DCT ?
-	AS_IF([test "x$enable_dct" == "xyes"], [
-		AC_DEFINE([SHTNS_DCT],[1],[Include DCT support (Fejer quadrature on regular grids)])
-		objs="$objs sht_dct.o"		# compile dct transforms
-	])
+	objs="$objs sht_mem.o"		# compile mem transforms
 ])
 
 # Verbosity setting
