@@ -152,7 +152,7 @@ static double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, const 
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
-	if ( (l>LMAX) || (l<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
+	if ( (l>LMAX+1) || (l<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
 #endif
 
 	ny = 0;
@@ -202,7 +202,7 @@ static double legendre_sphPlm_hp(shtns_cfg shtns, const int l, const int im, dou
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
-	if ( (l>LMAX) || (l<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
+	if ( (l>LMAX+1) || (l<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
 #endif
 
 	al = alm_im(shtns, im);
@@ -244,7 +244,7 @@ static void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im,
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
-	if ( (lmax>LMAX) || (lmax<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
+	if ( (lmax>LMAX+1) || (lmax<m) || (im>MMAX) ) shtns_runerr("argument out of range in legendre_sphPlm");
 #endif
 
 	al = alm_im(shtns, im);
@@ -296,7 +296,7 @@ static void legendre_sphPlm_array_hp(shtns_cfg shtns, const int lmax, const int 
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
-	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_array");
+	if ((lmax > LMAX+1)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_array");
 #endif
 
 	x = cost;
@@ -357,7 +357,7 @@ static void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const i
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
-	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
+	if ((lmax > LMAX+1)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
 
 	al = alm_im(shtns, im);
@@ -430,7 +430,7 @@ static void legendre_sphPlm_deriv_array_hp(shtns_cfg shtns, const int lmax, cons
 	x = cost;
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
-	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
+	if ((lmax > LMAX+1)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
 	al = alm_im(shtns, im);
 	yl -= m;	dyl -= m;			// shift pointers
@@ -499,7 +499,7 @@ static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, con
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
-	if ((lmax > LMAX)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
+	if ((lmax > LMAX+1)||(lmax < m)||(im>MMAX)) shtns_runerr("argument out of range in legendre_sphPlm_deriv_array");
 #endif
 
 	al = alm_im(shtns, im);

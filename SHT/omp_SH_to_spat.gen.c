@@ -57,6 +57,7 @@ T	#define BP0(i) ((double *)BpF)[i]
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
+QX	double Ql0[llim+2];
 V	v2d VWl[llim*2+4];
 
 	ct = shtns->ct;		st = shtns->st;
@@ -73,9 +74,9 @@ V	v2d VWl[llim*2+4];
 		if (m0 == 0)
 	#endif
 	{	//	im=0;
-Q		double Ql0[llim+1];
-S		double Sl0[llim];
-T		double Tl0[llim];
+S		double* const Sl0 = (double*) VWl;
+T		double* const Tl0 = (double*) VWl + llim+2;
+3		double* const Ql0 = (double*) (VWl + llim+2);
 		#ifdef SHT_GRAD
 		  #ifndef SHT_AXISYM
 			#ifdef _GCC_VEC_

@@ -59,7 +59,7 @@ T	#define BP0(i) ((double *)BpF)[i]
 	long int nk, k,l,m;
 	double *alm, *al;
 	s2d *ct, *st;
-QX	double VWl[llim+2];
+QX	double Ql0[llim+2];
 V	v2d VWl[llim*2+4];
 
   #ifndef SHT_AXISYM
@@ -108,45 +108,17 @@ T	BpF = (v2d*) Vp;
 	ct = (s2d*) shtns->ct;		st = (s2d*) shtns->st;
 	{	//	im=0;
 		alm = shtns->alm;
-QX		double* const Ql0 = (double*) VWl;
-V		double* const Ql0 = (double*) (VWl + llim+2);
-Q 		l=0;
-Q		do {		// for m=0, compress the complex Qlm to double
+S		double* const Sl0 = (double*) VWl;
+T		double* const Tl0 = (double*) VWl + llim+2;
+3		double* const Ql0 = (double*) (VWl + llim+2);
+ 		l=1;
+Q		Ql0[0] = (double) Qlm[0];		// l=0
+		do {		// for m=0, compress the complex Q,S,T to double
 Q			Ql0[l] = (double) Qlm[l];	//	Ql[l+1] = (double) Qlm[l+1];
-Q			++l;
-Q		} while(l<=llim);
-3		Ql0[l] = 0.0;		// allow up to llim+1
-
-V		double* const VWl0 = (double*) VWl;
-V		{	// convert from vector SH to scalar SH
-V			// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
-V			// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
-V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Vlm(l);
-V			double* mx = shtns->mx_stdt;
-S			double sl = 0.0;		// Slm[0] = 0
-T			double tl = 0.0;		// Tlm[0] = 0
-V			double vs = 0.0;
-V			double wt = 0.0;
-V			for (int l=0; l<=llim; l++) {
-V				double mxu = mx[2*l];
-V				double mxl = mx[2*l+1];		// compute for next iter
-S				double vs1 = mxl * sl;
-T				double wt1 = -mxl * tl;
-V				if (l < llim) {
-S					sl = creal(Slm[l+1]);		// kept for next iter
-T					tl = creal(Tlm[l+1]);		// kept for next iter
-S					vs += mxu * sl;
-T					wt -= mxu * tl;
-V				}
-V				VWl0[2*l]   = vs;
-V				VWl0[2*l+1] = wt;
-V				vs = 0.0;		wt = 0.0;
-S				vs = vs1;
-T				wt = wt1;
-V			}
-V			VWl0[2*llim+2] = vs;
-V			VWl0[2*llim+3] = wt;
-V		}
+S			Sl0[l-1] = (double) Slm[l];	//	Sl[l] = (double) Slm[l+1];
+T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
+			++l;
+		} while(l<=llim);
 		k=0;	nk = NLAT_2;
 	#if _GCC_VEC_
 		nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
@@ -154,56 +126,61 @@ V		}
 		do {
 			l=0;	al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
+V			rnd sint[NWAY], dy0[NWAY], dy1[NWAY];
 Q			rnd re[NWAY], ro[NWAY];
 S			rnd te[NWAY], to[NWAY];
 T			rnd pe[NWAY], po[NWAY];
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(ct, j+k);
-Q				y0[j] = vall(al[0]);
-V				y0[j] = vall(al[0]) / vread(st, j+k);		// for the vector transform: FIXME: problem when st = 0 (poles)  =>  revert to dy synthesis
+V				sint[j] = -vread(st, j+k);
+				y0[j] = vall(al[0]);
+V				dy0[j] = vall(0.0);
+Q				re[j] = y0[j] * vall(Ql0[0]);
+S				to[j] = dy0[j];
+T				po[j] = dy0[j];
 			}
 			for (int j=0; j<NWAY; ++j) {
-				y1[j]  = y0[j] * vall(al[1]) * cost[j];
-Q				re[j] = vall(0.0);
-S				te[j] = vall(0.0);
-T				pe[j] = vall(0.0);
+				y1[j]  = vall(al[0]*al[1]) * cost[j];
+V				dy1[j] = vall(al[0]*al[1]) * sint[j];
 			}
 			for (int j=0; j<NWAY; ++j) {
-Q				ro[j] = vall(0.0);
-S				to[j] = vall(0.0);
-T				po[j] = vall(0.0);
+Q				ro[j] = y1[j] * vall(Ql0[1]);
+S				te[j] = dy1[j] * vall(Sl0[0]);
+T				pe[j] = -dy1[j] * vall(Tl0[0]);
 			}
-			al+=2;
+			al+=2;	l+=2;
 			while(l<llim) {
 				for (int j=0; j<NWAY; ++j) {
-Q					re[j] += y0[j] * vall(Ql0[l]);
-S					te[j] += y0[j] * vall(VWl0[2*l]);
-T					pe[j] += y0[j] * vall(VWl0[2*l+1]);
-				}
-				for (int j=0; j<NWAY; ++j) {
+V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*sint[j]) + vall(al[0])*dy0[j];
 					y0[j]  = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 				}
 				for (int j=0; j<NWAY; ++j) {
-Q					ro[j] += y1[j] * vall(Ql0[l+1]);
-S					to[j] += y1[j] * vall(VWl0[2*l+2]);
-T					po[j] += y1[j] * vall(VWl0[2*l+3]);
+Q					re[j] += y0[j] * vall(Ql0[l]);
+S					to[j] += dy0[j] * vall(Sl0[l-1]);
+T					po[j] -= dy0[j] * vall(Tl0[l-1]);
 				}
 				for (int j=0; j<NWAY; ++j) {
+V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*sint[j]) + vall(al[2])*dy1[j];
 					y1[j]  = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
+				}
+				for (int j=0; j<NWAY; ++j) {
+Q					ro[j] += y1[j] * vall(Ql0[l+1]);
+S					te[j] += dy1[j] * vall(Sl0[l]);
+T					pe[j] -= dy1[j] * vall(Tl0[l]);
 				}
 				al+=4;	l+=2;
 			}
-S				for (int j=0; j<NWAY; ++j) 	te[j] += y0[j] * vall(VWl0[2*l]);
-T				for (int j=0; j<NWAY; ++j) 	pe[j] += y0[j] * vall(VWl0[2*l+1]);
 			if (l==llim) {
-Q				for (int j=0; j<NWAY; ++j) re[j] += y0[j] * vall(Ql0[l]);
-V				for (int j=0; j<NWAY; ++j) {
-S					to[j] += y1[j] * vall(VWl0[2*l+2]);
-T					po[j] += y1[j] * vall(VWl0[2*l+3]);
-V				}
+				for (int j=0; j<NWAY; ++j) {
+V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*sint[j]) + vall(al[0])*dy0[j];
+					y0[j]  = vall(al[1])*cost[j]*y1[j] + vall(al[0])*y0[j];
+				}
+				for (int j=0; j<NWAY; ++j) {
+Q					re[j] += y0[j] * vall(Ql0[l]);
+S					to[j] += dy0[j] * vall(Sl0[l-1]);
+T					po[j] -= dy0[j] * vall(Tl0[l-1]);
+				}
 			}
-
-3			for (int j=0; j<NWAY; ++j) {	re[j] *= vread(st, j+k);		ro[j] *= vread(st, j+k);	}
 		#if _GCC_VEC_
 			for (int j=0; j<NWAY; ++j) {
 Q				S2D_STORE(BrF, j+k, re[j], ro[j])
