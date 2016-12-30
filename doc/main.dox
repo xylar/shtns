@@ -13,7 +13,6 @@
  * - various conventions (normalization and Condon-Shortley phase)
  * - can be used from <b>Fortran, c/c++, and Python</b> programs
  * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature)
- * - an algorithm using DCT for <b>regular nodes</b> (based on a generalized Fejer quadrature)
  * - support for SSE2, SSE3 and <b>AVX</b> vectorization with gcc.
  * - <b>parallel transforms with OpenMP</b> (for Gauss grid only).
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
@@ -24,7 +23,7 @@
  * - \link operators special spectral operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
  * - scalar transforms for complex spatial fields.
  *
- * Using DCT acceleration and other classical \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
+ * Using several \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *
  * It requires the <a href="http://www.fftw.org/">FFTW</a> library for Fast Fourier Transforms.
  *
@@ -87,7 +86,7 @@ That's it, FFTW is now installed and ready for use.
 \subsection mkl Using MKL instead of FFTW
 
 SHTns can use MKL instead of FFTW. To do this, pass \c --enable-mkl to the configure script.
-Performance can be slightly better, but there is no DCT support, so only gauss grid is available.
+Performance can be slightly better.
 
 \note Currently the call of MKL through the fftw wrappers is not thread safe.
 The user is responsible for working around this MKL problem as <a href=http://software.intel.com/sites/products/documentation/hpc/mkl/mklman/GUID-D17B3AB4-BD4E-4652-94A7-BAD4130CCB4A.htm>indicated by intel</a>.
@@ -145,7 +144,6 @@ When dealing with non-linear equation, or more generally when analysing data tha
 exist. For a given non-linear order of the equation N (typically 2), the anti-aliasing conditions are :
  - NPHI > (N+1)*MMAX
  - NLAT > (N+1)*LMAX/2 for Gauss-Legendre quadrature
- - NLAT > N*LMAX for our DCT quadrature
 
 Furthermore, FFT is more efficient for certain values of NPHI and/or NLAT. If you do not require specific NLAT or NPHI, you can let SHTns choose them
 for you, by using \ref shtns_set_grid_auto with nphi and/or nlat set to zero.
@@ -415,39 +413,6 @@ Most x86 CPUs have support for Single-Instruction-Multiple-Data (SIMD) operation
 allowing to perform the same double precision arithmetic operations on a vector of 2 (SSE2) or 4 (AVX) double precision numbers,
 effectively multiplying by 2 or 4 the computing power. Modern compilers attempt to vectorize the code, but they cannot do miracles.
 SHTns uses explicit vectorization extensively (thanks to the GCC vector extensions) to use the full computing power of your CPU.
-
-\section opt_dct Discrete Cosine Transform optimization
-
-This is a non-trivial optimization mostly efficient on small m's,
-which can significantly decrease the operation count.
-
-It can be noticed that Spherical Harmonics are polynomials
-of order \f$ l \f$ in \f$ \cos \theta \f$ (multiplied by \f$ \sin \theta \f$ for odd m's).
-Thus, going to DCT space and summing there can help to further reduce the number of operations.
-
-Using a DCT requires a regular grid instead of the usual Gauss grid, and this
-means doubling the number of grid points to keep an equally accurate quadrature (Tchebychev quadrature), reducing
-the performance gain from the DCT to zero, when not performing worse.
-
-However, SHTns uses a quadrature inspired by the Fejer quadrature (or Clenshaw-Curtis), which allows exact result
-using only one more grid-point than the classical Gauss-Legendre quadrature.
-This allows SHTns to efficiently use the DCT optimization, but also to use regular grids with
-almost half the grid points as usual.
-
-The theoretical result is that for a function band-limited by L, L+2 equispaced grid-points allow us
-to fully recover the spectral content.
-There is, however, a drawback for non-linear terms : for a product of two functions band-limited to L,
-we would require L*2+2 grid points, whereas the Gauss-Legendre quadrature would only require (L+1)*3/2 grid-points if we
-are interested in only the first L modes of the product.
-
-There is a slight loss of accuracy due to round-off errors (as an example, relative errors
-with DCT are around \c 1.e-11 instead of \c 1.e-12 without for lmax around 500).
-If you can live with it (you really should), the DCT-based algorithm performs much faster on small m's :
-twice to four times faster for axisymmetric transforms, and between 1.5 and 1.2 times faster on non-axisymmetric ones.
-For large m's however, the spatial-domain polar optimization takes the lead.
-
-Note also that the DCT algorithm, while being usually faster, requires significantly larger initialization time.
-It is then suitable for performing many transforms (as in a direct numerical simulations).
 
 \section opt_runtime Runtime tuning of algorithm
 

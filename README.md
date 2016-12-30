@@ -16,20 +16,19 @@ FEATURES:
 - spatial data can be stored in latitude-major or longitude-major arrays.
 - various conventions (normalization and Condon-Shortley phase).
 - can be used from **Fortran, c/c++, and Python** programs.
-- a highly efficient Gauss algorithm working with Gauss nodes (based on
+- highly efficient Gauss algorithm working with Gauss nodes (based on
   Gauss-Legendre quadrature).
 - support for SSE2, SSE3, **AVX, AVX2** vectorization, as well as Xeon Phi and
   Blue Gene/Q.
-- **parallel transforms with OpenMP** (for Gauss grid only).
+- **parallel transforms with OpenMP**.
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).
-- ability to choose the optimal spatial sizes for a given spectral truncation.
 - **on-the-fly transforms** : saving memory and bandwidth, they are even faster
   on modern architectures.
 - accurate up to spherical harmonic degree l=16383 (at least).
-- rotation functions to rotate spherical harmonics (beta).
+- **rotation** functions to rotate spherical harmonics.
 - special spectral operator functions that do not require a transform
   (multiply by cos(theta)...).
-- scalar transforms for complex spatial fields.
+- scalar transforms and rotations for complex spatial fields.
 - SHT at fixed m (without fft, aka Legendre transform - beta).
 
 
@@ -67,6 +66,12 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
+
+* v2.7  (31 Dec 2016)
+	- Faster vector transforms: up to 2 times faster.
+	- Optimized pseudo-spectral rotation functions: 4 to 6 times faster (single thread).
+	- Improvements in complex spatial data support (flexible truncation + rotations).
+	- DCT-based transforms on regular grids have been removed.
 
 * v2.6.6  (6 Jul 2016)
 	- Improved `SH_to_lat()` function, now also included in the Python interface.
