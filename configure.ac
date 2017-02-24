@@ -107,7 +107,9 @@ AS_IF([test "x$enable_many_core" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 
+# Disable precomputed matrix support with openmp: to avoid bugs arising with icc + openmp.
 AS_IF([test "x$enable_openmp" = "xyes"], [
+  	enable_mem=no
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 	dnl AC_CHECK_HEADERS([omp.h])

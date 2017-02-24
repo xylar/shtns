@@ -3896,8 +3896,10 @@ fi
 
 fi
 
+# Disable precomputed matrix support with openmp: to avoid bugs arising with icc + openmp.
 if test "x$enable_openmp" = "xyes"; then :
 
+  	enable_mem=no
 
   OPENMP_CFLAGS=
   # Check whether --enable-openmp was given.
