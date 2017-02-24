@@ -67,7 +67,7 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
-* v2.7  (31 Dec 2016)
+* v2.7  (24 Feb 2017)
 	- Faster vector transforms: up to 2 times faster.
 	- Optimized pseudo-spectral rotation functions: 4 to 6 times faster (single thread).
 	- Improvements in complex spatial data support (flexible truncation + rotations).

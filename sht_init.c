@@ -1609,6 +1609,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		n_gauss = ((nl_order+1)*LMAX)/2 +1;		// required gauss nodes
 		n_gauss += (n_gauss&1);		// even is better.
 		n_gauss = ((n_gauss+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
+		if (n_gauss < VSIZE2*4) n_gauss=VSIZE2*4;			// avoid overflow with NLAT_2 < VSIZE2*2
 		if (flags != sht_gauss) {
 			m = fft_int(nl_order*LMAX+2, 7);		// required dct nodes
 			*nlat = m + (m&1);		// even is better.
