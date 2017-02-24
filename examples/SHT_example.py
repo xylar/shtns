@@ -39,7 +39,7 @@ l2 = el*(el+1)				# array l(l+1) that is useful for computing laplacian
 ### use advanced options to create a regular grid, theta-contiguous, and with south-pole comming first.
 # nlat = lmax*2
 # nphi = mmax*3
-# grid_typ = shtns.sht_reg_fast | shtns.SHT_THETA_CONTIGUOUS | shtns.SHT_SOUTH_POLE_FIRST
+# grid_typ = shtns.sht_gauss | shtns.SHT_THETA_CONTIGUOUS | shtns.SHT_SOUTH_POLE_FIRST
 # polar_opt_threshold = 1.0e-10
 # sh.set_grid(nlat, nphi, flags=grid_typ, polar_opt=polar_opt_threshold)
 
