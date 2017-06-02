@@ -663,7 +663,7 @@ static double legendre_Pl(const int l, double x)
 /// Newton method from initial Guess to find the zeros of the Legendre Polynome
 /// \param x = abscissa, \param w = weights, \param n points.
 /// \note Reference:  Numerical Recipes, Cornell press.
-static void gauss_nodes(real *x, real *w, int n)
+static void gauss_nodes(real *x, real *w, const int n)
 {
 	long int i,l,m, k;
 	real z, z1, p1, p2, p3, pp;
@@ -715,4 +715,35 @@ static void gauss_nodes(real *x, real *w, int n)
 	for (i=m-1; i>0; i--) {
 		if (((double) x[i]) == ((double) x[i-1])) shtns_runerr("bad gauss points");
 	}
+}
+
+/// \internal Generates the abscissa and weights for a Féjer quadrature.
+/// Compute weights via FFT
+/// \param x = abscissa, \param w = weights, \param n points.
+/// \note Reference: Waldvogel (2006) "Fast Construction of the Fejér and Clenshaw-Curtis Quadrature Rules"
+static void fejer1_nodes(real *x, real *w, const int n)
+{
+	fftw_plan ifft;
+	double* wf = (double*) malloc( (2*n+2) * sizeof(double) );
+	cplx* v1 = (cplx*) (wf + n);
+
+	// the nodes
+	for (int i=0; i<n; i++) {
+		x[i] = cos(M_PI*(0.5+i)/n);
+	}
+
+	// the weights
+	for (int k=0; k<n/2+1; k++) {
+		double t = (M_PI*k)/n;
+		v1[k] = (cos(t) + I*sin(t)) * 2.0/(1.0 - 4.0*k*k);
+	}
+
+	ifft = fftw_plan_dft_c2r_1d(n, v1, wf, FFTW_ESTIMATE);
+	fftw_execute_dft_c2r(ifft,v1,wf);
+
+	for (int k=0; k<n; k++)
+		w[k] = wf[k]/n;
+
+	fftw_destroy_plan(ifft);
+	free(wf);
 }
