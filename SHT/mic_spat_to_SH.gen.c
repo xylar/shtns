@@ -283,18 +283,18 @@ V			l=m-1;
 			long int nsint = 0;
 			do {		// sin(theta)^m		(use rescaling to avoid underflow)
 				if (l&1) {
-					for (int j=0; j<NW; ++j) y0[j] *= cost[j];
+					for (int j=NW-1; j>=0; --j) y0[j] *= cost[j];
 					ny += nsint;
-					if (vlo(y0[0]) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
+					if (vlo(y0[NW-1]) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
 						ny--;
-						for (int j=0; j<NW; ++j) y0[j] *= vall(SHT_SCALE_FACTOR);
+						for (int j=NW-1; j>=0; --j) y0[j] *= vall(SHT_SCALE_FACTOR);
 					}
 				}
-				for (int j=0; j<NW; ++j) cost[j] *= cost[j];
+				for (int j=NW-1; j>=0; --j) cost[j] *= cost[j];
 				nsint += nsint;
-				if (vlo(cost[0]) < 1.0/SHT_SCALE_FACTOR) {
+				if (vlo(cost[NW-1]) < 1.0/SHT_SCALE_FACTOR) {
 					nsint--;
-					for (int j=0; j<NW; ++j) cost[j] *= vall(SHT_SCALE_FACTOR);
+					for (int j=NW-1; j>=0; --j) cost[j] *= vall(SHT_SCALE_FACTOR);
 				}
 			} while(l >>= 1);
 		}

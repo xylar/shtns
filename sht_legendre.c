@@ -717,10 +717,11 @@ static void gauss_nodes(real *x, real *w, const int n)
 	}
 }
 
-/// \internal Generates the abscissa and weights for a Féjer quadrature.
+/// \internal Generates the abscissa and weights for a Féjer quadrature (#1).
 /// Compute weights via FFT
 /// \param x = abscissa, \param w = weights, \param n points.
 /// \note Reference: Waldvogel (2006) "Fast Construction of the Fejér and Clenshaw-Curtis Quadrature Rules"
+/// requires n > 2*lmax
 static void fejer1_nodes(real *x, real *w, const int n)
 {
 	fftw_plan ifft;
@@ -747,3 +748,127 @@ static void fejer1_nodes(real *x, real *w, const int n)
 	fftw_destroy_plan(ifft);
 	free(wf);
 }
+
+static void clenshaw_curtis_nodes(real *x, real *w, const int n)
+{
+	fftw_plan ifft;
+	double* wf = (double*) malloc( (2*n+2) * sizeof(double) );
+	cplx* v1 = (cplx*) (wf + n);
+
+	// the nodes
+	for (int i=0; i<n; i++) {
+		x[i] = cos((M_PI*i)/(n-1));
+	}
+
+	// the weights
+	for (int k=0; k<(n-1)/2+1; k++) {
+		v1[k] = 2.0/(1.0 - 4.0*k*k);
+	}
+
+	ifft = fftw_plan_dft_c2r_1d(n-1, v1, wf, FFTW_ESTIMATE);
+	fftw_execute_dft_c2r(ifft,v1,wf);
+
+	wf[0] *= 0.5;
+	for (int k=0; k<n-1; k++)  w[k] = wf[k]/(n-1);
+	w[n-1] = w[0];
+
+	fftw_destroy_plan(ifft);
+	free(wf);
+}
+
+/*
+
+/// \internal Generates the abscissa and weights for a Féjer quadrature (#2).
+/// Compute weights via FFT
+/// \param x = abscissa, \param w = weights, \param n points.
+/// \note Reference: Waldvogel (2006) "Fast Construction of the Fejér and Clenshaw-Curtis Quadrature Rules"
+/// requires n > 2*lmax
+static void fejer2_nodes(real *x, real *w, const int n)
+{
+	const double norm = 1.0/(n+1);
+
+	// the nodes
+	for (int i=0; i<n; i++) {
+		x[i] = cos((M_PI*(i+1))*norm);
+		if (n<=128) printf("%g ",acos(x[i])*180./M_PI);
+	}
+	printf("< nodes. weights > ");
+
+	// the weights, explicit formula
+	for (int k=0; k<n/2; k++) {
+		double th = M_PI*(k+1)*norm;
+		double s = 0.0;
+		for (int j=1; j<=(n+1)/2; j++) 	s += sin((2*j-1)*th)/(2*j-1);
+		s *= 4.*norm*sin(th);
+		w[k] = s;
+		w[n-1-k] = s;
+	}
+
+	if (n<=128) for (int k=0; k<n; k++) printf("%g ",w[k]);
+}
+
+/// \internal Generates the abscissa and weights for a Féjer quadrature (#2).
+/// Compute weights via FFT
+/// \param x = abscissa, \param w = weights, \param n points.
+/// \note Reference: Waldvogel (2006) "Fast Construction of the Fejér and Clenshaw-Curtis Quadrature Rules"
+/// requires n > 2*lmax+2
+static void fejer2_nodes_poles(real *x, real *w, const int n)
+{
+	const double norm = 1.0/(n-1);
+
+	// the nodes (including poles)
+	for (int i=0; i<n; i++) {
+		x[i] = cos((M_PI*i)*norm);
+		if (n<=128) printf("%g ",acos(x[i])*180./M_PI);
+	}
+	printf("< nodes. weights > ");
+
+	// the weights, explicit formula
+	for (int k=1; k<n/2; k++) {
+		double th = M_PI*k*norm;
+		double s = 0.0;
+		for (int j=1; j<=(n-1)/2; j++) 	s += sin((2*j-1)*th)/(2*j-1);
+		s *= 4.*norm*sin(th);
+		w[k] = s;
+		w[n-1-k] = s;
+	}
+	w[0] = 0.0;		w[n-1] = 0.0;
+
+	if (n<=128) for (int k=0; k<n; k++) printf("%g ",w[k]);
+}
+
+/// \internal Generates the abscissa and weights for a Clenshaw-Curtis quadrature (including poles).
+/// Compute weights via FFT
+/// \param x = abscissa, \param w = weights, \param n points.
+/// \note Reference: Waldvogel (2006) "Fast Construction of the Fejér and Clenshaw-Curtis Quadrature Rules"
+/// requires n > 2*lmax
+static void clenshaw_curtis_nodes_explicit(real *x, real *w, const int n)
+{
+	const double norm = 1.0/(n-1);
+
+	// the nodes
+	for (int i=0; i<n; i++) {
+		x[i] = cos((M_PI*i)*norm);
+		if (n<=128) printf("%g ",acos(x[i])*180./M_PI);
+	}
+	printf("< nodes. weights > ");
+
+	// the weights, explicit formula
+	double* a = (double*) malloc((n+1)/2 * sizeof(double));
+	for (int j=1; j<=(n-1)/2; j++)	a[j] = 1./(0.25-j*j);			// precompute these coefficients
+
+	for (int k=0; k<n/2; k++) {
+		double th = 2.*(M_PI*k)*norm;
+		double s = 2.0;
+		for (int j=1; j<=(n-1)/2; j++) 	s += a[j] * cos(j*th);
+		s *= norm;
+		w[k] = s;
+		w[n-1-k] = s;
+	}
+	w[0] *= 0.5;		w[n-1] *= 0.5;
+
+	if (n<=128) for (int k=0; k<n; k++) printf("%g ",w[k]);
+	free(a);
+}
+
+*/

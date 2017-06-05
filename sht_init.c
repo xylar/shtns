@@ -854,15 +854,15 @@ static void init_SH_gauss(shtns_cfg shtns)
 #endif
 
 /// \internal Generate a grid (including weights)
-static void grid_weights(shtns_cfg shtns, double latdir, unsigned char grid)
+static void grid_weights(shtns_cfg shtns, double latdir)
 {
 	long int it;
 	real iylm_fft_norm;
 	real xg[NLAT], wgl[NLAT];	// gauss points and weights.
 	const int overflow = 8*VSIZE2-1;
+	const unsigned char grid = shtns->grid;
 
-	shtns->grid = grid;
-	shtns->wg = VMALLOC((NLAT_2 +overflow) * sizeof(double));	// gauss weights, double precision.
+	shtns->wg = VMALLOC((NLAT_2 +overflow) * sizeof(double));	// quadrature weights, double precision.
 
 	iylm_fft_norm = 1.0;	// FFT/SHT normalization for zlm (4pi normalized)
 	if ((SHT_NORM != sht_fourpi)&&(SHT_NORM != sht_schmidt))  iylm_fft_norm = 4*M_PIl;	// FFT/SHT normalization for zlm (orthonormalized)
@@ -879,11 +879,18 @@ static void grid_weights(shtns_cfg shtns, double latdir, unsigned char grid)
 		#if SHT_VERBOSE > 0
 		if (verbose) {
 			printf("        => using Regular nodes (Chebychev) with Fejer quadrature\n");
-			if (NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Regular-Fejer anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);			
+			if (NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Regular-Fejer anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
 		}
 		#endif
 		fejer1_nodes(xg,wgl,NLAT);
-//		clenshaw_curtis_nodes(xg,wgl,NLAT);
+	} else if (grid == GRID_POLES) {
+		#if SHT_VERBOSE > 0
+		if (verbose) {
+			printf("        => using Regular nodes including poles, with Clenshaw-Curtis quadrature\n");
+			if (NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Regular-Clenshaw-Curtis anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
+		}
+		#endif
+		clenshaw_curtis_nodes(xg,wgl,NLAT);
 	} else shtns_runerr("unknown grid.");
 	for (it=0; it<NLAT; it++) {
 		shtns->ct[it] = latdir * xg[it];
@@ -892,7 +899,7 @@ static void grid_weights(shtns_cfg shtns, double latdir, unsigned char grid)
 	}
 	double s=0;
 	for (it=0; it<NLAT; it++) s += wgl[it];
-	printf("sum of weights = %g\n", s);
+	if (fabs(s-2.0) > 1e-12) printf(" !! Warning: sum of weigths = 2 + %g (should be 2)", s-2.0);
 	for (it=0; it<NLAT_2; it++)
 		shtns->wg[it] = wgl[it]*iylm_fft_norm;		// faster double-precision computations.
 	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point. (required for Gauss, untested for regular grids... TODO CHECK)
@@ -1594,11 +1601,11 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 
 	switch (flags) {
 		case sht_auto :		flags = sht_gauss;	break;		// only gauss available.
-		case sht_reg_fast:
+		case sht_reg_fast:	quick_init = 1;
 		case sht_reg_dct:	flags = sht_reg_fast; on_the_fly = 1;  break;
 		case sht_gauss_fly :  flags = sht_gauss;  on_the_fly = 1;  break;
 		case sht_quick_init : flags = sht_gauss;  quick_init = 1;  break;
-		case sht_reg_poles :  analys = 0;         quick_init = 1;  break;
+		case sht_reg_poles : on_the_fly = 1;  quick_init = 1;	break;		// WARNING: quick_init mandatory here, as reg_poles needs NWAY>1 to work (quick_init sets NWAY=2)
 		default : break;
 	}
 	#ifndef SHTNS_MEM
@@ -1625,7 +1632,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		n_gauss = ((n_gauss+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
 		if (n_gauss < VSIZE2*4) n_gauss=VSIZE2*4;			// avoid overflow with NLAT_2 < VSIZE2*2
 		if (flags != sht_gauss) {
-			m = (nl_order*2*LMAX+2);
+			m = ((nl_order+1)*(LMAX+1));
 			m += (m&1);		// even is better.
 			m = ((m+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
 			if (m < VSIZE2*4) m=VSIZE2*4;			// avoid overflow with NLAT_2 < VSIZE2*2
@@ -1662,7 +1669,8 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		}
 	}
 
-	if (*nlat <= shtns->lmax) shtns_runerr("Nlat must be larger than Lmax");
+	if ((flags == sht_gauss)&&(*nlat <= shtns->lmax)) shtns_runerr("Nlat must be larger than Lmax");
+	if ((flags != sht_gauss)&&(*nlat <= 2*shtns->lmax)) shtns_runerr("Nlat must be larger than 2*Lmax");
 	if (IS_TOO_LARGE(*nlat, shtns->nlat)) shtns_runerr("Nlat too large");
 	if (IS_TOO_LARGE(*nphi, shtns->nphi)) shtns_runerr("Nphi too large");
 
@@ -1680,33 +1688,23 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	planFFT(shtns, layout, on_the_fly);		// initialize fftw
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
 
-	if (flags == sht_gauss)
-	{
-		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
-		grid_weights(shtns, latdir, GRID_GAUSS);
-		#ifdef SHTNS_MEM
-		if (on_the_fly == 0) {
-			init_SH_gauss(shtns);			// precompute matrices
-			OptimizeMatrices(shtns, eps);
-		}
-		#endif
+	alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
+	shtns->grid = GRID_NONE;
+	switch(flags) {
+		case sht_gauss : 	 shtns->grid = GRID_GAUSS;	break;
+		case sht_reg_poles : shtns->grid = GRID_POLES;	break;
+		case sht_reg_fast :  shtns->grid = GRID_REGULAR;
 	}
-	if (flags == sht_reg_poles)
-	{
-		alloc_SHTarrays(shtns, on_the_fly, vector, 0);		// allocate dynamic arrays (no analysis)
-		grid_equal_polar(shtns, latdir);
-		#ifdef SHTNS_MEM
-		if (on_the_fly == 0) {
-			init_SH_synth(shtns);
-			for (im=0; im<=MMAX; im++) shtns->tm[im] = 0;	// avoid problems with tm[im] modified ????
-		}
-		#endif
+	grid_weights(shtns, latdir);
+	#ifdef SHTNS_MEM
+	if ((on_the_fly == 0) && (flags == sht_gauss)) {
+		init_SH_gauss(shtns);			// precompute matrices
+		OptimizeMatrices(shtns, eps);
 	}
-	if (flags == sht_reg_fast)
-	{
-		alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
-		grid_weights(shtns, latdir, GRID_REGULAR);
+	if (flags == sht_reg_poles) {
+		for (im=0; im<=MMAX; im++) shtns->tm[im] = 0;	// avoid problems with tm[im] modified ????
 	}
+	#endif
 
 	if (on_the_fly == 1) {
   #if SHT_VERBOSE > 0

@@ -568,7 +568,8 @@ void usage()
 	printf(" -fly : force gauss grid with on-the-fly computations only\n");
 	printf(" -quickinit : force gauss grid and fast initialiation time (but suboptimal fourier transforms)\n");
 	printf(" -vector : time and test also vector transforms (2D and 3D)\n");
-	printf(" -reg : force regular grid\n");
+	printf(" -reg : use regular grid\n");
+	printf(" -regpoles : use regular grid including poles\n");
 	printf(" -oop : force out-of-place transform\n");
 	printf(" -transpose : force transpose data (ie phi varies fastest)\n");
 	printf(" -nlorder : define non-linear order to be resolved.\n");
@@ -623,6 +624,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"gauss") == 0) shtmode = sht_gauss;		// force gauss grid.
 		if (strcmp(name,"fly") == 0) shtmode = sht_gauss_fly;		// force gauss grid with on-the-fly computation.
 		if (strcmp(name,"reg") == 0) shtmode = sht_reg_fast;	// force regular grid.
+		if (strcmp(name,"regpoles") == 0) shtmode = sht_reg_poles;	// force regular grid.
 		if (strcmp(name,"quickinit") == 0) shtmode = sht_quick_init;	// Gauss grid and fast initialization time, but suboptimal fourier transforms.
 		if (strcmp(name,"schmidt") == 0) shtnorm = sht_schmidt | SHT_NO_CS_PHASE;
 		if (strcmp(name,"4pi") == 0) shtnorm = sht_fourpi | SHT_REAL_NORM;
