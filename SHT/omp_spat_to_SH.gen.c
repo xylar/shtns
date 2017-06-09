@@ -86,30 +86,12 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 	#endif
 	{		// im=0 : dzl.p = 0.0 and evrything is REAL
 		alm = shtns->blm;
-V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-V			double an = BtF[k*k_inc];			double bn = BtF[k*k_inc +1];
-V			double bs = BtF[(NLAT-2-k)*k_inc];	double as = BtF[(NLAT-2-k)*k_inc +1];
-V			ter[k] = an+as;			tor[k] = an-as;
-V			ter[k+1] = bn+bs;		tor[k+1] = bn-bs;
-V			k+=2;
-V		} while(k < nk*VSIZE2);
-V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-V			double an = BpF[k*k_inc];			double bn = BpF[k*k_inc +1];
-V			double bs = BpF[(NLAT-2-k)*k_inc];	double as = BpF[(NLAT-2-k)*k_inc +1];
-V			per[k] = an+as;			por[k] = an-as;
-V			per[k+1] = bn+bs;		por[k+1] = bn-bs;
-V			k+=2;
-V		} while(k < nk*VSIZE2);
-Q		double r0a = 0.0;		double r0b = 0.0;
-Q		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-Q			double an = BrF[k*k_inc];			double bn = BrF[k*k_inc +1];
-Q			double bs = BrF[(NLAT-2-k)*k_inc];	double as = BrF[(NLAT-2-k)*k_inc +1];
-Q			rer[k] = an+as;			ror[k] = an-as;
-Q			rer[k+1] = bn+bs;		ror[k+1] = bn-bs;
-Q			r0a += (an+as)*wg[k];	r0b += (bn+bs)*wg[k+1];
-Q			k+=2;
-Q		} while(k < nk*VSIZE2);
-Q		Qlm[0] = (r0a+r0b) * alm[0];				// l=0 is done.
+		// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
+V		SYM_ASYM_M0_V(BtF, ter, tor)
+V		SYM_ASYM_M0_V(BpF, per, por)
+Q		double r0 = 0.0;
+Q		SYM_ASYM_M0_Q(BrF, rer, ror, r0)
+Q		Qlm[0] = r0 * alm[0];			// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
 		for (l=0;l<llim;++l) {
@@ -198,48 +180,11 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 		l = shtns->tm[im] / VSIZE2;
 		//alm = shtns->blm[im];
 		alm = shtns->blm + im*(2*(LMAX+1) -m+MRES);
-Q		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
-Q		do {	// compute symmetric and antisymmetric parts, and reorganize data.
-Q			double an, bn, ani, bni, bs, as, bsi, asi, t;
-3			double sina = st[k];	double sinb = st[k+1];
-Q			ani = BrF[im*m_inc + k*k_inc];			bni = BrF[im*m_inc + k*k_inc +1];		// north
-Q			an = BrF[(NPHI-im)*m_inc + k*k_inc];	bn = BrF[(NPHI-im)*m_inc + k*k_inc +1];
-Q			t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
-3			an *= sina;		ani*= sina;		bn *= sinb;		bni *= sinb;
-Q			bsi = BrF[im*m_inc + (NLAT-2 -k)*k_inc];		asi = BrF[im*m_inc + (NLAT-2-k)*k_inc + 1];	// south
-Q			bs = BrF[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = BrF[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1];
-Q			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
-3			as *= sina;		asi*= sina;		bs *= sinb;		bsi *= sinb;
-Q			rer[k] = an+as;		rei[k] = ani+asi;		rer[k+1] = bn+bs;		rei[k+1] = bni+bsi;
-Q			ror[k] = an-as;		roi[k] = ani-asi;		ror[k+1] = bn-bs;		roi[k+1] = bni-bsi;
-Q			k+=2;
-Q 		} while (k<nk*VSIZE2);
-V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
-V		do {	// compute symmetric and antisymmetric parts, and reorganize data.
-V			double an, bn, ani, bni, bs, as, bsi, asi, t;
-V			ani = BtF[im*m_inc + k*k_inc];			bni = BtF[im*m_inc + k*k_inc +1];		// north
-V			an = BtF[(NPHI-im)*m_inc + k*k_inc];	bn = BtF[(NPHI-im)*m_inc + k*k_inc +1];
-V			t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
-V			bsi = BtF[im*m_inc + (NLAT-2 -k)*k_inc];		asi = BtF[im*m_inc + (NLAT-2-k)*k_inc + 1];	// south
-V			bs = BtF[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = BtF[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1];
-V			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
-V			ter[k] = an+as;		tei[k] = ani+asi;		ter[k+1] = bn+bs;		tei[k+1] = bni+bsi;
-V			tor[k] = an-as;		toi[k] = ani-asi;		tor[k+1] = bn-bs;		toi[k+1] = bni-bsi;
-V			k+=2;
-V 		} while (k<nk*VSIZE2);
-V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
-V		do {	// compute symmetric and antisymmetric parts, and reorganize data.
-V			double an, bn, ani, bni, bs, as, bsi, asi, t;
-V			ani = BpF[im*m_inc + k*k_inc];			bni = BpF[im*m_inc + k*k_inc +1];		// north
-V			an = BpF[(NPHI-im)*m_inc + k*k_inc];	bn = BpF[(NPHI-im)*m_inc + k*k_inc +1];
-V			t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
-V			bsi = BpF[im*m_inc + (NLAT-2 -k)*k_inc];		asi = BpF[im*m_inc + (NLAT-2-k)*k_inc + 1];	// south
-V			bs = BpF[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = BpF[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1];
-V			t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
-V			per[k] = an+as;		pei[k] = ani+asi;		per[k+1] = bn+bs;		pei[k+1] = bni+bsi;
-V			por[k] = an-as;		poi[k] = ani-asi;		por[k+1] = bn-bs;		poi[k+1] = bni-bsi;
-V			k+=2;
-V		} while (k<nk*VSIZE2);
+		// compute symmetric and anti-symmetric parts:
+QX		SYM_ASYM_Q(BrF, rer, ror, rei, roi, l)
+3		SYM_ASYM_Q3(BrF, rer, ror, rei, roi, l)
+V		SYM_ASYM_V(BtF, ter, tor, tei, toi, l)
+V		SYM_ASYM_V(BpF, per, por, pei, poi, l)
 		k=l;
 		#if _GCC_VEC_
 Q			rnd* q = qq;

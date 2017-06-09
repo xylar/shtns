@@ -690,6 +690,7 @@ enable_openmp
 enable_mkl
 enable_mic
 enable_many_core
+enable_magic_layout
 enable_python
 enable_long_double
 enable_f77
@@ -1326,6 +1327,7 @@ Optional Features:
   --enable-many-core      Enable optimizations for many-core systems (Blue
                           Gene/Q, Xeon Phi,...) and remove single-threaded
                           transforms
+  --enable-magic-layout   Compile specific version for the MagIC code
   --enable-python         Build Python interface
   --enable-long-double    Use long double during initialization for (maybe)
                           slightly better precision
@@ -2269,6 +2271,13 @@ if test "${enable_many_core+set}" = set; then :
   enableval=$enable_many_core;
 else
   enable_many_core=no
+fi
+
+# Check whether --enable-magic-layout was given.
+if test "${enable_magic_layout+set}" = set; then :
+  enableval=$enable_magic_layout;
+else
+  enable_magic_layout=no
 fi
 
 # Check whether --enable-python was given.
@@ -3883,6 +3892,17 @@ if test "x$enable_python" != "xno"; then :
 	if test "x$enable_openmp" = "xdefault"; then :
   enable_openmp=yes
 fi
+
+fi
+
+# for MagIC code, also disable matrix transforms and switch to many-core.
+if test "x$enable_magic_layout" != "xno"; then :
+
+        PACKAGE_NAME="${PACKAGE_NAME}-magic"
+  	enable_mem=no
+
+$as_echo "#define SHTNS4MAGIC 1" >>confdefs.h
+
 
 fi
 

@@ -928,27 +928,6 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 #endif
 }
 
-/// \internal Generate an equi-spaced theta grid including the poles, for synthesis only.
-static void grid_equal_polar(shtns_cfg shtns, double latdir)
-{
-	long int j;
-
-	shtns->grid = GRID_POLES;
-#if SHT_VERBOSE > 0
-	if (verbose) printf("        => using Equaly Spaced Nodes including poles\n");
-#endif
-// cos theta of latidunal points (equaly spaced in theta)
-	double f = M_PIl/(NLAT-1);
-	for (j=0; j<NLAT; j++) {
-		shtns->ct[j] = latdir * cos(f*j);
-		shtns->st[j] = sin(f*j);
-		shtns->st_1[j] = 1.0/sin(f*j);
-	}
-#if SHT_VERBOSE > 0
-	if (verbose) printf("     !! Warning : only synthesis (inverse transform) supported for this grid !\n");
-#endif
-}
-
 
 /* TEST AND TIMING FUNCTIONS */
 
@@ -1206,7 +1185,11 @@ done:
 
 
 void shtns_print_version() {
+  #ifndef SHTNS4MAGIC
 	printf("[" PACKAGE_STRING "] built " __DATE__ ", " __TIME__ ", id: " _SIMD_NAME_ "\n");
+  #else
+	printf("[" PACKAGE_STRING "] built for MagIC " __DATE__ ", " __TIME__ ", id: " _SIMD_NAME_ "\n");
+  #endif
 }
 
 void fprint_ftable(FILE* fp, void* ftable[SHT_NVAR][SHT_NTYP])
@@ -1237,7 +1220,7 @@ void shtns_print_cfg(shtns_cfg shtns)
 
 	switch(shtns->grid) {
 		case GRID_GAUSS : printf("Gauss grid");	 break;
-//		case GRID_REGULAR : printf("Regular grid (mtr_dct=%d)",shtns->mtr_dct);	 break;
+		case GRID_REGULAR : printf("Regular grid");	 break;
 		case GRID_POLES : printf("Regular grid including poles");  break;
 		default : printf("Unknown grid");
 	}
@@ -1557,6 +1540,18 @@ void shtns_reset()
 	}
 }
 
+static int choose_nlat(int n)
+{
+	n += (n&1);		// even is better.
+	#ifndef SHTNS4MAGIC
+	n = ((n+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
+	#else
+	n = ((n+(2*VSIZE2-1))/(2*VSIZE2)) * (2*VSIZE2);		// multiple of twice the vector size
+	#endif
+	if (n < VSIZE2*4) n=VSIZE2*4;			// avoid overflow with NLAT_2 < VSIZE2*2
+	return n;
+}
+
 /*! Initialization of Spherical Harmonic transforms (backward and forward, vector and scalar, ...) of given size.
  * <b>This function must be called after \ref shtns_create and before any SH transform.</b> and sets all global variables and internal data.
  * returns the required number of doubles to be allocated for a spatial field.
@@ -1584,6 +1579,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 
 	#if _GCC_VEC_
 		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
+		#ifdef SHTNS4MAGIC
+			if (*nlat % (VSIZE2*2)) shtns_runerr("Nlat must be an even multiple of vector size\n");
+		#endif
 		#ifdef __MIC__
 			if (*nlat % VSIZE2) shtns_runerr("Nlat must be a multiple of 8 for the MIC\n");
 		#endif
@@ -1628,14 +1626,10 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 	if (*nlat == 0) {
 		n_gauss = ((nl_order+1)*LMAX)/2 +1;		// required gauss nodes
-		n_gauss += (n_gauss&1);		// even is better.
-		n_gauss = ((n_gauss+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
-		if (n_gauss < VSIZE2*4) n_gauss=VSIZE2*4;			// avoid overflow with NLAT_2 < VSIZE2*2
+		n_gauss = choose_nlat( n_gauss );
 		if (flags != sht_gauss) {
-			m = ((nl_order+1)*(LMAX+1));
-			m += (m&1);		// even is better.
-			m = ((m+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
-			if (m < VSIZE2*4) m=VSIZE2*4;			// avoid overflow with NLAT_2 < VSIZE2*2
+			m = ((nl_order+1)*(LMAX+1));		// required regular nodes
+			m = choose_nlat( m );
 			*nlat = m;
 		} else *nlat = n_gauss;
 	}
@@ -1850,7 +1844,6 @@ void shtns_print_cfg_()
 /// Initializes spherical harmonic transforms of given size using Gauss algorithm with default polar optimization.
 void shtns_init_sh_gauss_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_reset();
 	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
 	shtns_set_grid(shtns, sht_gauss | *layout, SHT_DEFAULT_POLAR_OPT, *nlat, *nphi);
 }
@@ -1858,7 +1851,6 @@ void shtns_init_sh_gauss_(int *layout, int *lmax, int *mmax, int *mres, int *nla
 /// Initializes spherical harmonic transforms of given size using Fastest available algorithm and polar optimization.
 void shtns_init_sh_auto_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_reset();
 	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
 	shtns_set_grid(shtns, sht_auto | *layout, SHT_DEFAULT_POLAR_OPT, *nlat, *nphi);
 }
@@ -1866,7 +1858,6 @@ void shtns_init_sh_auto_(int *layout, int *lmax, int *mmax, int *mres, int *nlat
 /// Initializes spherical harmonic transforms of given size using a regular grid and agressive optimizations.
 void shtns_init_sh_reg_fast_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_reset();
 	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
 	shtns_set_grid(shtns, sht_reg_fast | *layout, 1.e-6, *nlat, *nphi);
 }
@@ -1874,7 +1865,6 @@ void shtns_init_sh_reg_fast_(int *layout, int *lmax, int *mmax, int *mres, int *
 /// Initializes spherical harmonic transform SYNTHESIS ONLY of given size using a regular grid including poles.
 void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {
-	shtns_reset();
 	shtns_cfg shtns = shtns_create(*lmax, *mmax, *mres, SHT_DEFAULT_NORM);
 	shtns_set_grid(shtns, sht_reg_poles | *layout, 0, *nlat, *nphi);
 }
@@ -1884,7 +1874,6 @@ void shtns_init_sh_poles_(int *layout, int *lmax, int *mmax, int *mres, int *nla
 /// \see shtns_create
 void shtns_set_size_(int *lmax, int *mmax, int *mres, int *norm)
 {
-	shtns_reset();
 	shtns_create(*lmax, *mmax, *mres, *norm);
 }
 
@@ -1906,6 +1895,38 @@ void shtns_precompute_auto_(int *type, int *layout, double *eps, int *nl_order, 
 /// Clear everything
 void shtns_reset_() {
 	shtns_reset();
+}
+
+#define MAX_CONFIGS (4)
+shtns_cfg shtns_configs[MAX_CONFIGS];
+
+/// Saves the current shtns configuration with tag n
+void shtns_save_cfg_(unsigned *n) {
+	if (*n < MAX_CONFIGS)
+		shtns_configs[*n] = sht_data;
+	else
+		fprintf(stderr, "error saving shtns_cfg, tag %d too big\n", *n);
+}
+
+/// Loads the previously saved configuration tagged n
+void shtns_load_cfg_(unsigned *n) {
+	shtns_cfg s0 = sht_data;		// beginning of list
+	shtns_cfg s2 = NULL;
+	if (*n < MAX_CONFIGS) s2 = shtns_configs[*n];
+	if (s2 != NULL) {
+		if (s0 == s2) return;		// nothing to do, config already active.
+		while (s0 != NULL) {
+			shtns_cfg s1 = s0->next;
+			if (s1 == s2) {
+				s0->next = s1->next;		// remove from list
+				s1->next = sht_data;		// place in front of list
+				sht_data = s1;
+				return;			// done!
+			}
+			s0 = s1;
+		}
+	}
+	fprintf(stderr, "error loading shtns_cfg, invalid tag\n", *n);
 }
 
 /// returns nlm, the number of complex*16 elements in an SH array.

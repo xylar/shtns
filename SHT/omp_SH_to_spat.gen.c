@@ -38,9 +38,6 @@ T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, c
   #endif
 
   #ifndef SHT_AXISYM
-Q	#define BR0(i) ((double *)BrF)[2*(i)]
-V	#define BT0(i) ((double *)BtF)[2*(i)]
-V	#define BP0(i) ((double *)BpF)[2*(i)]
 Q	#define qr(l) vall(creal(Ql[l]))
 Q	#define qi(l) vall(cimag(Ql[l]))
 V	#define vr(l) vall( ((double*) VWl)[4*(l)]   )
@@ -48,10 +45,6 @@ V	#define vi(l) vall( ((double*) VWl)[4*(l)+1] )
 V	#define wr(l) vall( ((double*) VWl)[4*(l)+2] )
 V	#define wi(l) vall( ((double*) VWl)[4*(l)+3] )
 	unsigned im;
-  #else
-Q	#define BR0(i) ((double *)BrF)[i]
-S	#define BT0(i) ((double *)BtF)[i]
-T	#define BP0(i) ((double *)BpF)[i]
   #endif
 	unsigned m0, mstep;
 	long int nk,k,l,m;
@@ -111,6 +104,9 @@ T			rnd pe[NWAY], po[NWAY];
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(ct, j+k);
 V				sint[j] = -vread(st, j+k);
+V			#ifdef SHTNS4MAGIC
+V				sint[j] *= -sint[j];
+V			#endif
 				y0[j] = vall(al[0]);
 V				dy0[j] = vall(0.0);
 Q				re[j] = y0[j] * vall(Ql0[0]);
@@ -159,20 +155,27 @@ S					to[j] += dy0[j] * vall(Sl0[l-1]);
 T					po[j] -= dy0[j] * vall(Tl0[l-1]);
 				}
 			}
-		#if _GCC_VEC_
+		#ifndef SHT_AXISYM
+Q			v2d* const Br0 = BrF;
+S			v2d* const Bt0 = BtF;
+T			v2d* const Bp0 = BpF;
+		#else
+Q			double* const Br0 = (double*) BrF;
+S			double* const Bt0 = (double*) BtF;
+T			double* const Bp0 = (double*) BpF;
+		#endif
+		#ifndef SHTNS4MAGIC
 			for (int j=0; j<NWAY; ++j) {
-Q				S2D_STORE(BrF, j+k, re[j], ro[j])
-S				S2D_STORE(BtF, j+k, te[j], to[j])
-T				S2D_STORE(BpF, j+k, pe[j], po[j])
+Q				S2D_STORE(Br0, j+k, re[j], ro[j])
+S				S2D_STORE(Bt0, j+k, te[j], to[j])
+T				S2D_STORE(Bp0, j+k, pe[j], po[j])
 			}
 		#else
 			for (int j=0; j<NWAY; ++j) {
-Q				BR0(k+j) = (re[j]+ro[j]);
-Q				BR0(NLAT-k-1-j) = (re[j]-ro[j]);
-S				BT0(k+j) = (te[j]+to[j]);
-S				BT0(NLAT-k-1-j) = (te[j]-to[j]);
-T				BP0(k+j) = (pe[j]+po[j]);
-T				BP0(NLAT-k-1-j) = (pe[j]-po[j]);
+				if ((k+j)>=nk) break;
+Q				S2D_STORE_4MAGIC(Br0, j+k, re[j], ro[j])
+S				S2D_STORE_4MAGIC(Bt0, j+k, te[j], to[j])
+T				S2D_STORE_4MAGIC(Bp0, j+k, pe[j], po[j])
 			}
 		#endif
 			k+=NWAY;
@@ -235,20 +238,35 @@ V		}
 	#if _GCC_VEC_
 		l>>=1;		// stay on a 16 byte boundary
 		while (k<l) {	// polar optimization
+		  #ifndef SHTNS4MAGIC
 Q			BrF[k] = vdup(0.0);				BrF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
 Q			BrF[NLAT_2-l+k] = vdup(0.0);	BrF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
 V			BtF[k] = vdup(0.0);				BtF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
 V			BtF[NLAT_2-l+k] = vdup(0.0);	BtF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
 V			BpF[k] = vdup(0.0);				BpF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
 V			BpF[NLAT_2-l+k] = vdup(0.0);	BpF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
+		  #else
+Q			BrF[2*k] = vdup(0.0);			BrF[(NPHI-2*im)*NLAT_2 + 2*k] = vdup(0.0);
+Q			BrF[2*k+1] = vdup(0.0);			BrF[(NPHI-2*im)*NLAT_2 +2*k+1] = vdup(0.0);
+V			BtF[2*k] = vdup(0.0);			BtF[(NPHI-2*im)*NLAT_2 + 2*k] = vdup(0.0);
+V			BtF[2*k+1] = vdup(0.0);			BtF[(NPHI-2*im)*NLAT_2 +2*k+1] = vdup(0.0);
+V			BpF[2*k] = vdup(0.0);			BpF[(NPHI-2*im)*NLAT_2 + 2*k] = vdup(0.0);
+V			BpF[2*k+1] = vdup(0.0);			BpF[(NPHI-2*im)*NLAT_2 +2*k+1] = vdup(0.0);
+		  #endif
 			++k;
 		}
 		k = ((unsigned) k) / (VSIZE2/2);
 	#else
 		while (k<l) {	// polar optimization
+		  #ifndef SHTNS4MAGIC
 Q			BrF[k] = 0.0;		BrF[NLAT-l+k] = 0.0;
 V			BtF[k] = 0.0;		BtF[NLAT-l+k] = 0.0;
 V			BpF[k] = 0.0;		BpF[NLAT-l+k] = 0.0;
+		  #else
+Q			BrF[2*k] = 0.0;		BrF[2*k+1] = 0.0;
+V			BtF[2*k] = 0.0;		BtF[2*k+1] = 0.0;
+V			BpF[2*k] = 0.0;		BpF[2*k+1] = 0.0;
+		  #endif
 			++k;
 		}
 	#endif
@@ -263,7 +281,11 @@ V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 				y0[j] = vall(1.0);
 			}
 Q			l=m;
+V		#ifndef SHTNS4MAGIC
 V			l=m-1;
+V		#else
+V			l=m;
+V		#endif
 			long int ny = 0;
 		if ((int)llim <= SHT_L_RESCALE_FLY) {
 			do {		// sin(theta)^m
@@ -341,10 +363,12 @@ Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * q
 V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] * vi(l+1);	}
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 			}
+3		#ifndef SHTNS4MAGIC
 3			for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
 3			for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
+3		#endif
 		  }
-		#if _GCC_VEC_
+		#ifndef SHTNS4MAGIC
 			for (int j=0; j<NWAY; ++j) {
 Q				S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
 V				S2D_CSTORE(BtF, k+j, ter[j], tor[j], tei[j], toi[j])
@@ -352,12 +376,10 @@ V				S2D_CSTORE(BpF, k+j, per[j], por[j], pei[j], poi[j])
 			}
 		#else
 			for (int j=0; j<NWAY; ++j) {
-Q				BrF[k+j] = (rer[j]+ror[j]) + I*(rei[j]+roi[j]);
-Q				BrF[NLAT-k-1-j] = (rer[j]-ror[j]) + I*(rei[j]-roi[j]);
-V				BtF[k+j] = (ter[j]+tor[j]) + I*(tei[j]+toi[j]);
-V				BtF[NLAT-1-k-j] = (ter[j]-tor[j]) + I*(tei[j]-toi[j]);
-V				BpF[k+j] = (per[j]+por[j]) + I*(pei[j]+poi[j]);
-V				BpF[NLAT-1-k-j] = (per[j]-por[j]) + I*(pei[j]-poi[j]);
+				if ((k+j)>=nk) break;
+Q				S2D_CSTORE_4MAGIC(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
+V				S2D_CSTORE_4MAGIC(BtF, k+j, ter[j], tor[j], tei[j], toi[j])
+V				S2D_CSTORE_4MAGIC(BpF, k+j, per[j], por[j], pei[j], poi[j])
 			}
 		#endif
 			k+=NWAY;
@@ -397,9 +419,6 @@ V		BtF += mstep*NLAT;	BpF += mstep*NLAT;
   #endif
 }
 
-Q	#undef BR0
-V	#undef BT0
-V	#undef BP0
 Q	#undef qr
 Q	#undef qi
 S	#undef sr

@@ -24,6 +24,8 @@ AC_ARG_ENABLE([mic],
 	AS_HELP_STRING([--enable-mic], [Enable compilation for Xeon Phi]), [], [enable_mic=no])
 AC_ARG_ENABLE([many-core],
 	AS_HELP_STRING([--enable-many-core], [Enable optimizations for many-core systems (Blue Gene/Q, Xeon Phi,...) and remove single-threaded transforms]), [], [enable_many_core=no])
+AC_ARG_ENABLE([magic-layout],
+	AS_HELP_STRING([--enable-magic-layout], [Compile specific version for the MagIC code]), [], [enable_magic_layout=no])
 AC_ARG_ENABLE([python],
 	AS_HELP_STRING([--enable-python], [Build Python interface]), [], [enable_python=no])
 AC_ARG_ENABLE([long-double],
@@ -99,6 +101,12 @@ AC_CHECK_LIB([m],[cos],,AC_MSG_ERROR([math library not found.]))
 # With Python, enable openmp by default.
 AS_IF([test "x$enable_python" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
+])
+
+# for MagIC code, also disable matrix transforms and switch to many-core.
+AS_IF([test "x$enable_magic_layout" != "xno"], [
+  	enable_mem=no
+	AC_DEFINE([SHTNS4MAGIC],[1],[I need the transforms compatible with the MagIC code, to speed it up!])
 ])
 
 # On many-core systems, enable openmp by default, and disable precomputed matrix support.

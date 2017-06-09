@@ -38,7 +38,6 @@
   #include <omp.h>
 #endif
 
-
 /* BEGIN COMPILE-TIME SETTINGS */
 
 /// defines the maximum amount of memory in megabytes that SHTns should use.
@@ -272,6 +271,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 	}*/
 	#define VMALLOC(s)	malloc(s)
 	#define VFREE(s)	free(s)
+	#ifdef SHTNS4MAGIC
+		#error "Blue Gene/Q not supported."
+	#endif
 #endif
 
 #if _GCC_VEC_ && __MIC__
@@ -335,6 +337,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	#define VMALLOC(s)	_mm_malloc(s, MIN_ALIGNMENT)
 	#define VFREE(s)	_mm_free(s)
+	#ifdef SHTNS4MAGIC
+		#error "MIC/AVX512 not supported."
+	#endif
 #endif
 
 
@@ -386,6 +391,28 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[NLAT-2-(idx)*4] = _mm256_castpd256_pd128(bb);	\
 			((s2d*)mem)[NLAT-3-(idx)*4] = _mm256_extractf128_pd(aa, 1);	\
 			((s2d*)mem)[NLAT-4-(idx)*4] = _mm256_extractf128_pd(bb, 1);	}
+		#define S2D_STORE_4MAGIC(mem, idx, ev, od)	{ \
+			rnd n = ev+od;		rnd s = ev-od;	\
+			rnd a = _mm256_unpacklo_pd(n, s);	rnd b = _mm256_unpackhi_pd(n, s);	\
+			((s2d*)mem)[(idx)*4] = _mm256_castpd256_pd128(a);	\
+			((s2d*)mem)[(idx)*4+1] = _mm256_castpd256_pd128(b);	\
+			((s2d*)mem)[(idx)*4+2] = _mm256_extractf128_pd(a, 1);	\
+			((s2d*)mem)[(idx)*4+3] = _mm256_extractf128_pd(b, 1);	}
+		#define S2D_CSTORE_4MAGIC(mem, idx, er, or, ei, oi)	{	\
+			rnd nr = er + or;		rnd ni = ei + oi;	\
+			rnd sr = er - or;		rnd si = ei - oi;	\
+			rnd a0 = _mm256_unpacklo_pd(nr-si,  sr+ni);	\
+			rnd b0 = _mm256_unpacklo_pd(nr+si,  sr-ni);	\
+			rnd a1 = _mm256_unpackhi_pd(nr-si,  sr+ni);	\
+			rnd b1 = _mm256_unpackhi_pd(nr+si,  sr-ni);	\
+			((s2d*)mem)[(idx)*4] = _mm256_castpd256_pd128(a0);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*4] = _mm256_castpd256_pd128(b0);	\
+			((s2d*)mem)[(idx)*4+1] = _mm256_castpd256_pd128(a1);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*4+1] = _mm256_castpd256_pd128(b1);	\
+			((s2d*)mem)[(idx)*4+2] = _mm256_extractf128_pd(a0, 1);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*4+2] = _mm256_extractf128_pd(b0, 1);	\
+			((s2d*)mem)[(idx)*4+3] = _mm256_extractf128_pd(a1, 1);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*4+3] = _mm256_extractf128_pd(b1, 1);	}		
 	#else
 		#define MIN_ALIGNMENT 16
 		#define VSIZE2 2
@@ -425,6 +452,17 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(er+or, ei+oi);	\
 			((s2d*)mem)[NLAT-1-(idx)*2] = _mm_unpacklo_pd(er-or, ei-oi);	\
 			((s2d*)mem)[NLAT-2-(idx)*2] = _mm_unpackhi_pd(er-or, ei-oi);	}
+		#define S2D_STORE_4MAGIC(mem, idx, ev, od)		{	\
+			s2d n = ev+od;		s2d s = ev-od;	\
+			((s2d*)mem)[(idx)*2] = _mm_unpacklo_pd(n, s);	\
+			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(n, s);	}
+		#define S2D_CSTORE_4MAGIC(mem, idx, er, or, ei, oi)	{	\
+			rnd nr = er + or;		rnd ni = ei + oi;	\
+			rnd sr = er - or;		rnd si = ei - oi;	\
+			((s2d*)mem)[(idx)*2] = _mm_unpacklo_pd(nr-si,  sr+ni);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2] = _mm_unpacklo_pd(nr+si,  sr-ni);	\
+			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(nr-si,  sr+ni);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2+1] = _mm_unpackhi_pd(nr+si,  sr-ni);	}
 	#endif
 	#ifdef __SSE3__
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd((b),(b),1))		// a + I*b
@@ -496,6 +534,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 	// allocate memory aligned for FFTW. In 64 bit systems, malloc should be 16 bytes aligned.
 	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
 	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
+
+	#define S2D_STORE(mem, idx, ev, od)		(mem)[idx] = ev+od;		(mem)[NLAT-1 - (idx)] = ev-od;
+	#define S2D_CSTORE(mem, idx, er, or, ei, oi)	mem[idx] = (er+or) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-or) + I*(ei-oi);
+
+	#define S2D_STORE_4MAGIC(mem, idx, ev, od)	(mem)[2*(idx)+1] = ev+od;		(mem)[2*(idx)+1] = ev-od;
+	#define S2D_CSTORE_4MAGIC(mem, idx, er, or, ei, oi)		mem[2*(idx)] = (er+or) + I*(ei+oi);		mem[2*(idx)+1] = (er-or) + I*(ei-oi);
 #endif
 
 
@@ -519,3 +563,108 @@ struct DtDp {		// theta and phi derivatives stored together.
   #define PRINT_VERB(msg) (0)
 #endif
 
+// compute symmetric and antisymmetric parts, and reorganize data.
+#ifndef SHTNS4MAGIC
+  #define SYM_ASYM_M0_V(F, er, or) { \
+	long int k=0; do { \
+		double an = F[k*k_inc];				double bn = F[k*k_inc +1]; \
+		double bs = F[(NLAT-2-k)*k_inc];	double as = F[(NLAT-2-k)*k_inc +1]; \
+		er[k] = an+as;			or[k] = an-as; \
+		er[k+1] = bn+bs;		or[k+1] = bn-bs; \
+		k+=2; \
+	} while(k < nk*VSIZE2); }
+  #define SYM_ASYM_M0_Q(F, er, or, acc0) { \
+	double r0a = 0.0;	double r0b = 0.0; \
+	long int k=0; do { \
+		double an = F[k*k_inc];				double bn = F[k*k_inc +1]; \
+		double bs = F[(NLAT-2-k)*k_inc];	double as = F[(NLAT-2-k)*k_inc +1]; \
+		er[k] = an+as;			or[k] = an-as; \
+		er[k+1] = bn+bs;		or[k+1] = bn-bs; \
+		r0a += (an+as)*wg[k];	r0b += (bn+bs)*wg[k+1]; \
+		k+=2; \
+	} while(k < nk*VSIZE2); 	acc0 = r0a+r0b; }
+  #define SYM_ASYM_Q(F, er, or, ei, oi, k0v) { \
+	long int k = ((k0v*VSIZE2)>>1)*2; \
+	do { \
+		double an, bn, ani, bni, bs, as, bsi, asi, t; \
+		ani = F[im*m_inc + k*k_inc];		bni = F[im*m_inc + k*k_inc +1]; \
+		an  = F[(NPHI-im)*m_inc + k*k_inc];	bn = F[(NPHI-im)*m_inc + k*k_inc +1]; \
+		t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t; \
+		bsi = F[im*m_inc + (NLAT-2 -k)*k_inc];		asi = F[im*m_inc + (NLAT-2-k)*k_inc + 1]; \
+		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
+		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
+		er[k] = an+as;		ei[k] = ani+asi;		er[k+1] = bn+bs;		ei[k+1] = bni+bsi; \
+		or[k] = an-as;		oi[k] = ani-asi;		or[k+1] = bn-bs;		oi[k+1] = bni-bsi; \
+		k+=2; \
+		} while (k<nk*VSIZE2); }
+  #define SYM_ASYM_Q3(F, er, or, ei, oi, k0v) { \
+	long int k = ((k0v*VSIZE2)>>1)*2; \
+	do { \
+		double an, bn, ani, bni, bs, as, bsi, asi, t; \
+		double sina = st[k];	double sinb = st[k+1]; \
+		ani = F[im*m_inc + k*k_inc];		bni = F[im*m_inc + k*k_inc +1]; \
+		an  = F[(NPHI-im)*m_inc + k*k_inc];	bn = F[(NPHI-im)*m_inc + k*k_inc +1]; \
+		t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t; \
+		bsi = F[im*m_inc + (NLAT-2 -k)*k_inc];		asi = F[im*m_inc + (NLAT-2-k)*k_inc + 1]; \
+		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
+		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
+		er[k] = (an+as)*sina;	ei[k] = (ani+asi)*sina;		er[k+1] = (bn+bs)*sinb;		ei[k+1] = (bni+bsi)*sinb; \
+		or[k] = (an-as)*sina;	oi[k] = (ani-asi)*sina;		or[k+1] = (bn-bs)*sinb;		oi[k+1] = (bni-bsi)*sinb; \
+		k+=2; \
+		} while (k<nk*VSIZE2); }
+  #define SYM_ASYM_V SYM_ASYM_Q
+#else /* SHTNS4MAGIC */
+  #define SYM_ASYM_M0_V(F, er, or) { \
+	long int k=0; do { \
+		double st_1 = 1.0/st[k]; \
+		double an = F[2*k*k_inc];		double as = F[2*k*k_inc +1]; \
+		er[k] = (an+as)*st_1;			or[k] = (an-as)*st_1; \
+		k+=1; \
+	} while(k < nk*VSIZE2); }
+  #define SYM_ASYM_M0_Q(F, er, or, acc0) { \
+	acc0 = 0.0; \
+	long int k=0; do { \
+		double an = F[2*k*k_inc];	double as = F[2*k*k_inc +1]; \
+		er[k] = (an+as);			or[k] = (an-as); \
+		acc0 += (an+as)*wg[k]; \
+		k+=1; \
+	} while(k < nk*VSIZE2); }
+  #define SYM_ASYM_Q(F, er, or, ei, oi, k0v) { \
+	k = ((k0v*VSIZE2)>>1)*2; \
+	do { \
+		double ar,ai,br,bi, sr,si,nr,ni; \
+		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
+		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
+		nr = ar + br;		ni = ai - bi; \
+		sr = ai + bi;		si = br - ar; \
+		er[k] = nr+sr;		ei[k] = ni+si; \
+		or[k] = nr-sr;		oi[k] = ni-si; \
+		k+=1; \
+	} while(k < nk*VSIZE2); }
+  #define SYM_ASYM_Q3(F, er, or, ei, oi, k0v) { \
+	k = ((k0v*VSIZE2)>>1)*2; \
+	do { \
+		double ar,ai,br,bi, sr,si,nr,ni; \
+		double sina = st[k]; \
+		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
+		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
+		nr = (ar + br)*sina;		ni = (ai - bi)*sina; \
+		sr = (ai + bi)*sina;		si = (br - ar)*sina; \
+		er[k] = nr+sr;		ei[k] = ni+si; \
+		or[k] = nr-sr;		oi[k] = ni-si; \
+		k+=1; \
+	} while(k < nk*VSIZE2); }
+  #define SYM_ASYM_V(F, er, or, ei, oi, k0v) { \
+	k = ((k0v*VSIZE2)>>1)*2; \
+	do { \
+		double ar,ai,br,bi, sr,si,nr,ni; \
+		double sina = 1.0/st[k]; \
+		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
+		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
+		nr = (ar + br)*sina;		ni = (ai - bi)*sina; \
+		sr = (ai + bi)*sina;		si = (br - ar)*sina; \
+		er[k] = nr+sr;		ei[k] = ni+si; \
+		or[k] = nr-sr;		oi[k] = ni-si; \
+		k+=1; \
+	} while(k < nk*VSIZE2); }
+#endif
