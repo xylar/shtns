@@ -67,6 +67,11 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v2.8  (10 Jul 2017)
+	- Regular grids are back and improved (on-the-fly + exact quadrature weights).
+	- merge with shtns-magic, providing optional support for the MagIC code
+	  with --enable-magic-layout (thanks to Bertrand Putigny)
+
 * v2.7  (24 Feb 2017)
 	- Faster vector transforms: up to 2 times faster.
 	- Optimized pseudo-spectral rotation functions: 4 to 6 times faster (single thread).
@@ -76,7 +81,7 @@ CHANGE LOG:
 * v2.6.6  (6 Jul 2016)
 	- Improved `SH_to_lat()` function, now also included in the Python interface.
 	- Regular grid and DCT-based transform are deprecated and disabled by
-	   default (enable with --enable-dct).
+	  default (enable with --enable-dct).
 	- Fortran example: fixes segfault and compilation issues.
 	- configure script now accepts `FC=` to specify Fortran compiler.
 

@@ -13,6 +13,7 @@
  * - various conventions (normalization and Condon-Shortley phase)
  * - can be used from <b>Fortran, c/c++, and Python</b> programs
  * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature)
+ * - support for <b>regular grids</b> (but they require twice the number of nodes than Gauss grid)
  * - support for SSE2, SSE3 and <b>AVX</b> vectorization with gcc.
  * - <b>parallel transforms with OpenMP</b> (for Gauss grid only).
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
@@ -138,14 +139,15 @@ A field \e A (or one of its component in case of a vector field) is discretized 
  - NLAT gauss nodes or equally spaced nodes (depending on \ref shtns_type) in latitude, spanning angles from 0 to \f$ \pi \f$.
 
 There are constraints on the sizes NLAT and NPHI. The sampling theorem requires NPHI > 2*MMAX, with MMAX the highest Fourier mode to be resolved.
-Similarly NLAT > LMAX is required for a Gauss-Legendre quadrature.
+Similarly NLAT > LMAX is required for a Gauss-Legendre quadrature, while on a regular grid NLAT > 2*LMAX is needed for the Féjer and Clenshaw-Curtis quadratures.
 
-When dealing with non-linear equation, or more generally when analysing data that is not band-limited to LMAX and/or MMAX, anti-aliasing constraints
-exist. For a given non-linear order of the equation N (typically 2), the anti-aliasing conditions are :
+When dealing with non-linear equations, or more generally when analysing data that is not band-limited to LMAX and/or MMAX, anti-aliasing constraints
+exist. For a given non-linear order of the equation N (typically 2 for a quadratic non-linear term), the anti-aliasing conditions are :
  - NPHI > (N+1)*MMAX
- - NLAT > (N+1)*LMAX/2 for Gauss-Legendre quadrature
+ - NLAT > (N+1)*LMAX/2 for Gauss-Legendre quadrature (Gauss nodes, non-equispaced).
+ - NLAT > (N+1)*LMAX for Féjer or Clenshaw-Curtis quadratures (equispaced nodes).
 
-Furthermore, FFT is more efficient for certain values of NPHI and/or NLAT. If you do not require specific NLAT or NPHI, you can let SHTns choose them
+Furthermore, the FFT is more efficient for certain values of NPHI and/or NLAT. If you do not require specific NLAT or NPHI, you can let SHTns choose them
 for you, by using \ref shtns_set_grid_auto with nphi and/or nlat set to zero.
 
 Identifying a grid point with its indices \c it and \c ip in latitudinal and longitudinal direction respectively (indices start at 0), one has :

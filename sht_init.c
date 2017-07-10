@@ -1905,7 +1905,7 @@ void shtns_save_cfg_(unsigned *n) {
 	if (*n < MAX_CONFIGS)
 		shtns_configs[*n] = sht_data;
 	else
-		fprintf(stderr, "error saving shtns_cfg, tag %d too big\n", *n);
+		fprintf(stderr, "error saving shtns_cfg, tag %u too big\n", *n);
 }
 
 /// Loads the previously saved configuration tagged n
@@ -1926,7 +1926,7 @@ void shtns_load_cfg_(unsigned *n) {
 			s0 = s1;
 		}
 	}
-	fprintf(stderr, "error loading shtns_cfg, invalid tag\n", *n);
+	fprintf(stderr, "error loading shtns_cfg, invalid tag (%u)\n", *n);
 }
 
 /// returns nlm, the number of complex*16 elements in an SH array.
