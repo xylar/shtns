@@ -420,16 +420,30 @@ V		per[k] = 0.0;		por[k] = 0.0;
 	if (im == 0) {		// im=0
 		alm = shtns->blm;
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
+V			#ifndef SHTNS4MAGIC
 V			double n = creal(Vt[k]);		double s = creal(Vt[NLAT-1-k]);
+V			#else
+V			double st_1 = shtns->st_1[k];
+V			double n = creal(Vt[2*k])*st_1;		double s = creal(Vt[2*k+1])*st_1;
+V			#endif
 V			ter[k] = n+s;			tor[k] = n-s;
 V		} while(++k < nk*VSIZE2);
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
+V			#ifndef SHTNS4MAGIC
 V			double n = creal(Vp[k]);		double s = creal(Vp[NLAT-1-k]);
+V			#else
+V			double st_1 = shtns->st_1[k];
+V			double n = creal(Vp[2*k])*st_1;		double s = creal(Vp[2*k+1])*st_1;
+V			#endif
 V			per[k] = n+s;			por[k] = n-s;
 V		} while(++k < nk*VSIZE2);
 Q		double r0 = 0.0;
 Q		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
+Q			#ifndef SHTNS4MAGIC
 Q			double n = creal(Vr[k]);		double s = creal(Vr[NLAT-1-k]);
+Q			#else
+Q			double n = creal(Vr[2*k]);		double s = creal(Vr[2*k+1]);
+Q			#endif
 Q			rer[k] = n+s;			ror[k] = n-s;
 Q			r0 += (n+s)*wg[k];
 Q		} while(++k < nk*VSIZE2);
@@ -520,20 +534,34 @@ V			pei[k] = 0.0;		poi[k] = 0.0;
 Q		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 Q		do {	// compute symmetric and antisymmetric parts.
 3			double sink = st[k];
+Q			#ifndef SHTNS4MAGIC
 Q			cplx n = Vr[k];			cplx s = Vr[NLAT-1-k];
+Q			#else
+Q			cplx n = Vr[2*k];		cplx s = Vr[2*k+1];
+Q			#endif
 3			n *= sink;				s *= sink;
 Q			rer[k] = creal(n+s);	rei[k] = cimag(n+s);
 Q			ror[k] = creal(n-s);	roi[k] = cimag(n-s);
 Q		} while (++k<nk*VSIZE2);
 V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 V		do {	// compute symmetric and antisymmetric parts.
+V			#ifndef SHTNS4MAGIC
 V			cplx n = Vt[k];			cplx s = Vt[NLAT-1-k];
+V			#else
+V			double st_1 = shtns->st_1[k];
+V			cplx n = Vt[2*k]*st_1;	cplx s = Vt[2*k+1]*st_1;
+V			#endif
 V			ter[k] = creal(n+s);	tei[k] = cimag(n+s);
 V			tor[k] = creal(n-s);	toi[k] = cimag(n-s);
 V		} while (++k<nk*VSIZE2);
 V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 V		do {	// compute symmetric and antisymmetric parts.
+V			#ifndef SHTNS4MAGIC
 V			cplx n = Vp[k];			cplx s = Vp[NLAT-1-k];
+V			#else
+V			double st_1 = shtns->st_1[k];
+V			cplx n = Vp[2*k]*st_1;	cplx s = Vp[2*k+1]*st_1;
+V			#endif
 V			per[k] = creal(n+s);	pei[k] = cimag(n+s);
 V			por[k] = creal(n-s);	poi[k] = cimag(n-s);
 V		} while (++k<nk*VSIZE2);

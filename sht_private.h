@@ -413,6 +413,17 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*4+2] = _mm256_extractf128_pd(b0, 1);	\
 			((s2d*)mem)[(idx)*4+3] = _mm256_extractf128_pd(a1, 1);	\
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*4+3] = _mm256_extractf128_pd(b1, 1);	}		
+		#define S2D_CSTORE2_4MAGIC(mem, idx, er, or, ei, oi)	{	\
+			rnd aa = (rnd)_mm256_unpacklo_pd(er+or, ei+oi);	rnd bb = (rnd)_mm256_unpackhi_pd(er+or, ei+oi);	\
+			rnd cc = (rnd)_mm256_unpacklo_pd(er-or, ei-oi);	rnd dd = (rnd)_mm256_unpackhi_pd(er-or, ei-oi);	\
+			((s2d*)mem)[(idx)*8]   = _mm256_castpd256_pd128(aa);	\
+			((s2d*)mem)[(idx)*8+1] = _mm256_castpd256_pd128(cc);	\
+			((s2d*)mem)[(idx)*8+2] = _mm256_castpd256_pd128(bb);	\
+			((s2d*)mem)[(idx)*8+3] = _mm256_castpd256_pd128(dd);	\
+			((s2d*)mem)[(idx)*8+4] = _mm256_extractf128_pd(aa, 1);	\
+			((s2d*)mem)[(idx)*8+5] = _mm256_extractf128_pd(cc, 1);	\
+			((s2d*)mem)[(idx)*8+6] = _mm256_extractf128_pd(bb, 1);	\
+			((s2d*)mem)[(idx)*8+7] = _mm256_extractf128_pd(dd, 1);	}
 	#else
 		#define MIN_ALIGNMENT 16
 		#define VSIZE2 2
@@ -463,6 +474,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2] = _mm_unpacklo_pd(nr+si,  sr-ni);	\
 			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(nr-si,  sr+ni);	\
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2+1] = _mm_unpackhi_pd(nr+si,  sr-ni);	}
+		#define S2D_CSTORE2_4MAGIC(mem, idx, er, or, ei, oi)	{	\
+			((s2d*)mem)[(idx)*4]   = _mm_unpacklo_pd(er+or, ei+oi);	\
+			((s2d*)mem)[(idx)*4+1] = _mm_unpacklo_pd(er-or, ei-oi);	\
+			((s2d*)mem)[(idx)*4+2] = _mm_unpackhi_pd(er+or, ei+oi);	\
+			((s2d*)mem)[(idx)*4+3] = _mm_unpackhi_pd(er-or, ei-oi);	}
 	#endif
 	#ifdef __SSE3__
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd((b),(b),1))		// a + I*b
@@ -537,9 +553,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	#define S2D_STORE(mem, idx, ev, od)		(mem)[idx] = ev+od;		(mem)[NLAT-1 - (idx)] = ev-od;
 	#define S2D_CSTORE(mem, idx, er, or, ei, oi)	mem[idx] = (er+or) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-or) + I*(ei-oi);
+	#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	mem[idx] = (er+or) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-or) + I*(ei-oi);
 
 	#define S2D_STORE_4MAGIC(mem, idx, ev, od)	(mem)[2*(idx)+1] = ev+od;		(mem)[2*(idx)+1] = ev-od;
 	#define S2D_CSTORE_4MAGIC(mem, idx, er, or, ei, oi)		mem[2*(idx)] = (er+or) + I*(ei+oi);		mem[2*(idx)+1] = (er-or) + I*(ei-oi);
+	#define S2D_CSTORE2_4MAGIC(mem, idx, er, or, ei, oi)	mem[2*(idx)] = (er+or) + I*(ei+oi);		mem[2*(idx)+1] = (er-or) + I*(ei-oi);
 #endif
 
 
