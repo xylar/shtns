@@ -276,78 +276,66 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#endif
 #endif
 
-#if _GCC_VEC_ && __MIC__
-	// these values must be adjusted for the larger vectors of the MIC
-	#undef SHT_L_RESCALE_FLY
-	#undef SHT_ACCURACY
-	#define SHT_L_RESCALE_FLY 1800
-	#define SHT_ACCURACY 1.0e-40
-
-	#define MIN_ALIGNMENT 64
-	#define VSIZE 2
-	typedef complex double v2d __attribute__((aligned (16)));		// vector that contains a complex number
-	typedef double s2d __attribute__((aligned (16)));		// scalar number
-	#define VSIZE2 8
-	#include <immintrin.h>
-	#define _SIMD_NAME_ "mic"
-	typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 8 doubles.
-
-	typedef union { rnd i; double v[8]; } vec_rnd;
-	#define vall(x) ((rnd) _mm512_set1_pd(x))
-	inline static rnd vread(double *mem, int idx) {		// unaligned load.
-		rnd t;
-		t = (rnd)_mm512_loadunpacklo_pd( t, (mem) + (idx)*VSIZE2 );
-		t = (rnd)_mm512_loadunpackhi_pd( t, (mem) + (idx)*VSIZE2 + 64 );
-		return t;
-	}
-	#define reduce_add(a) _mm512_reduce_add_pd(a)
-	#define v2d_reduce(a, b) ( _mm512_reduce_add_pd(a) +I* _mm512_reduce_add_pd(b) )
-	inline static void vstor(double *mem, int idx, rnd v) {		// unaligned store.
-		_mm512_packstorelo_pd((mem) + (idx)*VSIZE2, v);
-		_mm512_packstorehi_pd((mem) + (idx)*VSIZE2 + 64, v);
-	}
-
-	// could be simplified with scatter
-	#define S2D_STORE(mem, idx, ev, od) \
-		_mm512_store_pd( (double*)mem + (idx)*VSIZE2,   ev+od); \
-		_mm512_store_pd( (double*)mem + NLAT_2-VSIZE2 - (idx)*VSIZE2, \
-				_mm512_castsi512_pd(_mm512_shuffle_epi32(_mm512_permute4f128_epi32(_mm512_castpd_si512(ev-od), _MM_PERM_ABCD),_MM_PERM_BADC)));
-
-	// could be simplified with scatter
-	#define S2D_CSTORE(mem, idx, er, or, ei, oi)    {       \
-		rnd aa = (rnd)_mm512_castsi512_pd(_mm512_shuffle_epi32(_mm512_castpd_si512(ei+oi), _MM_PERM_BADC)); \
-		rnd bb = (er + or) - aa; \
-		aa += er + or; \
-		_mm512_store_pd( (double*)mem + (idx)*VSIZE2, _mm512_mask_mov_pd(bb, 170, aa) ); \
-		_mm512_store_pd( (double*)mem + (NPHI-VSIZE2*im)*NLAT_2 + (idx)*VSIZE2, _mm512_mask_mov_pd(aa, 170, bb) ); \
-		aa = (rnd)_mm512_castsi512_pd(_mm512_shuffle_epi32( _mm512_castpd_si512(er-or), _MM_PERM_BADC )); \
-		bb = aa - (ei - oi);    \
-		aa += ei - oi; \
-		_mm512_store_pd( (double*)mem + NLAT_2-VSIZE2 - (idx)*VSIZE2, \
-				_mm512_castsi512_pd(_mm512_shuffle_epi32(_mm512_permute4f128_epi32(_mm512_castpd_si512(_mm512_mask_mov_pd(bb,170,aa)), _MM_PERM_ABCD),_MM_PERM_BADC))); \
-		_mm512_store_pd( (double*)mem + (NPHI+1-2*im)*NLAT_2-VSIZE2 - (idx)*VSIZE2, \
-				_mm512_castsi512_pd(_mm512_shuffle_epi32(_mm512_permute4f128_epi32(_mm512_castpd_si512(_mm512_mask_mov_pd(bb,170,aa)), _MM_PERM_ABCD),_MM_PERM_BADC))); }
-
-	#define vdup(x) (x)
-
-	#define vlo(a) ((vec_rnd)a).v[0]
-
-	#define vcplx_real(a) creal(a)
-	#define vcplx_imag(a) cimag(a)
-
-	#define VMALLOC(s)	_mm_malloc(s, MIN_ALIGNMENT)
-	#define VFREE(s)	_mm_free(s)
-	#ifdef SHTNS4MAGIC
-		#error "MIC/AVX512 not supported."
-	#endif
-#endif
-
 
 #if _GCC_VEC_ && __SSE2__
 	#define VSIZE 2
 	typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
 	typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
-	#ifdef __AVX__
+	#ifdef __AVX512F__
+		#define MIN_ALIGNMENT 64
+		#define VSIZE2 8
+		#include <immintrin.h>
+		// these values must be adjusted for the larger vectors of the MIC
+		#undef SHT_L_RESCALE_FLY
+		#undef SHT_ACCURACY
+		#define SHT_L_RESCALE_FLY 1800
+		#define SHT_ACCURACY 1.0e-40
+		// Allocate memory aligned on 64 bytes for AVX-512
+		#define VMALLOC(s)	_mm_malloc(s, MIN_ALIGNMENT)
+		#define VFREE(s)	_mm_free(s)
+		#define _SIMD_NAME_ "avx512"
+		typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 8 doubles.
+		typedef double s4d __attribute__ ((vector_size (4*8)));				// vector of 4 doubles.
+		#define vall(x) ((rnd) _mm512_set1_pd(x))
+		#define vread(mem, idx) ((rnd)_mm512_loadu_pd( ((double*)mem) + (idx)*8 ))
+		#define vstor(mem, idx, v) _mm512_storeu_pd( ((double*)mem) + (idx)*8 , v)
+		inline static double reduce_add(rnd a) {
+			return _mm512_reduce_add_pd(a);
+		}
+		inline static v2d v2d_reduce(rnd a, rnd b) {
+			rnd x = (rnd)_mm512_unpackhi_pd(a, b) + (rnd)_mm512_unpacklo_pd(a, b);
+			s4d y = (s4d)_mm512_castpd512_pd256(x) + (s4d)_mm512_extractf64x4_pd(x,1);
+			return (v2d)_mm256_castpd256_pd128(y) + (v2d)_mm256_extractf128_pd(y,1);
+		}
+		#define S2D_STORE(mem, idx, ev, od) \
+			_mm512_storeu_pd(((double*)mem) + (idx)*8,   ev+od); \
+			_mm256_storeu_pd(((double*)mem) + NLAT-4 -(idx)*8,  _mm512_castpd512_pd256( _mm512_permutex_pd(ev-od, 0x1B) ) ); \
+			_mm256_storeu_pd(((double*)mem) + NLAT-8 -(idx)*8,  _mm512_extractf64x4_pd( _mm512_permutex_pd(ev-od, 0x1B), 1 ) );
+		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
+			rnd aa = (rnd)_mm512_permute_pd(ei+oi, 0x55) + (er+or);	rnd bb = (er+or) - (rnd)_mm512_permute_pd(ei+oi, 0x55); \
+			_mm512_storeu_pd(((double*)mem) + (idx)*8, _mm512_shuffle_pd(bb, aa, 0xAA )); \
+			_mm512_storeu_pd(((double*)mem) + (NPHI-2*im)*NLAT + (idx)*8, _mm512_shuffle_pd(aa, bb, 0xAA )); \
+			aa = (rnd)_mm512_permute_pd(er-or, 0x55) + (ei - oi);		bb = (rnd)_mm512_permute_pd(er-or, 0x55) - (ei - oi);	\
+			rnd yy = _mm512_shuffle_pd(bb, aa, 0xAA );		rnd zz = _mm512_shuffle_pd(aa, bb, 0xAA ); \
+			yy = _mm512_permutex_pd( yy, 0x4E );			zz = _mm512_permutex_pd(zz, 0x4E ); \
+			((s4d*)mem)[(NLAT/4)-1 -2*(idx)] = (s4d)_mm512_castpd512_pd256(yy);	\
+			((s4d*)mem)[(NLAT/4)-2 -2*(idx)] = (s4d)_mm512_extractf64x4_pd(yy, 1);	\
+			((s4d*)mem)[(NPHI+1-2*im)*(NLAT/4) -1 -2*(idx)] = (s4d)_mm512_castpd512_pd256(zz);	\
+			((s4d*)mem)[(NPHI+1-2*im)*(NLAT/4) -2 -2*(idx)] = (s4d)_mm512_extractf64x4_pd(zz, 1); }
+		#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
+			rnd rr = (rnd)_mm512_permutex_pd(er+or, 0xD8);	rnd ii = (rnd)_mm512_permutex_pd(ei+oi, 0xD8);	\
+			rnd aa = (rnd)_mm512_unpacklo_pd(rr, ii);	rnd bb = (rnd)_mm512_unpackhi_pd(rr, ii);	\
+			((s4d*)mem)[(idx)*4]   = _mm512_castpd512_pd256(aa);	\
+			((s4d*)mem)[(idx)*4+1] = _mm512_castpd512_pd256(bb);	\
+			((s4d*)mem)[(idx)*4+2] = _mm512_extractf64x4_pd(aa, 1);	\
+			((s4d*)mem)[(idx)*4+3] = _mm512_extractf64x4_pd(bb, 1);	\
+			rr = (rnd)_mm512_permutex_pd(er-or, 0x8D);	ii = (rnd)_mm512_permutex_pd(ei-oi, 0x8D);	\
+			aa = (rnd)_mm256_unpacklo_pd(rr, ii);	bb = (rnd)_mm256_unpackhi_pd(rr, ii);	\
+			((s4d*)mem)[NLAT-1-(idx)*4] = _mm512_castpd512_pd256(aa);	\
+			((s4d*)mem)[NLAT-2-(idx)*4] = _mm512_castpd512_pd256(bb);	\
+			((s4d*)mem)[NLAT-3-(idx)*4] = _mm512_extractf64x4_pd(aa, 1);	\
+			((s4d*)mem)[NLAT-4-(idx)*4] = _mm512_extractf64x4_pd(bb, 1);	}
+	#elif defined __AVX__
 		#define MIN_ALIGNMENT 32
 		#define VSIZE2 4
 		#include <immintrin.h>
@@ -513,7 +501,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define vhi_to_dbl(a) (a)[1]
 	#else
 		// gcc extensions
-		#ifdef __AVX__
+		#ifdef __AVX512F__
+			#define vlo(a) _mm_cvtsd_f64(_mm512_castpd512_pd128(a))
+		#elif defined __AVX__
 			#define vlo(a) _mm_cvtsd_f64(_mm256_castpd256_pd128(a))
 		#else
 			#define vlo(a) _mm_cvtsd_f64(a)
