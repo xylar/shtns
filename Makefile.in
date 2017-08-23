@@ -74,11 +74,14 @@ sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp
 	$(shtcc) -c $< -o $@
 sht_mic.o : sht_mic.c Makefile $(hfiles) SHT/SH_to_spat_mic.c SHT/spat_to_SH_mic.c
 	$(cc) -c $< -o $@
+sht_gpu.o : sht_gpu.cu Makefile $(hfiles)
+	nvcc -c sht_gpu.cu -Xptxas=-v
 
 
 # programs & Examples
 time_SHT : time_SHT.c $(libname) shtns.h
-	$(cc) time_SHT.c -I. ./$(libname) $(LIBS) -o time_SHT
+	#$(cc) time_SHT.c -I. ./$(libname) $(LIBS) -o time_SHT
+	nvcc $(go) time_SHT.c sht_gpu.o -I. ./$(libname) $(LIBS) -o time_SHT
 
 test_rot : examples/test_rot.c $(libname) shtns.h
 	$(cc) examples/test_rot.c -I. ./$(libname) $(LIBS) -o test_rot

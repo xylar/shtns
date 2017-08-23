@@ -149,6 +149,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 	/* cuda stuff */
 	double* d_alm;
 	double* d_ct;
+	double* d_q;
+	double* d_qlm;
+	unsigned cufft_plan;
 
 	/* other misc informations */
 	unsigned char nlorder;	// order of non-linear terms to be resolved by SH transform.
