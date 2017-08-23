@@ -234,26 +234,28 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
     __shared__ double ni[THREADS_PER_BLOCK];
     __shared__ double si[THREADS_PER_BLOCK];
 
+    const double cost = (it < nlat_2) ? ct[it] : 0.0;
+
     if (im==0) {
+	int l = 0;
+	double y0 = al[0];
+	double re = y0 * ql[0];
+	double y1 = y0 * al[1] * cost;
+	double ro = y1 * ql[2];
+	al+=2;    l+=2;
+	while(l<llim) {
+	    y0  = al[1]*(cost*y1) + al[0]*y0;
+	    re += y0 * ql[2*l];
+	    y1  = al[3]*(cost*y0) + al[2]*y1;
+	    ro += y1 * ql[2*l+2];
+	    al+=4;	l+=2;
+	}
+	if (l==llim) {
+	    y0  = al[1]*cost*y1 + al[0]*y0;
+	    re += y0 * ql[2*l];
+	}
+
 	if (it < nlat_2) {
-	    int l = 0;
-	    const double cost = ct[it];
-	    double y0 = al[0];
-	    double re = y0 * ql[0];
-	    double y1 = y0 * al[1] * cost;
-	    double ro = y1 * ql[2];
-	    al+=2;    l+=2;
-	    while(l<llim) {
-		y0  = al[1]*(cost*y1) + al[0]*y0;
-		re += y0 * ql[2*l];
-		y1  = al[3]*(cost*y0) + al[2]*y1;
-		ro += y1 * ql[2*l+2];
-		al+=4;	l+=2;
-	    }
-	    if (l==llim) {
-		y0  = al[1]*cost*y1 + al[0]*y0;
-		re += y0 * ql[2*l];
-	    }
 	    // store mangled for complex fft
 	    q[it*k_inc] = re+ro;
 	    q[(nlat_2*2-1-it)*k_inc] = re-ro;
@@ -265,64 +267,82 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 	ql += 2*l;
 
 	// add polar optimization
-	if (it < nlat_2) {
-	    const double cost = ct[it];
-	    double rer,ror, rei, roi, y0, y1;
-	    ni[j] = 1.0;	// y0
-	    int l = im*mres;
-	    int ny = 0;
-	    si[j] = sqrt(1.0 - cost*cost);	// stx
-	    int nsint = 0;
-	    do {		// sin(theta)^m		(use rescaling to avoid underflow)
-		if (l&1) {
-		    ni[j] *= si[j];
-		    ny += nsint;
-		    if (ni[(j&0xE0) +31] < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence here !
-			ny--;
-			ni[j] *= SHT_SCALE_FACTOR;
-		    }
-		}
-		si[j] *= si[j];
-		nsint += nsint;
-		if (si[(j&0xE0) +31] < 1.0/SHT_SCALE_FACTOR) {		// avoid warp divergence here !
-		    nsint--;
-		    si[j] *= SHT_SCALE_FACTOR;
-		}
-	    } while(l >>= 1);
-	    
-	    y0 = ni[j] * al[0];
-	    ror = 0.0;		roi = 0.0;
-	    rer = 0.0;		rei = 0.0;
-	    y1 = al[1]*y0*cost;
 
-	    l=im*mres;		al+=2;
+	double rer,ror, rei, roi, y0, y1;
+	ni[j] = 1.0;	// y0
+	l = m;
+	int ny = 0;
+	si[j] = sqrt(1.0 - cost*cost);	// stx
+	int nsint = 0;
+	do {		// sin(theta)^m		(use rescaling to avoid underflow)
+	    if (l&1) {
+		ni[j] *= si[j];
+		ny += nsint;
+		if (ni[(j&0xE0) +31] < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence here !
+		    ny--;
+		    ni[j] *= SHT_SCALE_FACTOR;
+		}
+	    }
+	    si[j] *= si[j];
+	    nsint += nsint;
+	    if (si[(j&0xE0) +31] < 1.0/SHT_SCALE_FACTOR) {		// avoid warp divergence here !
+		nsint--;
+		si[j] *= SHT_SCALE_FACTOR;
+	    }
+	} while(l >>= 1);
+	
+	y0 = ni[j] * al[0];
+	ror = 0.0;		roi = 0.0;
+	rer = 0.0;		rei = 0.0;
+	y1 = al[1]*y0*cost;
+
+	l=m;		al+=2;
+	if (ny<0) {
+	    ni[j] = al[j&31];
+	    int ka = 0;
 	    while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
-		y0 = al[1]*cost*y1 + al[0]*y0;
-		y1 = al[3]*cost*y0 + al[2]*y1;
-		l+=2;	al+=4;
-		ni[j] = y0;
-		if (fabs(ni[(j&0xE0)+31]) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
+		if (ka+4 > 32) {
+		    ni[j] = al[(j&31)];
+		    ka=0;
+		}
+		//y0 = al[1]*cost*y1 + al[0]*y0;
+		//y1 = al[3]*cost*y0 + al[2]*y1;
+		y0 = ni[ka+1+(j&0xFFE0)]*(cost*y1) + ni[ka+(j&0xFFE0)]*y0;
+		y1 = ni[ka+3+(j&0xFFE0)]*(cost*y0) + ni[ka+2+(j&0xFFE0)]*y1;
+		l+=2;	al+=4;	ka+=4;
+		si[j] = y0;
+		if (fabs(si[(j&0xE0)+31]) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 		    ++ny;
 		    y0 *= 1.0/SHT_SCALE_FACTOR;
 		    y1 *= 1.0/SHT_SCALE_FACTOR;
 		}
 	    }
-	    if (ny == 0) {
-		while (l<llim) {	// compute even and odd parts
-		    rer += y0 * ql[2*l];	// real
-		    rei += y0 * ql[2*l+1];	// imag
-		    y0 = al[1]*(cost*y1) + al[0]*y0;
-		    ror += y1 * ql[2*l+2];	// real
-		    roi += y1 * ql[2*l+3];	// imag
-		    y1 = al[3]*(cost*y0) + al[2]*y1;
-		    l+=2;	al+=4;
+	}
+	if (ny == 0) {
+	    ni[j] = al[j&31];
+	    si[j] = ql[2*l+(j&31)];
+	    int kq = 0;		int ka = 0;
+	    while (l<llim) {	// compute even and odd parts
+		if (2*kq+4 > 32) {
+		    ni[j] = al[(j&31)];
+		    si[j] = ql[2*l+(j&31)];
+		    ka=0;	kq=0;
 		}
-		if (l==llim) {
-		    rer += y0 * ql[2*l];
-		    rei += y0 * ql[2*l+1];
-		}
+		rer += y0 * si[2*kq+(j&0xFFE0)];	// real
+		rei += y0 * si[2*kq+1+(j&0xFFE0)];	// imag
+		y0 = ni[ka+1+(j&0xFFE0)]*(cost*y1) + ni[ka+(j&0xFFE0)]*y0;
+		ror += y1 * si[2*kq+2+(j&0xFFE0)];	// real
+		roi += y1 * si[2*kq+3+(j&0xFFE0)];	// imag
+		y1 = ni[ka+3+(j&0xFFE0)]*(cost*y0) + ni[ka+2+(j&0xFFE0)]*y1;
+		l+=2;	al+=4;	kq+=2;	ka+=4;
 	    }
+	    if (l==llim) {
+		rer += y0 * ql[2*l];
+		rei += y0 * ql[2*l+1];
+	    }
+	}
 
+	if (it < nlat_2) {
 	    /// store mangled for complex fft
 	    // first, we store to shared memory the north and south values
 	    double nr = rer+ror;
