@@ -146,6 +146,10 @@ struct shtns_info {		// MUST start with "int nlm;"
 	fftw_plan ifft_lat;		///< fftw plan for SHqst_to_lat
 	int nphi_lat;			///< nphi of previous SHqst_to_lat
 
+	/* cuda stuff */
+	double* d_alm;
+	double* d_ct;
+
 	/* other misc informations */
 	unsigned char nlorder;	// order of non-linear terms to be resolved by SH transform.
 	unsigned char grid;		// store grid type.
@@ -237,23 +241,23 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define S2D_STORE(mem, idx, ev, od) \
 		vstor(mem, idx, ev+od); \
 		vstor((double*)mem + NLAT-VSIZE2 - (idx)*VSIZE2, 0, vec_perm(ev-od, ev-od, vec_gpci(03210)));
-	#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
-		rnd aa = vec_perm(ei+oi, ei+oi, vec_gpci(01032)) + (er+or); \
-		rnd bb = (er + or) - vec_perm(ei+oi, ei+oi, vec_gpci(01032)); \
+	#define S2D_CSTORE(mem, idx, er, od, ei, oi)	{	\
+		rnd aa = vec_perm(ei+oi, ei+oi, vec_gpci(01032)) + (er+od); \
+		rnd bb = (er + od) - vec_perm(ei+oi, ei+oi, vec_gpci(01032)); \
 		vstor(mem, idx, vec_perm(bb, aa, vec_gpci(00527))); \
 		vstor(((double*)mem) + (NPHI-2*im)*NLAT, idx, vec_perm(aa, bb, vec_gpci(00527))); \
-		aa = vec_perm(er-or, er-or, vec_gpci(01032)) + (ei-oi); \
-		bb = vec_perm(er-or, er-or, vec_gpci(01032)) - (ei-oi); \
+		aa = vec_perm(er-od, er-od, vec_gpci(01032)) + (ei-oi); \
+		bb = vec_perm(er-od, er-od, vec_gpci(01032)) - (ei-oi); \
 		vstor(((double*)mem) + NLAT, -(idx+1), vec_perm(bb, aa, vec_gpci(02705))); \
 		vstor(((double*)mem) + (NPHI+1-2*im)*NLAT, -(idx+1), vec_perm(aa, bb, vec_gpci(02705))); }
 	// TODO: S2D_CSTORE2 has not been tested and is probably wrong...
-	#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
-		rnd aa = vec_perm(er+or, ei+oi, vec_gpci(00415)); \
-		rnd bb = vec_perm(er+or, ei+oi, vec_gpci(02637)); \
+	#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	{	\
+		rnd aa = vec_perm(er+od, ei+oi, vec_gpci(00415)); \
+		rnd bb = vec_perm(er+od, ei+oi, vec_gpci(02637)); \
 		vstor(mem, idx*2, aa); \
 		vstor(mem, idx*2+1, bb); \
-		aa = vec_perm(er-or, ei-oi, vec_gpci(00415)); \
-		bb = vec_perm(er-or, ei-oi, vec_gpci(02637)); \
+		aa = vec_perm(er-od, ei-oi, vec_gpci(00415)); \
+		bb = vec_perm(er-od, ei-oi, vec_gpci(02637)); \
 		vstor(mem, NLAT_2-1-idx*2, aa); \
 		vstor(mem, NLAT_2-2-idx*2, bb); }
 
@@ -311,25 +315,25 @@ struct shtns_info {		// MUST start with "int nlm;"
 			_mm512_storeu_pd(((double*)mem) + (idx)*8,   ev+od); \
 			_mm256_storeu_pd(((double*)mem) + NLAT-4 -(idx)*8,  _mm512_castpd512_pd256( _mm512_permutex_pd(ev-od, 0x1B) ) ); \
 			_mm256_storeu_pd(((double*)mem) + NLAT-8 -(idx)*8,  _mm512_extractf64x4_pd( _mm512_permutex_pd(ev-od, 0x1B), 1 ) );
-		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
-			rnd aa = (rnd)_mm512_permute_pd(ei+oi, 0x55) + (er+or);	rnd bb = (er+or) - (rnd)_mm512_permute_pd(ei+oi, 0x55); \
+		#define S2D_CSTORE(mem, idx, er, od, ei, oi)	{	\
+			rnd aa = (rnd)_mm512_permute_pd(ei+oi, 0x55) + (er+od);	rnd bb = (er+od) - (rnd)_mm512_permute_pd(ei+oi, 0x55); \
 			_mm512_storeu_pd(((double*)mem) + (idx)*8, _mm512_shuffle_pd(bb, aa, 0xAA )); \
 			_mm512_storeu_pd(((double*)mem) + (NPHI-2*im)*NLAT + (idx)*8, _mm512_shuffle_pd(aa, bb, 0xAA )); \
-			aa = (rnd)_mm512_permute_pd(er-or, 0x55) + (ei - oi);		bb = (rnd)_mm512_permute_pd(er-or, 0x55) - (ei - oi);	\
+			aa = (rnd)_mm512_permute_pd(er-od, 0x55) + (ei - oi);		bb = (rnd)_mm512_permute_pd(er-od, 0x55) - (ei - oi);	\
 			rnd yy = _mm512_shuffle_pd(bb, aa, 0xAA );		rnd zz = _mm512_shuffle_pd(aa, bb, 0xAA ); \
 			yy = _mm512_permutex_pd( yy, 0x4E );			zz = _mm512_permutex_pd(zz, 0x4E ); \
 			((s4d*)mem)[(NLAT/4)-1 -2*(idx)] = (s4d)_mm512_castpd512_pd256(yy);	\
 			((s4d*)mem)[(NLAT/4)-2 -2*(idx)] = (s4d)_mm512_extractf64x4_pd(yy, 1);	\
 			((s4d*)mem)[(NPHI+1-2*im)*(NLAT/4) -1 -2*(idx)] = (s4d)_mm512_castpd512_pd256(zz);	\
 			((s4d*)mem)[(NPHI+1-2*im)*(NLAT/4) -2 -2*(idx)] = (s4d)_mm512_extractf64x4_pd(zz, 1); }
-		#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
-			rnd rr = (rnd)_mm512_permutex_pd(er+or, 0xD8);	rnd ii = (rnd)_mm512_permutex_pd(ei+oi, 0xD8);	\
+		#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	{	\
+			rnd rr = (rnd)_mm512_permutex_pd(er+od, 0xD8);	rnd ii = (rnd)_mm512_permutex_pd(ei+oi, 0xD8);	\
 			rnd aa = (rnd)_mm512_unpacklo_pd(rr, ii);	rnd bb = (rnd)_mm512_unpackhi_pd(rr, ii);	\
 			((s4d*)mem)[(idx)*4]   = _mm512_castpd512_pd256(aa);	\
 			((s4d*)mem)[(idx)*4+1] = _mm512_castpd512_pd256(bb);	\
 			((s4d*)mem)[(idx)*4+2] = _mm512_extractf64x4_pd(aa, 1);	\
 			((s4d*)mem)[(idx)*4+3] = _mm512_extractf64x4_pd(bb, 1);	\
-			rr = (rnd)_mm512_permutex_pd(er-or, 0x8D);	ii = (rnd)_mm512_permutex_pd(ei-oi, 0x8D);	\
+			rr = (rnd)_mm512_permutex_pd(er-od, 0x8D);	ii = (rnd)_mm512_permutex_pd(ei-oi, 0x8D);	\
 			aa = (rnd)_mm256_unpacklo_pd(rr, ii);	bb = (rnd)_mm256_unpackhi_pd(rr, ii);	\
 			((s4d*)mem)[NLAT-1-(idx)*4] = _mm512_castpd512_pd256(aa);	\
 			((s4d*)mem)[NLAT-2-(idx)*4] = _mm512_castpd512_pd256(bb);	\
@@ -359,22 +363,22 @@ struct shtns_info {		// MUST start with "int nlm;"
 			_mm256_storeu_pd(((double*)mem) + (idx)*4,   ev+od); \
 			((s2d*)mem)[NLAT_2-1 - (idx)*2] = _mm256_castpd256_pd128(_mm256_shuffle_pd(ev-od, ev-od, 5)); \
 			((s2d*)mem)[NLAT_2-2 - (idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(ev-od, ev-od, 5), 1);
-		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
-			rnd aa = (rnd)_mm256_shuffle_pd(ei+oi,ei+oi,5) + (er + or);		rnd bb = (er + or) - (rnd)_mm256_shuffle_pd(ei+oi,ei+oi,5);	\
+		#define S2D_CSTORE(mem, idx, er, od, ei, oi)	{	\
+			rnd aa = (rnd)_mm256_shuffle_pd(ei+oi,ei+oi,5) + (er + od);		rnd bb = (er + od) - (rnd)_mm256_shuffle_pd(ei+oi,ei+oi,5);	\
 			_mm256_storeu_pd(((double*)mem) + (idx)*4, _mm256_shuffle_pd(bb, aa, 10 )); \
 			_mm256_storeu_pd(((double*)mem) + (NPHI-2*im)*NLAT + (idx)*4, _mm256_shuffle_pd(aa, bb, 10 )); \
-			aa = (rnd)_mm256_shuffle_pd(er-or,er-or,5) + (ei - oi);		bb = (rnd)_mm256_shuffle_pd(er-or,er-or,5) - (ei - oi);	\
+			aa = (rnd)_mm256_shuffle_pd(er-od,er-od,5) + (ei - oi);		bb = (rnd)_mm256_shuffle_pd(er-od,er-od,5) - (ei - oi);	\
 			((s2d*)mem)[NLAT_2-1 -(idx)*2] = _mm256_castpd256_pd128(_mm256_shuffle_pd(bb, aa, 10 ));	\
 			((s2d*)mem)[NLAT_2-2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(bb, aa, 10 ), 1);	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)*2] = _mm256_castpd256_pd128(_mm256_shuffle_pd(aa, bb, 10 ));	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -2 -(idx)*2] = _mm256_extractf128_pd(_mm256_shuffle_pd(aa, bb, 10 ), 1);	}
-		#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
-			rnd aa = (rnd)_mm256_unpacklo_pd(er+or, ei+oi);	rnd bb = (rnd)_mm256_unpackhi_pd(er+or, ei+oi);	\
+		#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	{	\
+			rnd aa = (rnd)_mm256_unpacklo_pd(er+od, ei+oi);	rnd bb = (rnd)_mm256_unpackhi_pd(er+od, ei+oi);	\
 			((s2d*)mem)[(idx)*4]   = _mm256_castpd256_pd128(aa);	\
 			((s2d*)mem)[(idx)*4+1] = _mm256_castpd256_pd128(bb);	\
 			((s2d*)mem)[(idx)*4+2] = _mm256_extractf128_pd(aa, 1);	\
 			((s2d*)mem)[(idx)*4+3] = _mm256_extractf128_pd(bb, 1);	\
-			aa = (rnd)_mm256_unpacklo_pd(er-or, ei-oi);	bb = (rnd)_mm256_unpackhi_pd(er-or, ei-oi);	\
+			aa = (rnd)_mm256_unpacklo_pd(er-od, ei-oi);	bb = (rnd)_mm256_unpackhi_pd(er-od, ei-oi);	\
 			((s2d*)mem)[NLAT-1-(idx)*4] = _mm256_castpd256_pd128(aa);	\
 			((s2d*)mem)[NLAT-2-(idx)*4] = _mm256_castpd256_pd128(bb);	\
 			((s2d*)mem)[NLAT-3-(idx)*4] = _mm256_extractf128_pd(aa, 1);	\
@@ -386,9 +390,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[(idx)*4+1] = _mm256_castpd256_pd128(b);	\
 			((s2d*)mem)[(idx)*4+2] = _mm256_extractf128_pd(a, 1);	\
 			((s2d*)mem)[(idx)*4+3] = _mm256_extractf128_pd(b, 1);	}
-		#define S2D_CSTORE_4MAGIC(mem, idx, er, or, ei, oi)	{	\
-			rnd nr = er + or;		rnd ni = ei + oi;	\
-			rnd sr = er - or;		rnd si = ei - oi;	\
+		#define S2D_CSTORE_4MAGIC(mem, idx, er, od, ei, oi)	{	\
+			rnd nr = er + od;		rnd ni = ei + oi;	\
+			rnd sr = er - od;		rnd si = ei - oi;	\
 			rnd a0 = _mm256_unpacklo_pd(nr-si,  sr+ni);	\
 			rnd b0 = _mm256_unpacklo_pd(nr+si,  sr-ni);	\
 			rnd a1 = _mm256_unpackhi_pd(nr-si,  sr+ni);	\
@@ -401,9 +405,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*4+2] = _mm256_extractf128_pd(b0, 1);	\
 			((s2d*)mem)[(idx)*4+3] = _mm256_extractf128_pd(a1, 1);	\
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*4+3] = _mm256_extractf128_pd(b1, 1);	}		
-		#define S2D_CSTORE2_4MAGIC(mem, idx, er, or, ei, oi)	{	\
-			rnd aa = (rnd)_mm256_unpacklo_pd(er+or, ei+oi);	rnd bb = (rnd)_mm256_unpackhi_pd(er+or, ei+oi);	\
-			rnd cc = (rnd)_mm256_unpacklo_pd(er-or, ei-oi);	rnd dd = (rnd)_mm256_unpackhi_pd(er-or, ei-oi);	\
+		#define S2D_CSTORE2_4MAGIC(mem, idx, er, od, ei, oi)	{	\
+			rnd aa = (rnd)_mm256_unpacklo_pd(er+od, ei+oi);	rnd bb = (rnd)_mm256_unpackhi_pd(er+od, ei+oi);	\
+			rnd cc = (rnd)_mm256_unpacklo_pd(er-od, ei-oi);	rnd dd = (rnd)_mm256_unpackhi_pd(er-od, ei-oi);	\
 			((s2d*)mem)[(idx)*8]   = _mm256_castpd256_pd128(aa);	\
 			((s2d*)mem)[(idx)*8+1] = _mm256_castpd256_pd128(cc);	\
 			((s2d*)mem)[(idx)*8+2] = _mm256_castpd256_pd128(bb);	\
@@ -439,34 +443,34 @@ struct shtns_info {		// MUST start with "int nlm;"
 		#define vread(mem, idx) ((s2d*)mem)[idx]
 		#define vstor(mem, idx, v) ((s2d*)mem)[idx] = v
 		#define S2D_STORE(mem, idx, ev, od)		((s2d*)mem)[idx] = ev+od;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(ev-od);
-		#define S2D_CSTORE(mem, idx, er, or, ei, oi)	{	\
-			rnd aa = vxchg(ei + oi) + (er + or);		rnd bb = (er + or) - vxchg(ei + oi);	\
+		#define S2D_CSTORE(mem, idx, er, od, ei, oi)	{	\
+			rnd aa = vxchg(ei + oi) + (er + od);		rnd bb = (er + od) - vxchg(ei + oi);	\
 			((s2d*)mem)[idx] = _mm_shuffle_pd(bb, aa, 2 );	\
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = _mm_shuffle_pd(aa, bb, 2 );	\
-			aa = vxchg(er - or) + (ei - oi);		bb = vxchg(er - or) - (ei - oi);	\
+			aa = vxchg(er - od) + (ei - oi);		bb = vxchg(er - od) - (ei - oi);	\
 			((s2d*)mem)[NLAT_2-1 -(idx)] = _mm_shuffle_pd(bb, aa, 2 );	\
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = _mm_shuffle_pd(aa, bb, 2 );	}
-		#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	{	\
-			((s2d*)mem)[(idx)*2]   = _mm_unpacklo_pd(er+or, ei+oi);	\
-			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(er+or, ei+oi);	\
-			((s2d*)mem)[NLAT-1-(idx)*2] = _mm_unpacklo_pd(er-or, ei-oi);	\
-			((s2d*)mem)[NLAT-2-(idx)*2] = _mm_unpackhi_pd(er-or, ei-oi);	}
+		#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	{	\
+			((s2d*)mem)[(idx)*2]   = _mm_unpacklo_pd(er+od, ei+oi);	\
+			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(er+o, ei+oi);	\
+			((s2d*)mem)[NLAT-1-(idx)*2] = _mm_unpacklo_pd(er-od, ei-oi);	\
+			((s2d*)mem)[NLAT-2-(idx)*2] = _mm_unpackhi_pd(er-od, ei-oi);	}
 		#define S2D_STORE_4MAGIC(mem, idx, ev, od)		{	\
 			s2d n = ev+od;		s2d s = ev-od;	\
 			((s2d*)mem)[(idx)*2] = _mm_unpacklo_pd(n, s);	\
 			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(n, s);	}
-		#define S2D_CSTORE_4MAGIC(mem, idx, er, or, ei, oi)	{	\
-			rnd nr = er + or;		rnd ni = ei + oi;	\
-			rnd sr = er - or;		rnd si = ei - oi;	\
+		#define S2D_CSTORE_4MAGIC(mem, idx, er, od, ei, oi)	{	\
+			rnd nr = er + od;		rnd ni = ei + oi;	\
+			rnd sr = er - od;		rnd si = ei - oi;	\
 			((s2d*)mem)[(idx)*2] = _mm_unpacklo_pd(nr-si,  sr+ni);	\
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2] = _mm_unpacklo_pd(nr+si,  sr-ni);	\
 			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(nr-si,  sr+ni);	\
 			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2+1] = _mm_unpackhi_pd(nr+si,  sr-ni);	}
-		#define S2D_CSTORE2_4MAGIC(mem, idx, er, or, ei, oi)	{	\
-			((s2d*)mem)[(idx)*4]   = _mm_unpacklo_pd(er+or, ei+oi);	\
-			((s2d*)mem)[(idx)*4+1] = _mm_unpacklo_pd(er-or, ei-oi);	\
-			((s2d*)mem)[(idx)*4+2] = _mm_unpackhi_pd(er+or, ei+oi);	\
-			((s2d*)mem)[(idx)*4+3] = _mm_unpackhi_pd(er-or, ei-oi);	}
+		#define S2D_CSTORE2_4MAGIC(mem, idx, er, od, ei, oi)	{	\
+			((s2d*)mem)[(idx)*4]   = _mm_unpacklo_pd(er+od, ei+oi);	\
+			((s2d*)mem)[(idx)*4+1] = _mm_unpacklo_pd(er-od, ei-oi);	\
+			((s2d*)mem)[(idx)*4+2] = _mm_unpackhi_pd(er+od, ei+oi);	\
+			((s2d*)mem)[(idx)*4+3] = _mm_unpackhi_pd(er-od, ei-oi);	}
 	#endif
 	#ifdef __SSE3__
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd((b),(b),1))		// a + I*b
@@ -542,12 +546,12 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
 
 	#define S2D_STORE(mem, idx, ev, od)		(mem)[idx] = ev+od;		(mem)[NLAT-1 - (idx)] = ev-od;
-	#define S2D_CSTORE(mem, idx, er, or, ei, oi)	mem[idx] = (er+or) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-or) + I*(ei-oi);
-	#define S2D_CSTORE2(mem, idx, er, or, ei, oi)	mem[idx] = (er+or) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-or) + I*(ei-oi);
+	#define S2D_CSTORE(mem, idx, er, od, ei, oi)	mem[idx] = (er+od) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-od) + I*(ei-oi);
+	#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	mem[idx] = (er+od) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-od) + I*(ei-oi);
 
 	#define S2D_STORE_4MAGIC(mem, idx, ev, od)	(mem)[2*(idx)+1] = ev+od;		(mem)[2*(idx)+1] = ev-od;
-	#define S2D_CSTORE_4MAGIC(mem, idx, er, or, ei, oi)		mem[2*(idx)] = (er+or) + I*(ei+oi);		mem[2*(idx)+1] = (er-or) + I*(ei-oi);
-	#define S2D_CSTORE2_4MAGIC(mem, idx, er, or, ei, oi)	mem[2*(idx)] = (er+or) + I*(ei+oi);		mem[2*(idx)+1] = (er-or) + I*(ei-oi);
+	#define S2D_CSTORE_4MAGIC(mem, idx, er, od, ei, oi)		mem[2*(idx)] = (er+od) + I*(ei+oi);		mem[2*(idx)+1] = (er-od) + I*(ei-oi);
+	#define S2D_CSTORE2_4MAGIC(mem, idx, er, od, ei, oi)	mem[2*(idx)] = (er+od) + I*(ei+oi);		mem[2*(idx)+1] = (er-od) + I*(ei-oi);
 #endif
 
 
@@ -573,25 +577,25 @@ struct DtDp {		// theta and phi derivatives stored together.
 
 // compute symmetric and antisymmetric parts, and reorganize data.
 #ifndef SHTNS4MAGIC
-  #define SYM_ASYM_M0_V(F, er, or) { \
+  #define SYM_ASYM_M0_V(F, er, od) { \
 	long int k=0; do { \
 		double an = F[k*k_inc];				double bn = F[k*k_inc +1]; \
 		double bs = F[(NLAT-2-k)*k_inc];	double as = F[(NLAT-2-k)*k_inc +1]; \
-		er[k] = an+as;			or[k] = an-as; \
-		er[k+1] = bn+bs;		or[k+1] = bn-bs; \
+		er[k] = an+as;			od[k] = an-as; \
+		er[k+1] = bn+bs;		od[k+1] = bn-bs; \
 		k+=2; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_M0_Q(F, er, or, acc0) { \
+  #define SYM_ASYM_M0_Q(F, er, od, acc0) { \
 	double r0a = 0.0;	double r0b = 0.0; \
 	long int k=0; do { \
 		double an = F[k*k_inc];				double bn = F[k*k_inc +1]; \
 		double bs = F[(NLAT-2-k)*k_inc];	double as = F[(NLAT-2-k)*k_inc +1]; \
-		er[k] = an+as;			or[k] = an-as; \
-		er[k+1] = bn+bs;		or[k+1] = bn-bs; \
+		er[k] = an+as;			od[k] = an-as; \
+		er[k+1] = bn+bs;		od[k+1] = bn-bs; \
 		r0a += (an+as)*wg[k];	r0b += (bn+bs)*wg[k+1]; \
 		k+=2; \
 	} while(k < nk*VSIZE2); 	acc0 = r0a+r0b; }
-  #define SYM_ASYM_Q(F, er, or, ei, oi, k0v) { \
+  #define SYM_ASYM_Q(F, er, od, ei, oi, k0v) { \
 	long int k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double an, bn, ani, bni, bs, as, bsi, asi, t; \
@@ -602,10 +606,10 @@ struct DtDp {		// theta and phi derivatives stored together.
 		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
 		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
 		er[k] = an+as;		ei[k] = ani+asi;		er[k+1] = bn+bs;		ei[k+1] = bni+bsi; \
-		or[k] = an-as;		oi[k] = ani-asi;		or[k+1] = bn-bs;		oi[k+1] = bni-bsi; \
+		od[k] = an-as;		oi[k] = ani-asi;		od[k+1] = bn-bs;		oi[k+1] = bni-bsi; \
 		k+=2; \
 		} while (k<nk*VSIZE2); }
-  #define SYM_ASYM_Q3(F, er, or, ei, oi, k0v) { \
+  #define SYM_ASYM_Q3(F, er, od, ei, oi, k0v) { \
 	long int k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double an, bn, ani, bni, bs, as, bsi, asi, t; \
@@ -617,27 +621,27 @@ struct DtDp {		// theta and phi derivatives stored together.
 		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
 		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
 		er[k] = (an+as)*sina;	ei[k] = (ani+asi)*sina;		er[k+1] = (bn+bs)*sinb;		ei[k+1] = (bni+bsi)*sinb; \
-		or[k] = (an-as)*sina;	oi[k] = (ani-asi)*sina;		or[k+1] = (bn-bs)*sinb;		oi[k+1] = (bni-bsi)*sinb; \
+		od[k] = (an-as)*sina;	oi[k] = (ani-asi)*sina;		od[k+1] = (bn-bs)*sinb;		oi[k+1] = (bni-bsi)*sinb; \
 		k+=2; \
 		} while (k<nk*VSIZE2); }
   #define SYM_ASYM_V SYM_ASYM_Q
 #else /* SHTNS4MAGIC */
-  #define SYM_ASYM_M0_V(F, er, or) { \
+  #define SYM_ASYM_M0_V(F, er, od) { \
 	long int k=0; do { \
 		double st_1 = 1.0/st[k]; \
 		double an = F[2*k*k_inc];		double as = F[2*k*k_inc +1]; \
-		er[k] = (an+as)*st_1;			or[k] = (an-as)*st_1; \
+		er[k] = (an+as)*st_1;			od[k] = (an-as)*st_1; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_M0_Q(F, er, or, acc0) { \
+  #define SYM_ASYM_M0_Q(F, er, od, acc0) { \
 	acc0 = 0.0; \
 	long int k=0; do { \
 		double an = F[2*k*k_inc];	double as = F[2*k*k_inc +1]; \
-		er[k] = (an+as);			or[k] = (an-as); \
+		er[k] = (an+as);			od[k] = (an-as); \
 		acc0 += (an+as)*wg[k]; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_Q(F, er, or, ei, oi, k0v) { \
+  #define SYM_ASYM_Q(F, er, od, ei, oi, k0v) { \
 	k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double ar,ai,br,bi, sr,si,nr,ni; \
@@ -646,10 +650,10 @@ struct DtDp {		// theta and phi derivatives stored together.
 		nr = ar + br;		ni = ai - bi; \
 		sr = ai + bi;		si = br - ar; \
 		er[k] = nr+sr;		ei[k] = ni+si; \
-		or[k] = nr-sr;		oi[k] = ni-si; \
+		od[k] = nr-sr;		oi[k] = ni-si; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_Q3(F, er, or, ei, oi, k0v) { \
+  #define SYM_ASYM_Q3(F, er, od, ei, oi, k0v) { \
 	k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double ar,ai,br,bi, sr,si,nr,ni; \
@@ -659,10 +663,10 @@ struct DtDp {		// theta and phi derivatives stored together.
 		nr = (ar + br)*sina;		ni = (ai - bi)*sina; \
 		sr = (ai + bi)*sina;		si = (br - ar)*sina; \
 		er[k] = nr+sr;		ei[k] = ni+si; \
-		or[k] = nr-sr;		oi[k] = ni-si; \
+		od[k] = nr-sr;		oi[k] = ni-si; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_V(F, er, or, ei, oi, k0v) { \
+  #define SYM_ASYM_V(F, er, od, ei, oi, k0v) { \
 	k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double ar,ai,br,bi, sr,si,nr,ni; \
@@ -672,7 +676,7 @@ struct DtDp {		// theta and phi derivatives stored together.
 		nr = (ar + br)*sina;		ni = (ai - bi)*sina; \
 		sr = (ai + bi)*sina;		si = (br - ar)*sina; \
 		er[k] = nr+sr;		ei[k] = ni+si; \
-		or[k] = nr-sr;		oi[k] = ni-si; \
+		od[k] = nr-sr;		oi[k] = ni-si; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
 #endif
