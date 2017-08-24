@@ -80,8 +80,7 @@ sht_gpu.o : sht_gpu.cu Makefile $(hfiles)
 
 # programs & Examples
 time_SHT : time_SHT.c $(libname) shtns.h
-	#$(cc) time_SHT.c -I. ./$(libname) $(LIBS) -o time_SHT
-	nvcc $(go) time_SHT.c sht_gpu.o -I. ./$(libname) $(LIBS) -o time_SHT
+	$(cc) time_SHT.c -I. ./$(libname) $(LIBS) -o time_SHT
 
 test_rot : examples/test_rot.c $(libname) shtns.h
 	$(cc) examples/test_rot.c -I. ./$(libname) $(LIBS) -o test_rot

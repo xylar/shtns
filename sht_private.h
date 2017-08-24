@@ -146,12 +146,14 @@ struct shtns_info {		// MUST start with "int nlm;"
 	fftw_plan ifft_lat;		///< fftw plan for SHqst_to_lat
 	int nphi_lat;			///< nphi of previous SHqst_to_lat
 
+	#ifdef HAVE_LIBCUFFT
 	/* cuda stuff */
 	double* d_alm;
 	double* d_ct;
 	double* d_q;
 	double* d_qlm;
 	unsigned cufft_plan;
+	#endif
 
 	/* other misc informations */
 	unsigned char nlorder;	// order of non-linear terms to be resolved by SH transform.

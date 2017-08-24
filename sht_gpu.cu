@@ -6,7 +6,7 @@
 #include <cufft.h>
 
 // 256 for scalar SH_to_spat seems best on kepler.
-#define THREADS_PER_BLOCK 256
+#define THREADS_PER_BLOCK 128
 
 // adjustment for cuda
 #undef SHT_L_RESCALE_FLY
@@ -376,53 +376,77 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 
 
 extern "C"
-void shtns_use_gpu(shtns_cfg shtns)
+int shtns_init_gpu(shtns_cfg shtns)
 {
     cudaError_t err = cudaSuccess;
     const long nlm = shtns->nlm;
     const long nlat_2 = shtns->nlat_2;
 
-//    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+    double *d_alm = NULL;
+    double *d_ct  = NULL;
+    double *d_qlm = NULL;
+    double *d_q   = NULL;
+    int err_count = 0;
+
+    cudaDeviceProp prop;
+    err = cudaGetDeviceProperties(&prop, 0);
+    if (err != cudaSuccess) return 0;
+    #if SHT_VERBOSE > 0
+    printf("  cuda GPU \"%s\" found (warp size = %d).\n", prop.name, prop.warpSize);
+    #endif
+    if (prop.warpSize != 32) return 0;		// failure, SHTns requires a warpSize of 32.
 
     // Allocate the device input vector alm
-    double *d_alm = NULL;
     err = cudaMalloc((void **)&d_alm, 2*nlm*sizeof(double));
-    if (err != cudaSuccess) printf("CUDA: failed alloc alm\n");
+    if (err != cudaSuccess) err_count ++;
     // Allocate the device input vector ct
-    double *d_ct = NULL;
     err = cudaMalloc((void **)&d_ct, nlat_2*sizeof(double));
-    if (err != cudaSuccess) printf("CUDA: failed alloc ct\n");
-
-    err = cudaMemcpy(d_alm, shtns->alm, 2*nlm*sizeof(double), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess)  printf("failed copy alm\n");
-    err = cudaMemcpy(d_ct, shtns->ct, nlat_2*sizeof(double), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess)  printf("failed copy ct\n");
-
+    if (err != cudaSuccess) err_count ++;
     // Allocate the device work vector qlm
-    double *d_qlm = NULL;
     err = cudaMalloc((void **)&d_qlm, 2*nlm*sizeof(double));
-    if (err != cudaSuccess) printf("failed alloc qlm\n");
-
+    if (err != cudaSuccess) err_count ++;
     // Allocate the device work vector q
-    double *d_q = NULL;
     err = cudaMalloc((void **)&d_q, shtns->nlat * shtns->nphi * sizeof(double));
-    if (err != cudaSuccess) printf("failed alloc q\n");
+    if (err != cudaSuccess) err_count ++;
 
-    shtns->d_alm = d_alm;
-    shtns->d_ct = d_ct;
-    shtns->d_q = d_q;
-    shtns->d_qlm = d_qlm;
+    if (err_count == 0) {
+	err = cudaMemcpy(d_alm, shtns->alm, 2*nlm*sizeof(double), cudaMemcpyHostToDevice);
+	if (err != cudaSuccess)  err_count ++;
+	err = cudaMemcpy(d_ct, shtns->ct, nlat_2*sizeof(double), cudaMemcpyHostToDevice);
+	if (err != cudaSuccess)  err_count ++;
+    }
 
-    printf("shtns: GPU initialized\n");
     /* cuFFT init */
     int nfft = shtns->nphi;
     if (nfft > 1) {
 	// cufftPlanMany(cufftHandle *plan, int rank, int *n,   int *inembed, int istride, int idist,   int *onembed, int ostride, int odist,   cufftType type, int batch);
 	cufftResult res;
 	res = cufftPlanMany((cufftHandle*) &shtns->cufft_plan, 1, &nfft, &nfft, shtns->nlat_2, 1, &nfft, shtns->nlat_2, 1, CUFFT_Z2Z, shtns->nlat_2);
-	printf("cufft planning return %d, plan = %d\n", res, shtns->cufft_plan);
+	if (res != CUFFT_SUCCESS)  err_count ++;
     }
+
+    if (err_count != 0) {
+	cudaFree(d_q);	cudaFree(d_qlm);  cudaFree(d_ct);  cudaFree(d_alm);
+	return 0;	// fail
+    }
+
+    shtns->d_alm = d_alm;
+    shtns->d_ct  = d_ct;
+    shtns->d_q   = d_q;
+    shtns->d_qlm = d_qlm;
+    return 1;	// success
 }
+
+extern "C"
+void shtns_release_gpu(shtns_cfg shtns)
+{
+    cufftDestroy(shtns->cufft_plan);
+    cudaFree(shtns->d_q);
+    cudaFree(shtns->d_qlm);
+    cudaFree(shtns->d_ct);
+    cudaFree(shtns->d_alm);
+}
+
 
 extern "C"
 void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim)
@@ -484,60 +508,59 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
     }
 }
 
-
+/// Perform SH transform on data that is already on the GPU. d_Qlm and d_Vr are pointers to GPU memory (obtained by cudaMalloc() for instance)
 extern "C"
-void SH_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim)
+void cu_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int llim)
 {
-    cudaError_t err = cudaSuccess;
     const int lmax = shtns->lmax;
     const int mmax = shtns->mmax;
     const int mres = shtns->mres;
-    const int nlm = shtns->nlm;
-    const int nlat = shtns->nlat;
+    const int nlat_2 = shtns->nlat_2;
     const int nphi = shtns->nphi;
     double *d_alm = shtns->d_alm;
     double *d_ct = shtns->d_ct;
 
     // Launch the Legendre CUDA Kernel
     const int threadsPerBlock = THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
-    const int blocksPerGrid =(nlat/2 + threadsPerBlock - 1) / threadsPerBlock;
-    double *d_qlm = shtns->d_qlm;
-    double *d_q = shtns->d_q;
+    const int blocksPerGrid =(nlat_2 + threadsPerBlock - 1) / threadsPerBlock;
     if (nphi == 1) {
-/*	double* Ql0;
-	Ql0 = (double*) malloc((lmax+1)*sizeof(double));
-	for (int l=0; l<=llim; l++) {
-	    Ql0[l] = creal(Qlm[l]);
-	}
-	err = cudaMemcpy(d_qlm, Ql0, (llim+1)*sizeof(double), cudaMemcpyHostToDevice);
-*/	
-	err = cudaMemcpy(d_qlm, Qlm, 2*(llim+1)*sizeof(double), cudaMemcpyHostToDevice);
-	if (err != cudaSuccess)  printf("failed copy qlm\n");
-
-	leg_m0<<<blocksPerGrid, threadsPerBlock>>>(d_alm, d_ct, d_qlm, d_q, llim, nlat/2);
+	leg_m0<<<blocksPerGrid, threadsPerBlock>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
     } else {
-	err = cudaMemcpy(d_qlm, Qlm, 2*nlm*sizeof(double), cudaMemcpyHostToDevice);
-	if (err != cudaSuccess)  printf("failed copy qlm\n");
-
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
 	if (llim <= SHT_L_RESCALE_FLY) {
-	    leg_m_lowllim<<<blocks, threads>>>(d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mmax,mres, nphi);
+	    leg_m_lowllim<<<blocks, threads>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mmax,mres, nphi);
 	} else {
-	    leg_m_highllim<<<blocks, threads>>>(d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mmax,mres, nphi);
+	    leg_m_highllim<<<blocks, threads>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mmax,mres, nphi);
 	}
-
 	cufftResult res;
-	res = cufftExecZ2Z((cufftHandle) shtns->cufft_plan, (cufftDoubleComplex*) d_q, (cufftDoubleComplex*) d_q, CUFFT_INVERSE);
+	res = cufftExecZ2Z((cufftHandle) shtns->cufft_plan, (cufftDoubleComplex*) d_Vr, (cufftDoubleComplex*) d_Vr, CUFFT_INVERSE);
 	if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
     }
-    err = cudaGetLastError();
-    if (err != cudaSuccess)
-    {
-        printf("Failed to launch cuda kernel (error code %s)!\n", cudaGetErrorString(err));
-    }
-
-    err = cudaMemcpy(Vr, d_q, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess)  printf("failed copy back\n");
-//    cudaDeviceSynchronize();
 }
+
+extern "C"
+void SH_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim)
+{
+    cudaError_t err = cudaSuccess;
+    const int nlm = shtns->nlm;
+    const int nlat = shtns->nlat;
+    const int nphi = shtns->nphi;
+
+    double *d_qlm = shtns->d_qlm;
+    double *d_q = shtns->d_q;
+
+    // copy spectral data to GPU
+    err = cudaMemcpy(d_qlm, Qlm, 2*nlm*sizeof(double), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) { printf("failed copy qlm\n");	return; }
+
+    // SHT on the GPU
+    cu_SH_to_spat(shtns, (cplx*) d_qlm, d_q, llim);
+    err = cudaGetLastError();
+    if (err != cudaSuccess) { printf("CUDA error : %s!\n", cudaGetErrorString(err));	return; }
+
+    // copy back spatial data
+    err = cudaMemcpy(Vr, d_q, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) { printf("failed copy back\n");	return; }
+}
+

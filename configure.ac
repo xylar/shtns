@@ -24,6 +24,8 @@ AC_ARG_ENABLE([knl],
 	AS_HELP_STRING([--enable-knl], [Enable compilation for Xeon Phi (KNL)]), [], [enable_knl=no])
 AC_ARG_ENABLE([many-core],
 	AS_HELP_STRING([--enable-many-core], [Enable optimizations for many-core systems (Blue Gene/Q, Xeon Phi,...) and remove single-threaded transforms]), [], [enable_many_core=no])
+AC_ARG_ENABLE([cuda],
+	AS_HELP_STRING([--enable-cuda], [Enable compilation for Nvidia gpu using cuda]), [], [enable_cuda=no])
 AC_ARG_ENABLE([magic-layout],
 	AS_HELP_STRING([--enable-magic-layout], [Compile specific version for the MagIC code]), [], [enable_magic_layout=no])
 AC_ARG_ENABLE([python],
@@ -193,6 +195,14 @@ AS_IF([test "x$enable_python" != "xno"], [
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
 	target="_shtns.so"		# build python extension instead of C library.
 	install="install-py"	# install python extension instead of C library.
+])
+
+# Check for CUDA
+AS_IF([test "x$enable_cuda" = "xyes"], [
+	AC_CHECK_LIB([cudart],[cudaMalloc],,AC_MSG_ERROR([cudart library not found. Try adding LDFLAGS="-L/usr/local/cuda/lib64]))
+	AC_CHECK_LIB([cufft],[cufftPlanMany],,AC_MSG_ERROR([cufft library not found.]))
+	objs="$objs sht_gpu.o"
+	target="libshtns_cuda.a"
 ])
 
 # Checks related to long double
