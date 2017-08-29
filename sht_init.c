@@ -144,11 +144,11 @@ static int fft_int(int n, int fmax)
 // sht algorithms (hyb, fly1, ...)
 enum sht_algos { SHT_MEM, SHT_SV,
 	SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8,
-	SHT_GPU,
+	SHT_GPU, SHT_GPU2,
 	SHT_OMP1, SHT_OMP2, SHT_OMP3, SHT_OMP4, SHT_OMP6, SHT_OMP8,
 	SHT_NALG };
 
-char* sht_name[SHT_NALG] = {"mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu", "omp1", "omp2", "omp3", "omp4", "omp6", "omp8" };
+char* sht_name[SHT_NALG] = {"mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu", "gpu2", "omp1", "omp2", "omp3", "omp4", "omp6", "omp8" };
 char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 char* sht_var[SHT_NVAR] = {"std", "ltr", "m" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
@@ -167,7 +167,9 @@ extern void* fomp[6][SHT_NTYP];
 #endif
 #ifdef HAVE_LIBCUFFT
 void SH_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim);
+void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim);
 void* fgpu[SHT_NTYP] = { SH_to_spat_gpu, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+void* fgpu2[SHT_NTYP] = { SH_to_spat_gpu_hostfft, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 #endif
 
 // big array holding all sht functions, variants and algorithms
@@ -263,6 +265,8 @@ static void init_sht_array_func(shtns_cfg shtns)
 	  #ifdef HAVE_LIBCUFFT
 		memcpy(sht_func[SHT_STD][SHT_GPU], &fgpu, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_GPU], &fgpu, sizeof(void*)*SHT_NTYP);
+		memcpy(sht_func[SHT_STD][SHT_GPU2], &fgpu2, sizeof(void*)*SHT_NTYP);
+		memcpy(sht_func[SHT_LTR][SHT_GPU2], &fgpu2, sizeof(void*)*SHT_NTYP);
 	  #endif
 	}
 
@@ -1732,7 +1736,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
   #ifdef HAVE_LIBCUFFT
 	int gpu_ok = shtns_init_gpu(shtns);		// try to initialize cuda gpu
     #if SHT_VERBOSE > 0
-	if ((verbose)&&(gpu_ok)) printf("        + GPU successfully initialized.\n");
+	if ((verbose)&&(gpu_ok)) printf("        + GPU successfully initialized (cc=%d).\n", gpu_ok);
 	#endif
   #endif
 

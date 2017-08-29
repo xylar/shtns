@@ -75,8 +75,8 @@ sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp
 sht_mic.o : sht_mic.c Makefile $(hfiles) SHT/SH_to_spat_mic.c SHT/spat_to_SH_mic.c
 	$(cc) -c $< -o $@
 sht_gpu.o : sht_gpu.cu Makefile $(hfiles)
-	nvcc -c sht_gpu.cu -Xptxas=-v
-
+	nvcc -c sht_gpu.cu -Xptxas=-v -arch=sm_30
+#sm_30 is Kepler K10, sm_35 = Kepler K20, sm_50 = Pascal
 
 # programs & Examples
 time_SHT : time_SHT.c $(libname) shtns.h
