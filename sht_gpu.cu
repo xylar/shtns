@@ -16,7 +16,7 @@
 // 256 for scalar SH_to_spat seems best on kepler.
 #define THREADS_PER_BLOCK 256
 // number of latitudes per thread:
-#define NWAY 1
+#define NWAY 2
 // the warp size is always 32 on cuda devices (up to Pascal at least)
 #define WARPSZE 32
 
@@ -143,50 +143,78 @@ old = atomicCAS(address_as_ull, assumed,
 }
 #endif
 
+/// On KEPLER, works best with THREADS_PER_BLOCK=32 and NWAY=3
 __global__ void
 ileg_m0(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2)
 {
     // im = 0
-    const int it = blockDim.x * blockIdx.x + threadIdx.x;
+    const int it = (blockDim.x * blockIdx.x + threadIdx.x)*NWAY;
     const int j = threadIdx.x;
 
-//    __shared__ double ak[THREADS_PER_BLOCK];
+    __shared__ double ak[THREADS_PER_BLOCK];
+    #if THREADS_PER_BLOCK > WARPSZE
     __shared__ double qk[2*THREADS_PER_BLOCK/WARPSZE];
+    #endif
 
-    double y0, y1;
-    double re,ro,  qe,qo;
-    y0 = (it < nlat_2) ? q[it] : 0.0;			// north
-    y1 = (it < nlat_2) ? q[nlat_2*2-1-it] : 0.0;	// south
-    re = y0 + y1;
-    ro = y0 - y1;
+    double y0[NWAY], y1[NWAY];
+    double re[NWAY],ro[NWAY],  qe,qo;
+    for (int i=0; i<NWAY; i++) {
+	y0[i] = (it+i < nlat_2) ? q[it+i] : 0.0;		// north
+	y1[i] = (it+i < nlat_2) ? q[nlat_2*2-1-(it+i)] : 0.0;	// south
+	re[i] = y0[i] + y1[i];
+	ro[i] = y0[i] - y1[i];
+    }
 
-//    ak[j] = al[j];
+    ak[j] = al[j];
+    #if THREADS_PER_BLOCK > WARPSZE
+    __syncthreads();
+    #endif
 
     int l = 0;
-    y0 = (it < nlat_2) ? ct[it+nlat_2] : 0.0;		// weight are stored just after ct.
-    const double cost = (it < nlat_2) ? ct[it] : 0.0;
-    y0 *= al[0];
-    y1 = y0 * al[1] * cost;
-    al+=2;
+    double cost[NWAY];
+    for (int i=0; i<NWAY; i++) {
+	if (it+i < nlat_2) {
+	    y0[i] = ct[it+i + nlat_2];		// weight are stored just after ct.
+	    cost[i] = ct[it+i];
+	} else {
+	    y0[i] = 0.0;	    cost[i] = 0.0;
+	}
+    }
+    for (int i=0; i<NWAY; i++) 	y0[i] *= ak[0];
+    for (int i=0; i<NWAY; i++) 	y1[i] = y0[i] * ak[1] * cost[i];
+    al+=2;	int k=2;
     while (l<llim) {
-	qe = re*y0;
-	qo = ro*y1;
-	y0  = al[1]*cost*y1 + al[0]*y0;
-	y1  = al[3]*cost*y0 + al[2]*y1;
+	qe = re[0]*y0[0];
+	qo = ro[0]*y1[0];
+	y0[0]  = ak[k+1]*cost[0]*y1[0] + ak[k]*y0[0];
+	y1[0]  = ak[k+3]*cost[0]*y0[0] + ak[k+2]*y1[0];
+	for (int i=1; i<NWAY; i++) {
+	    qe += re[i]*y0[i];
+	    qo += ro[i]*y1[i];
+	    y0[i]  = ak[k+1]*cost[i]*y1[i] + ak[k]*y0[i];
+	    y1[i]  = ak[k+3]*cost[i]*y0[i] + ak[k+2]*y1[i];
+	}
+	al+=4;		k+=4;	// 4 als consumed.
 	warp_reduce_add_2(qe, qo);		// reduce within warp
 	#if 2*THREADS_PER_BLOCK > WARPSZE*WARPSZE
 	    #error "threads/block should be <= warp-size^2"
 	#endif
+	#if THREADS_PER_BLOCK > WARPSZE
 	if ((j&31) == 0) {			// first lane stores in shared mem
 	    qk[2*j/WARPSZE] = qe;
 	    qk[2*j/WARPSZE+1] = qo;
 	}
-	#if THREADS_PER_BLOCK > WARPSZE
 	__syncthreads();
-	#endif
 	qe = (j<2*THREADS_PER_BLOCK/WARPSZE) ? qk[j] : 0.0;			// read from shared mem
 	for (int offset = THREADS_PER_BLOCK/WARPSZE; offset > 1; offset >>= 1)
 	    qe += __shfl_down(qe, offset);
+	#else
+	qo = __shfl_up(qo, 1,2);
+	if (j==1) qe = qo;
+	#endif
+	if (k+4 > THREADS_PER_BLOCK) {		// cache next als (between the two __syncthreads() calls)
+	    ak[j] = al[j];	k=0;
+	}
 	#if THREADS_PER_BLOCK > WARPSZE
 	__syncthreads();
 	#endif
@@ -198,10 +226,13 @@ ileg_m0(const double *al, const double *ct, const double *q, double *ql, const i
 		atomicAdd(ql+2*(l+j), qe);		// VERY slow atomic add on Kepler.
 	    }
 	}
-	al+=4;	l+=2;
+	l+=2;
     }
     if (l==llim) {
-	qe = re*y0;
+	qe = re[0]*y0[0];
+	for (int i=1; i<NWAY; i++) {
+	    qe += re[i]*y0[i];
+	}
 	warp_reduce_add(qe);
 	#if THREADS_PER_BLOCK > WARPSZE
 	if ((j&31) == 0) {			// first lane stores in shared mem
@@ -556,7 +587,7 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 
 
 extern "C"
-int shtns_init_gpu(shtns_cfg shtns)
+int cushtns_init_gpu(shtns_cfg shtns)
 {
     cudaError_t err = cudaSuccess;
     const long nlm = shtns->nlm;
@@ -567,14 +598,15 @@ int shtns_init_gpu(shtns_cfg shtns)
     double *d_qlm = NULL;
     double *d_q   = NULL;
     int err_count = 0;
+    int device_id = -1;
 
     cudaDeviceProp prop;
     err = cudaGetDeviceProperties(&prop, 0);
-    if (err != cudaSuccess) return 0;
+    if (err != cudaSuccess) return -1;
     #if SHT_VERBOSE > 0
     printf("  cuda GPU \"%s\" found (warp size = %d, compute capabilities = %d.%d).\n", prop.name, prop.warpSize, prop.major, prop.minor);
     #endif
-    if (prop.warpSize != WARPSZE) return 0;		// failure, SHTns requires a warpSize of 32.
+    if (prop.warpSize != WARPSZE) return -1;		// failure, SHTns requires a warpSize of 32.
 
     // Allocate the device input vector alm
     err = cudaMalloc((void **)&d_alm, 2*nlm*sizeof(double));
@@ -609,24 +641,42 @@ int shtns_init_gpu(shtns_cfg shtns)
 
     if (err_count != 0) {
 	cudaFree(d_q);	cudaFree(d_qlm);  cudaFree(d_ct);  cudaFree(d_alm);
-	return 0;	// fail
+	return -1;	// fail
     }
 
     shtns->d_alm = d_alm;
     shtns->d_ct  = d_ct;
     shtns->d_q   = d_q;
     shtns->d_qlm = d_qlm;
-    return prop.major*10 + prop.minor;		// success, return compute capability (e.g. 35 for 3.5).
+    cudaGetDevice(&device_id);
+    return device_id;		// success, return device_id
 }
 
 extern "C"
-void shtns_release_gpu(shtns_cfg shtns)
+void cushtns_release_gpu(shtns_cfg shtns)
 {
     cufftDestroy(shtns->cufft_plan);
     cudaFree(shtns->d_q);
     cudaFree(shtns->d_qlm);
     cudaFree(shtns->d_ct);
     cudaFree(shtns->d_alm);
+    shtns->d_alm = 0;
+}
+
+/// \internal Enables parallel transforms on selected GPU device, if available. \see shtns_use_gpu 
+extern "C"
+int cushtns_use_gpu(int device_id)
+{
+    int count = 0;
+    if (device_id >= 0) {
+	cudaGetDeviceCount(&count);
+	if (count > 0) {
+	    device_id = device_id % count;
+	    cudaSetDevice(device_id);
+	    return device_id;
+	}
+    }
+    return -1;		// disable gpu.
 }
 
 
@@ -738,7 +788,7 @@ void cu_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int ll
 
     // Launch the Legendre CUDA Kernel
     const int threadsPerBlock = THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
-    const int blocksPerGrid =(nlat_2 + threadsPerBlock - 1) / threadsPerBlock;
+    const int blocksPerGrid =(nlat_2 + threadsPerBlock*NWAY - 1) / (threadsPerBlock*NWAY);
     cudaMemset(d_Qlm, 0, sizeof(double)*2*nlm);		// set to zero before we start.
     if (nphi == 1) {
 	ileg_m0<<<blocksPerGrid, threadsPerBlock>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);

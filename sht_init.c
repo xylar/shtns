@@ -30,8 +30,12 @@
 // global variables definitions
 #include "sht_private.h"
 
-/// function to initialize gpu and copy data for a plan to it.
-int shtns_init_gpu(shtns_cfg);
+#ifdef HAVE_LIBCUFFT
+/// gpu functions.
+int cushtns_init_gpu(shtns_cfg);
+void cushtns_release_gpu(shtns_cfg);
+int cushtns_use_gpu(int);
+#endif
 
 // cycle counter from FFTW
 #include "fftw3/cycle.h"
@@ -45,6 +49,10 @@ shtns_cfg sht_data = NULL;
   #endif
 #else
   #define omp_threads 1
+#endif
+
+#ifdef HAVE_LIBCUFFT
+	int cuda_gpu_id = 0;	// by default, use gpu device 0
 #endif
 
 static int verbose = 0;		// runtime verbosity control: 0 no output, 1 output, 2 debug (if compiled in)
@@ -1532,6 +1540,9 @@ void shtns_unset_grid(shtns_cfg shtns)
 /// release all resources allocated by a given shtns_cfg.
 void shtns_destroy(shtns_cfg shtns)
 {
+	#ifdef HAVE_LIBCUFFT
+	if (shtns->d_alm) cushtns_release_gpu(shtns);
+	#endif
 	free_unused(shtns, &shtns->l_2);
 	if (shtns->blm != shtns->alm)
 		free_unused(shtns, &shtns->blm);
@@ -1735,9 +1746,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
   #ifdef HAVE_LIBCUFFT
-	int gpu_ok = shtns_init_gpu(shtns);		// try to initialize cuda gpu
+	int gpu_ok = cushtns_init_gpu(shtns);		// try to initialize cuda gpu
     #if SHT_VERBOSE > 0
-	if ((verbose)&&(gpu_ok)) printf("        + GPU successfully initialized (cc=%d).\n", gpu_ok);
+	if ((verbose)&&(gpu_ok>=0)) printf("        + GPU #%d successfully initialized.\n", gpu_ok);
 	#endif
   #endif
 
@@ -1827,6 +1838,21 @@ int shtns_use_threads(int num_threads)
 	return omp_threads;
 }
 
+/** Enables parallel transforms on selected GPU device, if available (see \ref compil).
+ Call before any initialization of shtns to select a GPU device. Returns the actual device id used, or -1 if no device found.
+ \li If device_id >= 0, try to use device with number device_id % device_count.
+ \li If device_d < 0, do not try to use GPU. */
+int shtns_use_gpu(int device_id)
+{
+#ifdef HAVE_LIBCUFFT
+	cuda_gpu_id = cushtns_use_gpu(device_id);
+	return cuda_gpu_id;
+#else
+	return -1;
+#endif
+}
+
+
 /// fill the given array with Gauss weights. returns the number of weights written, which
 /// may be zero if the grid is not a Gauss grid.
 int shtns_gauss_wts(shtns_cfg shtns, double *wts)
@@ -1866,6 +1892,11 @@ void shtns_verbose_(int *v)
 void shtns_use_threads_(int *num_threads)
 {
 	shtns_use_threads(*num_threads);
+}
+
+void shtns_use_gpu_(int *device_id)
+{
+	shtns_use_gpu(*device_id);
 }
 
 /// Print info
