@@ -16,7 +16,7 @@
 // 256 for scalar SH_to_spat seems best on kepler.
 #define THREADS_PER_BLOCK 256
 // number of latitudes per thread:
-#define NWAY 2
+#define NWAY 1
 // the warp size is always 32 on cuda devices (up to Pascal at least)
 #define WARPSZE 32
 
@@ -111,6 +111,15 @@ leg_m0(const double *al, const double *ct, const double *ql, double *q, const in
     */
 }
 
+__inline__ __device__
+void warp_reduce_add_4(double& re, double& ro, double& ie, double& io) {
+  for (int offset = WARPSZE/2; offset > 0; offset >>= 1) {
+    re += __shfl_down(re, offset);
+    ro += __shfl_down(ro, offset);
+    ie += __shfl_down(ie, offset);
+    io += __shfl_down(io, offset);
+  }
+}
 
 __inline__ __device__
 void warp_reduce_add_2(double& ev, double& od) {
@@ -135,7 +144,7 @@ __device__ double atomicAdd(double* address, double val)
     unsigned long long int old = *address_as_ull, assumed;
     do {
         assumed = old;
-old = atomicCAS(address_as_ull, assumed,
+	old = atomicCAS(address_as_ull, assumed,
                         __double_as_longlong(val +
                                __longlong_as_double(assumed)));
     } while (assumed != old);
@@ -583,6 +592,227 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 
 
 
+__global__ void
+ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mmax, const int mres, const int nphi)
+{
+    const int it = (blockDim.x * blockIdx.x + threadIdx.x)*NWAY;
+    const int j = threadIdx.x;
+    const int im = blockIdx.y;
+    const int m_inc = 2*nlat_2;
+//    const int k_inc = 1;
+
+    __shared__ double ak[THREADS_PER_BLOCK];
+    __shared__ double qk[4*THREADS_PER_BLOCK/WARPSZE];
+
+    if (im == 0) {
+	double y0[NWAY], y1[NWAY];
+	double re[NWAY],ro[NWAY],  qe,qo;
+	for (int i=0; i<NWAY; i++) {
+	    y0[i] = (it+i < nlat_2) ? q[it+i] : 0.0;		// north
+	    y1[i] = (it+i < nlat_2) ? q[nlat_2*2-1-(it+i)] : 0.0;	// south
+	    re[i] = y0[i] + y1[i];
+	    ro[i] = y0[i] - y1[i];
+	}
+
+	ak[j] = al[j];
+	#if THREADS_PER_BLOCK > WARPSZE
+	__syncthreads();
+	#endif
+
+	int l = 0;
+	double cost[NWAY];
+	for (int i=0; i<NWAY; i++) {
+	    if (it+i < nlat_2) {
+		y0[i] = ct[it+i + nlat_2];		// weight are stored just after ct.
+		cost[i] = ct[it+i];
+	    } else {
+		y0[i] = 0.0;	    cost[i] = 0.0;
+	    }
+	}
+	for (int i=0; i<NWAY; i++) 	y0[i] *= ak[0];
+	for (int i=0; i<NWAY; i++) 	y1[i] = y0[i] * ak[1] * cost[i];
+	al+=2;	int k=2;
+	while (l<llim) {
+	    qe = re[0]*y0[0];
+	    qo = ro[0]*y1[0];
+	    y0[0]  = ak[k+1]*cost[0]*y1[0] + ak[k]*y0[0];
+	    y1[0]  = ak[k+3]*cost[0]*y0[0] + ak[k+2]*y1[0];
+	    for (int i=1; i<NWAY; i++) {
+		qe += re[i]*y0[i];
+		qo += ro[i]*y1[i];
+		y0[i]  = ak[k+1]*cost[i]*y1[i] + ak[k]*y0[i];
+		y1[i]  = ak[k+3]*cost[i]*y0[i] + ak[k+2]*y1[i];
+	    }
+	    al+=4;		k+=4;	// 4 als consumed.
+	    warp_reduce_add_2(qe, qo);		// reduce within warp
+	    #if 2*THREADS_PER_BLOCK > WARPSZE*WARPSZE
+		#error "threads/block should be <= warp-size^2"
+	    #endif
+	    #if THREADS_PER_BLOCK > WARPSZE
+	    if ((j&31) == 0) {			// first lane stores in shared mem
+		qk[2*j/WARPSZE] = qe;
+		qk[2*j/WARPSZE+1] = qo;
+	    }
+	    __syncthreads();
+	    qe = (j<2*THREADS_PER_BLOCK/WARPSZE) ? qk[j] : 0.0;			// read from shared mem
+	    for (int offset = THREADS_PER_BLOCK/WARPSZE; offset > 1; offset >>= 1)
+		qe += __shfl_down(qe, offset);
+	    #else
+	    qo = __shfl_up(qo, 1,2);
+	    if (j==1) qe = qo;
+	    #endif
+	    if (k+4 > THREADS_PER_BLOCK) {		// cache next als (between the two __syncthreads() calls)
+		ak[j] = al[j];	k=0;
+	    }
+	    #if THREADS_PER_BLOCK > WARPSZE
+	    __syncthreads();
+	    #endif
+	    if (j<2) {		// should be an atomic-add to global mem for large transforms (nlat_2 > block_size)
+		if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
+		    ql[2*(l+j)] = qe;
+    //		ql[2*(l+j)+1] = 0.0;
+		} else {
+		    atomicAdd(ql+2*(l+j), qe);		// VERY slow atomic add on Kepler.
+		}
+	    }
+	    l+=2;
+	}
+	if (l==llim) {
+	    qe = re[0]*y0[0];
+	    for (int i=1; i<NWAY; i++) {
+		qe += re[i]*y0[i];
+	    }
+	    warp_reduce_add(qe);
+	    #if THREADS_PER_BLOCK > WARPSZE
+	    if ((j&31) == 0) {			// first lane stores in shared mem
+		qk[j/WARPSZE] = qe;
+	    }
+	    __syncthreads();	// block-reduce, max block-size = 1024
+	    qe = (j<THREADS_PER_BLOCK/WARPSZE) ? qk[j] : 0.0;			// read from shared mem
+	    for (int offset = THREADS_PER_BLOCK/WARPSZE/2; offset > 0; offset >>= 1)
+		qe += __shfl_down(qe, offset);
+	    #endif
+	    if (j==0) {		// should be an atomic-add to global mem for large transforms (nlat_2 > block_size)
+		if (nlat_2 <= THREADS_PER_BLOCK) {
+		    ql[2*l] = qe;
+    //	        ql[2*l+1] = 0.0;
+		} else {
+		    atomicAdd(ql+2*l, qe);		// VERY slow atomic add on Kepler.
+		}
+	    }
+	}
+    } else {	// im > 0
+	int m = im*mres;
+	int l = (im*(2*(lmax+1)-(m+mres)))>>1;
+	al += 2*(l+m);
+	ql += 2*l;
+
+	double y0, y1;
+	double re, ro, ie, io, qer,qei, qor,qoi;
+	const double sgn = 2*(j&1) - 1;	// -/+
+
+	y0    = (it < nlat_2) ? q[im*m_inc + it] : 0.0;		// north imag (ani)
+	qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
+	y1    = (it < nlat_2) ? q[im*m_inc + nlat_2*2-1-it] : 0.0;	// south imag (asi)
+	qor    = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it] : 0.0;	// south real (as)
+	qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
+	qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
+	y0 = __shfl_xor(qei, 1);	// exchange between adjacent lanes.
+	y1 = __shfl_xor(qoi, 1);
+	re = qer + qor;
+	ro = qer - qor;
+	ie = sgn*(y0 - y1);
+	io = sgn*(y0 + y1);
+
+	const double cost = (it < nlat_2) ? ct[it] : 0.0;
+    	
+	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
+	ak[j] = al[j];
+	__syncthreads();
+
+	    y0 = 0.5;	// y0
+	    l = m;
+	    do {		// sin(theta)^m
+		if (l&1) y0 *= y1;
+		y1 *= y1;
+	    } while(l >>= 1);
+	    y0 *= ak[0] * ct[it + nlat_2];	// include quadrature weights.
+	    y1 = ak[1]*y0*cost;
+
+	    l=m;		al+=2;
+	    int k = 2;
+
+	    while (l<llim) {	// compute even and odd parts
+		qer = y0 * re;
+		qei = y0 * ie;
+		y0 = ak[k+1]*cost*y1 + ak[k]*y0;
+		qor = y1 * ro;
+		qoi = y1 * io;
+		y1 = ak[k+3]*cost*y0 + ak[k+2]*y1;
+		al+=4;	k+=4;
+		warp_reduce_add_4(qer, qei, qor, qoi);
+
+		#if 4*THREADS_PER_BLOCK > WARPSZE*WARPSZE
+		    #error "threads/block should be <= warp-size^2"
+		#endif
+
+		if ((j&31) == 0) {			// first lane stores in shared mem
+		    qk[4*j/WARPSZE]   = qer;
+		    qk[4*j/WARPSZE+1] = qei;
+		    qk[4*j/WARPSZE+2] = qor;
+		    qk[4*j/WARPSZE+3] = qoi;
+		}
+		#if THREADS_PER_BLOCK > WARPSZE
+		__syncthreads();
+		#endif
+		qer = (j<4*THREADS_PER_BLOCK/WARPSZE) ? qk[j] : 0.0;			// read from shared mem
+		for (int offset = 2*THREADS_PER_BLOCK/WARPSZE; offset > 2; offset >>= 1)
+		    qer += __shfl_down(qer, offset);
+
+		if (k+4 > THREADS_PER_BLOCK) {		// cache next als (between the two __syncthreads() calls)
+		    ak[j] = al[j];	k=0;
+		}
+		#if THREADS_PER_BLOCK > WARPSZE
+		__syncthreads();
+		#endif
+		if (j<4) {
+		    if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
+			ql[2*l+j] = qer;
+		    } else {
+			atomicAdd(ql+2*l+j, qer);		// VERY slow atomic add on Kepler.
+		    }
+		}
+		l+=2;
+	    }
+	    if (l==llim) {
+		qer = y0 * re;
+		qei = y0 * ie;
+		warp_reduce_add_2(qer, qei);
+		if ((j&31) == 0) {			// first lane stores in shared mem
+		    qk[2*j/WARPSZE]   = qer;
+		    qk[2*j/WARPSZE+1] = qei;
+		}
+		#if THREADS_PER_BLOCK > WARPSZE
+		__syncthreads();
+		#endif
+		qer = (j<2*THREADS_PER_BLOCK/WARPSZE) ? qk[j] : 0.0;			// read from shared mem
+		for (int offset = THREADS_PER_BLOCK/WARPSZE; offset > 1; offset >>= 1)
+		    qer += __shfl_down(qer, offset);
+		#if THREADS_PER_BLOCK > WARPSZE
+		__syncthreads();
+		#endif
+		if (j<2) {
+		    if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
+			ql[2*l+j] = qer;
+		    } else {
+			atomicAdd(ql+2*l+j, qer);		// VERY slow atomic add on Kepler.
+		    }
+		}
+	    }
+    }
+}
+
+
 
 
 
@@ -778,6 +1008,7 @@ void cu_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int ll
 extern "C"
 void cu_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int llim)
 {
+    const int lmax = shtns->lmax;
     const int mmax = shtns->mmax;
     const int mres = shtns->mres;
     const int nlat_2 = shtns->nlat_2;
@@ -801,18 +1032,14 @@ void cu_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int ll
 	dim3 threads(threadsPerBlock, 1);
 	if (mmax==0) {
 	    ileg_m0<<<blocksPerGrid, threadsPerBlock>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);
+	} else
+	if (llim <= SHT_L_RESCALE_FLY) {
+	    ileg_m_lowllim<<<blocks, threads>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mmax,mres,nphi);
 	} else {
-	    printf("NOT implemented\n");	return;
+	    printf("NOT implemented\n");
 	}
-/*	if (llim <= SHT_L_RESCALE_FLY) {
-	    leg_m_lowllim<<<blocks, threads>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mmax,mres, nphi);
-	} else {
-	    leg_m_highllim<<<blocks, threads>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mmax,mres, nphi);
-	}
-	*/
     }
 }
-
 
 extern "C"
 void SH_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim)
