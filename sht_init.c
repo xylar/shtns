@@ -168,7 +168,8 @@ extern void* fomp[6][SHT_NTYP];
 #ifdef HAVE_LIBCUFFT
 void SH_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim);
 void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim);
-void* fgpu[SHT_NTYP] = { SH_to_spat_gpu, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+void spat_to_SH_gpu(shtns_cfg shtns, double *Vr, cplx *Qlm, const long int llim);
+void* fgpu[SHT_NTYP] = { SH_to_spat_gpu, spat_to_SH_gpu, NULL, NULL, NULL, NULL, NULL, NULL };
 void* fgpu2[SHT_NTYP] = { SH_to_spat_gpu_hostfft, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 #endif
 
