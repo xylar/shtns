@@ -17,6 +17,8 @@
 #define THREADS_PER_BLOCK 256
 // number of latitudes per thread:
 #define NWAY 1
+// number of l blocks to pre-compute
+#define LSPAN 16
 // the warp size is always 32 on cuda devices (up to Pascal at least)
 #define WARPSZE 32
 
@@ -152,7 +154,9 @@ __device__ double atomicAdd(double* address, double val)
 }
 #endif
 
-/// On KEPLER, works best with THREADS_PER_BLOCK=32 and NWAY=3
+
+/// THREADS_PER_BLOCK/LSPAN must be a power of 2 and <= WARPSZE
+/// LSPAN must be a multiple of 2.
 __global__ void
 ileg_m0(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2)
 {
@@ -160,108 +164,75 @@ ileg_m0(const double *al, const double *ct, const double *q, double *ql, const i
     const int it = (blockDim.x * blockIdx.x + threadIdx.x)*NWAY;
     const int j = threadIdx.x;
 
-    __shared__ double ak[THREADS_PER_BLOCK];
-    #if THREADS_PER_BLOCK > WARPSZE
-    __shared__ double qk[2*THREADS_PER_BLOCK/WARPSZE];
-    #endif
+    __shared__ double ak[2*LSPAN+2];	// cache
+    __shared__ double yl[LSPAN*THREADS_PER_BLOCK];
+    __shared__ double reo[2*THREADS_PER_BLOCK];
+    const int l_inc = THREADS_PER_BLOCK;
+    double cost, y0, y1;
 
-    double y0[NWAY], y1[NWAY];
-    double re[NWAY],ro[NWAY],  qe,qo;
-    for (int i=0; i<NWAY; i++) {
-	y0[i] = (it+i < nlat_2) ? q[it+i] : 0.0;		// north
-	y1[i] = (it+i < nlat_2) ? q[nlat_2*2-1-(it+i)] : 0.0;	// south
-	re[i] = y0[i] + y1[i];
-	ro[i] = y0[i] - y1[i];
-    }
+    y0 = (it < nlat_2) ? q[it] : 0.0;		// north
+    y1 = (it < nlat_2) ? q[nlat_2*2-1 - it] : 0.0;	// south
+    reo[j] = y0+y1;				// even
+    reo[THREADS_PER_BLOCK +j] = y0-y1;		// odd
 
-    ak[j] = al[j];
+    if (j < 2*LSPAN+2) ak[j] = al[j];
     #if THREADS_PER_BLOCK > WARPSZE
     __syncthreads();
     #endif
 
     int l = 0;
-    double cost[NWAY];
-    for (int i=0; i<NWAY; i++) {
-	if (it+i < nlat_2) {
-	    y0[i] = ct[it+i + nlat_2];		// weight are stored just after ct.
-	    cost[i] = ct[it+i];
-	} else {
-	    y0[i] = 0.0;	    cost[i] = 0.0;
-	}
+    if (it < nlat_2) {
+	y0 = ct[it + nlat_2];		// weights are stored just after ct.
+	cost = ct[it];
+    } else {
+	y0 = 0.0;	cost = 0.0;
     }
-    for (int i=0; i<NWAY; i++) 	y0[i] *= ak[0];
-    for (int i=0; i<NWAY; i++) 	y1[i] = y0[i] * ak[1] * cost[i];
-    al+=2;	int k=2;
-    while (l<llim) {
-	qe = re[0]*y0[0];
-	qo = ro[0]*y1[0];
-	y0[0]  = ak[k+1]*cost[0]*y1[0] + ak[k]*y0[0];
-	y1[0]  = ak[k+3]*cost[0]*y0[0] + ak[k+2]*y1[0];
-	for (int i=1; i<NWAY; i++) {
-	    qe += re[i]*y0[i];
-	    qo += ro[i]*y1[i];
-	    y0[i]  = ak[k+1]*cost[i]*y1[i] + ak[k]*y0[i];
-	    y1[i]  = ak[k+3]*cost[i]*y0[i] + ak[k+2]*y1[i];
+    y0 *= ak[0];
+    y1 = y0 * ak[1] * cost;
+    yl[j] = y0;
+    yl[l_inc +j] = y1;
+    al+=2;
+    while (l < llim) {
+	for (int k=0; k<LSPAN; k+=2) {		// compute a block of the matrix, write it in shared mem.
+	    yl[k*l_inc +j]     = y0;
+	    y0 = ak[2*k+3]*cost*y1 + ak[2*k+2]*y0;
+	    yl[(k+1)*l_inc +j] = y1;
+	    y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
+	    al += 4;
 	}
-	al+=4;		k+=4;	// 4 als consumed.
-	warp_reduce_add_2(qe, qo);		// reduce within warp
-	#if 2*THREADS_PER_BLOCK > WARPSZE*WARPSZE
-	    #error "threads/block should be <= warp-size^2"
-	#endif
-	#if THREADS_PER_BLOCK > WARPSZE
-	if ((j&31) == 0) {			// first lane stores in shared mem
-	    qk[2*j/WARPSZE] = qe;
-	    qk[2*j/WARPSZE+1] = qo;
-	}
-	__syncthreads();
-	qe = (j<2*THREADS_PER_BLOCK/WARPSZE) ? qk[j] : 0.0;			// read from shared mem
-	for (int offset = THREADS_PER_BLOCK/WARPSZE; offset > 1; offset >>= 1)
-	    qe += __shfl_down(qe, offset);
-	#else
-	qo = __shfl_up(qo, 1,2);
-	if (j==1) qe = qo;
-	#endif
-	if (k+4 > THREADS_PER_BLOCK) {		// cache next als (between the two __syncthreads() calls)
-	    ak[j] = al[j];	k=0;
-	}
+
 	#if THREADS_PER_BLOCK > WARPSZE
 	__syncthreads();
 	#endif
-	if (j<2) {		// should be an atomic-add to global mem for large transforms (nlat_2 > block_size)
+	double qll = 0.0;	// accumulator
+	// now re-assign each thread an l (transpose)
+	const int ll = j / (THREADS_PER_BLOCK/LSPAN);
+	for (int i=0; i<THREADS_PER_BLOCK; i+= THREADS_PER_BLOCK/LSPAN) {
+	    int it = j % (THREADS_PER_BLOCK/LSPAN) + i;
+	    qll += reo[(ll&1)*THREADS_PER_BLOCK +it] * yl[ll*l_inc +it];
+	}
+	// reduce_add within same l must be in same warp too:
+	#if THREADS_PER_BLOCK/LSPAN > WARPSZE
+	    #error "THREADS_PER_BLOCK/LSPAN > WARPSZE"
+	#endif
+	for (int ofs = THREADS_PER_BLOCK/(LSPAN*2); ofs > 0; ofs>>=1) {
+	    qll += __shfl_down(qll, ofs, THREADS_PER_BLOCK/LSPAN);
+	}
+	if ( ((j % (THREADS_PER_BLOCK/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
 	    if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
-		ql[2*(l+j)] = qe;
-//		ql[2*(l+j)+1] = 0.0;
+		ql[2*(l+ll)] = qll;
 	    } else {
-		atomicAdd(ql+2*(l+j), qe);		// VERY slow atomic add on Kepler.
+		atomicAdd(ql+2*(l+ll), qll);		// VERY slow atomic add on Kepler.
 	    }
 	}
-	l+=2;
-    }
-    if (l==llim) {
-	qe = re[0]*y0[0];
-	for (int i=1; i<NWAY; i++) {
-	    qe += re[i]*y0[i];
-	}
-	warp_reduce_add(qe);
+	if (j<2*LSPAN) ak[j+2] = al[j];
 	#if THREADS_PER_BLOCK > WARPSZE
-	if ((j&31) == 0) {			// first lane stores in shared mem
-	    qk[j/WARPSZE] = qe;
-	}
-	__syncthreads();	// block-reduce, max block-size = 1024
-	qe = (j<THREADS_PER_BLOCK/WARPSZE) ? qk[j] : 0.0;			// read from shared mem
-	for (int offset = THREADS_PER_BLOCK/WARPSZE/2; offset > 0; offset >>= 1)
-	    qe += __shfl_down(qe, offset);
+	__syncthreads();
 	#endif
-	if (j==0) {		// should be an atomic-add to global mem for large transforms (nlat_2 > block_size)
-	    if (nlat_2 <= THREADS_PER_BLOCK) {
-	        ql[2*l] = qe;
-//	        ql[2*l+1] = 0.0;
-	    } else {
-		atomicAdd(ql+2*l, qe);		// VERY slow atomic add on Kepler.
-	    }
-	}
+	l+=LSPAN;
     }
 }
+
 
 
 
@@ -451,34 +422,8 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 	double rer,ror, rei,roi, y0, y1;
 	ror = 0.0;	roi = 0.0;
 	rer = 0.0;	rei = 0.0;
-	#if __CUDA_ARCH__ < 300
-	si[j] = sqrt(1.0 - cost*cost);	// sin(theta)
-	if (m - llim*si[(j&0xE0) +31] <= max(50,llim/200)) {		// polar optimization (see Reinecke 2013), avoiding warp divergence
-	    ni[j] = 1.0;	// y0
-	    l = m;
-	    int ny = 0;
-	    int nsint = 0;
-	    do {		// sin(theta)^m		(use rescaling to avoid underflow)
-		if (l&1) {
-		    ni[j] *= si[j];
-		    ny += nsint;
-		    if (ni[(j&0xE0) +31] < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence here !
-			ny--;
-			ni[j] *= SHT_SCALE_FACTOR;
-		    }
-		}
-		si[j] *= si[j];
-		nsint += nsint;
-		if (si[(j&0xE0) +31] < 1.0/SHT_SCALE_FACTOR) {		// avoid warp divergence here !
-		    nsint--;
-		    si[j] *= SHT_SCALE_FACTOR;
-		}
-	    } while(l >>= 1);
-	    y0 = ni[j] * al[0];
-	    y1 = al[1]*y0*cost;
-	#else
 	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
-	if (m - llim*__shfl(y1,31) <= max(50,llim/200)) {		// polar optimization (see Reinecke 2013), avoiding warp divergence
+	if (__any(m - llim*y1 <= max(50,llim/200))) {		// polar optimization (see Reinecke 2013), avoiding warp divergence
 	    y0 = 1.0;	// y0
 	    l = m;
 	    int ny = 0;
@@ -487,21 +432,20 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 		if (l&1) {
 		    y0 *= y1;
 		    ny += nsint;
-		    if (__shfl(y0, 31) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence
+		    if (__any(y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR))) {		// avoid warp divergence
 			ny--;
 			y0 *= SHT_SCALE_FACTOR;
 		    }
 		}
 		y1 *= y1;
 		nsint += nsint;
-		if (__shfl(y1, 31) < 1.0/SHT_SCALE_FACTOR) {		// avoid warp divergence
+		if (__any(y1 < 1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence
 		    nsint--;
 		    y1 *= SHT_SCALE_FACTOR;
 		}
 	    } while(l >>= 1);
 	    y0 *= al[0];
 	    y1 = al[1]*y0*cost;
-	#endif
 
 	    l=m;		al+=2;
 	    if (ny<0) {
@@ -517,12 +461,7 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 		    y0 = ni[ka+1+(j&0xFFE0)]*(cost*y1) + ni[ka+(j&0xFFE0)]*y0;
 		    y1 = ni[ka+3+(j&0xFFE0)]*(cost*y0) + ni[ka+2+(j&0xFFE0)]*y1;
 		    l+=2;	al+=4;	ka+=4;
-		    #if __CUDA_ARCH__ < 300
-		    si[j] = y0;
-		    if (fabs(si[(j&0xE0)+31]) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
-		    #else
-		    if (fabs(__shfl(y0,31)) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
-		    #endif
+		    if (__any(fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0))
 		    {	// rescale when value is significant
 			++ny;
 			y0 *= 1.0/SHT_SCALE_FACTOR;
