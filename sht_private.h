@@ -202,7 +202,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 #endif
 
 /* are there vector extensions available ? */
-#if !(defined __SSE2__ || defined __MIC__ || defined __VECTOR4DOUBLE__)
+#if !(defined __SSE2__ || defined __MIC__ || defined __VECTOR4DOUBLE__ || defined __VSX__ )
 	#undef _GCC_VEC_
 #endif
 #ifdef __INTEL_COMPILER
@@ -273,6 +273,89 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define vcplx_real(a) creal(a)
 	#define vcplx_imag(a) cimag(a)
 
+	#define VMALLOC(s)	malloc(s)
+	#define VFREE(s)	free(s)
+	#ifdef SHTNS4MAGIC
+		#error "Blue Gene/Q not supported."
+	#endif
+#elif _GCC_VEC_ && __VSX__
+	// support VSX (IBM Power)
+	#include <altivec.h>
+	#define MIN_ALIGNMENT 16
+	#define VSIZE 2
+	//typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
+	//typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
+	typedef __vector double s2d;
+	typedef __vector double v2d;
+	typedef __vector double rnd;
+	#define VSIZE2 2
+	#define _SIMD_NAME_ "vsx"
+	//typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 2 doubles.
+	#define vall(x) vec_splats((double)x)
+	inline static s2d vxchg(s2d a) {
+		const vector unsigned char perm = { 8,9,10,11,12,13,14,15, 0,1,2,3,4,5,6,7 };
+		return vec_perm(a,a,perm);
+	}
+	#define vread(mem, idx) vec_ld((int)(idx)*16, ((const vector double*)mem))
+	#define vstor(mem, idx, v) vec_st((v2d)v, (int)(idx)*16, ((vector double*)mem))
+	inline static double reduce_add(rnd a) {
+		rnd b = a + vec_mergel(a, a);
+		return( vec_extract(b,0) );
+	}
+	inline static v2d v2d_reduce(rnd a, rnd b) {
+		v2d c = vec_mergel(a, b);		b = vec_mergeh(a, b);
+		return b + c;
+	}
+	inline static v2d addi(v2d a, v2d b) {
+		const s2d mp = {-1.0, 1.0};
+		return a + vxchg(b)*mp;
+	}
+	inline static s2d subadd(s2d a, s2d b) {
+		const s2d mp = {-1.0, 1.0};
+		return a + b*mp;
+	}
+
+	#define vdup(x) vec_splats((double)x)
+	#define vlo(a) vec_extract(a, 0)
+	#define vhi(a) vec_extract(a, 1)
+	#define vcplx_real(a) vec_extract(a, 0)
+	#define vcplx_imag(a) vec_extract(a, 1)
+	inline static s2d vec_mix_lohi(s2d a, s2d b) {	// same as _mm_shuffle_pd(a,b,2)
+		const vector unsigned char perm = {0,1,2,3,4,5,6,7, 24,25,26,27,28,29,30,31};
+		return vec_perm(a,b,perm);
+	}
+
+		#define S2D_STORE(mem, idx, ev, od)		((s2d*)mem)[idx] = ev+od;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(ev-od);
+		#define S2D_CSTORE(mem, idx, er, od, ei, oi)	{	\
+			rnd aa = vxchg(ei + oi) + (er + od);		rnd bb = (er + od) - vxchg(ei + oi);	\
+			((s2d*)mem)[idx] = vec_mix_lohi(bb, aa);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = vec_mix_lohi(aa, bb);	\
+			aa = vxchg(er - od) + (ei - oi);		bb = vxchg(er - od) - (ei - oi);	\
+			((s2d*)mem)[NLAT_2-1 -(idx)] = vec_mix_lohi(bb, aa);	\
+			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = vec_mix_lohi(aa, bb);	}
+		#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	{	\
+			((s2d*)mem)[(idx)*2]   = vec_mergeh(er+od, ei+oi);	\
+			((s2d*)mem)[(idx)*2+1] = vec_mergel(er+od, ei+oi);	\
+			((s2d*)mem)[NLAT-1-(idx)*2] = vec_mergeh(er-od, ei-oi);	\
+			((s2d*)mem)[NLAT-2-(idx)*2] = vec_mergel(er-od, ei-oi);	}
+
+		#define S2D_STORE_4MAGIC(mem, idx, ev, od)		{	\
+			s2d n = ev+od;		s2d s = ev-od;	\
+			((s2d*)mem)[(idx)*2] = vec_mergeh(n, s);	\
+			((s2d*)mem)[(idx)*2+1] = vec_mergel(n, s);	}
+		#define S2D_CSTORE_4MAGIC(mem, idx, er, od, ei, oi)	{	\
+			rnd nr = er + od;		rnd ni = ei + oi;	\
+			rnd sr = er - od;		rnd si = ei - oi;	\
+			((s2d*)mem)[(idx)*2] = vec_mergeh(nr-si,  sr+ni);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2] = vec_mergeh(nr+si,  sr-ni);	\
+			((s2d*)mem)[(idx)*2+1] = vec_mergel(nr-si,  sr+ni);	\
+			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)*2+1] = vec_mergel(nr+si,  sr-ni);	}
+		#define S2D_CSTORE2_4MAGIC(mem, idx, er, od, ei, oi)	{	\
+			((s2d*)mem)[(idx)*4]   = vec_mergeh(er+od, ei+oi);	\
+			((s2d*)mem)[(idx)*4+1] = vec_mergeh(er-od, ei-oi);	\
+			((s2d*)mem)[(idx)*4+2] = vec_mergel(er+od, ei+oi);	\
+			((s2d*)mem)[(idx)*4+3] = vec_mergel(er-od, ei-oi);	}
+
 	/*inline static void* VMALLOC(size_t s) {
 		void* ptr;
 		posix_memalign(&ptr, MIN_ALIGNMENT, s);
@@ -280,10 +363,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	}*/
 	#define VMALLOC(s)	malloc(s)
 	#define VFREE(s)	free(s)
-	#ifdef SHTNS4MAGIC
-		#error "Blue Gene/Q not supported."
-	#endif
 #endif
+
 
 
 #if _GCC_VEC_ && __SSE2__
@@ -457,7 +538,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = _mm_shuffle_pd(aa, bb, 2 );	}
 		#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	{	\
 			((s2d*)mem)[(idx)*2]   = _mm_unpacklo_pd(er+od, ei+oi);	\
-			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(er+o, ei+oi);	\
+			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(er+od, ei+oi);	\
 			((s2d*)mem)[NLAT-1-(idx)*2] = _mm_unpacklo_pd(er-od, ei-oi);	\
 			((s2d*)mem)[NLAT-2-(idx)*2] = _mm_unpackhi_pd(er-od, ei-oi);	}
 		#define S2D_STORE_4MAGIC(mem, idx, ev, od)		{	\
