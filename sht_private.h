@@ -150,9 +150,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 	/* cuda stuff */
 	double* d_alm;
 	double* d_ct;
+	double* d_mx_stdt;
 	double* d_q;
 	double* d_qlm;
-	unsigned cufft_plan;
+	unsigned cufft_plan[2];
+	int strm[2];
 	#endif
 
 	/* other misc informations */
