@@ -201,6 +201,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#undef _GCC_VEC_
 #endif
 
+#ifdef __NVCC__
+		// disable vector extensions when compiling cuda code.
+        #undef _GCC_VEC_
+#endif
+
 /* are there vector extensions available ? */
 #if !(defined __SSE2__ || defined __MIC__ || defined __VECTOR4DOUBLE__ || defined __VSX__ )
 	#undef _GCC_VEC_

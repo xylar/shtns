@@ -176,8 +176,9 @@ extern void* fomp[6][SHT_NTYP];
 #ifdef HAVE_LIBCUFFT
 void SH_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim);
 void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim);
+void SHsphtor_to_spat_gpu(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, const long int llim);
 void spat_to_SH_gpu(shtns_cfg shtns, double *Vr, cplx *Qlm, const long int llim);
-void* fgpu[SHT_NTYP] = { SH_to_spat_gpu, spat_to_SH_gpu, NULL, NULL, NULL, NULL, NULL, NULL };
+void* fgpu[SHT_NTYP] = { SH_to_spat_gpu, spat_to_SH_gpu, SHsphtor_to_spat_gpu, NULL, NULL, NULL, NULL, NULL };
 void* fgpu2[SHT_NTYP] = { SH_to_spat_gpu_hostfft, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 #endif
 
@@ -1839,9 +1840,11 @@ int shtns_use_threads(int num_threads)
 }
 
 /** Enables parallel transforms on selected GPU device, if available (see \ref compil).
- Call before any initialization of shtns to select a GPU device. Returns the actual device id used, or -1 if no device found.
+ Call BEFORE any initialization of shtns to select a GPU device. Returns the actual device id used, or -1 if no device found.
  \li If device_id >= 0, try to use device with number device_id % device_count.
- \li If device_d < 0, do not try to use GPU. */
+ \li If device_d < 0, do not try to use GPU.
+ WARNING: Calls cudaSetDevice() internally, so it changes the current device for the entire host thread.
+ */
 int shtns_use_gpu(int device_id)
 {
 #ifdef HAVE_LIBCUFFT
