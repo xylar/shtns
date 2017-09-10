@@ -68,7 +68,7 @@ leg_m0(const double *al, const double *ct, const double *ql, double *q, const in
     }
     al+=2;    l+=2;	k+=2;	kq+=2;
     while(l<llim) {
-	if (k+6 > THREADS_PER_BLOCK) {
+	if (k+6 >= THREADS_PER_BLOCK) {
 	    __syncthreads();
 	    ak[j] = al[j];
 	    if ((j&1) == 0) qk[j/2] = ql[2*l+j];
@@ -313,7 +313,7 @@ leg_m_lowllim(const double *al, const double *ct, const double *ql, double *q, c
 	double ro = y1 * qk[2];
 	al+=2;    l+=2;		ka+=2;	kq+=2;
 	while(l<llim) {
-	    if (ka+6 > blockDim.x) {
+	    if (ka+6 >= blockDim.x) {
 		__syncthreads();  
 		ak[j] = al[j];
 		qk[j] = ql[2*l+j];
@@ -480,7 +480,7 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 		ak[j] = al[j&31];
 		int ka = 0;
 		while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
-		    if (ka+4 > warpSize) {
+		    if (ka+4 >= warpSize) {
 			ak[j] = al[(j&31)];
 			ka=0;
 		    }
@@ -502,7 +502,7 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 		qk[j] = ql[2*l+(j&31)];
 		int k = 0;		const int ofs = j & 0xFFE0;
 		while (l<llim) {	// compute even and odd parts
-		    if (k+4 > warpSize) {
+		    if (k+4 >= warpSize) {
 			ak[j] = al[(j&31)];
 			qk[j] = ql[2*l+(j&31)];
 			k=0;
@@ -638,13 +638,13 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
     	
 	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
 
-	    y0 = 0.5;	// y0
+	    y0 = 0.5 * ak[0];	// y0
 	    l = m;
 	    do {		// sin(theta)^m
 		if (l&1) y0 *= y1;
 		y1 *= y1;
 	    } while(l >>= 1);
-	    y0 *= ak[0] * ct[it + nlat_2];	// include quadrature weights.
+	    if (it < nlat_2)     y0 *= ct[it + nlat_2];		// include quadrature weights.
 	    y1 = ak[1]*y0*cost;
 
 	    l=m;		al+=2;
@@ -719,10 +719,10 @@ int cushtns_init_gpu(shtns_cfg shtns)
     if (prop.warpSize != WARPSZE) return -1;		// failure, SHTns requires a warpSize of 32.
 
     // Allocate the device input vector alm
-    err = cudaMalloc((void **)&d_alm, 2*nlm*sizeof(double));
+    err = cudaMalloc((void **)&d_alm, (2*nlm+THREADS_PER_BLOCK-1)*sizeof(double));	// allow some overflow.
     if (err != cudaSuccess) err_count ++;
     // Allocate the device matrix for d(sin(t))/dt
-    err = cudaMalloc((void **)&d_mx_stdt, 2*nlm*sizeof(double));
+    err = cudaMalloc((void **)&d_mx_stdt, (2*nlm+THREADS_PER_BLOCK-1)*sizeof(double));
     if (err != cudaSuccess) err_count ++;
     // Allocate the device input vector cos(theta) and gauss weights
     err = cudaMalloc((void **)&d_ct, 2*nlat_2*sizeof(double));
