@@ -532,52 +532,55 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 		}
 	    } while(l >>= 1);
 	    y0 *= al[0];
-	    y1 = al[1]*y0*cost;
+	    y1 = 0.0;
+//	    y1 = al[1]*y0*cost;
 
-	    l=m;		al+=2;
-	    if (ny<0) {
-		ak[j] = al[j&31];
-		int ka = 0;
-		while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
-		    if (ka+4 >= warpSize) {
-			ak[j] = al[(j&31)];
-			ka=0;
-		    }
-		    //y0 = al[1]*cost*y1 + al[0]*y0;
-		    //y1 = al[3]*cost*y0 + al[2]*y1;
-		    y0 = ak[ka+1+(j&0xFFE0)]*(cost*y1) + ak[ka+(j&0xFFE0)]*y0;
-		    y1 = ak[ka+3+(j&0xFFE0)]*(cost*y0) + ak[ka+2+(j&0xFFE0)]*y1;
-		    l+=2;	al+=4;	ka+=4;
-		    if (__any(fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0))
-		    {	// rescale when value is significant
-			++ny;
-			y0 *= 1.0/SHT_SCALE_FACTOR;
-			y1 *= 1.0/SHT_SCALE_FACTOR;
-		    }
+	    l=m;	int ka = WARPSZE;
+	    const int ofs = j & 0xFFE0;
+
+	    while ( __all(ny<0) && (l<llim) ) {
+		if (ka+4 >= WARPSZE) {
+		    ak[j] = al[(j&31)];
+		    ka=0;
+		}
+		y1 = ak[ka+1+ofs]*cost*y0 + ak[ka+ofs]*y1;
+		y0 = ak[ka+3+ofs]*cost*y1 + ak[ka+2+ofs]*y0;
+		l+=2;	al+=4;	ka+=4;
+		if (fabs(y1) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
+		{	// rescale when value is significant
+		    ++ny;
+		    y0 *= 1.0/SHT_SCALE_FACTOR;
+		    y1 *= 1.0/SHT_SCALE_FACTOR;
 		}
 	    }
-	    if (ny == 0) {
-		ak[j] = al[j&31];
-		qk[j] = ql[2*l+(j&31)];
-		int k = 0;		const int ofs = j & 0xFFE0;
-		while (l<llim) {	// compute even and odd parts
-		    if (k+4 >= warpSize) {
-			ak[j] = al[(j&31)];
-			qk[j] = ql[2*l+(j&31)];
-			k=0;
-		    }
-		    rer += y0 * qk[k+ofs];	// real
-		    rei += y0 * qk[k+1+ofs];	// imag
-		    y0 = ak[k+1+ofs]*(cost*y1) + ak[k+ofs]*y0;
-		    ror += y1 * qk[k+2+ofs];	// real
-		    roi += y1 * qk[k+3+ofs];	// imag
-		    y1 = ak[k+3+ofs]*(cost*y0) + ak[k+2+ofs]*y1;
-		    l+=2;	al+=4;	k+=4;
+	    
+	    ka = WARPSZE;
+	    while (l<llim) {
+		if (ka+4 >= WARPSZE) {		// cache coefficients
+		    ak[j] = al[(j&31)];
+		    qk[j] = ql[2*l+(j&31)];
+		    ka = 0;
 		}
-		if (l==llim) {
-		    rer += y0 * ql[2*l];
-		    rei += y0 * ql[2*l+1];
+		y1 = ak[ka+1+ofs]*cost*y0 + ak[ka+ofs]*y1;
+		if (ny==0) {
+		    rer += y0 * qk[ka+ofs];	// real
+		    rei += y0 * qk[ka+1+ofs];	// imag
+		    ror += y1 * qk[ka+2+ofs];	// real
+		    roi += y1 * qk[ka+3+ofs];	// imag
 		}
+		else if (fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
+		{	// rescale when value is significant
+		    ++ny;
+		    y0 *= 1.0/SHT_SCALE_FACTOR;
+		    y1 *= 1.0/SHT_SCALE_FACTOR;
+		}
+		l+=2;	al+=4;
+		y0 = ak[ka+3+ofs]*cost*y1 + ak[ka+2+ofs]*y0;
+		ka+=4;
+	    }
+	    if ((l==llim) && (ny==0)) {
+		rer += y0 * ql[2*l];
+		rei += y0 * ql[2*l+1];
 	    }
 	}
 
