@@ -1577,6 +1577,18 @@ void shtns_reset()
 	}
 }
 
+#ifndef HAVE_LIBCUFFT
+// allocation for vector-aligned data. If gpu is enabled, these are replace by pinned memory allocation.
+void* shtns_malloc(size_t size) {
+	return VMALLOC(size);
+}
+
+void shtns_free(void* p) {
+	VFREE(p);
+}
+#endif
+
+
 static int choose_nlat(int n)
 {
 	#if HAVE_LIBCUFFT

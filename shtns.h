@@ -152,6 +152,11 @@ void shtns_reset(void);				///< destroy all configs, free memory, and go back to
 void shtns_destroy(shtns_cfg);		///< free memory of given config, which cannot be used afterwards.
 void shtns_unset_grid(shtns_cfg);	///< unset the grid.
 
+
+void* shtns_malloc(size_t bytes);	///< alloc appropriate memory (pinned for gpu, aligned for avx, ...). Use \ref shtns_free to free it.
+void shtns_free(void* p);			///< free memory allocated with \ref shtns_malloc
+
+
 //@}
 
 /// \name special values

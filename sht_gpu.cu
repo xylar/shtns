@@ -35,6 +35,18 @@
 
 cudaStream_t strm[MAX_STRM];
 
+extern "C"
+void* shtns_malloc(size_t size) {
+    void* ptr = NULL;
+    cudaMallocHost(&ptr, size);		// allocate pinned memory (for faster transfers !)
+    return ptr;
+}
+
+extern "C"
+void shtns_free(void* p) {
+    cudaFreeHost(p);
+}
+
 /// On KEPLER, This kernel is fastest with THREADS_PER_BLOCK=256 and NWAY=1
 template<int S> __global__ void
 leg_m0(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2)
