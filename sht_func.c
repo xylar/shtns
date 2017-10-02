@@ -453,14 +453,15 @@ void mul_ct_matrix(shtns_cfg shtns, double* mx)
 {
 	long int im,l,lm;
 	double a_1;
-	
+
+	mul_ct_matrix_shifted(shtns, mx);
+	for (int lm=2*NLM-1; lm>0; lm--)	mx[lm] = mx[lm-1];		// shift back indices (copy, slow)
 	mx[0] = 0.0;
-	mul_ct_matrix_shifted(shtns, mx+1);			// shift indices
 	for (int im=1; im<=MMAX; im++) {				// remove the coeff for lmax+1 (for backward compatibility)
 		int lm = LiM(shtns, im*MRES, im);
 		mx[2*lm-1] = 0.0;		mx[2*lm] = 0.0;
 	}
-	mx[NLM-1] = 0.0;
+	mx[2*NLM-1] = 0.0;
 }
 
 /// fill mx with the coefficients of operator sin(theta).d/dtheta

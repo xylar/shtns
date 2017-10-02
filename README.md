@@ -67,9 +67,13 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v2.8.1  (2 Oct 2017)
+	- Fixed-m Legendre transforms (without fft) support magic-layout.
+	- Fix bug in `mul_ct_matrix()` introduced in v2.7.
+
 * v2.8  (10 Jul 2017)
 	- Regular grids are back and improved (on-the-fly + exact quadrature weights).
-	- merge with shtns-magic, providing optional support for the MagIC code
+	- Merge with shtns-magic, providing optional support for the MagIC code
 	  with --enable-magic-layout (thanks to Bertrand Putigny)
 
 * v2.7  (24 Feb 2017)
