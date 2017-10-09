@@ -302,6 +302,18 @@ void SHqst_to_lat(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
 //@}
 
+
+/// \name GPU transforms
+//@{
+void cu_spat_to_SH(shtns_cfg shtns, double *Vr, cplx *Qlm, int ltr);
+void cu_SH_to_spat(shtns_cfg shtns, cplx *Qlm, double *Vr, int ltr);
+void cu_spat_to_SHsphtor(shtns_cfg, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, int ltr);
+void cu_SHsphtor_to_spat(shtns_cfg, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, int ltr);
+void cu_spat_to_SHqst(shtns_cfg, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, int ltr);
+void cu_SHqst_to_spat(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, int ltr);
+//@}
+
+
 #endif
 
 #ifdef __cplusplus
