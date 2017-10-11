@@ -152,7 +152,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double* d_ct;
 	double* d_mx_stdt;
 	double* d_mx_van;
+	double* gpu_mem;
 	unsigned cufft_plan;
+	size_t nlm_stride, spat_stride;
 	#endif
 
 	/* other misc informations */
