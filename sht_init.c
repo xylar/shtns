@@ -30,13 +30,6 @@
 // global variables definitions
 #include "sht_private.h"
 
-#ifdef HAVE_LIBCUFFT
-/// gpu functions.
-int cushtns_init_gpu(shtns_cfg);
-void cushtns_release_gpu(shtns_cfg);
-int cushtns_use_gpu(int);
-#endif
-
 // cycle counter from FFTW
 #include "fftw3/cycle.h"
 
@@ -174,12 +167,8 @@ extern void* ffly_m0[6][SHT_NTYP];
 extern void* fomp[6][SHT_NTYP];
 #endif
 #ifdef HAVE_LIBCUFFT
-void SH_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim);
-void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim);
-void SHsphtor_to_spat_gpu(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, const long int llim);
-void spat_to_SH_gpu(shtns_cfg shtns, double *Vr, cplx *Qlm, const long int llim);
-void* fgpu[SHT_NTYP] = { SH_to_spat_gpu, spat_to_SH_gpu, SHsphtor_to_spat_gpu, NULL, NULL, NULL, NULL, NULL };
-void* fgpu2[SHT_NTYP] = { SH_to_spat_gpu_hostfft, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+extern void* fgpu[SHT_NTYP];
+extern void* fgpu2[SHT_NTYP];
 #endif
 
 // big array holding all sht functions, variants and algorithms
@@ -1771,6 +1760,12 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
     #if SHT_VERBOSE > 0
 	if ((verbose)&&(gpu_ok>=0)) printf("        + GPU #%d successfully initialized.\n", gpu_ok);
 	#endif
+	if (gpu_ok < 0) {		// disable the GPU functions
+		memset(sht_func[SHT_STD][SHT_GPU], 0, sizeof(void*)*SHT_NTYP);
+		memset(sht_func[SHT_LTR][SHT_GPU], 0, sizeof(void*)*SHT_NTYP);
+		memset(sht_func[SHT_STD][SHT_GPU2], 0, sizeof(void*)*SHT_NTYP);
+		memset(sht_func[SHT_LTR][SHT_GPU2], 0, sizeof(void*)*SHT_NTYP);
+	}
   #endif
 
 	if ((layout & SHT_LOAD_SAVE_CFG) && (!cfg_loaded)) cfg_loaded = (config_load(shtns, req_flags) > 0);
@@ -1795,7 +1790,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
 //	set_sht_fly(shtns, SHT_TYP_VAN);
-	set_sht_gpu(shtns, 0);
+//	set_sht_gpu(shtns, 0);
 
   #if SHT_VERBOSE > 1
 	if ((omp_threads > 1)&&(verbose>1)) printf(" nthreads = %d\n",shtns->nthreads);

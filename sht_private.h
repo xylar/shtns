@@ -38,6 +38,23 @@
   #include <omp.h>
 #endif
 
+#ifdef HAVE_LIBCUFFT
+#include <cufft.h>
+#include "shtns_cuda.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+/// private gpu functions:
+int cushtns_init_gpu(shtns_cfg);
+void cushtns_release_gpu(shtns_cfg);
+int cushtns_use_gpu(int);
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+#endif
+
 /* BEGIN COMPILE-TIME SETTINGS */
 
 /// defines the maximum amount of memory in megabytes that SHTns should use.
@@ -148,13 +165,15 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	#ifdef HAVE_LIBCUFFT
 	/* cuda stuff */
+	int cu_flags;
 	double* d_alm;
 	double* d_ct;
 	double* d_mx_stdt;
 	double* d_mx_van;
 	double* gpu_mem;
-	unsigned cufft_plan;
 	size_t nlm_stride, spat_stride;
+	cudaStream_t xfer_stream, comp_stream;		// the cuda streams
+	cufftHandle cufft_plan;						// the cufft Handle
 	#endif
 
 	/* other misc informations */
