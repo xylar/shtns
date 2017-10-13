@@ -638,6 +638,7 @@ int main(int argc, char *argv[])
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
 	if (loadsave) layout |= SHT_LOAD_SAVE_CFG;
+	layout |= SHT_ALLOW_GPU;			// Allow GPU transforms if possible.
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	shtns_use_threads(nthreads);		// 0 : means automatically chooses the number of threads.
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);

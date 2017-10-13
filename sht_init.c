@@ -1756,10 +1756,13 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
   #ifdef HAVE_LIBCUFFT
-	int gpu_ok = cushtns_init_gpu(shtns);		// try to initialize cuda gpu
-    #if SHT_VERBOSE > 0
-	if ((verbose)&&(gpu_ok>=0)) printf("        + GPU #%d successfully initialized.\n", gpu_ok);
-	#endif
+	int gpu_ok = -1;
+	if (layout & SHT_ALLOW_GPU) {
+		gpu_ok = cushtns_init_gpu(shtns);		// try to initialize cuda gpu
+		#if SHT_VERBOSE > 0
+		if ((verbose)&&(gpu_ok>=0)) printf("        + GPU #%d successfully initialized.\n", gpu_ok);
+		#endif
+	}
 	if (gpu_ok < 0) {		// disable the GPU functions
 		memset(sht_func[SHT_STD][SHT_GPU], 0, sizeof(void*)*SHT_NTYP);
 		memset(sht_func[SHT_LTR][SHT_GPU], 0, sizeof(void*)*SHT_NTYP);

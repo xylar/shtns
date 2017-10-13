@@ -953,10 +953,10 @@ void cushtns_release_gpu(shtns_cfg shtns)
 	if (shtns->nphi > 1) cufftDestroy(shtns->cufft_plan);
 	if (shtns->cu_flags & CUSHT_OWN_COMP_STREAM) cudaStreamDestroy(shtns->comp_stream);
 	if (shtns->cu_flags & CUSHT_OWN_XFER_STREAM) cudaStreamDestroy(shtns->xfer_stream);
-//	if (shtns->d_ct) cudaFree(shtns->d_ct);
-//	if (shtns->d_alm) cudaFree(shtns->d_alm);
-//	if (shtns->d_mx_stdt) cudaFree(shtns->d_mx_stdt);
-//	if (shtns->d_mx_van) cudaFree(shtns->d_mx_van);
+	if (shtns->d_ct) cudaFree(shtns->d_ct);
+	if (shtns->d_alm) cudaFree(shtns->d_alm);
+	if (shtns->d_mx_stdt) cudaFree(shtns->d_mx_stdt);
+	if (shtns->d_mx_van) cudaFree(shtns->d_mx_van);
 	if (shtns->gpu_mem) cudaFree(shtns->gpu_mem);
 	shtns->d_alm = 0;		// disable gpu.
 	shtns->cu_flags = 0;
@@ -1102,6 +1102,7 @@ void cushtns_set_streams(shtns_cfg shtns, cudaStream_t compute_stream, cudaStrea
 	}
 }
 
+/*
 extern "C"
 shtns_cfg cushtns_clone(shtns_cfg shtns, cudaStream_t compute_stream, cudaStream_t transfer_stream)
 {
@@ -1117,6 +1118,24 @@ shtns_cfg cushtns_clone(shtns_cfg shtns, cudaStream_t compute_stream, cudaStream
 	cushtns_set_streams(sht_clone, compute_stream, transfer_stream);
 	return sht_clone;
 }
+*/
+
+extern "C"
+shtns_cfg cushtns_clone(shtns_cfg shtns, cudaStream_t compute_stream, cudaStream_t transfer_stream)
+{
+	shtns_cfg sht_clone;
+	sht_clone = shtns_create_with_grid(shtns, shtns->mmax, 0);		// copy the shtns_cfg, sharing all data.
+
+	int dev_id = cushtns_init_gpu(sht_clone);
+	if (dev_id >= 0) {
+		cushtns_set_streams(sht_clone, compute_stream, transfer_stream);
+		return sht_clone;
+	} else {
+		shtns_destroy(sht_clone);
+		return 0;		// fail
+	}
+}
+
 
 extern "C"
 void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim)
