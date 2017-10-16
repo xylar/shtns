@@ -44,6 +44,10 @@ shtns_cfg sht_data = NULL;
   #define omp_threads 1
 #endif
 
+#ifdef HAVE_LIBCUFFT
+	int cuda_gpu_id = 0;	// by default, use gpu device 0
+#endif
+
 static int verbose = 0;		// runtime verbosity control: 0 no output, 1 output, 2 debug (if compiled in)
 void shtns_verbose(int v) {
 	verbose = v;
@@ -139,12 +143,13 @@ static int fft_int(int n, int fmax)
 */
 
 // sht algorithms (hyb, fly1, ...)
-enum sht_algos { SHT_DCT, SHT_MEM, SHT_SV,
+enum sht_algos { SHT_MEM, SHT_SV,
 	SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8,
+	SHT_GPU, SHT_GPU2,
 	SHT_OMP1, SHT_OMP2, SHT_OMP3, SHT_OMP4, SHT_OMP6, SHT_OMP8,
 	SHT_NALG };
 
-char* sht_name[SHT_NALG] = {"dct", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "omp1", "omp2", "omp3", "omp4", "omp6", "omp8" };
+char* sht_name[SHT_NALG] = {"mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu", "gpu2", "omp1", "omp2", "omp3", "omp4", "omp6", "omp8" };
 char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 char* sht_var[SHT_NVAR] = {"std", "ltr", "m" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
@@ -161,6 +166,10 @@ extern void* ffly_m0[6][SHT_NTYP];
 #ifdef _OPENMP
 extern void* fomp[6][SHT_NTYP];
 #endif
+#ifdef HAVE_LIBCUFFT
+extern void* fgpu[SHT_NTYP];
+extern void* fgpu2[SHT_NTYP];
+#endif
 
 // big array holding all sht functions, variants and algorithms
 void* sht_func[SHT_NVAR][SHT_NALG][SHT_NTYP];
@@ -173,6 +182,17 @@ static void set_sht_fly(shtns_cfg shtns, int typ_start)
 	for (int it=typ_start; it<SHT_NTYP; it++) {
 		for (int v=0; v<SHT_NVAR; v++)
 			shtns->ftable[v][it] = sht_func[v][algo][it];
+	}
+}
+
+/// \internal use gpu alogorithm where possible
+static void set_sht_gpu(shtns_cfg shtns, int typ_start)
+{
+	int algo = SHT_GPU;
+	for (int it=typ_start; it<SHT_NTYP; it++) {
+		for (int v=0; v<SHT_NVAR; v++)
+			if (sht_func[v][algo][it] != NULL)
+				shtns->ftable[v][it] = sht_func[v][algo][it];
 	}
 }
 
@@ -240,6 +260,12 @@ static void init_sht_array_func(shtns_cfg shtns)
 	  #ifdef SHTNS_MEM
 		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem, sizeof(void*)*SHT_NTYP);
 		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_l, sizeof(void*)*SHT_NTYP);
+	  #endif
+	  #ifdef HAVE_LIBCUFFT
+		memcpy(sht_func[SHT_STD][SHT_GPU], &fgpu, sizeof(void*)*SHT_NTYP);
+		memcpy(sht_func[SHT_LTR][SHT_GPU], &fgpu, sizeof(void*)*SHT_NTYP);
+		memcpy(sht_func[SHT_STD][SHT_GPU2], &fgpu2, sizeof(void*)*SHT_NTYP);
+		memcpy(sht_func[SHT_LTR][SHT_GPU2], &fgpu2, sizeof(void*)*SHT_NTYP);
 	  #endif
 	}
 
@@ -1050,7 +1076,7 @@ static double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *f
 /// *nlp is the number of loops. If zero, it is set to a good value.
 /// on_the_fly : 1 = skip all memory algorithm. 0 = include memory and on-the-fly. -1 = test only DCT.
 /// returns time without dct / best time with dct (or 0 if no dct available).
-static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr)
+static void choose_best_sht(shtns_cfg shtns, int* nlp, int vector)
 {
 	cplx *Qlm=0, *Slm=0, *Tlm=0;
 	double *Qh=0, *Sh=0, *Th=0;
@@ -1062,7 +1088,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 	int on_the_fly_only = (shtns->ylm == NULL);		// only on-the-fly.
 	int otf_analys = (shtns->wg != NULL);			// on-the-fly analysis supported.
 
-	if (NLAT < VSIZE2*4) return(0.0);			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow) and DCT not efficient for low NLAT.
+	if (NLAT < VSIZE2*4) return;			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow).
 
 	size_t nspat = sizeof(double) * NSPAT_ALLOC(shtns);
 	size_t nspec = sizeof(cplx)* NLM;
@@ -1086,9 +1112,7 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 
 	#if SHT_VERBOSE > 0
 	if (verbose) {
-		if (dct_mtr != 0)	printf("        finding optimal m-truncation for DCT synthesis");
-		else 	printf("        finding optimal algorithm");
-		fflush(stdout);
+		printf("        finding optimal algorithm");	fflush(stdout);
 	}
 	#endif
 
@@ -1124,7 +1148,6 @@ static double choose_best_sht(shtns_cfg shtns, int* nlp, int vector, int dct_mtr
 //	if (tt > 10.0)	goto done;		// timing this will be too slow...
 
 	int ityp = 0;	do {
-		if ((dct_mtr != 0) && (ityp >= 4)) break;		// dct !=0 : only scalar and vector.
 		if (ityp == 2) nloop = (nloop+1)/2;		// scalar ar done.
 		t0 = 1e100;
 		i0 = SHT_MEM;
@@ -1178,9 +1201,6 @@ done:
 	if (Qlm) VFREE(Qlm);		if (Tlm) VFREE(Tlm);
 	if (Qh)  VFREE(Qh);			if (Th)  VFREE(Th);
 	if (Slm) VFREE(Slm);	 	if (Sh)  VFREE(Sh);
-	if (dct_mtr > 0) {
-		return(tnodct/tdct);
-	} else	return(0.0);
 }
 
 
@@ -1372,6 +1392,9 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->ct = NULL;	shtns->st = NULL;
 		shtns->nphi = 0;	shtns->nlat = 0;	shtns->nlat_2 = 0;		shtns->nspat = 0;	// public data
 		shtns->ylm_lat = NULL;	shtns->ct_lat = 2.0;	shtns->ifft_lat = NULL;		shtns->nphi_lat = 0;	// _to_lat data
+		#ifdef HAVE_LIBCUFFT
+		shtns->d_alm = NULL;		// this marks the gpu as disabled.
+		#endif
 	}
 
 	// copy sizes.
@@ -1507,6 +1530,9 @@ void shtns_unset_grid(shtns_cfg shtns)
 /// release all resources allocated by a given shtns_cfg.
 void shtns_destroy(shtns_cfg shtns)
 {
+	#ifdef HAVE_LIBCUFFT
+	if (shtns->d_alm) cushtns_release_gpu(shtns);
+	#endif
 	free_unused(shtns, &shtns->l_2);
 	if (shtns->blm != shtns->alm)
 		free_unused(shtns, &shtns->blm);
@@ -1540,8 +1566,25 @@ void shtns_reset()
 	}
 }
 
+#ifndef HAVE_LIBCUFFT
+// allocation for vector-aligned data. If gpu is enabled, these are replace by pinned memory allocation.
+void* shtns_malloc(size_t size) {
+	return VMALLOC(size);
+}
+
+void shtns_free(void* p) {
+	VFREE(p);
+}
+#endif
+
+
 static int choose_nlat(int n)
 {
+	#if HAVE_LIBCUFFT
+	n = ((n+63)/64) * 64;		// multiple of 64 for GPUs
+	return n;
+	#endif
+
 	n += (n&1);		// even is better.
 	#ifndef SHTNS4MAGIC
 	n = ((n+(VSIZE2-1))/VSIZE2) * VSIZE2;		// multiple of vector size
@@ -1577,6 +1620,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	int analys = 1;
 	const int req_flags = flags;		// requested flags.
 
+	#if HAVE_LIBCUFFT
+		if (*nlat % 64) shtns_runerr("Nlat must be a multiple of 64 for GPUs\n");
+	#endif
 	#if _GCC_VEC_
 		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
 		#ifdef SHTNS4MAGIC
@@ -1709,10 +1755,26 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		set_sht_fly(shtns, 0);		// switch function pointers to "on-the-fly" functions.
 	}
 
+  #ifdef HAVE_LIBCUFFT
+	int gpu_ok = -1;
+	if (layout & SHT_ALLOW_GPU) {
+		gpu_ok = cushtns_init_gpu(shtns);		// try to initialize cuda gpu
+		#if SHT_VERBOSE > 0
+		if ((verbose)&&(gpu_ok>=0)) printf("        + GPU #%d successfully initialized.\n", gpu_ok);
+		#endif
+	}
+	if (gpu_ok < 0) {		// disable the GPU functions
+		memset(sht_func[SHT_STD][SHT_GPU], 0, sizeof(void*)*SHT_NTYP);
+		memset(sht_func[SHT_LTR][SHT_GPU], 0, sizeof(void*)*SHT_NTYP);
+		memset(sht_func[SHT_STD][SHT_GPU2], 0, sizeof(void*)*SHT_NTYP);
+		memset(sht_func[SHT_LTR][SHT_GPU2], 0, sizeof(void*)*SHT_NTYP);
+	}
+  #endif
+
 	if ((layout & SHT_LOAD_SAVE_CFG) && (!cfg_loaded)) cfg_loaded = (config_load(shtns, req_flags) > 0);
 	if (quick_init == 0) {
 		if (!cfg_loaded) {
-			choose_best_sht(shtns, &nloop, vector, 0);
+			choose_best_sht(shtns, &nloop, vector);
 			if (layout & SHT_LOAD_SAVE_CFG) config_save(shtns, req_flags);
 		}
 		#ifdef SHTNS_MEM
@@ -1731,6 +1793,8 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
 //	set_sht_fly(shtns, SHT_TYP_VAN);
+//	set_sht_gpu(shtns, 0);
+
   #if SHT_VERBOSE > 1
 	if ((omp_threads > 1)&&(verbose>1)) printf(" nthreads = %d\n",shtns->nthreads);
   #endif
@@ -1793,6 +1857,23 @@ int shtns_use_threads(int num_threads)
 	return omp_threads;
 }
 
+/** Enables parallel transforms on selected GPU device, if available (see \ref compil).
+ Call BEFORE any initialization of shtns to select a GPU device. Returns the actual device id used, or -1 if no device found.
+ \li If device_id >= 0, try to use device with number device_id % device_count.
+ \li If device_d < 0, do not try to use GPU.
+ WARNING: Calls cudaSetDevice() internally, so it changes the current device for the entire host thread.
+ */
+int shtns_use_gpu(int device_id)
+{
+#ifdef HAVE_LIBCUFFT
+	cuda_gpu_id = cushtns_use_gpu(device_id);
+	return cuda_gpu_id;
+#else
+	return -1;
+#endif
+}
+
+
 /// fill the given array with Gauss weights. returns the number of weights written, which
 /// may be zero if the grid is not a Gauss grid.
 int shtns_gauss_wts(shtns_cfg shtns, double *wts)
@@ -1832,6 +1913,11 @@ void shtns_verbose_(int *v)
 void shtns_use_threads_(int *num_threads)
 {
 	shtns_use_threads(*num_threads);
+}
+
+void shtns_use_gpu_(int *device_id)
+{
+	shtns_use_gpu(*device_id);
 }
 
 /// Print info

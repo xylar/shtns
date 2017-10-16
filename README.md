@@ -18,8 +18,8 @@ FEATURES:
 - can be used from **Fortran, c/c++, and Python** programs.
 - highly efficient Gauss algorithm working with Gauss nodes (based on
   Gauss-Legendre quadrature).
-- support for SSE2, SSE3, **AVX, AVX2** vectorization, as well as Xeon Phi and
-  Blue Gene/Q.
+- support for SSE2, SSE3, **AVX, AVX2, AVX-512** vectorization, as well as 
+  Xeon Phi (KNL), Blue Gene/Q and AltiVec VSX.
 - **parallel transforms with OpenMP**.
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).
 - **on-the-fly transforms** : saving memory and bandwidth, they are even faster
@@ -66,6 +66,10 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
+
+	- support for AVX-512 (intel KNL)
+	- support for VSX (IBM Power7 & Power 8)
+	- remove support for intel MIC (KNC)
 
 * v2.8.1  (2 Oct 2017)
 	- Fixed-m Legendre transforms (without fft) support magic-layout.

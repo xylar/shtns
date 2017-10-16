@@ -67,6 +67,7 @@ enum shtns_type {
 
 #define SHT_SCALAR_ONLY (256*16)	///< don't compute vector matrices. (add to flags in shtns_set_grid)
 #define SHT_LOAD_SAVE_CFG (256*64)	///< try to load and save the config. (add to flags in shtns_set_grid)
+#define SHT_ALLOW_GPU (256*128)		///< do not attempt to use a GPU
 
 
 #ifndef SHTNS_PRIVATE
@@ -145,10 +146,17 @@ int shtns_set_grid_auto(shtns_cfg, enum shtns_type flags, double eps, int nl_ord
 shtns_cfg shtns_create_with_grid(shtns_cfg, int mmax, int nofft);
 /// Enables multi-thread transform using OpenMP with num_threads (if available). Returns number of threads that will be used.
 int shtns_use_threads(int num_threads);
+/// Selects the gpu device (device_id % Num_devices). Must be called BEFORE any initialization. Internally calls cudaSetDevice(). Returns the actual device or -1 when no device found.
+int shtns_use_gpu(int device_id);
 
 void shtns_reset(void);				///< destroy all configs, free memory, and go back to initial state.
 void shtns_destroy(shtns_cfg);		///< free memory of given config, which cannot be used afterwards.
 void shtns_unset_grid(shtns_cfg);	///< unset the grid.
+
+
+void* shtns_malloc(size_t bytes);	///< alloc appropriate memory (pinned for gpu, aligned for avx, ...). Use \ref shtns_free to free it.
+void shtns_free(void* p);			///< free memory allocated with \ref shtns_malloc
+
 
 //@}
 
@@ -294,6 +302,7 @@ void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 void SHqst_to_lat(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
 //@}
+
 
 #endif
 

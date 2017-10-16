@@ -352,8 +352,8 @@ void test_SHT_vect_l(int ltr)
 	double ts, ta;
 	struct timeval t1, t2;
 
-	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *S2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+	complex double *T2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
 
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
@@ -374,7 +374,7 @@ void test_SHT_vect_l(int ltr)
 	ta = tdiff(&t1, &t2);
 	printf("   vector SHT time trucated at l=%d : \t synthesis %f ms \t analysis %f ms\n", ltr, ts, ta);
 
-	fftw_free(T2);	fftw_free(S2);
+	shtns_free(T2);	shtns_free(S2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, ltr);
 
 	if (LMAX < 256) {
@@ -391,8 +391,8 @@ void test_SHT_vect()
 	double ts, ta;
 	struct timeval t1, t2;
 
-	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *S2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+	complex double *T2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
 
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
@@ -413,7 +413,7 @@ void test_SHT_vect()
 	ta = tdiff(&t1, &t2);
 	printf("   vector SHT time (lmax=%d) : \t synthesis %f ms \t analysis %f ms\n", LMAX, ts, ta);
 
-	fftw_free(T2);	fftw_free(S2);
+	shtns_free(T2);	shtns_free(S2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
 	return;
 }
@@ -424,9 +424,9 @@ void test_SHT_vect3d_l(int ltr)
 	double ts, ta;
 	struct timeval t1, t2;
 	
-	complex double *Q2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *Q2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+	complex double *S2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+	complex double *T2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
 	
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
@@ -448,7 +448,7 @@ void test_SHT_vect3d_l(int ltr)
 	ta = tdiff(&t1, &t2);
 	printf("   3D vector SHT time : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
 
-	fftw_free(T2);	fftw_free(S2);	fftw_free(Q2);
+	shtns_free(T2);	shtns_free(S2);	shtns_free(Q2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, ltr);
 	scal_error(Qlm, Tlm0, ltr);
 
@@ -468,9 +468,9 @@ void test_SHT_vect3d()
 	double ts, ta;
 	struct timeval t1, t2;
 	
-	complex double *Q2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	complex double *S2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	complex double *T2 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	complex double *Q2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+	complex double *S2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+	complex double *T2 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
 	
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
@@ -492,7 +492,7 @@ void test_SHT_vect3d()
 	ta = tdiff(&t1, &t2);
 	printf("   3D vector SHT time (lmax=%d): \t synthesis %f ms \t analysis %f ms\n", LMAX, ts, ta);
 
-	fftw_free(T2);	fftw_free(S2);	fftw_free(Q2);
+	shtns_free(T2);	shtns_free(S2);	shtns_free(Q2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, LMAX);
 	scal_error(Qlm, Tlm0, LMAX);
 	return;
@@ -517,7 +517,7 @@ init_fft_tests()
 	nreal = 2*ncplx;
 
 // Allocate dummy Spatial Fields.
-	ShF = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	ShF = (complex double *) shtns_malloc(ncplx * NLAT * sizeof(complex double));
 	Sh = (double *) ShF;
 
 // IFFT : unnormalized
@@ -530,7 +530,7 @@ printf("in-place done\n");
 	printf("** ifft in-place :\n");	fftw_print_plan(ifft_in);
 	printf("\n** fft in-place :\n");	fftw_print_plan(fft_in);
 
-	Shout = (complex double *) fftw_malloc(ncplx * NLAT * sizeof(complex double));
+	Shout = (complex double *) shtns_malloc(ncplx * NLAT * sizeof(complex double));
 	ifft_out = fftw_plan_many_dft_c2r(1, &nfft, NLAT, Shout, &ncplx, NLAT, 1, Sh, &nfft, NLAT, 1, fftw_plan_mode);
 	if (ifft_out == NULL) printf("ifft_out failed\n");
 	fft_out = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nfft, NLAT, 1, Shout, &ncplx, NLAT, 1, fftw_plan_mode);
@@ -547,7 +547,7 @@ printf("\ntranspose done\n");
 	printf("** ifft + transpose :\n");	fftw_print_plan(ifft_tr);
 	printf("\n** fft + transpose :\n"); fftw_print_plan(fft_tr);
 
-	fftw_free(Shout);	fftw_free(ShF);
+	shtns_free(Shout);	shtns_free(ShF);
 }
 
 do_fft_tests()
@@ -572,36 +572,36 @@ do_fft_tests()
 
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
-		Sho = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+		Sho = (complex double *) shtns_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
 		fftw_execute_dft_c2r(ifft_out, Sho, (double *) ShF);
-		fftw_free(Sho);
+		shtns_free(Sho);
 	}
 	tcpu = clock() - tcpu;
 	printf("  ifft out-of-place (+malloc) : %d\n", (int) tcpu);
 
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
-		Sho = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+		Sho = (complex double *) shtns_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
 		fftw_execute_dft_r2c(fft_out, (double *) ShF, Sho);
-		fftw_free(Sho);
+		shtns_free(Sho);
 	}
 	tcpu = clock() - tcpu;
 	printf("  fft out-of-place (+malloc) : %d\n", (int) tcpu);
 
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
-		Sho = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+		Sho = (complex double *) shtns_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
 		fftw_execute_dft_c2r(ifft_tr, Sho, (double *) ShF);
-		fftw_free(Sho);
+		shtns_free(Sho);
 	}
 	tcpu = clock() - tcpu;
 	printf("  ifft transpose (+malloc) : %d\n", (int) tcpu);
 
 	tcpu = clock();
 	for (jj=0; jj< SHT_ITER; jj++) {
-		Sho = (complex double *) fftw_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
+		Sho = (complex double *) shtns_malloc( (NPHI/2+1) * NLAT * sizeof(complex double));
 		fftw_execute_dft_r2c(fft_tr, (double *) ShF, Sho);
-		fftw_free(Sho);
+		shtns_free(Sho);
 	}
 	tcpu = clock() - tcpu;
 	printf("  fft transpose (+malloc) : %d\n", (int) tcpu);
@@ -695,6 +695,7 @@ int main(int argc, char *argv[])
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
 	printf("loadsave = %d\n", loadsave);
 	if (loadsave) layout |= SHT_LOAD_SAVE_CFG;
+	layout |= SHT_ALLOW_GPU;			// Allow GPU transforms if possible.
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	shtns_use_threads(nthreads);		// 0 : means automatically chooses the number of threads.
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
@@ -715,24 +716,24 @@ int main(int argc, char *argv[])
 //	write_vect("cost",ct,NLAT);
 //	write_vect("sint",st,NLAT);
 
-	ShF = (complex double *) fftw_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
+	ShF = (complex double *) shtns_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
 	Sh = (double *) ShF;
 	if (ShF == NULL) runerr("memory allocation 1 failed");
 	if (vector) {
-		ThF = (complex double *) fftw_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
+		ThF = (complex double *) shtns_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
 		Th = (double *) ThF;
-		NLF = (complex double *) fftw_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
+		NLF = (complex double *) shtns_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
 		NL = (double *) NLF;
 		if ((ThF == NULL)||(NLF == NULL)) runerr("memory allocation 2 failed");
 	}
 
-	Slm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	Slm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-	Tlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+	Slm0 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+	Slm = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+	Tlm = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
 	if ((Slm0 == NULL)||(Slm == NULL)||(Tlm == NULL)) runerr("memory allocation 3 failed");
 	if (vector) {
-		Tlm0 = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
-		Qlm = (complex double *) fftw_malloc(sizeof(complex double)* NLM);
+		Tlm0 = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
+		Qlm = (complex double *) shtns_malloc(sizeof(complex double)* NLM);
 		if ((Tlm0 == NULL)||(Qlm == NULL)) runerr("memory allocation 4 failed");
 	}
 
@@ -856,11 +857,11 @@ int main(int argc, char *argv[])
 //	shtns_create_with_grid(shtns, MMAX/2, 1);
 
 // free memory and resources (to track memory leaks)
-	fftw_free(Slm);		fftw_free(ShF);
+	shtns_free(Slm);		shtns_free(ShF);
 	if (vector) {
-		fftw_free(Qlm);		fftw_free(Tlm);		
-		fftw_free(Slm0);	fftw_free(Tlm0);
-		fftw_free(NLF);		fftw_free(ThF);
+		shtns_free(Qlm);		shtns_free(Tlm);		
+		shtns_free(Slm0);		shtns_free(Tlm0);
+		shtns_free(NLF);		shtns_free(ThF);
 	}
 
 	shtns_reset();

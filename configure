@@ -688,8 +688,9 @@ enable_option_checking
 enable_verbose
 enable_openmp
 enable_mkl
-enable_mic
+enable_knl
 enable_many_core
+enable_cuda
 enable_magic_layout
 enable_python
 enable_long_double
@@ -1323,10 +1324,11 @@ Optional Features:
   --enable-openmp         Enable multi-threading with OpenMP
   --enable-mkl            Try to link with intel MKL instead of FFTW (can be
                           slightly faster, but NOT THREAD SAFE)
-  --enable-mic            Enable compilation for Xeon Phi
+  --enable-knl            Enable compilation for Xeon Phi (KNL)
   --enable-many-core      Enable optimizations for many-core systems (Blue
                           Gene/Q, Xeon Phi,...) and remove single-threaded
                           transforms
+  --enable-cuda           Enable compilation for Nvidia gpu using cuda
   --enable-magic-layout   Compile specific version for the MagIC code
   --enable-python         Build Python interface
   --enable-long-double    Use long double during initialization for (maybe)
@@ -2259,11 +2261,11 @@ else
   enable_mkl=default
 fi
 
-# Check whether --enable-mic was given.
-if test "${enable_mic+set}" = set; then :
-  enableval=$enable_mic;
+# Check whether --enable-knl was given.
+if test "${enable_knl+set}" = set; then :
+  enableval=$enable_knl;
 else
-  enable_mic=no
+  enable_knl=no
 fi
 
 # Check whether --enable-many-core was given.
@@ -2271,6 +2273,13 @@ if test "${enable_many_core+set}" = set; then :
   enableval=$enable_many_core;
 else
   enable_many_core=no
+fi
+
+# Check whether --enable-cuda was given.
+if test "${enable_cuda+set}" = set; then :
+  enableval=$enable_cuda;
+else
+  enable_cuda=no
 fi
 
 # Check whether --enable-magic-layout was given.
@@ -3182,7 +3191,7 @@ fi
 # define macrao AX_CHECK_COMPILE_FLAG
 
 
-if test "x$enable_mic" != "xyes"; then :
+if test "x$enable_knl" != "xyes"; then :
 
 	# add gcc compile options if supported.
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -march=native" >&5
@@ -3260,15 +3269,15 @@ fi
 else
 
 	enable_many_core=yes		# optimize for many-core architecture
-	# MIC native cross-compiling
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mmic" >&5
-$as_echo_n "checking whether C compiler accepts -mmic... " >&6; }
-if ${ax_cv_check_cflags___mmic+:} false; then :
+	# KNL native cross-compiling
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -xMIC-AVX512" >&5
+$as_echo_n "checking whether C compiler accepts -xMIC-AVX512... " >&6; }
+if ${ax_cv_check_cflags___xMIC_AVX512+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -mmic"
+  CFLAGS="$CFLAGS  -xMIC-AVX512"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3281,22 +3290,22 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___mmic=yes
+  ax_cv_check_cflags___xMIC_AVX512=yes
 else
-  ax_cv_check_cflags___mmic=no
+  ax_cv_check_cflags___xMIC_AVX512=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
   CFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___mmic" >&5
-$as_echo "$ax_cv_check_cflags___mmic" >&6; }
-if test x"$ax_cv_check_cflags___mmic" = xyes; then :
-  CC="$CC -mmic"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___xMIC_AVX512" >&5
+$as_echo "$ax_cv_check_cflags___xMIC_AVX512" >&6; }
+if test x"$ax_cv_check_cflags___xMIC_AVX512" = xyes; then :
+  CC="$CC -xMIC-AVX512"
 else
-  as_fn_error $? "\"Xeon Phi not supported.\"" "$LINENO" 5
+  as_fn_error $? "\"Xeon Phi (KNL) not supported.\"" "$LINENO" 5
 fi
 
-	# With MIC, enable mkl by default.
+	# With KNL, enable mkl by default.
 	if test "x$enable_mkl" = "xdefault"; then :
   enable_mkl=yes
 fi
@@ -3986,7 +3995,7 @@ $as_echo "$ac_cv_prog_c_openmp" >&6; }
 
 
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
-		if test "x$enable_mic" != "xno"; then :
+		if test "x$enable_knl" != "xno"; then :
 
 		target="libshtns_mic.a"
 		objs="sht_mic.o"
@@ -4265,6 +4274,108 @@ fi
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
 	target="_shtns.so"		# build python extension instead of C library.
 	install="install-py"	# install python extension instead of C library.
+
+fi
+
+# Check for CUDA
+if test "x$enable_cuda" = "xyes"; then :
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cudaMalloc in -lcudart" >&5
+$as_echo_n "checking for cudaMalloc in -lcudart... " >&6; }
+if ${ac_cv_lib_cudart_cudaMalloc+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcudart  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char cudaMalloc ();
+int
+main ()
+{
+return cudaMalloc ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_cudart_cudaMalloc=yes
+else
+  ac_cv_lib_cudart_cudaMalloc=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_cudart_cudaMalloc" >&5
+$as_echo "$ac_cv_lib_cudart_cudaMalloc" >&6; }
+if test "x$ac_cv_lib_cudart_cudaMalloc" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBCUDART 1
+_ACEOF
+
+  LIBS="-lcudart $LIBS"
+
+else
+  as_fn_error $? "cudart library not found. Try adding LDFLAGS=\"-L/usr/local/cuda/lib64\"" "$LINENO" 5
+fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cufftPlanMany in -lcufft" >&5
+$as_echo_n "checking for cufftPlanMany in -lcufft... " >&6; }
+if ${ac_cv_lib_cufft_cufftPlanMany+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcufft  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char cufftPlanMany ();
+int
+main ()
+{
+return cufftPlanMany ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_cufft_cufftPlanMany=yes
+else
+  ac_cv_lib_cufft_cufftPlanMany=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_cufft_cufftPlanMany" >&5
+$as_echo "$ac_cv_lib_cufft_cufftPlanMany" >&6; }
+if test "x$ac_cv_lib_cufft_cufftPlanMany" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBCUFFT 1
+_ACEOF
+
+  LIBS="-lcufft $LIBS"
+
+else
+  as_fn_error $? "cufft library not found." "$LINENO" 5
+fi
+
+	objs="$objs sht_gpu.o"
+	target="libshtns_cuda.a"
 
 fi
 

@@ -20,10 +20,12 @@ AC_ARG_ENABLE([openmp],
 	AS_HELP_STRING([--enable-openmp], [Enable multi-threading with OpenMP]), [], [enable_openmp=default])
 AC_ARG_ENABLE([mkl],
 	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (can be slightly faster, but NOT THREAD SAFE)]), [], [enable_mkl=default])
-AC_ARG_ENABLE([mic],
-	AS_HELP_STRING([--enable-mic], [Enable compilation for Xeon Phi]), [], [enable_mic=no])
+AC_ARG_ENABLE([knl],
+	AS_HELP_STRING([--enable-knl], [Enable compilation for Xeon Phi (KNL)]), [], [enable_knl=no])
 AC_ARG_ENABLE([many-core],
 	AS_HELP_STRING([--enable-many-core], [Enable optimizations for many-core systems (Blue Gene/Q, Xeon Phi,...) and remove single-threaded transforms]), [], [enable_many_core=no])
+AC_ARG_ENABLE([cuda],
+	AS_HELP_STRING([--enable-cuda], [Enable compilation for Nvidia gpu using cuda]), [], [enable_cuda=no])
 AC_ARG_ENABLE([magic-layout],
 	AS_HELP_STRING([--enable-magic-layout], [Compile specific version for the MagIC code]), [], [enable_magic_layout=no])
 AC_ARG_ENABLE([python],
@@ -69,16 +71,16 @@ AS_IF([test x"AS_VAR_GET(CACHEVAR)" = xyes],
 AS_VAR_POPDEF([CACHEVAR])dnl
 ])dnl AX_CHECK_COMPILE_FLAGS
 
-AS_IF([test "x$enable_mic" != "xyes"], [
+AS_IF([test "x$enable_knl" != "xyes"], [
 	# add gcc compile options if supported.
 	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"], [
 		AX_CHECK_COMPILE_FLAG([-mtune=native],[CC="$CC -mtune=native"])
 	])
   ],[
 	enable_many_core=yes		# optimize for many-core architecture
-	# MIC native cross-compiling
-	AX_CHECK_COMPILE_FLAG([-mmic],[CC="$CC -mmic"], [AC_MSG_ERROR(["Xeon Phi not supported."])])
-	# With MIC, enable mkl by default.
+	# KNL native cross-compiling
+	AX_CHECK_COMPILE_FLAG([-xMIC-AVX512],[CC="$CC -xMIC-AVX512"], [AC_MSG_ERROR(["Xeon Phi (KNL) not supported."])])
+	# With KNL, enable mkl by default.
 	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
 ])
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
@@ -121,7 +123,7 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 	dnl AC_CHECK_HEADERS([omp.h])
-	AS_IF([test "x$enable_mic" != "xno"], [
+	AS_IF([test "x$enable_knl" != "xno"], [
 		target="libshtns_mic.a"
 		objs="sht_mic.o"
 	],[
@@ -193,6 +195,14 @@ AS_IF([test "x$enable_python" != "xno"], [
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
 	target="_shtns.so"		# build python extension instead of C library.
 	install="install-py"	# install python extension instead of C library.
+])
+
+# Check for CUDA
+AS_IF([test "x$enable_cuda" = "xyes"], [
+	AC_CHECK_LIB([cudart],[cudaMalloc],,AC_MSG_ERROR([cudart library not found. Try adding LDFLAGS="-L/usr/local/cuda/lib64"]))
+	AC_CHECK_LIB([cufft],[cufftPlanMany],,AC_MSG_ERROR([cufft library not found.]))
+	objs="$objs sht_gpu.o"
+	target="libshtns_cuda.a"
 ])
 
 # Checks related to long double
