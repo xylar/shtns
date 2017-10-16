@@ -38,6 +38,7 @@ install-lib : $(libname)
 	@mkdir -p $(PREFIX)/include/
 	cp $(libname) $(PREFIX)/lib/$(libname)
 	cp shtns.h $(PREFIX)/include/
+	cp shtns_cuda.h $(PREFIX)/include/
 	cp shtns.f $(PREFIX)/include/
 	@echo " "
 	@cat COPYRIGHT
@@ -75,8 +76,7 @@ sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp
 sht_mic.o : sht_mic.c Makefile $(hfiles) SHT/SH_to_spat_mic.c SHT/spat_to_SH_mic.c
 	$(cc) -c $< -o $@
 sht_gpu.o : sht_gpu.cu Makefile $(hfiles)
-	nvcc -c sht_gpu.cu -lineinfo -Xptxas=-v -arch=sm_30
-#sm_30 is Kepler K10, sm_35 = Kepler K20, sm_50 = Pascal
+	nvcc -c sht_gpu.cu -lineinfo -Xptxas=-v -gencode=arch=compute_30,code=sm_30 -gencode=arch=compute_60,code=sm_60
 
 # programs & Examples
 time_SHT : time_SHT.c $(libname) shtns.h

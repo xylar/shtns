@@ -199,7 +199,7 @@ AS_IF([test "x$enable_python" != "xno"], [
 
 # Check for CUDA
 AS_IF([test "x$enable_cuda" = "xyes"], [
-	AC_CHECK_LIB([cudart],[cudaMalloc],,AC_MSG_ERROR([cudart library not found. Try adding LDFLAGS="-L/usr/local/cuda/lib64]))
+	AC_CHECK_LIB([cudart],[cudaMalloc],,AC_MSG_ERROR([cudart library not found. Try adding LDFLAGS="-L/usr/local/cuda/lib64"]))
 	AC_CHECK_LIB([cufft],[cufftPlanMany],,AC_MSG_ERROR([cufft library not found.]))
 	objs="$objs sht_gpu.o"
 	target="libshtns_cuda.a"

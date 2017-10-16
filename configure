@@ -4324,7 +4324,7 @@ _ACEOF
   LIBS="-lcudart $LIBS"
 
 else
-  as_fn_error $? "cudart library not found. Try adding LDFLAGS=\"-L/usr/local/cuda/lib64" "$LINENO" 5
+  as_fn_error $? "cudart library not found. Try adding LDFLAGS=\"-L/usr/local/cuda/lib64\"" "$LINENO" 5
 fi
 
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cufftPlanMany in -lcufft" >&5
