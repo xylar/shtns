@@ -156,7 +156,25 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		if (t>tmax) { tmax = t; jj = i; }
 	}
 	printf("   Spheroidal => max error = %g (l=%d,lm=%ld)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
-	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
+	if (tmax > 1e-3) {
+		if (NLM < 15) {
+			printf("\n orig:");
+			for (i=0; i<NLM;i++)
+				if ((i <= LMAX)||(i >= NLM)) {		// m=0, and 2*m=nphi is real
+					printf("  %g",creal(Slm0[i]));
+				} else {
+					printf("  %g,%g",creal(Slm0[i]),cimag(Slm0[i]));
+				}
+			printf("\n diff:");
+			for (i=0; i<NLM;i++)
+				if ((i <= LMAX)||(i >= NLM)) {		// m=0, and 2*m=nphi is real
+					printf("  %g",creal(Slm[i]));
+				} else {
+					printf("  %g,%g",creal(Slm[i]),cimag(Slm[i]));
+				}
+		}
+		printf("    **** ERROR ****\n");
+	}
 		else printf("\n");
 //	write_vect("Slm",Slm,NLM*2);
 	tmax0 = tmax;
@@ -175,7 +193,25 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		if (t>tmax) { tmax = t; jj = i; }
 	}
 	printf("   Toroidal => max error = %g (l=%d,lm=%ld)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
-	if (tmax > 1e-3) { printf("    **** ERROR ****\n"); }
+	if (tmax > 1e-3) {
+		if (NLM < 15) {
+			printf("\n orig:");
+			for (i=0; i<NLM;i++)
+				if ((i <= LMAX)||(i >= NLM)) {		// m=0, and 2*m=nphi is real
+					printf("  %g",creal(Tlm0[i]));
+				} else {
+					printf("  %g,%g",creal(Tlm0[i]),cimag(Tlm0[i]));
+				}
+			printf("\n diff:");
+			for (i=0; i<NLM;i++)
+				if ((i <= LMAX)||(i >= NLM)) {		// m=0, and 2*m=nphi is real
+					printf("  %g",creal(Tlm[i]));
+				} else {
+					printf("  %g,%g",creal(Tlm[i]),cimag(Tlm[i]));
+				}
+		}
+		printf("    **** ERROR ****\n");
+	}
 		else printf("\n");
 //	write_vect("Tlm",Tlm,NLM*2);
 	return(tmax > tmax0 ? tmax : tmax0);
@@ -301,6 +337,12 @@ void test_SHT_l(int ltr)
 	printf("   SHT time truncated at l=%d : synthesis = %f ms, analysis = %f ms\n", ltr, ts, ta);
 
 	scal_error(Slm, Slm0, ltr);
+
+	if (LMAX < 256) {
+		SH_to_spat_l(shtns, Slm0,Sh,ltr);
+		spat_to_SH(shtns, Sh, Slm);
+		scal_error(Slm, Slm0, ltr);		// check if the synthesis did not lead to l>ltr
+	}
 	return;
 }
 
@@ -334,6 +376,12 @@ void test_SHT_vect_l(int ltr)
 
 	fftw_free(T2);	fftw_free(S2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, ltr);
+
+	if (LMAX < 256) {
+		SHsphtor_to_spat_l(shtns, Slm0,Tlm0,Sh,Th,ltr);
+		spat_to_SHsphtor(shtns, Sh,Th,Slm,Tlm);
+		vect_error(Slm, Tlm, Slm0, Tlm0, ltr);		// check if the synthesis did not actually produce l>ltr
+	}
 	return;
 }
 
@@ -403,6 +451,14 @@ void test_SHT_vect3d_l(int ltr)
 	fftw_free(T2);	fftw_free(S2);	fftw_free(Q2);
 	vect_error(Slm, Tlm, Slm0, Tlm0, ltr);
 	scal_error(Qlm, Tlm0, ltr);
+
+	if (LMAX < 256) {
+		SHqst_to_spat_l(shtns, Tlm0,Slm0,Tlm0,NL,Sh,Th, ltr);
+		spat_to_SHqst(shtns, NL,Sh,Th,Qlm,Slm,Tlm);
+		vect_error(Slm, Tlm, Slm0, Tlm0, ltr);		// check if the synthesis did not actually produce l>ltr
+		scal_error(Qlm, Tlm0, ltr);		// check if the synthesis did not lead to l>ltr
+	}
+
 	return;
 }
 
@@ -637,6 +693,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
+	printf("loadsave = %d\n", loadsave);
 	if (loadsave) layout |= SHT_LOAD_SAVE_CFG;
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	shtns_use_threads(nthreads);		// 0 : means automatically chooses the number of threads.
@@ -752,7 +809,11 @@ int main(int argc, char *argv[])
 		Slm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 		if (vector) Tlm0[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
 	}
-	
+	for (int m=0; m<=MMAX; m++) {		// zero the last one.
+	//	Slm0[LiM(shtns, LMAX,m)] = 0.0;	
+	//	if (vector) Tlm0[LiM(shtns, LMAX, m)] = 0.0;
+	}
+
 	if (point) {
 		test_SH_point();
 		exit(0);
@@ -776,7 +837,7 @@ int main(int argc, char *argv[])
 		test_SHT_vect();
 		printf(":: LTR\n");
 		test_SHT_vect_l(LMAX/2);
-		
+
 		printf("** performing %d 3D vector SHT\n", SHT_ITER);
 		printf(":: STD\n");
 		test_SHT_vect3d();
