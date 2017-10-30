@@ -8,18 +8,18 @@
  * 5) allow several variants, which may change occupancy for large sizes ?
  * 6) try to store data for complex2real fft, and perform fft on host (less data to transfer)
  */
- 
+
 // NOTE variables gridDim.x, blockIdx.x, blockDim.x, threadIdx.x, and warpSize are defined in device functions
 
 #include "sht_private.h"
 
 // 256 for scalar SH_to_spat seems best on kepler.
-#define THREADS_PER_BLOCK 256
+#define THREADS_PER_BLOCK 128
 #define MAX_THREADS_PER_BLOCK 512
 // number of latitudes per thread:
 #define NWAY 1
 // number of l blocks to pre-compute
-#define LSPAN 16
+//#define LSPAN 16
 // the warp size is always 32 on cuda devices (up to Pascal at least)
 #define WARPSZE 32
 
@@ -176,16 +176,16 @@ __device__ double atomicAdd(double* address, double val)
 
 /// THREADS_PER_BLOCK/LSPAN must be a power of 2 and <= WARPSZE
 /// LSPAN must be a multiple of 2.
-template<int S> __global__ void
+template<int BLOCKSIZE, int LSPAN, int S> __global__ void
 ileg_m0(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2)
 {
 	// im = 0
-	const int it = (blockDim.x * blockIdx.x + threadIdx.x)*NWAY;
+	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
 
 	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN][THREADS_PER_BLOCK+1];	// padding to avoid bank conflicts
-	__shared__ double reo[2][THREADS_PER_BLOCK+1];	// padding to avoid bank conflicts
+	__shared__ double yl[LSPAN][BLOCKSIZE+1];	// padding to avoid bank conflicts
+	__shared__ double reo[2][BLOCKSIZE+1];	// padding to avoid bank conflicts
 	double cost, y0, y1;
 
 	y0 = (it < nlat_2) ? q[it] : 0.0;		// north
@@ -194,9 +194,7 @@ ileg_m0(const double *al, const double *ct, const double *q, double *ql, const i
 	reo[1][j] = y0-y1;		// odd
 
 	if (j < 2*LSPAN+2) ak[j] = al[j];
-	#if THREADS_PER_BLOCK > WARPSZE
-	__syncthreads();
-	#endif
+	if (BLOCKSIZE > WARPSZE)	__syncthreads();
 
 	int l = 0;
 	if (it < nlat_2) {
@@ -220,34 +218,29 @@ ileg_m0(const double *al, const double *ct, const double *q, double *ql, const i
 		al += 4;
 	}
 
-	#if THREADS_PER_BLOCK > WARPSZE
-	__syncthreads();
-	#endif
+	if (BLOCKSIZE > WARPSZE)	__syncthreads();
 	double qll = 0.0;	// accumulator
 	// now re-assign each thread an l (transpose)
-	const int ll = j / (THREADS_PER_BLOCK/LSPAN);
-	for (int i=0; i<THREADS_PER_BLOCK; i+= THREADS_PER_BLOCK/LSPAN) {
-		int it = j % (THREADS_PER_BLOCK/LSPAN) + i;
+	const int ll = j / (BLOCKSIZE/LSPAN);
+	for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN) {
+		int it = j % (BLOCKSIZE/LSPAN) + i;
 		qll += reo[ll&1][it] * yl[ll][it];
 	}
 	// reduce_add within same l must be in same warp too:
-	#if THREADS_PER_BLOCK/LSPAN > WARPSZE
-		#error "THREADS_PER_BLOCK/LSPAN > WARPSZE"
-	#endif
-	for (int ofs = THREADS_PER_BLOCK/(LSPAN*2); ofs > 0; ofs>>=1) {
-		qll += __shfl_down(qll, ofs, THREADS_PER_BLOCK/LSPAN);
+	if (BLOCKSIZE/LSPAN > WARPSZE)	printf("ERROR\n");
+
+	for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
+		qll += __shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
 	}
-	if ( ((j % (THREADS_PER_BLOCK/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
-		if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
+	if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
+		if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
 		ql[2*(l+ll)] = qll;
 		} else {
 		atomicAdd(ql+2*(l+ll), qll);		// VERY slow atomic add on Kepler.
 		}
 	}
 	if (j<2*LSPAN) ak[j+2] = al[j];
-	#if THREADS_PER_BLOCK > WARPSZE
-	__syncthreads();
-	#endif
+	if (BLOCKSIZE > WARPSZE)	__syncthreads();
 	l+=LSPAN;
 	}
 }
@@ -359,58 +352,71 @@ scal2sphtor_kernel(const double *mx, const double *vlm, const double *wlm, doubl
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim MUST BE <= 1800
 /// S can only be 0 (for scalar) or 1 (for spin 1 / vector)
-template<int S> __global__ void
-leg_m_lowllim(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
+template<int BLOCKSIZE, int S, int NFIELDS> __global__ void
+leg_m_lowllim(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int ql_dist=0, const int q_dist=0)
 {
-	const int it = blockDim.x * blockIdx.x + threadIdx.x;
+	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int im = blockIdx.y;
 	const int j = threadIdx.x;
 	const int m_inc = 2*nlat_2;
 	const int k_inc = 1;
 
-	// two arrays in shared memory of size blockDim.x :
-	extern __shared__ double ak[];
-	double* const qk = ak + blockDim.x;
+	__shared__ double ak[BLOCKSIZE];		// size blockDim.x
+	__shared__ double qk[NFIELDS*BLOCKSIZE];	// size blockDim.x * NFIELDS
 
 	const double cost = (it < nlat_2) ? ct[it] : 0.0;
 
 	if (im==0) {
 		ak[j] = al[j];
-		if (j<2*(llim+1)) qk[j] = ql[j];
+		if (j<2*(llim+1)) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) 	qk[j + f*BLOCKSIZE] = ql[j  + f*ql_dist];
+		}
 		__syncthreads();
 		int l = 0;
 		int ka = 0;	int kq = 0;
 		double y0 = ak[0];
 		if (S==1) y0 *= rsqrt(1.0 - cost*cost);	// for vectors, divide by sin(theta)
-		double re = y0 * qk[0];
 		double y1 = y0 * ak[1] * cost;
-		double ro = y1 * qk[2];
+		double re[NFIELDS], ro[NFIELDS];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			re[f] = y0 * qk[0 + f*BLOCKSIZE];
+			ro[f] = y1 * qk[2 + f*BLOCKSIZE];
+		}
 		al+=2;    l+=2;		ka+=2;	kq+=2;
 		while(l<llim) {
-			if (ka+6 >= blockDim.x) {
-			__syncthreads();  
-			ak[j] = al[j];
-			qk[j] = ql[2*l+j];
-			ka=0;	kq=0;
-			__syncthreads();
+			if (ka+6 >= BLOCKSIZE) {
+				__syncthreads();
+				ak[j] = al[j];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++) 	qk[j + f*BLOCKSIZE] = ql[2*l+j  + f*ql_dist];
+				ka=0;	kq=0;
+				__syncthreads();
 			}
 			y0  = ak[ka+1]*cost*y1 + ak[ka]*y0;
-			re += y0 * qk[2*kq];
 			y1  = ak[ka+3]*cost*y0 + ak[ka+2]*y1;
-			ro += y1 * qk[2*kq+2];
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[2*kq + f*BLOCKSIZE];
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	ro[f] += y1 * qk[2*kq+2 + f*BLOCKSIZE];
 			al+=4;	l+=2;	  ka+=4;    kq+=2;
 		}
 		if (l==llim) {
 			y0  = ak[ka+1]*cost*y1 + ak[ka]*y0;
-			re += y0 * qk[2*kq];
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[2*kq + f*BLOCKSIZE];
 		}
 		if (it<nlat_2) {
 			// store mangled for complex fft
-			q[it*k_inc] = re+ro;
-			q[(nlat_2*2-1-it)*k_inc] = re-ro;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				q[it*k_inc + f*q_dist] = re[f]+ro[f];
+				q[(nlat_2*2-1-it)*k_inc + f*q_dist] = re[f]-ro[f];
+			}
 		}
 	} else { 	// m>0
-		double rer,ror, rei, roi, y0, y1;
+		double rer[NFIELDS], ror[NFIELDS], rei[NFIELDS], roi[NFIELDS], y0, y1;
 		int m = im*mres;
 		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
 		al += 2*(l+m);
@@ -418,17 +424,21 @@ leg_m_lowllim(const double *al, const double *ct, const double *ql, double *q, c
 
 		y1 = sqrt(1.0 - cost*cost);		// y1 = sin(theta)
 		ak[j] = al[j];
-		qk[j] = ql[2*m+j];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++)	if (m+j/2 <= llim) qk[j + f*BLOCKSIZE] = ql[2*m+j + f*ql_dist];
 
-		ror = 0.0;		roi = 0.0;
-		rer = 0.0;		rei = 0.0;
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			ror[f] = 0.0;		roi[f] = 0.0;
+			rer[f] = 0.0;		rei[f] = 0.0;
+		}
 		y0 = 1.0;
 		l = m - S;
 		do {		// sin(theta)^(m-S)
 			if (l&1) y0 *= y1;
 			y1 *= y1;
 		} while(l >>= 1);
-		
+
 		__syncthreads();
 		y0 *= ak[0];
 		y1 = ak[1]*y0*cost;
@@ -438,39 +448,62 @@ leg_m_lowllim(const double *al, const double *ct, const double *ql, double *q, c
 		int kq = 0;
 
 		while (l<llim) {	// compute even and odd parts
-			if (2*kq+6 > blockDim.x) {
-			__syncthreads();
-			ak[j] = al[j];
-			qk[j] = ql[2*l+j];
-			ka=0;	kq=0;
-			__syncthreads();
+			if (2*kq+6 > BLOCKSIZE) {
+				__syncthreads();
+				ak[j] = al[j];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	if (l+j/2 <= llim)  qk[j + f*BLOCKSIZE] = ql[2*l+j + f*ql_dist];
+				ka=0;	kq=0;
+				__syncthreads();
 			}
-			rer += y0 * qk[2*kq];	// real
-			rei += y0 * qk[2*kq+1];	// imag
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				rer[f] += y0 * qk[2*kq + f*BLOCKSIZE];	// real
+				rei[f] += y0 * qk[2*kq+1 + f*BLOCKSIZE];	// imag
+			}
 			y0 = ak[ka+1]*(cost*y1) + ak[ka]*y0;
-			ror += y1 * qk[2*kq+2];	// real
-			roi += y1 * qk[2*kq+3];	// imag
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				ror[f] += y1 * qk[2*kq+2 + f*BLOCKSIZE];	// real
+				roi[f] += y1 * qk[2*kq+3 + f*BLOCKSIZE];	// imag
+			}
 			y1 = ak[ka+3]*(cost*y0) + ak[ka+2]*y1;
 			l+=2;	al+=4;	 ka+=4;	  kq+=2;
 		}
 		if (l==llim) {
-			rer += y0 * qk[2*kq];
-			rei += y0 * qk[2*kq+1];
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				rer[f] += y0 * qk[2*kq + f*BLOCKSIZE];
+				rei[f] += y0 * qk[2*kq+1 + f*BLOCKSIZE];
+			}
 		}
 
 		/// store mangled for complex fft
-		double nr = rer+ror;
-		double sr = rer-ror;
+		double nr[NFIELDS];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			nr[f] = rer[f]+ror[f];
+			rer[f] = rer[f]-ror[f];
+		}
 		const double sgn = 1 - 2*(j&1);
-		rei = __shfl_xor(rei, 1);
-		roi = __shfl_xor(roi, 1);
-		double nix = sgn*(rei+roi);
-		double six = sgn*(rei-roi);
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			rei[f] = __shfl_xor(rei[f], 1);
+			roi[f] = __shfl_xor(roi[f], 1);
+		}
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			ror[f] = sgn*(rei[f]+roi[f]);
+			rei[f] = sgn*(rei[f]-roi[f]);
+		}
 		if (it < nlat_2) {
-			q[im*m_inc + it*k_inc]                     = nr - nix;
-			q[(nphi-im)*m_inc + it*k_inc]              = nr + nix;
-			q[im*m_inc + (nlat_2*2-1-it)*k_inc]        = sr + six;
-			q[(nphi-im)*m_inc + (nlat_2*2-1-it)*k_inc] = sr - six;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				q[im*m_inc + it*k_inc + f*q_dist]                     = nr[f]  - ror[f];
+				q[(nphi-im)*m_inc + it*k_inc + f*q_dist]              = nr[f]  + ror[f];
+				q[im*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist]        = rer[f] + rei[f];
+				q[(nphi-im)*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist] = rer[f] - rei[f];
+			}
 		}
 	}
 }
@@ -570,7 +603,7 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 			y1 *= 1.0/SHT_SCALE_FACTOR;
 		}
 		}
-		
+
 		ka = WARPSZE;
 		while (l<llim) {
 		if (ka+4 >= WARPSZE) {		// cache coefficients
@@ -619,32 +652,30 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 }
 
 
-template<int S> __global__ void
+template<int BLOCKSIZE, int LSPAN, int S> __global__ void
 ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
 {
-	const int it = (blockDim.x * blockIdx.x + threadIdx.x)*NWAY;
+	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
 	const int im = blockIdx.y;
 	const int m_inc = 2*nlat_2;
 //    const int k_inc = 1;
 
 	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*THREADS_PER_BLOCK];
-	__shared__ double reo[4*THREADS_PER_BLOCK];
-	const int l_inc = THREADS_PER_BLOCK;
+	__shared__ double yl[LSPAN*BLOCKSIZE];
+	__shared__ double reo[4*BLOCKSIZE];
+	const int l_inc = BLOCKSIZE;
 	const double cost = (it < nlat_2) ? ct[it] : 0.0;
 	double y0, y1;
 
 
 	if (im == 0) {
 	if (j < 2*LSPAN+2) ak[j] = al[j];
-	#if THREADS_PER_BLOCK > WARPSZE
-	__syncthreads();
-	#endif
+	if (BLOCKSIZE > WARPSZE)	__syncthreads();
 	y0 = (it < nlat_2) ? q[it] : 0.0;		// north
 	y1 = (it < nlat_2) ? q[nlat_2*2-1 - it] : 0.0;	// south
 	reo[j] = y0+y1;				// even
-	reo[THREADS_PER_BLOCK +j] = y0-y1;		// odd
+	reo[BLOCKSIZE +j] = y0-y1;		// odd
 
 	int l = 0;
 	y0 = (it < nlat_2) ? ct[it + nlat_2] : 0.0;		// weights are stored just after ct.
@@ -662,34 +693,30 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 		y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
 		al += 4;
 		}
-		#if THREADS_PER_BLOCK > WARPSZE
-		__syncthreads();
-		#endif
+		if (BLOCKSIZE > WARPSZE)	__syncthreads();
 		double qll = 0.0;	// accumulator
 		// now re-assign each thread an l (transpose)
-		const int ll = j / (THREADS_PER_BLOCK/LSPAN);
-		for (int i=0; i<THREADS_PER_BLOCK; i+= THREADS_PER_BLOCK/LSPAN) {
-		int it = j % (THREADS_PER_BLOCK/LSPAN) + i;
-		qll += reo[(ll&1)*THREADS_PER_BLOCK +it] * yl[ll*l_inc +it];
+		const int ll = j / (BLOCKSIZE/LSPAN);
+		for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN) {
+		int it = j % (BLOCKSIZE/LSPAN) + i;
+		qll += reo[(ll&1)*BLOCKSIZE +it] * yl[ll*l_inc +it];
 		}
+
 		// reduce_add within same l must be in same warp too:
-		#if THREADS_PER_BLOCK/LSPAN > WARPSZE
-		#error "THREADS_PER_BLOCK/LSPAN > WARPSZE"
-		#endif
-		for (int ofs = THREADS_PER_BLOCK/(LSPAN*2); ofs > 0; ofs>>=1) {
-		qll += __shfl_down(qll, ofs, THREADS_PER_BLOCK/LSPAN);
+		if (BLOCKSIZE/LSPAN > WARPSZE)	printf("ERROR\n");
+
+		for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
+		qll += __shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
 		}
-		if ( ((j % (THREADS_PER_BLOCK/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
-		if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
+		if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
+		if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
 			ql[2*(l+ll)] = qll;
 		} else {
 			atomicAdd(ql+2*(l+ll), qll);		// VERY slow atomic add on Kepler.
 		}
 		}
 		if (j<2*LSPAN) ak[j+2] = al[j];
-		#if THREADS_PER_BLOCK > WARPSZE
-		__syncthreads();
-		#endif
+		if (BLOCKSIZE > WARPSZE)	__syncthreads();
 		l+=LSPAN;
 	}
 	} else {	// im > 0
@@ -699,9 +726,8 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 	ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
 
 	if (j < 2*LSPAN+2) ak[j] = al[j];
-	#if THREADS_PER_BLOCK > WARPSZE
-	__syncthreads();
-	#endif
+	if (BLOCKSIZE > WARPSZE)	__syncthreads();
+
 	const double sgn = 2*(j&1) - 1;	// -/+
 	y0    = (it < nlat_2) ? q[im*m_inc + it] : 0.0;		// north imag (ani)
 	double qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
@@ -712,10 +738,10 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 	y0 = __shfl_xor(qei, 1);	// exchange between adjacent lanes.
 	y1 = __shfl_xor(qoi, 1);
 	reo[j] 			    = qer + qor;	// rer
-	reo[THREADS_PER_BLOCK +j]   = qer - qor;	// ror
-	reo[2*THREADS_PER_BLOCK +j] = sgn*(y0 - y1);	// rei
-	reo[3*THREADS_PER_BLOCK +j] = sgn*(y0 + y1);	// roi
-		
+	reo[BLOCKSIZE +j]   = qer - qor;	// ror
+	reo[2*BLOCKSIZE +j] = sgn*(y0 - y1);	// rei
+	reo[3*BLOCKSIZE +j] = sgn*(y0 + y1);	// roi
+
 	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
 
 		y0 = 0.5 * ak[0];	// y0
@@ -737,67 +763,62 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 			al += 4;
 		}
 
-		#if THREADS_PER_BLOCK > WARPSZE
-		__syncthreads();
-		#endif
+		if (BLOCKSIZE > WARPSZE)	__syncthreads();
+
 		double qlri = 0.0;	// accumulator
 		// now re-assign each thread an l (transpose)
-		const int ll = j / (THREADS_PER_BLOCK/LSPAN);
-		const int ri = j / (THREADS_PER_BLOCK/(2*LSPAN)) % 2;	// real (0) or imag (1)
-		for (int i=0; i<THREADS_PER_BLOCK; i+= THREADS_PER_BLOCK/(2*LSPAN)) {
-			int it = j % (THREADS_PER_BLOCK/(2*LSPAN)) + i;
-			qlri += reo[((ll&1)+2*ri)*THREADS_PER_BLOCK +it]   * yl[ll*l_inc +it];
+		const int ll = j / (BLOCKSIZE/LSPAN);
+		const int ri = j / (BLOCKSIZE/(2*LSPAN)) % 2;	// real (0) or imag (1)
+		for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/(2*LSPAN)) {
+			int it = j % (BLOCKSIZE/(2*LSPAN)) + i;
+			qlri += reo[((ll&1)+2*ri)*BLOCKSIZE +it]   * yl[ll*l_inc +it];
 		}
+
 		// reduce_add within same l must be in same warp too:
-		#if THREADS_PER_BLOCK/(2*LSPAN) > WARPSZE
-			#error "THREADS_PER_BLOCK/(2*LSPAN) > WARPSZE"
-		#endif
-		for (int ofs = THREADS_PER_BLOCK/(LSPAN*4); ofs > 0; ofs>>=1) {
-			qlri += __shfl_down(qlri, ofs, THREADS_PER_BLOCK/(LSPAN*2));
+		if (BLOCKSIZE/(2*LSPAN) > WARPSZE)	printf("ERROR\n");
+
+		for (int ofs = BLOCKSIZE/(LSPAN*4); ofs > 0; ofs>>=1) {
+			qlri += __shfl_down(qlri, ofs, BLOCKSIZE/(LSPAN*2));
 		}
-		if ( ((j % (THREADS_PER_BLOCK/(2*LSPAN))) == 0) && ((l+ll)<=llim) ) {	// write result
-			if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
+		if ( ((j % (BLOCKSIZE/(2*LSPAN))) == 0) && ((l+ll)<=llim) ) {	// write result
+			if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
 			ql[2*(l+ll)+ri]   = qlri;
 			} else {
 			atomicAdd(ql+2*(l+ll)+ri, qlri);		// VERY slow atomic add on Kepler.
 			}
 		}
 		if (j<2*LSPAN) ak[j+2] = al[j];
-		#if THREADS_PER_BLOCK > WARPSZE
-		__syncthreads();
-		#endif
+		if (BLOCKSIZE > WARPSZE)	__syncthreads();
 		l+=LSPAN;
 		}
 	}
 }
 
 
-template<int S> __global__ void
+template<int BLOCKSIZE, int LSPAN, int S> __global__ void
 ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
 {
-	const int it = (blockDim.x * blockIdx.x + threadIdx.x)*NWAY;
+	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
 	const int im = blockIdx.y;
 	const int m_inc = 2*nlat_2;
 //    const int k_inc = 1;
 
 	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*THREADS_PER_BLOCK];
-	__shared__ double reo[4*THREADS_PER_BLOCK];
-	const int l_inc = THREADS_PER_BLOCK;
+	__shared__ double yl[LSPAN*BLOCKSIZE];
+	__shared__ double reo[4*BLOCKSIZE];
+	const int l_inc = BLOCKSIZE;
 	const double cost = (it < nlat_2) ? ct[it] : 0.0;
 	double y0, y1;
 
 
 	if (im == 0) {
 		if (j < 2*LSPAN+2) ak[j] = al[j];
-		#if THREADS_PER_BLOCK > WARPSZE
-		__syncthreads();
-		#endif
+		if (BLOCKSIZE > WARPSZE)	__syncthreads();
 		y0 = (it < nlat_2) ? q[it] : 0.0;		// north
 		y1 = (it < nlat_2) ? q[nlat_2*2-1 - it] : 0.0;	// south
 		reo[j] = y0+y1;				// even
-		reo[THREADS_PER_BLOCK +j] = y0-y1;		// odd
+		reo[BLOCKSIZE +j] = y0-y1;		// odd
 
 		int l = 0;
 		y0 = (it < nlat_2) ? ct[it + nlat_2] : 0.0;		// weights are stored just after ct.
@@ -815,34 +836,30 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 				y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
 				al += 4;
 			}
-			#if THREADS_PER_BLOCK > WARPSZE
-			__syncthreads();
-			#endif
+			if (BLOCKSIZE > WARPSZE)	__syncthreads();
 			double qll = 0.0;	// accumulator
 			// now re-assign each thread an l (transpose)
-			const int ll = j / (THREADS_PER_BLOCK/LSPAN);
-			for (int i=0; i<THREADS_PER_BLOCK; i+= THREADS_PER_BLOCK/LSPAN) {
-				int it = j % (THREADS_PER_BLOCK/LSPAN) + i;
-				qll += reo[(ll&1)*THREADS_PER_BLOCK +it] * yl[ll*l_inc +it];
+			const int ll = j / (BLOCKSIZE/LSPAN);
+			for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN) {
+				int it = j % (BLOCKSIZE/LSPAN) + i;
+				qll += reo[(ll&1)*BLOCKSIZE +it] * yl[ll*l_inc +it];
 			}
+
 			// reduce_add within same l must be in same warp too:
-			#if THREADS_PER_BLOCK/LSPAN > WARPSZE
-			#error "THREADS_PER_BLOCK/LSPAN > WARPSZE"
-			#endif
-			for (int ofs = THREADS_PER_BLOCK/(LSPAN*2); ofs > 0; ofs>>=1) {
-				qll += __shfl_down(qll, ofs, THREADS_PER_BLOCK/LSPAN);
+			if (BLOCKSIZE/LSPAN > WARPSZE) printf("ERROR\n");
+
+			for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
+				qll += __shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
 			}
-			if ( ((j % (THREADS_PER_BLOCK/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
-				if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
+			if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
+				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
 					ql[2*(l+ll)] = qll;
 				} else {
 					atomicAdd(ql+2*(l+ll), qll);		// VERY slow atomic add on Kepler.
 				}
 			}
 			if (j<2*LSPAN) ak[j+2] = al[j];
-			#if THREADS_PER_BLOCK > WARPSZE
-			__syncthreads();
-			#endif
+			if (BLOCKSIZE > WARPSZE)	__syncthreads();
 			l+=LSPAN;
 		}
 	} else {	// im > 0
@@ -852,9 +869,7 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 		ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
 
 		if (j < 2*LSPAN+2) ak[j] = al[j];
-		#if THREADS_PER_BLOCK > WARPSZE
-		__syncthreads();
-		#endif
+		if (BLOCKSIZE > WARPSZE)	__syncthreads();
 		const double sgn = 2*(j&1) - 1;	// -/+
 		y0    = (it < nlat_2) ? q[im*m_inc + it] : 0.0;		// north imag (ani)
 		double qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
@@ -865,10 +880,10 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 		y0 = __shfl_xor(qei, 1);	// exchange between adjacent lanes.
 		y1 = __shfl_xor(qoi, 1);
 		reo[j] 			    = qer + qor;	// rer
-		reo[THREADS_PER_BLOCK +j]   = qer - qor;	// ror
-		reo[2*THREADS_PER_BLOCK +j] = sgn*(y0 - y1);	// rei
-		reo[3*THREADS_PER_BLOCK +j] = sgn*(y0 + y1);	// roi
-			
+		reo[BLOCKSIZE +j]   = qer - qor;	// ror
+		reo[2*BLOCKSIZE +j] = sgn*(y0 - y1);	// rei
+		reo[3*BLOCKSIZE +j] = sgn*(y0 + y1);	// roi
+
 		y1 = sqrt(1.0 - cost*cost);	// sin(theta)
 
 		y0 = 0.5;	// y0
@@ -918,37 +933,33 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 				al += 4;
 			}
 
-			#if THREADS_PER_BLOCK > WARPSZE
-			__syncthreads();
-			#endif
+			if (BLOCKSIZE > WARPSZE)	__syncthreads();
 			double qlri = 0.0;	// accumulator
 			// now re-assign each thread an l (transpose)
-			const int ll = j / (THREADS_PER_BLOCK/LSPAN);
-			const int ri = j / (THREADS_PER_BLOCK/(2*LSPAN)) % 2;	// real (0) or imag (1)
+			const int ll = j / (BLOCKSIZE/LSPAN);
+			const int ri = j / (BLOCKSIZE/(2*LSPAN)) % 2;	// real (0) or imag (1)
 			if (ll+l <= llim) {
-				for (int i=0; i<THREADS_PER_BLOCK; i+= THREADS_PER_BLOCK/(2*LSPAN)) {
-				int it = j % (THREADS_PER_BLOCK/(2*LSPAN)) + i;
-				qlri += reo[((ll&1)+2*ri)*THREADS_PER_BLOCK +it]   * yl[ll*l_inc +it];
+				for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/(2*LSPAN)) {
+				int it = j % (BLOCKSIZE/(2*LSPAN)) + i;
+				qlri += reo[((ll&1)+2*ri)*BLOCKSIZE +it]   * yl[ll*l_inc +it];
 				}
 			}
+
 			// reduce_add within same l must be in same warp too:
-			#if THREADS_PER_BLOCK/(2*LSPAN) > WARPSZE
-				#error "THREADS_PER_BLOCK/(2*LSPAN) > WARPSZE"
-			#endif
-			for (int ofs = THREADS_PER_BLOCK/(LSPAN*4); ofs > 0; ofs>>=1) {
-				qlri += __shfl_down(qlri, ofs, THREADS_PER_BLOCK/(LSPAN*2));
+			if (BLOCKSIZE/(2*LSPAN) > WARPSZE) printf("ERROR\n");
+
+			for (int ofs = BLOCKSIZE/(LSPAN*4); ofs > 0; ofs>>=1) {
+				qlri += __shfl_down(qlri, ofs, BLOCKSIZE/(LSPAN*2));
 			}
-			if ( ((j % (THREADS_PER_BLOCK/(2*LSPAN))) == 0) && ((l+ll)<=llim) ) {	// write result
-				if (nlat_2 <= THREADS_PER_BLOCK) {		// do we need atomic add or not ?
+			if ( ((j % (BLOCKSIZE/(2*LSPAN))) == 0) && ((l+ll)<=llim) ) {	// write result
+				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
 				ql[2*(l+ll)+ri]   = qlri;
 				} else {
 				atomicAdd(ql+2*(l+ll)+ri, qlri);		// VERY slow atomic add on Kepler.
 				}
 			}
 			if (j<2*LSPAN) ak[j+2] = al[j];
-			#if THREADS_PER_BLOCK > WARPSZE
-			__syncthreads();
-			#endif
+			if (BLOCKSIZE > WARPSZE)	__syncthreads();
 			l+=LSPAN;
 		}
 	}
@@ -1034,12 +1045,16 @@ int cushtns_init_gpu(shtns_cfg shtns)
 	if (prop.major < 3) return -1;			// failure, SHTns requires compute cap. >= 3 (warp shuffle instructions)
 
 	// compute block number and block length (heuristic):
-	int nblocks = (nlat_2 + MAX_THREADS_PER_BLOCK-1)/MAX_THREADS_PER_BLOCK;
-	int threadsPerBlock = (((nlat_2 + nblocks-1)/nblocks) + 2*WARPSZE-1) & (~(2*WARPSZE-1));
+	int nblocks, threadsPerBlock;
+/*	nblocks = (nlat_2 + MAX_THREADS_PER_BLOCK-1)/MAX_THREADS_PER_BLOCK;
+	threadsPerBlock = (((nlat_2 + nblocks-1)/nblocks) + 2*WARPSZE-1) & (~(2*WARPSZE-1));
 	if (shtns->lmax > SHT_L_RESCALE_FLY) {		// for high_llim :
 		threadsPerBlock = 128;
 		nblocks = (nlat_2 + threadsPerBlock - 1) / threadsPerBlock;
 	}
+*/
+	threadsPerBlock = THREADS_PER_BLOCK;
+	nblocks = (nlat_2 + threadsPerBlock - 1) / threadsPerBlock;		
 	shtns->nblocks = nblocks;
 	shtns->threads_per_block = threadsPerBlock;
 	#if SHT_VERBOSE > 0
@@ -1091,7 +1106,7 @@ int cushtns_init_gpu(shtns_cfg shtns)
 	return device_id;		// success, return device_id
 }
 
-/// \internal Enables parallel transforms on selected GPU device, if available. \see shtns_use_gpu 
+/// \internal Enables parallel transforms on selected GPU device, if available. \see shtns_use_gpu
 extern "C"
 int cushtns_use_gpu(int device_id)
 {
@@ -1199,7 +1214,7 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 		dim3 blocks(blocksPerGrid, mmax+1);
 		dim3 threads(threadsPerBlock, 1);
 		if (llim <= SHT_L_RESCALE_FLY) {
-			leg_m_lowllim<0> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
+			leg_m_lowllim<THREADS_PER_BLOCK,0,1> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
 		} else {
 			leg_m_highllim<0> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
 		}
@@ -1229,8 +1244,8 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 }
 
 /// Perform SH transform on data that is already on the GPU. d_Qlm and d_Vr are pointers to GPU memory (obtained by cudaMalloc() for instance)
-template<int S>
-void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int llim)
+template<int S, int NFIELDS>
+void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int llim, int spat_dist = 0)
 {
 	const int lmax = shtns->lmax;
 	int mmax = shtns->mmax;
@@ -1256,15 +1271,19 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 			leg_m0<S><<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
 		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
-			leg_m_lowllim<S><<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi);
+//			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS><<<blocks, threads, (NFIELDS+1)*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, (spat_dist == 0) ? shtns->spat_stride : spat_dist);
+			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, (spat_dist == 0) ? shtns->spat_stride : spat_dist);
 		} else {
 			leg_m_highllim<S><<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi);
 		}
-		// padd missing m's with 0 (m>mmax)
-		if (2*(mmax+1) <= nphi)
-			cudaMemsetAsync( d_Vr + (mmax+1)*2*nlat_2, 0, sizeof(double)*(nphi-2*mmax-1)*2*nlat_2, stream );		// set to zero before fft
 		cufftResult res;
-		res = cufftExecZ2Z(shtns->cufft_plan, (cufftDoubleComplex*) d_Vr, (cufftDoubleComplex*) d_Vr, CUFFT_INVERSE);
+		for (int f=0; f<NFIELDS; f++) {
+			cufftDoubleComplex* x = (cufftDoubleComplex*) (d_Vr + f * shtns->spat_stride);
+			// padd missing m's with 0 (m>mmax)
+			if (2*(mmax+1) <= nphi)
+				cudaMemsetAsync( x + (mmax+1)*nlat_2, 0, sizeof(double)*(nphi-2*mmax-1)*2*nlat_2, stream );		// set to zero before fft
+			res = cufftExecZ2Z(shtns->cufft_plan, x, x, CUFFT_INVERSE);
+		}
 		if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
 	}
 }
@@ -1288,7 +1307,7 @@ void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int 
 	const int blocksPerGrid =(nlat_2 + threadsPerBlock - 1) / (threadsPerBlock*NWAY);
 	cudaMemsetAsync(d_Qlm, 0, sizeof(double)*2*nlm, stream);		// set to zero before we start.
 	if (nphi == 1) {
-		ileg_m0<S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);
+		ileg_m0<THREADS_PER_BLOCK, 4, S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);
 	} else {
 		cufftResult res;
 		res = cufftExecZ2Z(shtns->cufft_plan, (cufftDoubleComplex*) d_Vr, (cufftDoubleComplex*) d_Vr, CUFFT_INVERSE);
@@ -1298,12 +1317,12 @@ void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int 
 		dim3 blocks(blocksPerGrid, mmax+1);
 		dim3 threads(threadsPerBlock, 1);
 		if (mmax==0) {
-			ileg_m0<S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);
+			ileg_m0<THREADS_PER_BLOCK, 4, S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);
 		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
-			ileg_m_lowllim<S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi);
+			ileg_m_lowllim<THREADS_PER_BLOCK, 4, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi);
 		} else {
-			ileg_m_highllim<S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi);
+			ileg_m_highllim<THREADS_PER_BLOCK, 4, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi);
 		}
 	}
 }
@@ -1311,7 +1330,7 @@ void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int 
 extern "C"
 void cu_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, int llim)
 {
-	cuda_SH_to_spat<0>(shtns, d_Qlm, d_Vr, llim);
+	cuda_SH_to_spat<0,1>(shtns, d_Qlm, d_Vr, llim);
 }
 
 
@@ -1322,7 +1341,7 @@ void sphtor2scal_gpu(shtns_cfg shtns, cplx* d_Slm, cplx* d_Tlm, cplx* d_Vlm, cpl
 	sphtor2scal_kernel <<< blocks, threads,0, shtns->comp_stream >>>
 		(shtns->d_mx_stdt, (double*) d_Slm, (double*) d_Tlm, (double*) d_Vlm, (double*) d_Wlm, llim, shtns->lmax, shtns->mres);
 	cudaError_t err = cudaGetLastError();
-	if (err != cudaSuccess) { printf("sphtor2scal_gpu error : %s!\n", cudaGetErrorString(err));	return; }	
+	if (err != cudaSuccess) { printf("sphtor2scal_gpu error : %s!\n", cudaGetErrorString(err));	return; }
 }
 
 
@@ -1348,14 +1367,15 @@ void cu_SHsphtor_to_spat(shtns_cfg shtns, cplx* d_Slm, cplx* d_Tlm, double* d_Vt
 
 	sphtor2scal_gpu(shtns, d_Slm, d_Tlm, (cplx*) d_vwlm, (cplx*) (d_vwlm+nlm_stride), llim);
 	// SHT on the GPU
-	cuda_SH_to_spat<1>(shtns, (cplx*) d_vwlm, d_Vt, llim+1);
-	cuda_SH_to_spat<1>(shtns, (cplx*) (d_vwlm + nlm_stride), d_Vp, llim+1);
+//	cuda_SH_to_spat<1,1>(shtns, (cplx*) d_vwlm, d_Vt, llim+1);
+//	cuda_SH_to_spat<1,1>(shtns, (cplx*) (d_vwlm + nlm_stride), d_Vp, llim+1);
+	cuda_SH_to_spat<1,2>(shtns, (cplx*) d_vwlm, d_Vt, llim+1, d_Vp-d_Vt);
 }
 
 extern "C"
 void cu_SHqst_to_spat(shtns_cfg shtns, cplx* d_Qlm, cplx* d_Slm, cplx* d_Tlm, double* d_Vr, double* d_Vt, double* d_Vp, int llim)
 {
-	cuda_SH_to_spat<0>(shtns, d_Qlm, d_Vr, llim);
+	cuda_SH_to_spat<0,1>(shtns, d_Qlm, d_Vr, llim);
 	cu_SHsphtor_to_spat(shtns, d_Slm, d_Tlm, d_Vt, d_Vp, llim);
 }
 
@@ -1427,7 +1447,7 @@ void SH_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim)
 	if (err != cudaSuccess) { printf("SH_to_spat_gpu failed copy qlm\n");	return; }
 
 	// SHT on the GPU
-	cuda_SH_to_spat<0>(shtns, (cplx*) d_qlm, d_q, llim);
+	cuda_SH_to_spat<0,1>(shtns, (cplx*) d_qlm, d_q, llim);
 	err = cudaGetLastError();
 	if (err != cudaSuccess) { printf("SH_to_spat_gpu CUDA error : %s!\n", cudaGetErrorString(err));	return; }
 
@@ -1457,7 +1477,7 @@ void sphtor2scal(shtns_cfg shtns, cplx* Slm, cplx* Tlm, cplx* Vlm, cplx* Wlm, co
 	cplx* Vl = (cplx*) &Vlm[l+im];
 	cplx* Wl = (cplx*) &Wlm[l+im];
 	const double em = m;
-	
+
 	cplx sl = Sl[m];
 	cplx tl = Tl[m];
 	cplx vs = 0.0;
@@ -1504,7 +1524,7 @@ void SHsphtor_to_spat_gpu(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, dou
 	d_vwlm = shtns->gpu_mem;
 	d_vtp = d_vwlm + 2*nlm_stride;
 
-/*   // convert on cpu & transfer (via pinned mem) 
+/*   // convert on cpu & transfer (via pinned mem)
 	sphtor2scal(shtns, Slm, Tlm, (cplx*) vw, (cplx*) (vw + nlm_stride), llim);		// convert & copy to pinned mem
 	err = cudaMemcpy(d_vwlm, vw, 2*nlm_stride*sizeof(double), cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) { printf("failed copy vw\n");	return; }
@@ -1517,20 +1537,28 @@ void SHsphtor_to_spat_gpu(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, dou
 
 	sphtor2scal_gpu(shtns, (cplx*) d_vtp, (cplx*) (d_vtp+nlm_stride), (cplx*) d_vwlm, (cplx*) (d_vwlm+nlm_stride), llim);
 
+/*
 	// SHT on the GPU
-	cuda_SH_to_spat<1>(shtns, (cplx*) d_vwlm, d_vtp, llim+1);
+	cuda_SH_to_spat<1,1>(shtns, (cplx*) d_vwlm, d_vtp, llim+1);
 	cudaEventCreateWithFlags(&ev_sht, cudaEventDisableTiming );
 	cudaEventRecord(ev_sht, shtns->comp_stream);					// record the end of scalar SH (theta).
 
-	cuda_SH_to_spat<1>(shtns, (cplx*) (d_vwlm + nlm_stride), d_vtp + spat_stride, llim+1);
+	cuda_SH_to_spat<1,1>(shtns, (cplx*) (d_vwlm + nlm_stride), d_vtp + spat_stride, llim+1);
 	err = cudaGetLastError();
 	if (err != cudaSuccess) { printf("SH_to_spat CUDA error : %s!\n", cudaGetErrorString(err));	return; }
 
 	cudaStreamWaitEvent(xfer_stream, ev_sht, 0);					// xfer stream waits for end of scalar SH (theta).
 	cudaMemcpyAsync(Vt, d_vtp, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost, shtns->xfer_stream);
+	cudaEventDestroy(ev_sht);
 
 	// copy back spatial data (phi)
 	err = cudaMemcpy(Vp, d_vtp + spat_stride, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost);
+*/
+
+	// SHT on the GPU
+	cuda_SH_to_spat<1,2>(shtns, (cplx*) d_vwlm, d_vtp, llim+1);		// Vt and Vp together  (merge with sphtor2scal_gpu)
+	cudaMemcpy(Vt, d_vtp, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost);
+	cudaMemcpy(Vp, d_vtp + spat_stride, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost);
 
 /*	// OR copy to pinned memory first
 	err = cudaMemcpy(vw, d_vtp, 2*spat_stride*sizeof(double), cudaMemcpyDeviceToHost);
@@ -1538,7 +1566,6 @@ void SHsphtor_to_spat_gpu(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, dou
 	memcpy(Vp, vw + spat_stride, nlat*nphi*sizeof(double));
 */
 
-	cudaEventDestroy(ev_sht);
 //    cudaFree(d_vwlm);		d_vwlm = NULL;
 }
 
@@ -1573,9 +1600,9 @@ void SHqst_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double 
 	err = cudaMemcpy(d_qvwlm, Qlm, 2*nlm*sizeof(double), cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) { printf("memcpy 0 error : %s!\n", cudaGetErrorString(err));	return; }
 	// SHT on the GPU
-	cuda_SH_to_spat<0>(shtns, (cplx*) d_qvwlm, d_vrtp + 2*spat_stride, llim);
+	cuda_SH_to_spat<0,1>(shtns, (cplx*) d_qvwlm, d_vrtp + 2*spat_stride, llim);
 
-/*   // convert on cpu & transfer (via pinned mem) 
+/*   // convert on cpu & transfer (via pinned mem)
 	sphtor2scal(shtns, Slm, Tlm, (cplx*) vw, (cplx*) (vw + nlm_stride), llim);		// convert & copy to pinned mem
 	err = cudaMemcpy(d_vwlm, vw, 2*nlm_stride*sizeof(double), cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) { printf("failed copy vw\n");	return; }
@@ -1595,20 +1622,29 @@ void SHqst_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double 
 	sphtor2scal_gpu(shtns, (cplx*) d_vrtp, (cplx*) (d_vrtp+nlm_stride), (cplx*) d_qvwlm, (cplx*) (d_qvwlm+nlm_stride), llim);
 
 	// SHT on the GPU
-	cuda_SH_to_spat<1>(shtns, (cplx*) d_qvwlm, d_vrtp, llim+1);
+	/*
+	cuda_SH_to_spat<1,1>(shtns, (cplx*) d_qvwlm, d_vrtp, llim+1);
 	cudaEventCreateWithFlags(&ev_sht1, cudaEventDisableTiming );
 	cudaEventRecord(ev_sht1, comp_stream);					// record the end of scalar SH (theta).
 
-	cuda_SH_to_spat<1>(shtns, (cplx*) (d_qvwlm + nlm_stride), d_vrtp + spat_stride, llim+1);
+	cuda_SH_to_spat<1,1>(shtns, (cplx*) (d_qvwlm + nlm_stride), d_vrtp + spat_stride, llim+1);
+	*/
+	cuda_SH_to_spat<1,2>(shtns, (cplx*) d_qvwlm, d_vrtp, llim+1);
 
 	err = cudaGetLastError();
 	if (err != cudaSuccess) { printf("SH_to_spat CUDA error : %s!\n", cudaGetErrorString(err));	return; }
 
+
 	cudaStreamWaitEvent(xfer_stream, ev_sht0, 0);					// xfer stream waits for end of scalar SH (radial).
 	cudaMemcpyAsync(Vr, d_vrtp + 2*spat_stride, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost, xfer_stream);
+	cudaEventDestroy(ev_sht0);
 
+	cudaMemcpy(Vt, d_vrtp, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost);
+/*
 	cudaStreamWaitEvent(xfer_stream, ev_sht1, 0);					// xfer stream waits for end of scalar SH (theta).
 	cudaMemcpyAsync(Vt, d_vrtp, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost, xfer_stream);
+	cudaEventDestroy(ev_sht1);
+*/
 
 	// copy back the last transform (compute stream).
 	err = cudaMemcpy(Vp, d_vrtp + spat_stride, nlat*nphi*sizeof(double), cudaMemcpyDeviceToHost);
@@ -1618,7 +1654,7 @@ void SHqst_to_spat_gpu(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double 
 	memcpy(Vt, vw, nlat*nphi*sizeof(double));
 	memcpy(Vp, vw + spat_stride, nlat*nphi*sizeof(double));
 */
-	cudaEventDestroy(ev_up);	cudaEventDestroy(ev_sht0);		cudaEventDestroy(ev_sht1);
+	cudaEventDestroy(ev_up);
 //    cudaFree(d_qvwlm);		d_qvwlm = NULL;
 //    cudaFreeHost(vw);
 }
@@ -1646,11 +1682,11 @@ void SHqst_to_spat_hyb(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double 
 	cudaMemcpyAsync(d_vrtp + nlm_stride, Tlm, 2*nlm*sizeof(double), cudaMemcpyHostToDevice, comp_stream);
 	sphtor2scal_gpu(shtns, (cplx*) d_vrtp, (cplx*) (d_vrtp+nlm_stride), (cplx*) d_qvwlm, (cplx*) (d_qvwlm+nlm_stride), llim);
 
-	cuda_SH_to_spat<1>(shtns, (cplx*) d_qvwlm, d_vrtp, llim+1);
+	cuda_SH_to_spat<1,1>(shtns, (cplx*) d_qvwlm, d_vrtp, llim+1);
 	cudaEventCreateWithFlags(&ev_sht1, cudaEventDisableTiming );
 	cudaEventRecord(ev_sht1, comp_stream);					// record the end of scalar SH (theta).
 
-	cuda_SH_to_spat<1>(shtns, (cplx*) (d_qvwlm + nlm_stride), d_vrtp + spat_stride, llim+1);
+	cuda_SH_to_spat<1,1>(shtns, (cplx*) (d_qvwlm + nlm_stride), d_vrtp + spat_stride, llim+1);
 	cudaEventCreateWithFlags(&ev_sht2, cudaEventDisableTiming );
 	cudaEventRecord(ev_sht2, comp_stream);					// record the end of scalar SH (phi).
 
@@ -1818,7 +1854,7 @@ void SH_to_spat_many_gpu(shtns_cfg shtns, int howmany, cplx *Qlm, double *Vr, co
 	const int nlm = shtns->nlm;
 	const int lmax = shtns->lmax;
 	int mmax = shtns->mmax;
-	const int mres = shtns->mres;    
+	const int mres = shtns->mres;
 	const int nlat = shtns->nlat;
 	const int nphi = shtns->nphi;
 	const int nspat = shtns->nspat;
