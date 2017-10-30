@@ -621,6 +621,7 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+nvcc_flags
 shtcc_flags
 libname
 objs
@@ -4011,8 +4012,141 @@ fi
 fi
 
 fi
-libname=$target		# set the libname befor checking for python.
 
+# Check for CUDA
+if test "x$enable_cuda" = "xyes"; then :
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cudaMalloc in -lcudart" >&5
+$as_echo_n "checking for cudaMalloc in -lcudart... " >&6; }
+if ${ac_cv_lib_cudart_cudaMalloc+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcudart  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char cudaMalloc ();
+int
+main ()
+{
+return cudaMalloc ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_cudart_cudaMalloc=yes
+else
+  ac_cv_lib_cudart_cudaMalloc=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_cudart_cudaMalloc" >&5
+$as_echo "$ac_cv_lib_cudart_cudaMalloc" >&6; }
+if test "x$ac_cv_lib_cudart_cudaMalloc" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBCUDART 1
+_ACEOF
+
+  LIBS="-lcudart $LIBS"
+
+else
+  as_fn_error $? "cudart library not found. Try adding LDFLAGS=\"-L/usr/local/cuda/lib64\"" "$LINENO" 5
+fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cufftPlanMany in -lcufft" >&5
+$as_echo_n "checking for cufftPlanMany in -lcufft... " >&6; }
+if ${ac_cv_lib_cufft_cufftPlanMany+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcufft  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char cufftPlanMany ();
+int
+main ()
+{
+return cufftPlanMany ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_cufft_cufftPlanMany=yes
+else
+  ac_cv_lib_cufft_cufftPlanMany=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_cufft_cufftPlanMany" >&5
+$as_echo "$ac_cv_lib_cufft_cufftPlanMany" >&6; }
+if test "x$ac_cv_lib_cufft_cufftPlanMany" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBCUFFT 1
+_ACEOF
+
+  LIBS="-lcufft $LIBS"
+
+else
+  as_fn_error $? "cufft library not found." "$LINENO" 5
+fi
+
+	objs="$objs sht_gpu.o"
+	target="libshtns_cuda.a"
+
+	nvcc_flags=""
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports Kepler gpu" >&5
+$as_echo_n "checking whether nvcc supports Kepler gpu... " >&6; }
+	if nvcc sht_gpu.cu -c -arch=sm_30 --dryrun > /dev/null 2>&1; then :
+
+	    nvcc_flags="$nvcc_flags -gencode=arch=compute_30,code=sm_30"
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+else
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports Pascal gpu" >&5
+$as_echo_n "checking whether nvcc supports Pascal gpu... " >&6; }
+	if nvcc sht_gpu.cu -c -arch=sm_60 --dryrun > /dev/null 2>&1; then :
+
+	    nvcc_flags="$nvcc_flags -gencode=arch=compute_60,code=sm_60"
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+else
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+	if test "x$nvcc_flags" == "x"; then :
+
+	    as_fn_error $? "nvcc does not support any compatible gpu. Is nvcc available ?" "$LINENO" 5
+
+fi
+
+fi
+libname=$target		# set the libname befor checking for python.
 
 # Check for FFTW (FFTW preferred, MKL optional)
 if test "x$enable_mkl" = "xyes"; then :
@@ -4274,108 +4408,6 @@ fi
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
 	target="_shtns.so"		# build python extension instead of C library.
 	install="install-py"	# install python extension instead of C library.
-
-fi
-
-# Check for CUDA
-if test "x$enable_cuda" = "xyes"; then :
-
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cudaMalloc in -lcudart" >&5
-$as_echo_n "checking for cudaMalloc in -lcudart... " >&6; }
-if ${ac_cv_lib_cudart_cudaMalloc+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lcudart  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char cudaMalloc ();
-int
-main ()
-{
-return cudaMalloc ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_cudart_cudaMalloc=yes
-else
-  ac_cv_lib_cudart_cudaMalloc=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_cudart_cudaMalloc" >&5
-$as_echo "$ac_cv_lib_cudart_cudaMalloc" >&6; }
-if test "x$ac_cv_lib_cudart_cudaMalloc" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBCUDART 1
-_ACEOF
-
-  LIBS="-lcudart $LIBS"
-
-else
-  as_fn_error $? "cudart library not found. Try adding LDFLAGS=\"-L/usr/local/cuda/lib64\"" "$LINENO" 5
-fi
-
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cufftPlanMany in -lcufft" >&5
-$as_echo_n "checking for cufftPlanMany in -lcufft... " >&6; }
-if ${ac_cv_lib_cufft_cufftPlanMany+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lcufft  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char cufftPlanMany ();
-int
-main ()
-{
-return cufftPlanMany ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_cufft_cufftPlanMany=yes
-else
-  ac_cv_lib_cufft_cufftPlanMany=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_cufft_cufftPlanMany" >&5
-$as_echo "$ac_cv_lib_cufft_cufftPlanMany" >&6; }
-if test "x$ac_cv_lib_cufft_cufftPlanMany" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBCUFFT 1
-_ACEOF
-
-  LIBS="-lcufft $LIBS"
-
-else
-  as_fn_error $? "cufft library not found." "$LINENO" 5
-fi
-
-	objs="$objs sht_gpu.o"
-	target="libshtns_cuda.a"
 
 fi
 
@@ -4865,6 +4897,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 #### end Fortran #####
 
 echo "prefix=$prefix"
+
 
 
 

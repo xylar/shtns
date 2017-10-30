@@ -132,8 +132,31 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 		AS_IF([test "x$enable_many_core" != "xno"], [objs="sht_mic.o"])
 	])
 ])
-libname=$target		# set the libname befor checking for python.
 
+# Check for CUDA
+AS_IF([test "x$enable_cuda" = "xyes"], [
+	AC_CHECK_LIB([cudart],[cudaMalloc],,AC_MSG_ERROR([cudart library not found. Try adding LDFLAGS="-L/usr/local/cuda/lib64"]))
+	AC_CHECK_LIB([cufft],[cufftPlanMany],,AC_MSG_ERROR([cufft library not found.]))
+	objs="$objs sht_gpu.o"
+	target="libshtns_cuda.a"
+
+	nvcc_flags=""
+	AC_MSG_CHECKING([whether nvcc supports Kepler gpu])
+	AS_IF([nvcc sht_gpu.cu -c -arch=sm_30 --dryrun > /dev/null 2>&1], [
+	    nvcc_flags="$nvcc_flags -gencode=arch=compute_30,code=sm_30"
+	    AC_MSG_RESULT(yes)
+	],[ AC_MSG_RESULT(no) ])
+	AC_MSG_CHECKING([whether nvcc supports Pascal gpu])
+	AS_IF([nvcc sht_gpu.cu -c -arch=sm_60 --dryrun > /dev/null 2>&1], [
+	    nvcc_flags="$nvcc_flags -gencode=arch=compute_60,code=sm_60"
+	    AC_MSG_RESULT(yes)
+	],[ AC_MSG_RESULT(no) ])
+
+	AS_IF([test "x$nvcc_flags" == "x"], [
+	    AC_MSG_ERROR([nvcc does not support any compatible gpu. Is nvcc available ?])
+	])
+])
+libname=$target		# set the libname befor checking for python.
 
 # Check for FFTW (FFTW preferred, MKL optional)
 AS_IF([test "x$enable_mkl" = "xyes"], [
@@ -195,14 +218,6 @@ AS_IF([test "x$enable_python" != "xno"], [
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
 	target="_shtns.so"		# build python extension instead of C library.
 	install="install-py"	# install python extension instead of C library.
-])
-
-# Check for CUDA
-AS_IF([test "x$enable_cuda" = "xyes"], [
-	AC_CHECK_LIB([cudart],[cudaMalloc],,AC_MSG_ERROR([cudart library not found. Try adding LDFLAGS="-L/usr/local/cuda/lib64"]))
-	AC_CHECK_LIB([cufft],[cufftPlanMany],,AC_MSG_ERROR([cufft library not found.]))
-	objs="$objs sht_gpu.o"
-	target="libshtns_cuda.a"
 ])
 
 # Checks related to long double
@@ -269,5 +284,6 @@ AC_SUBST([install])
 AC_SUBST([objs])
 AC_SUBST([libname])
 AC_SUBST([shtcc_flags])
+AC_SUBST([nvcc_flags])
 AC_CONFIG_FILES([Makefile setup.py])
 AC_OUTPUT
