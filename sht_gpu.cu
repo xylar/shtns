@@ -15,6 +15,7 @@
 
 // 256 for scalar SH_to_spat seems best on kepler.
 #define THREADS_PER_BLOCK 256
+#define MAX_THREADS_PER_BLOCK 512
 // number of latitudes per thread:
 #define NWAY 1
 // number of l blocks to pre-compute
@@ -50,8 +51,12 @@ leg_m0(const double *al, const double *ct, const double *ql, double *q, const in
 	const int it = blockDim.x * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
 
-	__shared__ double ak[THREADS_PER_BLOCK];
-	__shared__ double qk[THREADS_PER_BLOCK/2];
+	//__shared__ double ak[THREADS_PER_BLOCK];		// size blockDim.x
+	//__shared__ double qk[THREADS_PER_BLOCK/2];	// size blockDim.x / 2
+
+	extern __shared__ double ak[];			// size blockDim.x
+	double* const qk = ak + blockDim.x;		// size blockDim.x / 2
+
 	ak[j] = al[j];
 	if ((j <= llim)&&(j<THREADS_PER_BLOCK/2)) qk[j] = ql[2*j];
 	__syncthreads();
@@ -481,8 +486,11 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 	const int m_inc = 2*nlat_2;
 	const int k_inc = 1;
 
-	__shared__ double ak[THREADS_PER_BLOCK];	// cache
-	__shared__ double qk[THREADS_PER_BLOCK];
+	//__shared__ double ak[THREADS_PER_BLOCK];	// cache
+	//__shared__ double qk[THREADS_PER_BLOCK];
+	// two arrays in shared memory of size blockDim.x :
+	extern __shared__ double ak[];
+	double* const qk = ak + blockDim.x;
 
 	const double cost = (it < nlat_2) ? ct[it] : 0.0;
 
@@ -1025,6 +1033,19 @@ int cushtns_init_gpu(shtns_cfg shtns)
 	if (prop.warpSize != WARPSZE) return -1;		// failure, SHTns requires a warpSize of 32.
 	if (prop.major < 3) return -1;			// failure, SHTns requires compute cap. >= 3 (warp shuffle instructions)
 
+	// compute block number and block length (heuristic):
+	int nblocks = (nlat_2 + MAX_THREADS_PER_BLOCK-1)/MAX_THREADS_PER_BLOCK;
+	int threadsPerBlock = (((nlat_2 + nblocks-1)/nblocks) + 2*WARPSZE-1) & (~(2*WARPSZE-1));
+	if (shtns->lmax > SHT_L_RESCALE_FLY) {		// for high_llim :
+		threadsPerBlock = 128;
+		nblocks = (nlat_2 + threadsPerBlock - 1) / threadsPerBlock;
+	}
+	shtns->nblocks = nblocks;
+	shtns->threads_per_block = threadsPerBlock;
+	#if SHT_VERBOSE > 0
+	printf("  cuda threads_per_block = %d, nblocks= %d\n", threadsPerBlock, nblocks);
+	#endif
+
 	// Allocate the device input vector alm
 	err = cudaMalloc((void **)&d_alm, (2*nlm+THREADS_PER_BLOCK-1)*sizeof(double));	// allow some overflow.
 	if (err != cudaSuccess) err_count ++;
@@ -1170,7 +1191,7 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 		err = cudaMemcpy(d_qlm, Ql0, (llim+1)*sizeof(double), cudaMemcpyHostToDevice);
 		if (err != cudaSuccess)  printf("failed copy qlm\n");
 
-		leg_m0<0> <<< blocksPerGrid, threadsPerBlock, 0, shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2);
+		leg_m0<0> <<< blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2);
 	} else {
 		err = cudaMemcpy(d_qlm, Qlm, 2*nlm*sizeof(double), cudaMemcpyHostToDevice);
 		if (err != cudaSuccess)  printf("failed copy qlm\n");
@@ -1180,7 +1201,7 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 		if (llim <= SHT_L_RESCALE_FLY) {
 			leg_m_lowllim<0> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
 		} else {
-			leg_m_highllim<0> <<< blocks, threads,0, shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
+			leg_m_highllim<0> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
 		}
 		// padd missing m's with 0 (m>mmax)
 		if (2*(mmax+1) <= nphi)
@@ -1221,21 +1242,23 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 	cudaStream_t stream = shtns->comp_stream;
 
 	// Launch the Legendre CUDA Kernel
-	const int threadsPerBlock = THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
-	const int blocksPerGrid =(nlat_2 + threadsPerBlock - 1) / threadsPerBlock;
+	//const int threadsPerBlock = THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
+	//const int blocksPerGrid = (nlat_2 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+	const int threadsPerBlock = shtns->threads_per_block;	// can be from 32 to 1024, we should try to measure the fastest !
+	const int blocksPerGrid = shtns->nblocks;
 	if (nphi == 1) {
-		leg_m0<S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
+		leg_m0<S><<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
 	} else {
 		if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
 		dim3 blocks(blocksPerGrid, mmax+1);
 		dim3 threads(threadsPerBlock, 1);
 		if (mmax==0) {
-			leg_m0<S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
+			leg_m0<S><<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
 		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
 			leg_m_lowllim<S><<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi);
 		} else {
-			leg_m_highllim<S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi);
+			leg_m_highllim<S><<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi);
 		}
 		// padd missing m's with 0 (m>mmax)
 		if (2*(mmax+1) <= nphi)

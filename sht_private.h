@@ -166,6 +166,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#ifdef HAVE_LIBCUFFT
 	/* cuda stuff */
 	int cu_flags;
+	short nblocks;				///< number of blocks
+	short threads_per_block;	///< number of threads per block
 	double* d_alm;
 	double* d_ct;
 	double* d_mx_stdt;
