@@ -661,88 +661,115 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 	const int m_inc = 2*nlat_2;
 //    const int k_inc = 1;
 
+	// re-assign each thread an l (transpose)
+	const int ll = j / (BLOCKSIZE/LSPAN);
+	const int ri = j / (BLOCKSIZE/(2*LSPAN)) % 2;	// real (0) or imag (1)
+
 	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*BLOCKSIZE];
-	__shared__ double reo[4*BLOCKSIZE];
+	__shared__ double yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
 	const int l_inc = BLOCKSIZE;
 	const double cost = (it < nlat_2) ? ct[it] : 0.0;
 	double y0, y1;
 
+	if (LSPAN < 4) printf("ERROR: LSPAN<4\n");
 
 	if (im == 0) {
-	if (j < 2*LSPAN+2) ak[j] = al[j];
-	if (BLOCKSIZE > WARPSZE)	__syncthreads();
-	y0 = (it < nlat_2) ? q[it] : 0.0;		// north
-	y1 = (it < nlat_2) ? q[nlat_2*2-1 - it] : 0.0;	// south
-	reo[j] = y0+y1;				// even
-	reo[BLOCKSIZE +j] = y0-y1;		// odd
+		if (j < 2*LSPAN+2) ak[j] = al[j];
+		#if BLOCKSIZE > WARPSZE
+		__syncthreads();
+		#endif
+		y0 = (it < nlat_2) ? q[it] : 0.0;		// north
+		y1 = (it < nlat_2) ? q[nlat_2*2-1 - it] : 0.0;	// south
+		yl[j] = y0+y1;				// even
+		yl[BLOCKSIZE +j] = y0-y1;		// odd
 
-	int l = 0;
-	y0 = (it < nlat_2) ? ct[it + nlat_2] : 0.0;		// weights are stored just after ct.
-	if (S==1) y0 *= rsqrt(1.0 - cost*cost);
-	y0 *= ak[0];
-	y1 = y0 * ak[1] * cost;
-	yl[j] = y0;
-	yl[l_inc +j] = y1;
-	al+=2;
-	while (l <= llim) {
-		for (int k=0; k<LSPAN; k+=2) {		// compute a block of the matrix, write it in shared mem.
-		yl[k*l_inc +j]     = y0;
-		y0 = ak[2*k+3]*cost*y1 + ak[2*k+2]*y0;
-		yl[(k+1)*l_inc +j] = y1;
-		y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
-		al += 4;
-		}
-		if (BLOCKSIZE > WARPSZE)	__syncthreads();
-		double qll = 0.0;	// accumulator
-		// now re-assign each thread an l (transpose)
-		const int ll = j / (BLOCKSIZE/LSPAN);
+		if (BLOCKSIZE > WARPSZE) 	__syncthreads();
+		// transpose reo to my_reo
+		double my_reo[LSPAN];			// in registers
+		int k = 0;
+		#pragma unroll
 		for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN) {
-		int it = j % (BLOCKSIZE/LSPAN) + i;
-		qll += reo[(ll&1)*BLOCKSIZE +it] * yl[ll*l_inc +it];
+			int it = j % (BLOCKSIZE/LSPAN) + i;
+			my_reo[k++] = yl[(ll&1)*BLOCKSIZE +it];
 		}
 
-		// reduce_add within same l must be in same warp too:
-		if (BLOCKSIZE/LSPAN > WARPSZE)	printf("ERROR\n");
+		int l = 0;
+		y0 = (it < nlat_2) ? ct[it + nlat_2] : 0.0;		// weights are stored just after ct.
+		if (S==1) y0 *= rsqrt(1.0 - cost*cost);
+		y0 *= ak[0];
+		y1 = y0 * ak[1] * cost;
 
-		for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
-		qll += __shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
+		if (BLOCKSIZE > WARPSZE) 	__syncthreads();
+		yl[j] = y0;
+		yl[l_inc +j] = y1;
+		al+=2;
+		while (l <= llim) {
+			for (int k=0; k<LSPAN; k+=2) {		// compute a block of the matrix, write it in shared mem.
+				yl[k*l_inc +j]     = y0;
+				y0 = ak[2*k+3]*cost*y1 + ak[2*k+2]*y0;
+				yl[(k+1)*l_inc +j] = y1;
+				y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
+				al += 4;
+			}
+			if(BLOCKSIZE > WARPSZE)	__syncthreads();
+			double qll = 0.0;	// accumulator
+			// now re-assign each thread an l (transpose)
+			int k=0;
+			#pragma unroll
+			for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN) {
+				int it = j % (BLOCKSIZE/LSPAN) + i;
+				qll += my_reo[k++] * yl[ll*l_inc +it];
+			}
+
+			// reduce_add within same l must be in same warp too:
+			if (BLOCKSIZE/LSPAN > WARPSZE) printf("ERROR\n");
+			#pragma unroll
+			for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
+				qll += __shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
+			}
+			if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
+				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
+					ql[2*(l+ll)] = qll;
+				} else {
+					atomicAdd(ql+2*(l+ll), qll);		// VERY slow atomic add on Kepler.
+				}
+			}
+			if (j<2*LSPAN) ak[j+2] = al[j];
+			if (BLOCKSIZE > WARPSZE)	__syncthreads();
+			l+=LSPAN;
 		}
-		if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
-		if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
-			ql[2*(l+ll)] = qll;
-		} else {
-			atomicAdd(ql+2*(l+ll), qll);		// VERY slow atomic add on Kepler.
-		}
-		}
-		if (j<2*LSPAN) ak[j+2] = al[j];
-		if (BLOCKSIZE > WARPSZE)	__syncthreads();
-		l+=LSPAN;
-	}
 	} else {	// im > 0
-	int m = im*mres;
-	int l = (im*(2*(lmax+1)-(m+mres)))>>1;
-	al += 2*(l+m);
-	ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
+		int m = im*mres;
+		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
+		al += 2*(l+m);
+		ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
 
-	if (j < 2*LSPAN+2) ak[j] = al[j];
-	if (BLOCKSIZE > WARPSZE)	__syncthreads();
+		if (j < 2*LSPAN+2) ak[j] = al[j];
+		const double sgn = 2*(j&1) - 1;	// -/+
+		y0    = (it < nlat_2) ? q[im*m_inc + it] : 0.0;		// north imag (ani)
+		double qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
+		y1    = (it < nlat_2) ? q[im*m_inc + nlat_2*2-1-it] : 0.0;	// south imag (asi)
+		double qor    = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it] : 0.0;	// south real (as)
+		double qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
+		double qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
+		y0 = __shfl_xor(qei, 1);	// exchange between adjacent lanes.
+		y1 = __shfl_xor(qoi, 1);
+		yl[j] 			    = qer + qor;	// rer
+		yl[BLOCKSIZE +j]   = qer - qor;	// ror
+		yl[2*BLOCKSIZE +j] = sgn*(y0 - y1);	// rei
+		yl[3*BLOCKSIZE +j] = sgn*(y0 + y1);	// roi
 
-	const double sgn = 2*(j&1) - 1;	// -/+
-	y0    = (it < nlat_2) ? q[im*m_inc + it] : 0.0;		// north imag (ani)
-	double qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
-	y1    = (it < nlat_2) ? q[im*m_inc + nlat_2*2-1-it] : 0.0;	// south imag (asi)
-	double qor    = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it] : 0.0;	// south real (as)
-	double qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
-	double qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
-	y0 = __shfl_xor(qei, 1);	// exchange between adjacent lanes.
-	y1 = __shfl_xor(qoi, 1);
-	reo[j] 			    = qer + qor;	// rer
-	reo[BLOCKSIZE +j]   = qer - qor;	// ror
-	reo[2*BLOCKSIZE +j] = sgn*(y0 - y1);	// rei
-	reo[3*BLOCKSIZE +j] = sgn*(y0 + y1);	// roi
+		if (BLOCKSIZE > WARPSZE) 	__syncthreads();
+		// transpose yl to my_reo
+		double my_reo[2*LSPAN];			// in registers
+		int k = 0;
+		#pragma unroll
+		for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/(2*LSPAN)) {
+			int it = j % (BLOCKSIZE/(2*LSPAN)) + i;
+			my_reo[k++] = yl[((ll&1)+2*ri)*BLOCKSIZE +it];
+		}
 
-	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
+		y1 = sqrt(1.0 - cost*cost);	// sin(theta)
 
 		y0 = 0.5 * ak[0];	// y0
 		l = m - S;
@@ -755,44 +782,44 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 
 		l=m;		al+=2;
 		while (l <= llim) {
-		for (int k=0; k<LSPAN; k+=2) {		// compute a block of the matrix, write it in shared mem.
-			yl[k*l_inc +j]     = y0;
-			y0 = ak[2*k+3]*cost*y1 + ak[2*k+2]*y0;
-			yl[(k+1)*l_inc +j] = y1;
-			y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
-			al += 4;
-		}
-
-		if (BLOCKSIZE > WARPSZE)	__syncthreads();
-
-		double qlri = 0.0;	// accumulator
-		// now re-assign each thread an l (transpose)
-		const int ll = j / (BLOCKSIZE/LSPAN);
-		const int ri = j / (BLOCKSIZE/(2*LSPAN)) % 2;	// real (0) or imag (1)
-		for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/(2*LSPAN)) {
-			int it = j % (BLOCKSIZE/(2*LSPAN)) + i;
-			qlri += reo[((ll&1)+2*ri)*BLOCKSIZE +it]   * yl[ll*l_inc +it];
-		}
-
-		// reduce_add within same l must be in same warp too:
-		if (BLOCKSIZE/(2*LSPAN) > WARPSZE)	printf("ERROR\n");
-
-		for (int ofs = BLOCKSIZE/(LSPAN*4); ofs > 0; ofs>>=1) {
-			qlri += __shfl_down(qlri, ofs, BLOCKSIZE/(LSPAN*2));
-		}
-		if ( ((j % (BLOCKSIZE/(2*LSPAN))) == 0) && ((l+ll)<=llim) ) {	// write result
-			if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
-			ql[2*(l+ll)+ri]   = qlri;
-			} else {
-			atomicAdd(ql+2*(l+ll)+ri, qlri);		// VERY slow atomic add on Kepler.
+			if (BLOCKSIZE > WARPSZE) 	__syncthreads();
+			for (int k=0; k<LSPAN; k+=2) {		// compute a block of the matrix, write it in shared mem.
+				yl[k*l_inc +j]     = y0;
+				y0 = ak[2*k+3]*cost*y1 + ak[2*k+2]*y0;
+				yl[(k+1)*l_inc +j] = y1;
+				y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
+				al += 4;
 			}
-		}
-		if (j<2*LSPAN) ak[j+2] = al[j];
-		if (BLOCKSIZE > WARPSZE)	__syncthreads();
-		l+=LSPAN;
+
+			// transposed work:
+			if (BLOCKSIZE > WARPSZE)	__syncthreads();
+			double qlri = 0.0;	// accumulator
+			int k = 0;
+			#pragma unroll
+			for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/(2*LSPAN)) {
+				int it = j % (BLOCKSIZE/(2*LSPAN)) + i;
+				qlri += my_reo[k++] * yl[ll*l_inc +it];
+			}
+			// reduce_add within same l must be in same warp too:
+			if (BLOCKSIZE/(2*LSPAN) > WARPSZE) printf("ERROR\n");
+			#pragma unroll
+			for (int ofs = BLOCKSIZE/(LSPAN*4); ofs > 0; ofs>>=1) {
+				qlri += __shfl_down(qlri, ofs, BLOCKSIZE/(LSPAN*2));
+			}
+			if ( ((j % (BLOCKSIZE/(2*LSPAN))) == 0) && ((l+ll)<=llim) ) {	// write result
+				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
+					ql[2*(l+ll)+ri]   = qlri;
+				} else {
+					atomicAdd(ql+2*(l+ll)+ri, qlri);		// VERY slow atomic add on Kepler.
+				}
+			}
+
+			if (j<2*LSPAN) ak[j+2] = al[j];
+			l+=LSPAN;
 		}
 	}
 }
+
 
 
 template<int BLOCKSIZE, int LSPAN, int S> __global__ void
