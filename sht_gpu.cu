@@ -1,12 +1,15 @@
+/* NOTES:
+ * - the cuda transforms are NOT thread-safe. Use cushtns_clone() to clone transforms for each thread.
+*/
 
 /* TODO
  * 0) DYNAMIC THREADS/BLOCK, computed on init.
- * 1) AVOID cudaMalloc/cudaFree => thread-safety is lost (but it was already lost because of cuFFT)
- * 2) use static polar optimization (from constant memory ?)
- * 3) use a for loop in m-direction to re-use threads at larger m's.
- * 4) create a compute stream and a xfer stream for each shtns instance (allow compute overlap between shtns instances).
- * 5) allow several variants, which may change occupancy for large sizes ?
- * 6) try to store data for complex2real fft, and perform fft on host (less data to transfer)
+ * 1) use static polar optimization (from constant memory ?)
+ * 2) use a for loop in m-direction to re-use threads at larger m's ?
+ * 3) implement FFT on host versions. otpimize data transfer (don't transfer zeros): store as complex2real fft ?
+ * 4) allow several variants, which may change occupancy for large sizes ?
+ * 5) generalize NFIELDS to all kernels
+ * 6) find optimal threads/block for minor kernels too (e.g. sphtor2scal)
  */
 
 // NOTE variables gridDim.x, blockIdx.x, blockDim.x, threadIdx.x, and warpSize are defined in device functions
@@ -42,6 +45,36 @@ extern "C"
 void shtns_free(void* p) {
 	cudaFreeHost(p);
 }
+
+#if (__CUDACC_VER_MAJOR__ < 8) || ( defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600 )
+__device__ double atomicAdd(double* address, double val)
+{
+	unsigned long long int* address_as_ull =
+							 (unsigned long long int*)address;
+	unsigned long long int old = *address_as_ull, assumed;
+	do {
+		assumed = old;
+	old = atomicCAS(address_as_ull, assumed,
+						__double_as_longlong(val +
+							   __longlong_as_double(assumed)));
+	} while (assumed != old);
+	return __longlong_as_double(old);
+}
+#endif
+
+// define our own suffle macros, to accomodate cuda<9 and cuda>=9
+#if __CUDACC_VER_MAJOR__ < 9
+	#define shfl_xor(...) __shfl_xor(__VA_ARGS__)
+	#define shfl_down(...) __shfl_down(__VA_ARGS__)
+	#define _any(p) __any(p)
+	#define _all(p) __all(p)
+#else
+	#define shfl_xor(...) __shfl_xor_sync(0xFFFFFFFF, __VA_ARGS__)
+	#define shfl_down(...) __shfl_down_sync(0xFFFFFFFF, __VA_ARGS__)
+	#define _any(p) __any_sync(0xFFFFFFFF, p)
+	#define _all(p) __all_sync(0xFFFFFFFF, p)
+#endif
+
 
 /// On KEPLER, This kernel is fastest with THREADS_PER_BLOCK=256 and NWAY=1
 template<int S> __global__ void
@@ -86,7 +119,7 @@ leg_m0(const double *al, const double *ct, const double *ql, double *q, const in
 		ak[j] = al[j];
 		if ((j <= llim)&&(j<THREADS_PER_BLOCK/2)) qk[j] = ql[2*(l+j)];
 		k=0;	kq=0;
-			__syncthreads();
+		__syncthreads();
 	}
 	for (int i=0; i<NWAY; i++)	y0[i]  = ak[k+1]*cost[i]*y1[i] + ak[k]*y0[i];
 	for (int i=0; i<NWAY; i++)	re[i] += y0[i] * qk[kq];
@@ -135,44 +168,27 @@ leg_m0(const double *al, const double *ct, const double *ql, double *q, const in
 __inline__ __device__
 void warp_reduce_add_4(double& re, double& ro, double& ie, double& io) {
   for (int offset = warpSize/2; offset > 0; offset >>= 1) {
-	re += __shfl_down(re, offset);
-	ro += __shfl_down(ro, offset);
-	ie += __shfl_down(ie, offset);
-	io += __shfl_down(io, offset);
+	re += shfl_down(re, offset);
+	ro += shfl_down(ro, offset);
+	ie += shfl_down(ie, offset);
+	io += shfl_down(io, offset);
   }
 }
 
 __inline__ __device__
 void warp_reduce_add_2(double& ev, double& od) {
   for (int offset = warpSize/2; offset > 0; offset >>= 1) {
-	ev += __shfl_down(ev, offset);
-	od += __shfl_down(od, offset);
+	ev += shfl_down(ev, offset);
+	od += shfl_down(od, offset);
   }
 }
 
 __inline__ __device__
 void warp_reduce_add(double& ev) {
   for (int offset = warpSize/2; offset > 0; offset >>= 1) {
-	ev += __shfl_down(ev, offset);
+	ev += shfl_down(ev, offset);
   }
 }
-
-#if (__CUDACC_VER_MAJOR__ < 8) || ( defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600 )
-__device__ double atomicAdd(double* address, double val)
-{
-	unsigned long long int* address_as_ull =
-							 (unsigned long long int*)address;
-	unsigned long long int old = *address_as_ull, assumed;
-	do {
-		assumed = old;
-	old = atomicCAS(address_as_ull, assumed,
-						__double_as_longlong(val +
-							   __longlong_as_double(assumed)));
-	} while (assumed != old);
-	return __longlong_as_double(old);
-}
-#endif
-
 
 /// THREADS_PER_BLOCK/LSPAN must be a power of 2 and <= WARPSZE
 /// LSPAN must be a multiple of 2.
@@ -230,7 +246,7 @@ ileg_m0(const double *al, const double *ct, const double *q, double *ql, const i
 	if (BLOCKSIZE/LSPAN > WARPSZE)	printf("ERROR\n");
 
 	for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
-		qll += __shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
+		qll += shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
 	}
 	if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
 		if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
@@ -487,8 +503,8 @@ leg_m_lowllim(const double *al, const double *ct, const double *ql, double *q, c
 		const double sgn = 1 - 2*(j&1);
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
-			rei[f] = __shfl_xor(rei[f], 1);
-			roi[f] = __shfl_xor(roi[f], 1);
+			rei[f] = shfl_xor(rei[f], 1);
+			roi[f] = shfl_xor(roi[f], 1);
 		}
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
@@ -559,7 +575,7 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 	ror = 0.0;	roi = 0.0;
 	rer = 0.0;	rei = 0.0;
 	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
-	if (__any(m - llim*y1 <= max(50,llim/200))) {		// polar optimization (see Reinecke 2013), avoiding warp divergence
+	if (_any(m - llim*y1 <= max(50,llim/200))) {		// polar optimization (see Reinecke 2013), avoiding warp divergence
 		y0 = 1.0;	// y0
 		l = m - S;
 		int ny = 0;
@@ -568,14 +584,14 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 		if (l&1) {
 			y0 *= y1;
 			ny += nsint;
-			if (__any(y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR))) {		// avoid warp divergence
+			if (_any(y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR))) {		// avoid warp divergence
 			ny--;
 			y0 *= SHT_SCALE_FACTOR;
 			}
 		}
 		y1 *= y1;
 		nsint += nsint;
-		if (__any(y1 < 1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence
+		if (_any(y1 < 1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence
 			nsint--;
 			y1 *= SHT_SCALE_FACTOR;
 		}
@@ -587,7 +603,7 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 		l=m;	int ka = WARPSZE;
 		const int ofs = j & 0xFFE0;
 
-		while ( __all(ny<0) && (l<llim) ) {
+		while ( _all(ny<0) && (l<llim) ) {
 		if (ka+4 >= WARPSZE) {
 			ak[j] = al[(j&31)];
 			ka=0;
@@ -637,8 +653,8 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 	double nr = rer+ror;
 	double sr = rer-ror;
 	const double sgn = 1 - 2*(j&1);
-	rei = __shfl_xor(rei, 1);
-	roi = __shfl_xor(roi, 1);
+	rei = shfl_xor(rei, 1);
+	roi = shfl_xor(roi, 1);
 	double nix = sgn*(rei+roi);
 	double six = sgn*(rei-roi);
 	if (it < nlat_2) {
@@ -731,7 +747,7 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 			#pragma unroll
 			for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
 				#pragma unroll
-				for (int f=0; f<NFIELDS; f++)	qll[f] += __shfl_down(qll[f], ofs, BLOCKSIZE/LSPAN);
+				for (int f=0; f<NFIELDS; f++)	qll[f] += shfl_down(qll[f], ofs, BLOCKSIZE/LSPAN);
 			}
 			if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
 				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
@@ -764,8 +780,8 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 			double qor = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it + f*q_dist] : 0.0;	// south real (as)
 			double qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
 			double qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
-			y0 = __shfl_xor(qei, 1);	// exchange between adjacent lanes.
-			y1 = __shfl_xor(qoi, 1);
+			y0 = shfl_xor(qei, 1);	// exchange between adjacent lanes.
+			y1 = shfl_xor(qoi, 1);
 
 			if ((f>0) && (BLOCKSIZE > WARPSZE)) 	__syncthreads();
 
@@ -822,7 +838,7 @@ ileg_m_lowllim(const double *al, const double *ct, const double *q, double *ql, 
 			#pragma unroll
 			for (int ofs = BLOCKSIZE/(LSPAN*4); ofs > 0; ofs>>=1) {
 				#pragma unroll
-				for (int f=0; f<NFIELDS; f++)	qlri[f] += __shfl_down(qlri[f], ofs, BLOCKSIZE/(LSPAN*2));
+				for (int f=0; f<NFIELDS; f++)	qlri[f] += shfl_down(qlri[f], ofs, BLOCKSIZE/(LSPAN*2));
 			}
 			if ( ((j % (BLOCKSIZE/(2*LSPAN))) == 0) && ((l+ll)<=llim) ) {	// write result
 				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
@@ -896,7 +912,7 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 			if (BLOCKSIZE/LSPAN > WARPSZE) printf("ERROR\n");
 
 			for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
-				qll += __shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
+				qll += shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
 			}
 			if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
 				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
@@ -924,8 +940,8 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 		double qor    = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it] : 0.0;	// south real (as)
 		double qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
 		double qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
-		y0 = __shfl_xor(qei, 1);	// exchange between adjacent lanes.
-		y1 = __shfl_xor(qoi, 1);
+		y0 = shfl_xor(qei, 1);	// exchange between adjacent lanes.
+		y1 = shfl_xor(qoi, 1);
 		reo[j] 			    = qer + qor;	// rer
 		reo[BLOCKSIZE +j]   = qer - qor;	// ror
 		reo[2*BLOCKSIZE +j] = sgn*(y0 - y1);	// rei
@@ -941,8 +957,8 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 			if (l&1) {
 				y0 *= y1;
 				ny += nsint;
-				// the use of __any leads to wrong results. On KEPLER it is also slower.
-	//		    if (__any(y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR))) {		// avoid warp divergence
+				// the use of _any leads to wrong results. On KEPLER it is also slower.
+	//		    if (_any(y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR))) {		// avoid warp divergence
 				if (y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
 					ny--;
 					y0 *= SHT_SCALE_FACTOR;
@@ -950,7 +966,7 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 			}
 			y1 *= y1;
 			nsint += nsint;
-	//		if (__any(y1 < 1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence
+	//		if (_any(y1 < 1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence
 			if (y1 < 1.0/SHT_SCALE_FACTOR) {
 				nsint--;
 				y1 *= SHT_SCALE_FACTOR;
@@ -969,7 +985,7 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 				yl[(k+1)*l_inc +j] = (ny==0) ? y1 : 0.0;
 				y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
 				if (ny<0) {
-	//			if (__any(fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0))
+	//			if (_any(fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0))
 					if (fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
 					{	// rescale when value is significant
 						++ny;
@@ -996,7 +1012,7 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 			if (BLOCKSIZE/(2*LSPAN) > WARPSZE) printf("ERROR\n");
 
 			for (int ofs = BLOCKSIZE/(LSPAN*4); ofs > 0; ofs>>=1) {
-				qlri += __shfl_down(qlri, ofs, BLOCKSIZE/(LSPAN*2));
+				qlri += shfl_down(qlri, ofs, BLOCKSIZE/(LSPAN*2));
 			}
 			if ( ((j % (BLOCKSIZE/(2*LSPAN))) == 0) && ((l+ll)<=llim) ) {	// write result
 				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
@@ -1308,6 +1324,7 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 	//const int blocksPerGrid = (nlat_2 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 	const int threadsPerBlock = shtns->threads_per_block;	// can be from 32 to 1024, we should try to measure the fastest !
 	const int blocksPerGrid = shtns->nblocks;
+	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	if (nphi == 1) {
 		leg_m0<S><<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
 	} else {
@@ -1319,13 +1336,15 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
 //			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS><<<blocks, threads, (NFIELDS+1)*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, (spat_dist == 0) ? shtns->spat_stride : spat_dist);
-			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, (spat_dist == 0) ? shtns->spat_stride : spat_dist);
+			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
 		} else {
-			leg_m_highllim<S><<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi);
+			for (int f=0; f<NFIELDS; f++) {
+				leg_m_highllim<S><<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) (d_Qlm + f*shtns->nlm_stride/2), (double*) (d_Vr + f*spat_dist), llim, nlat_2, lmax,mres, nphi);
+			}
 		}
 		cufftResult res;
 		for (int f=0; f<NFIELDS; f++) {
-			cufftDoubleComplex* x = (cufftDoubleComplex*) (d_Vr + f * shtns->spat_stride);
+			cufftDoubleComplex* x = (cufftDoubleComplex*) (d_Vr + f*spat_dist);
 			// padd missing m's with 0 (m>mmax)
 			if (2*(mmax+1) <= nphi)
 				cudaMemsetAsync( x + (mmax+1)*nlat_2, 0, sizeof(double)*(nphi-2*mmax-1)*2*nlat_2, stream );		// set to zero before fft
@@ -1352,6 +1371,7 @@ void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int 
 	// Launch the Legendre CUDA Kernel
 	const int threadsPerBlock = THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
 	const int blocksPerGrid =(nlat_2 + threadsPerBlock - 1) / (threadsPerBlock*NWAY);
+	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	for (int f=0; f<NFIELDS; f++) {
 		cudaMemsetAsync(d_Qlm + (f*shtns->nlm_stride)/2, 0, sizeof(double)*2*nlm, stream);		// set to zero before we start.
 	}
@@ -1360,7 +1380,7 @@ void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int 
 	} else {
 		for (int f=0; f<NFIELDS; f++) {
 			cufftResult res;
-			cufftDoubleComplex *x = (cufftDoubleComplex*) (d_Vr + f*shtns->spat_stride);
+			cufftDoubleComplex *x = (cufftDoubleComplex*) (d_Vr + f*spat_dist);
 			res = cufftExecZ2Z(shtns->cufft_plan, x, x, CUFFT_INVERSE);
 			if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
 		}
@@ -1371,9 +1391,11 @@ void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int 
 			ileg_m0<THREADS_PER_BLOCK, 4, S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);
 		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
-			ileg_m_lowllim<THREADS_PER_BLOCK, 4, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi, (spat_dist == 0) ? shtns->spat_stride : spat_dist, shtns->nlm_stride);
+			ileg_m_lowllim<THREADS_PER_BLOCK, 4, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi, spat_dist, shtns->nlm_stride);
 		} else {
-			ileg_m_highllim<THREADS_PER_BLOCK, 4, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi);
+			for (int f=0; f<NFIELDS; f++) {
+				ileg_m_highllim<THREADS_PER_BLOCK, 4, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) (d_Vr + f*spat_dist), (double*) (d_Qlm + f*shtns->nlm_stride/2), llim, nlat_2, lmax,mres,nphi);
+			}
 		}
 	}
 }
