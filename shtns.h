@@ -239,6 +239,11 @@ void SHsphtor_to_spat(shtns_cfg, cplx *Slm, cplx *Tlm, double *Vt, double *Vp);
 void SHsph_to_spat(shtns_cfg, cplx *Slm, double *Vt, double *Vp);
 /// transform toroidal spherical harmonic coefficients Tlm to the spatial theta and phi components (Vt,Vp). \see \ref vsh
 void SHtor_to_spat(shtns_cfg, cplx *Tlm, double *Vt, double *Vp);
+
+/// transform the theta and phi components (Vt,Vp) of a complex valued vector into its spheroidal-toroidal spherical harmonic representation (Slm,Tlm). \see \ref vsh
+void spat_cplx_to_SHsphtor(shtns_cfg, cplx *Vt, cplx *Vp, cplx *Slm, cplx *Tlm);
+/// transform spheroidal-toroidal spherical harmonic coefficients (Slm,Tlm) to the spatial theta and phi complex-valued components (Vt,Vp). \see \ref vsh
+void SHsphtor_to_spat_cplx(shtns_cfg, cplx *Slm, cplx *Tlm, cplx *Vt, cplx *Vp);
 //@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat
 #define SH_to_grad_spat(shtns, S,Gt,Gp) SHsph_to_spat(shtns, S, Gt, Gp)

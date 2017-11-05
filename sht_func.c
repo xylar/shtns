@@ -924,6 +924,89 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 	VFREE(re);
 }
 
+/// complex scalar transform.
+/// in: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
+/// for a total of (LMAX+1)^2 coefficients.
+/// out: complex spatial field.
+void SHsphtor_to_spat_cplx(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx *zp)
+{
+	long int nspat = shtns->nspat;
+	double *zt_r, *zt_i, *zp_r, *zp_i;
+	cplx *slm_r, *slm_i, *tlm_r, *tlm_i;
+
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	zt_r = (double*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
+	zp_r = zt_r + nspat;
+	zt_i = zt_r + 2*nspat;
+	zp_i = zt_r + 3*nspat;
+	slm_r = (cplx*) (zt_r + 4*nspat);
+	tlm_r = slm_r + NLM;
+	slm_i = slm_r + 2*NLM;
+	tlm_i = slm_r + 3*NLM;
+
+	// extract complex coefficients corresponding to real and imag
+	SH_cplx_to_2real(shtns, slm, slm_r, slm_i);
+	SH_cplx_to_2real(shtns, tlm, tlm_r, tlm_i);
+
+	// perform two real transforms:
+	SHsphtor_to_spat(shtns, slm_r, tlm_r, zt_r, zp_r);
+	SHsphtor_to_spat(shtns, slm_i, tlm_i, zt_i, zp_i);
+
+	// combine into zt and zp
+	for (int k=0; k<nspat; k++)
+		zt[k] = zt_r[k] + I*zt_i[k];
+	for (int k=0; k<nspat; k++)
+		zp[k] = zp_r[k] + I*zp_i[k];
+
+	VFREE(zt_r);
+}
+
+
+/// complex scalar transform.
+/// in: complex spatial field.
+/// out: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
+/// for a total of (LMAX+1)^2 coefficients.
+void spat_cplx_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm, cplx *tlm)
+{
+	long int nspat = shtns->nspat;
+	double *zt_r, *zt_i, *zp_r, *zp_i;
+	cplx *slm_r, *slm_i, *tlm_r, *tlm_i;
+
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	zt_r = (double*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
+	zp_r = zt_r + nspat;
+	zt_i = zt_r + 2*nspat;
+	zp_i = zt_r + 3*nspat;
+	slm_r = (cplx*) (zt_r + 4*nspat);
+	tlm_r = slm_r + NLM;
+	slm_i = slm_r + 2*NLM;
+	tlm_i = slm_r + 3*NLM;
+
+	// split zt and zp into real and imag parts.
+	for (int k=0; k<nspat; k++) {
+		zt_r[k] = creal(zt[k]);		zt_i[k] = cimag(zt[k]);
+	}
+	for (int k=0; k<nspat; k++) {
+		zp_r[k] = creal(zp[k]);		zp_i[k] = cimag(zp[k]);
+	}
+
+	// perform two real transforms:
+	spat_to_SHsphtor(shtns, zt_r,zp_r, slm_r,tlm_r);	// real
+	spat_to_SHsphtor(shtns, zt_i,zp_i, slm_i,tlm_i);	// imag
+
+	// combine into complex coefficients
+	SH_2real_to_cplx(shtns, slm_r, slm_i, slm);
+	SH_2real_to_cplx(shtns, tlm_r, tlm_i, tlm);
+
+	VFREE(zt_r);
+}
+
+
+
 void SH_cplx_Xrotate90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm)
 {
 	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
