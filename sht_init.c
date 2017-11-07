@@ -91,6 +91,15 @@ long nlm_calc(long lmax, long mmax, long mres)
 	return (mmax+1)*(lmax+1) - ((mmax*mres)*(mmax+1))/2;	// this is wrong if lmax < mmax*mres
 }
 
+/// \code return mmax*mmax*mres + (2*mmax+1)*(lmax-mmax*mres+1); \endcode */
+/// \ingroup init
+long nlm_cplx_calc(long lmax, long mmax, long mres)
+{
+//	return 2*nlm_calc(lmax,mmax,mres) - (lmax+1);
+	if (mmax*mres > lmax) mmax = lmax/mres;
+	return (2*mmax+1)*(lmax+1) - (mmax*mres)*(mmax+1);	// this is wrong if lmax < mmax*mres
+}
+
 
 /*  LEGENDRE FUNCTIONS  */
 #include "sht_legendre.c"
@@ -1406,6 +1415,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 
 	shtns->mmax = mmax;		shtns->mres = mres;		shtns->lmax = lmax;
 	shtns->nlm = nlm_calc(lmax, mmax, mres);
+	shtns->nlm_cplx = 2*shtns->nlm - (lmax+1);	// = nlm_cplx_calc(lmax, mmax, mres);
 	shtns->nthreads = omp_threads;
 	if (omp_threads > mmax+1) shtns->nthreads = mmax+1;	// limit the number of threads to mmax+1
 	#if SHT_VERBOSE > 0

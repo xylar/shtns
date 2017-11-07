@@ -85,6 +85,7 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 	const double *const ct;			///< cos(theta) array (size nlat)
 	const double *const st;			///< sin(theta) array (size nlat)
 	const unsigned int nspat;		///< number of real numbers that must be allocated in a spatial field.
+	const unsigned int nlm_cplx;	///< number of complex coefficients to represent a complex-valued spatial field.
 };
 #endif
 
@@ -105,6 +106,8 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 /// LM_L_LOOP : loop over all (l,im) and perform "action"  : l and lm are defined (but NOT m and im).
 /// \c lm and \c m must be declared int's. \c lm is the loop counter and SH array index, while \c l is the SH degree. more info : \ref spec_data
 #define LM_L_LOOP( shtns, action ) { int lm=0; do { int l=shtns->li[lm]; action } while(++lm < shtns->nlm); }
+/// LM_cplx(shtns, l,m) : macro returning array index for SH representation of complex-valued fields for given l and m. (mres=1 only!)
+#define LM_cplx(shtns, l, m) ( ((l) <= shtns->mmax) ? (l)*((l)+1)+(m) : shtns->mmax*(2*(l) - shtns->mmax) + (l)+(m) )
 //@}
 
 
@@ -122,8 +125,11 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 
 // FUNCTIONS //
 
-/// compute number of spherical harmonics modes (l,m) for given size parameters. Does not require any previous setup.
+/// compute number of spherical harmonics modes (l,m) to represent a real-valued spatial field for given size parameters. Does not require any previous setup.
 long nlm_calc(long lmax, long mmax, long mres);
+
+/// compute number of spherical harmonics modes (l,m) to represent a complex-valued spatial field, for given size parameters. Does not require any previous setup.
+long nlm_cplx_calc(long lmax, long mmax, long mres);
 
 void shtns_verbose(int);			///< controls output during initialization: 0=no output (default), 1=some output, 2=degug (if compiled in)
 void shtns_print_version(void);		///< print version information to stdout.
@@ -256,6 +262,9 @@ void spat_to_SHqst(shtns_cfg, double *Vr, double *Vt, double *Vp, cplx *Qlm, cpl
 /// 3D vector transform from spherical coordinates to radial-spheroidal-toroidal spectral components (see \ref vsh_def).
 /// They should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
 void SHqst_to_spat(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp);
+
+void spat_cplx_to_SHqst(shtns_cfg, cplx *Vr, cplx *Vt, cplx *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm);
+void SHqst_to_spat_cplx(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, cplx *Vr, cplx *Vt, cplx *Vp);
 //@}
 
 /// \name Truncated transforms at given degree l

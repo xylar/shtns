@@ -805,7 +805,7 @@ void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 
 // SPAT_CPLX transform indexing scheme:
 // if (l<=MMAX) : l*(l+1) + m
-// if (l>=MMAX) : l*(2*mmax+1) - mmax*mmax + m
+// if (l>=MMAX) : l*(2*mmax+1) - mmax*mmax + m  = mmax*(2*l-mmax) + l+m
 ///\internal
 void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
 {
@@ -860,9 +860,9 @@ void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
 }
 
 /// complex scalar transform.
-/// in: complex spatial field.
-/// out: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
-/// for a total of (LMAX+1)^2 coefficients.
+/// in: complex spatial field z.
+/// out: alm[LM(shtns,l,m)] is the SH coefficients of order l and degree m (with -l <= m <= l)
+/// for a total of nlm_cplx_calc(lmax,mmax,mres) coefficients.
 void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 {
 	long int nspat = shtns->nspat;
@@ -893,9 +893,9 @@ void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 }
 
 /// complex scalar transform.
-/// in: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
-/// for a total of (LMAX+1)^2 coefficients.
-/// out: complex spatial field.
+/// in: alm[LM_cplx(shtns,l,m)] is the SH coefficients of order l and degree m (with -l <= m <= l)
+/// for a total of nlm_cplx_calc(lmax,mmax,mres) coefficients.
+/// out: complex spatial field z.
 void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 {
 	long int nspat = shtns->nspat;
@@ -924,10 +924,9 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 	VFREE(re);
 }
 
-/// complex scalar transform.
-/// in: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
-/// for a total of (LMAX+1)^2 coefficients.
-/// out: complex spatial field.
+/// complex vector transform (2D).
+/// in: slm, tlm are the spheroidal/toroidal SH coefficients of order l and degree m (with -l <= m <= l)
+/// out: zt, zp are respectively the theta and phi components of the complex spatial vector field.
 void SHsphtor_to_spat_cplx(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx *zp)
 {
 	long int nspat = shtns->nspat;
@@ -964,10 +963,10 @@ void SHsphtor_to_spat_cplx(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx
 }
 
 
-/// complex scalar transform.
-/// in: complex spatial field.
-/// out: alm[l*(l+1)+m] is the SH coefficients of order l and degree m (with -l <= m <= l)
-/// for a total of (LMAX+1)^2 coefficients.
+/// complex vector transform (2D).
+/// zt,zp: theta,phi components of the complex spatial vector field.
+/// out: slm[LM_cplx(l,m)] and tlm[LM_cplx(l,m)] are the SH coefficients of order l and degree m (with -l <= m <= l)
+/// for a total of shtns->nlm_cplx = nlm_cplx_calc(lmax, mmax, mres) coefficients.
 void spat_cplx_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm, cplx *tlm)
 {
 	long int nspat = shtns->nspat;
@@ -1003,6 +1002,24 @@ void spat_cplx_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm, cplx 
 	SH_2real_to_cplx(shtns, tlm_r, tlm_i, tlm);
 
 	VFREE(zt_r);
+}
+
+/// complex vector transform (3D).
+/// in: zr,zt,zp are the r,theta,phi components of the complex spatial vector field.
+/// out: {qlm,slm,tlm}[LM_cplx(l,m)] are the SH coefficients of order l and degree m (with -l <= m <= l)
+void spat_cplx_to_SHqst(shtns_cfg shtns, cplx *zr, cplx *zt, cplx *zp, cplx *qlm, cplx *slm, cplx *tlm)
+{
+	spat_cplx_to_SH(shtns, zr, qlm);
+	spat_cplx_to_SHsphtor(shtns, zt,zp, slm,tlm);
+}
+
+/// complex vector transform (3D).
+/// in: {qlm,slm,tlm}[LM_cplx(l,m)] are the SH coefficients of order l and degree m (with -l <= m <= l)
+/// out: zr,zt,zp: r,theta,phi components of the complex spatial vector field.
+void SHqst_to_spat_cplx(shtns_cfg shtns, cplx *qlm, cplx *slm, cplx *tlm, cplx *zr, cplx *zt, cplx *zp)
+{
+	SH_to_spat_cplx(shtns, qlm, zr);
+	SHsphtor_to_spat_cplx(shtns, slm,tlm, zt,zp);
 }
 
 

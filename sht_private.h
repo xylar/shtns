@@ -120,6 +120,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	unsigned short *mi;			///< order m for given mode index (size nlm) : mi[lm]
 	double *ct, *st;			///< cos(theta) and sin(theta) arrays (size nlat)
 	unsigned int nspat;			///< number of real numbers that must be allocated in a spatial field.
+	unsigned int nlm_cplx;		///< number of complex coefficients to represent a complex-valued spatial field.
 /* END OF PUBLIC PART */
 
 	short fftc_mode;			///< how to perform the complex fft : -1 = no fft; 0 = interleaved/native; 1 = split/transpose.
