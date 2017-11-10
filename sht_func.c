@@ -803,11 +803,122 @@ void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 	fftw_free(vrc);
 }
 
+
+///\internal
+static void spat_xsint_2real(shtns_cfg shtns, const double* st, double* vt, double* vp)
+{
+	long nlat = shtns->nlat;
+	if (shtns->k_stride_a == 1) {				// theta contiguous
+		long nspat = shtns->nspat;
+		/* #ifdef _GCC_VEC_
+		if (nlat % VSIZE2 == 0) {		// vectorize
+			nspat /= VSIZE2;
+			nlat /= VSIZE2;
+			for (long k=0, j=0; k<nspat; k++) {
+				const rnd x = vread(st, j);
+				if (++j >= nlat) j=0;
+				rnd xt = vread(vt, k) * x;
+				rnd xp = vread(vp, k) * x;
+				vstor(vt, k, xt);
+				vstor(vp, k, xp);
+			}
+		} else
+		#endif */
+		{
+			for (long k=0, j=0; k<nspat; k++) {
+				const double x = st[j];
+				if (++j >= nlat) j=0;
+				vt[k] *= x;
+				vp[k] *= x;
+			}
+		}
+	} else {	// phi contiguous
+		long nphi = shtns->nphi;
+		long k=0;
+		/* #ifdef _GCC_VEC_
+		if (nphi % VSIZE2 == 0) {	// vectorize
+			nphi /= VSIZE2;
+			for (long it=0; it<nlat; it++) {
+				const rnd x = vall(st[it]);
+				for (long ip=0; ip<nphi; ip++) {
+					rnd xt = vread(vt, k) * x;
+					rnd xp = vread(vp, k) * x;
+					vstor(vt, k, xt);
+					vstor(vp, k, xp);
+					++k;
+				}
+			}			
+		} else
+		#endif */
+		{
+			for (long it=0; it<nlat; it++) {
+				const double x = st[it];
+				for (long ip=0; ip<nphi; ip++) {
+					vt[k] *= x;
+					vp[k] *= x;
+					++k;
+				}
+			}
+		}
+	}
+}
+
+///\internal
+static void spat_sint_cplx_to_2real(shtns_cfg shtns, cplx *z, double *zr, double *zi)
+{
+	const int nlat = shtns->nlat;
+	const double* st_1 = shtns->st_1;
+	if (shtns->k_stride_a == 1) {				// theta contiguous
+		const int nspat = shtns->nspat;
+		for (int k=0, j=0; k<nspat; k++) {
+			const double x = st_1[j];
+			if (++j >= nlat) j=0;
+			zr[k] = creal(z[k]) * x;		zi[k] = cimag(z[k]) * x;
+		}
+	} else {	// phi contiguous
+		const int nphi = shtns->nphi;
+		long k=0;
+		for (int it=0; it<nlat; it++) {
+			const double x = st_1[it];
+			for (int ip=0; ip<nphi; ip++) {
+				zr[k] = creal(z[k]) * x;		zi[k] = cimag(z[k]) * x;
+				++k;
+			}
+		}
+	}
+}
+
+///\internal
+static void spat_xsint_2real_to_cplx(shtns_cfg shtns, double *zr, double *zi, cplx *z)
+{
+	const int nlat = shtns->nlat;
+	const double* st = shtns->st;
+	if (shtns->k_stride_a == 1) {				// theta contiguous
+		const int nspat = shtns->nspat;
+		for (int k=0, j=0; k<nspat; k++) {
+			const double x = st[j];
+			if (++j >= nlat) j=0;
+			z[k] = (zr[k] + I*zi[k]) * x;
+		}
+	} else {	// phi contiguous
+		const int nphi = shtns->nphi;
+		long k=0;
+		for (int it=0; it<nlat; it++) {
+			const double x = st[it];
+			for (int ip=0; ip<nphi; ip++) {
+				z[k] = (zr[k] + I*zi[k]) * x;
+				++k;
+			}
+		}
+	}
+}
+
+
 // SPAT_CPLX transform indexing scheme:
 // if (l<=MMAX) : l*(l+1) + m
 // if (l>=MMAX) : l*(2*mmax+1) - mmax*mmax + m  = mmax*(2*l-mmax) + l+m
 ///\internal
-void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
+static void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
 {
 	// combine into complex coefficients
 	unsigned ll = 0;
@@ -833,7 +944,7 @@ void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
 }
 
 ///\internal
-void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
+static void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
 {
 	// extract complex coefficients corresponding to real and imag
 	unsigned ll = 0;
@@ -924,6 +1035,7 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 	VFREE(re);
 }
 
+
 /// complex vector transform (2D).
 /// in: slm, tlm are the spheroidal/toroidal SH coefficients of order l and degree m (with -l <= m <= l)
 /// out: zt, zp are respectively the theta and phi components of the complex spatial vector field.
@@ -1003,6 +1115,77 @@ void spat_cplx_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm, cplx 
 
 	VFREE(zt_r);
 }
+
+/// same as \ref SHsphtor_to_spat_cplx but multiply by sin(theta) after the transform.
+void SHsphtor_to_spat_cplx_xsint(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx *zp)
+{
+	long int nspat = shtns->nspat;
+	double *zt_r, *zt_i, *zp_r, *zp_i;
+	cplx *slm_r, *slm_i, *tlm_r, *tlm_i;
+
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	zt_r = (double*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
+	zp_r = zt_r + nspat;
+	zt_i = zt_r + 2*nspat;
+	zp_i = zt_r + 3*nspat;
+	slm_r = (cplx*) (zt_r + 4*nspat);
+	tlm_r = slm_r + NLM;
+	slm_i = slm_r + 2*NLM;
+	tlm_i = slm_r + 3*NLM;
+
+	// extract complex coefficients corresponding to real and imag
+	SH_cplx_to_2real(shtns, slm, slm_r, slm_i);
+	SH_cplx_to_2real(shtns, tlm, tlm_r, tlm_i);
+
+	// perform two real transforms:
+	SHsphtor_to_spat(shtns, slm_r, tlm_r, zt_r, zp_r);
+	SHsphtor_to_spat(shtns, slm_i, tlm_i, zt_i, zp_i);
+
+	// combine into zt and zp, while multiplying by sin(theta):
+	spat_xsint_2real_to_cplx(shtns, zt_r, zt_i, zt);
+	spat_xsint_2real_to_cplx(shtns, zp_r, zp_i, zp);
+
+	VFREE(zt_r);
+}
+
+
+/// same as \ref spat_cplx_to_SHsphtor but divide by sin(theta) before the transform.
+void spat_cplx_xsint_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm, cplx *tlm)
+{
+	long int nspat = shtns->nspat;
+	const double* st_1 = shtns->st_1;
+	double *zt_r, *zt_i, *zp_r, *zp_i;
+	cplx *slm_r, *slm_i, *tlm_r, *tlm_i;
+
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	zt_r = (double*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
+	zp_r = zt_r + nspat;
+	zt_i = zt_r + 2*nspat;
+	zp_i = zt_r + 3*nspat;
+	slm_r = (cplx*) (zt_r + 4*nspat);
+	tlm_r = slm_r + NLM;
+	slm_i = slm_r + 2*NLM;
+	tlm_i = slm_r + 3*NLM;
+
+	// split zt and zp into real and imag parts, while dividing by sin(theta)
+	spat_sint_cplx_to_2real(shtns, zt, zt_r, zt_i);
+	spat_sint_cplx_to_2real(shtns, zp, zp_r, zp_i);
+
+	// perform two real transforms:
+	spat_to_SHsphtor(shtns, zt_r,zp_r, slm_r,tlm_r);	// real
+	spat_to_SHsphtor(shtns, zt_i,zp_i, slm_i,tlm_i);	// imag
+
+	// combine into complex coefficients
+	SH_2real_to_cplx(shtns, slm_r, slm_i, slm);
+	SH_2real_to_cplx(shtns, tlm_r, tlm_i, tlm);
+
+	VFREE(zt_r);
+}
+
 
 /// complex vector transform (3D).
 /// in: zr,zt,zp are the r,theta,phi components of the complex spatial vector field.
@@ -1181,3 +1364,33 @@ void SH_to_spat_grad(shtns_cfg shtns, cplx *alm, double *gt, double *gp)
 	VFREE(blm);
 }
 */
+
+
+/// same as \ref SHsphtor_to_spat but multiply by sin(theta) after the transform.
+void SHsphtor_to_spat_xsint(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *vt, double *vp)
+{
+	SHsphtor_to_spat(shtns, Slm, Tlm, vt, vp);	
+	spat_xsint_2real(shtns, shtns->st, vt, vp);
+}
+
+/// same as \ref spat_to_SHsphtor but divide by sin(theta) before the transform.
+void spat_xsint_to_SHsphtor(shtns_cfg shtns, double *vt, double *vp, cplx *Slm, cplx *Tlm)
+{
+	spat_xsint_2real(shtns, shtns->st_1, vt, vp);
+	spat_to_SHsphtor(shtns, vt,vp, Slm, Tlm);
+}
+
+/// same as \ref SHsphtor_to_spat_l but multiply by sin(theta) after the transform.
+void SHsphtor_to_spat_xsint_l(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *vt, double *vp, long ltr)
+{
+	SHsphtor_to_spat_l(shtns, Slm, Tlm, vt, vp, ltr);
+	spat_xsint_2real(shtns, shtns->st, vt, vp);
+}
+
+/// same as \ref spat_to_SHsphtor_l but divide by sin(theta) before the transform.
+void spat_xsint_to_SHsphtor_l(shtns_cfg shtns, double *vt, double *vp, cplx *Slm, cplx *Tlm, long ltr)
+{
+	spat_xsint_2real(shtns, shtns->st_1, vt, vp);
+	spat_to_SHsphtor_l(shtns, vt,vp, Slm, Tlm, ltr);
+}
+
