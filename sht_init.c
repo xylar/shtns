@@ -1665,6 +1665,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#ifndef SHTNS_MEM
 		on_the_fly = 1;
 	#endif
+	#ifdef SHTNS4MAGIC
+		if (flags == sht_reg_poles) shtns_runerr("Grid cannot include poles with MagIC layout.");
+	#endif
 
 	if (vector) {
 		// initialize sin(theta).d/dtheta matrix (for vector transforms)
