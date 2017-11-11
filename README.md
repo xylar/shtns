@@ -28,7 +28,7 @@ FEATURES:
 - **rotation** functions to rotate spherical harmonics.
 - special spectral operator functions that do not require a transform
   (multiply by cos(theta)...).
-- scalar transforms and rotations for complex spatial fields.
+- transforms and rotations for complex-valued spatial fields.
 - SHT at fixed m (without fft, aka Legendre transform - beta).
 
 
@@ -66,10 +66,14 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
-
-	- support for AVX-512 (intel KNL)
-	- support for VSX (IBM Power7 & Power 8)
-	- remove support for intel MIC (KNC)
+* v2.9  (11 Nov 2017)
+	- New `shtns_malloc()` and `shtns_free()` functions to allocate/free optimally
+	  aligned memory.
+	- New functions supporting complex-valued vector transforms and Robert formulation.
+	- Support for AVX-512 (intel KNL).
+	- Support for VSX (IBM Power7 & Power 8).
+	- Improved support for MagIC code.
+	- Remove support for intel MIC (KNC).
 
 * v2.8.1  (2 Oct 2017)
 	- Fixed-m Legendre transforms (without fft) support magic-layout.
