@@ -505,6 +505,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		return;
 	}
 
+	shtns->layout = layout;		// store the data-layout for future reference (by CUDA init).
 	/* NPHI > 1 */
 	theta_inc=1;  phi_inc=NLAT;  phi_embed=2*(NPHI/2+1);	// SHT_NATIVE_LAYOUT is the default.
 	if (layout & SHT_THETA_CONTIGUOUS) {	theta_inc=1;  phi_inc=NLAT;  phi_embed=NPHI;	}

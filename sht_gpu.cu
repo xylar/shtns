@@ -12,7 +12,25 @@
  * 6) find optimal threads/block for minor kernels too (e.g. sphtor2scal)
  */
 
+/* Session with S. Chauveau from nvidia:
+ * useful metrics = achieved_occupancy, cache_hit
+ * for leg_m_lowllim, the "while(l<llim)" loop:
+ * 		0) full al, ql load before the while loop.
+ * 		1) reduce pointer update by moving ql and al updates into the "if" statement.
+ * 	    2a) try to use a double-buffer (indexed by b, switched by b=1-b)		=> only 1 __syncthread() instead of 2.
+ * 	OR:	2b) preload al, ql into registers => may reduce the waiting at __syncthreads()
+ * 		3) unroll by had the while loop (with an inner-loop of fixed size)
+ * 		4) introduce NWAY (1 to 4) to avoid the need of several blocks in theta => one block for all means al, ql are read only once!
+ * 				=> increases register pressure, but may be OK !
+ */
+
 // NOTE variables gridDim.x, blockIdx.x, blockDim.x, threadIdx.x, and warpSize are defined in device functions
+/* NOTE:
+ * 				KEPLER							PASCAL
+ * cache-line:  128 bytes (16 doubles)
+ * 
+ * fetching 1 double/thread: 2 requests/warp
+ */
 
 #include "sht_private.h"
 
@@ -34,12 +52,17 @@
 #define SHT_L_RESCALE_FLY 1800
 #define SHT_ACCURACY 1.0e-40
 
-enum cushtns_flags { CUSHT_OFF=0, CUSHT_ON=1, CUSHT_OWN_COMP_STREAM=2, CUSHT_OWN_XFER_STREAM=4 };
+enum cushtns_flags { CUSHT_OFF=0, CUSHT_ON=1, CUSHT_OWN_COMP_STREAM=2, CUSHT_OWN_XFER_STREAM=4};
+enum cushtns_fft_mode { CUSHT_NOFFT, CUSHT_FFT_THETA_CONTIGUOUS, CUSHT_FFT_TRANSPOSE };
 
 extern "C"
 void* shtns_malloc(size_t size) {
 	void* ptr = NULL;
-	cudaMallocHost(&ptr, size);		// allocate pinned memory (for faster transfers !)
+	cudaError_t err = cudaSuccess;
+	err = cudaMallocHost(&ptr, size);		// try to allocate pinned memory (for faster transfers !)
+	if (err != cudaSuccess) {
+		ptr = VMALLOC(size);		// return regular memory instead...
+	}
 	return ptr;
 }
 
@@ -68,15 +91,96 @@ __device__ double atomicAdd(double* address, double val)
 #if __CUDACC_VER_MAJOR__ < 9
 	#define shfl_xor(...) __shfl_xor(__VA_ARGS__)
 	#define shfl_down(...) __shfl_down(__VA_ARGS__)
+	#define shfl(...) __shfl(__VA_ARGS__)
 	#define _any(p) __any(p)
 	#define _all(p) __all(p)
 #else
 	#define shfl_xor(...) __shfl_xor_sync(0xFFFFFFFF, __VA_ARGS__)
 	#define shfl_down(...) __shfl_down_sync(0xFFFFFFFF, __VA_ARGS__)
+	#define shfl(...) __shfl_sync(0xFFFFFFFF, __VA_ARGS__)
 	#define _any(p) __any_sync(0xFFFFFFFF, p)
 	#define _all(p) __all_sync(0xFFFFFFFF, p)
 #endif
 
+__device__ __forceinline__ int getLaneId() {
+  int laneId;
+  asm("mov.s32 %0, %laneid;" : "=r"(laneId) );
+  return laneId;
+}
+
+__device__ __forceinline__ void namedBarrierWait(int name, int numThreads) {
+  asm volatile("bar.sync %0, %1;" : : "r"(name), "r"(numThreads) : "memory");
+}
+
+__device__ __forceinline__ void namedBarrierArrived(int name, int numThreads) {
+  asm volatile("bar.arrive %0, %1;" : : "r"(name), "r"(numThreads) : "memory");
+}
+
+/// dim0, dim1 : size in complex numbers !
+/// BLOCK_DIM_Y must be between 1 and 16
+template<int BLOCK_DIM_Y> __global__ void
+transpose_cplx(const double* in, double* out, const int dim0, const int dim1)
+{
+	const int TILE_DIM = WARPSZE/2;		// 16 double2 per warp, read as 32 doubles.
+    __shared__ double shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
+
+    const int lx = threadIdx.x >> 1;
+    const int ly = threadIdx.y;
+    const int ri = threadIdx.x & 1;		// real/imag index
+    
+    const int bx = TILE_DIM * blockIdx.x;
+    const int by = TILE_DIM * blockIdx.y;
+
+    int gx = lx + bx;
+    int gy = ly + by;
+	#pragma unroll
+    for (int repeat = 0; repeat < TILE_DIM; repeat += BLOCK_DIM_Y) {
+        int gy_ = gy+repeat;
+        shrdMem[ly + repeat][lx][ri] = in[2*(gy_ * dim0 + gx) + ri];
+    }
+
+	// transpose tiles:
+    gx = lx + by;
+    gy = ly + bx;
+
+    __syncthreads();
+	// transpose within tile:
+	#pragma unroll
+    for (unsigned repeat = 0; repeat < TILE_DIM; repeat += BLOCK_DIM_Y) {
+        int gy_ = gy+repeat;
+        out[2*(gy_ * dim1 + gx) + ri] = shrdMem[lx][ly + repeat][ri];
+    }
+}
+
+/*
+template<typename T>
+__global__
+void transpose32(const T * in, T * out, unsigned dim0, unsigned dim1)
+{
+	const int TILE_DIM = 32;
+    __shared__ T shrdMem[TILE_DIM][TILE_DIM+1];
+ 
+    unsigned lx = threadIdx.x;
+    unsigned ly = threadIdx.y;
+ 
+    unsigned gx = lx + blockDim.x * blockIdx.x;
+    unsigned gy = ly + TILE_DIM   * blockIdx.y;
+ 
+    for (unsigned repeat = 0; repeat < TILE_DIM; repeat += blockDim.y) {
+        unsigned gy_ = gy+repeat;
+        shrdMem[ly + repeat][lx] = in[gy_ * dim0 + gx];
+    }
+    __syncthreads();
+ 
+    gx = lx + blockDim.x * blockIdx.y;
+    gy = ly + TILE_DIM   * blockIdx.x;
+ 
+    for (unsigned repeat = 0; repeat < TILE_DIM; repeat += blockDim.y) {
+        unsigned gy_ = gy+repeat;
+        out[gy_ * dim1 + gx] = shrdMem[lx][ly + repeat];
+    }
+}
+*/
 
 /// On KEPLER, This kernel is fastest with THREADS_PER_BLOCK=256 and NWAY=1
 template<int S> __global__ void
@@ -192,77 +296,129 @@ void warp_reduce_add(double& ev) {
   }
 }
 
-/// THREADS_PER_BLOCK/LSPAN must be a power of 2 and <= WARPSZE
-/// LSPAN must be a multiple of 2.
-template<int BLOCKSIZE, int LSPAN, int S> __global__ void
-ileg_m0(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2)
+
+template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
+ileg_m0(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int q_dist=0, const int ql_dist=0)
 {
-	// im = 0
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
 
-	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN][BLOCKSIZE+1];	// padding to avoid bank conflicts
-	__shared__ double reo[2][BLOCKSIZE+1];	// padding to avoid bank conflicts
-	double cost, y0, y1;
-
-	y0 = (it < nlat_2) ? q[it] : 0.0;		// north
-	y1 = (it < nlat_2) ? q[nlat_2*2-1 - it] : 0.0;	// south
-	reo[0][j] = y0+y1;				// even
-	reo[1][j] = y0-y1;		// odd
-
-	if (j < 2*LSPAN+2) ak[j] = al[j];
-	if (BLOCKSIZE > WARPSZE)	__syncthreads();
-
-	int l = 0;
-	if (it < nlat_2) {
-	y0 = ct[it + nlat_2];		// weights are stored just after ct.
-	cost = ct[it];
-	} else {
-	y0 = 0.0;	cost = 0.0;
-	}
-	if (S==1) y0 *= rsqrt(1.0 - cost*cost);	// for vectors, divide by sin(theta)
-	y0 *= ak[0];
-	y1 = y0 * ak[1] * cost;
-	yl[0][j] = y0;
-	yl[1][j] = y1;
-	al+=2;
-	while (l < llim) {
-	for (int k=0; k<LSPAN; k+=2) {		// compute a block of the matrix, write it in shared mem.
-		yl[k][j]     = y0;
-		y0 = ak[2*k+3]*cost*y1 + ak[2*k+2]*y0;
-		yl[k+1][j] = y1;
-		y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
-		al += 4;
-	}
-
-	if (BLOCKSIZE > WARPSZE)	__syncthreads();
-	double qll = 0.0;	// accumulator
-	// now re-assign each thread an l (transpose)
+	// re-assign each thread an l (transpose)
 	const int ll = j / (BLOCKSIZE/LSPAN);
-	for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN) {
-		int it = j % (BLOCKSIZE/LSPAN) + i;
-		qll += reo[ll&1][it] * yl[ll][it];
-	}
-	// reduce_add within same l must be in same warp too:
-	if (BLOCKSIZE/LSPAN > WARPSZE)	printf("ERROR\n");
 
-	for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
-		qll += shfl_down(qll, ofs, BLOCKSIZE/LSPAN);
-	}
-	if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
-		if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
-		ql[2*(l+ll)] = qll;
-		} else {
-		atomicAdd(ql+2*(l+ll), qll);		// VERY slow atomic add on Kepler.
+	__shared__ double ak[2*LSPAN+2];	// cache
+	__shared__ double yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
+	const int l_inc = BLOCKSIZE;
+	const double cost = (it < nlat_2) ? ct[it] : 0.0;
+	double y0, y1;
+
+	if (LSPAN < 4) printf("ERROR: LSPAN<4\n");
+
+	double my_reo[NFIELDS][LSPAN];			// in registers
+	if (j < 2*LSPAN+2) ak[j] = al[j];
+
+	#pragma unroll
+	for (int f=0; f<NFIELDS; f++) {
+		y0 = (it < nlat_2) ? q[it + f*q_dist] : 0.0;				// north
+		y1 = (it < nlat_2) ? q[nlat_2*2-1 - it + f*q_dist] : 0.0;	// south
+
+		if ((f>0) && (BLOCKSIZE > WARPSZE)) 	__syncthreads();
+		yl[j] = y0+y1;					// even
+		yl[BLOCKSIZE +j] = y0-y1;		// odd
+		if (BLOCKSIZE > WARPSZE) 	__syncthreads();
+
+		// transpose reo to my_reo
+		#pragma unroll
+		for (int i=0, k=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN, k++) {
+			int it = j % (BLOCKSIZE/LSPAN) + i;
+			my_reo[f][k] = yl[(ll&1)*BLOCKSIZE +it];
 		}
 	}
-	if (j<2*LSPAN) ak[j+2] = al[j];
+
+	int l = 0;
+	y0 = (it < nlat_2) ? ct[it + nlat_2] : 0.0;		// weights are stored just after ct.
+	if (S==1) y0 *= rsqrt(1.0 - cost*cost);
+	y0 *= ak[0];
+	y1 = y0 * ak[1] * cost;
+
 	if (BLOCKSIZE > WARPSZE)	__syncthreads();
-	l+=LSPAN;
+	
+	yl[j] = y0;
+	yl[l_inc +j] = y1;
+	al+=2;
+	while (l <= llim) {
+		for (int k=0; k<LSPAN; k+=2) {		// compute a block of the matrix, write it in shared mem.
+			yl[k*l_inc +j]     = y0;
+			y0 = ak[2*k+3]*cost*y1 + ak[2*k+2]*y0;
+			yl[(k+1)*l_inc +j] = y1;
+			y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
+			al += 4;
+		}
+		if(BLOCKSIZE > WARPSZE)	__syncthreads();
+
+		double qll[NFIELDS];	// accumulator
+		// now re-assign each thread an l (transpose)
+		const int itl = ll*l_inc + j % (BLOCKSIZE/LSPAN);
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) qll[f] = my_reo[f][0] * yl[itl];			// first element
+		#pragma unroll
+		for (int i=BLOCKSIZE/LSPAN, k=1; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN, k++) {		// accumulate
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	qll[f] += my_reo[f][k] * yl[itl+i];
+		}
+
+		if (BLOCKSIZE/LSPAN <= WARPSZE) {	// reduce_add within same l is in same warp too:
+			if (WARPSZE % (BLOCKSIZE/LSPAN)) printf("ERROR\n");
+			#pragma unroll
+			for (int ofs = BLOCKSIZE/(LSPAN*2); ofs > 0; ofs>>=1) {
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	qll[f] += shfl_down(qll[f], ofs, BLOCKSIZE/LSPAN);
+			}
+			if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
+				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
+					#pragma unroll
+					for (int f=0; f<NFIELDS; f++)	ql[2*(l+ll) + f*ql_dist] = qll[f];
+				} else {
+					#pragma unroll
+					for (int f=0; f<NFIELDS; f++)	atomicAdd(ql+2*(l+ll) + f*ql_dist, qll[f]);		// VERY slow atomic add on Kepler.
+				}
+			}
+		} else {	// only partial reduction possible, finish with atomicAdd():
+			if ((BLOCKSIZE/LSPAN) % WARPSZE) printf("ERROR\n");
+			#pragma unroll
+			for (int ofs = WARPSZE/2; ofs > 0; ofs>>=1) {
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	qll[f] += shfl_down(qll[f], ofs, WARPSZE);
+			}
+			__syncthreads();
+			const int nsum = (BLOCKSIZE/(LSPAN*WARPSZE));
+			if ((j % WARPSZE) == 0) {
+				for (int f=0; f<NFIELDS; f++)  yl[ll*nsum + ((j/WARPSZE) % nsum) + f*LSPAN*nsum] = qll[f];
+			}
+			__syncthreads();
+			if ( ((j % (BLOCKSIZE/LSPAN)) == 0) && ((l+ll)<=llim) ) {	// write result
+				for (int i=1; i<nsum; i++) {
+					for (int f=0; f<NFIELDS; f++)	qll[f] += yl[ll*nsum + i + f*LSPAN*nsum];
+				}
+				if (nlat_2 <= BLOCKSIZE) {		// do we need atomic add or not ?
+					#pragma unroll
+					for (int f=0; f<NFIELDS; f++)	ql[2*(l+ll) + f*ql_dist] = qll[f];
+				} else {
+					#pragma unroll
+					for (int f=0; f<NFIELDS; f++)	atomicAdd(ql+2*(l+ll) + f*ql_dist, qll[f]);		// VERY slow atomic add on Kepler.
+				}
+			}
+		/*	if ( ((j % WARPSZE) == 0) && ((l+ll)<=llim) ) {	// write result
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	atomicAdd(ql+2*(l+ll) + f*ql_dist, qll[f]);		// VERY slow atomic add on Kepler.
+			}*/
+		}
+
+		if (j<2*LSPAN) ak[j+2] = al[j];
+		if (BLOCKSIZE > WARPSZE)	__syncthreads();
+		l+=LSPAN;
 	}
 }
-
 
 /** \internal convert from vector SH to scalar SH
 	Vlm =  st*d(Slm)/dtheta + I*m*Tlm
@@ -379,7 +535,7 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 	const int k_inc = 1;
 
 	__shared__ double ak[BLOCKSIZE];		// size blockDim.x
-	__shared__ double qk[NFIELDS*BLOCKSIZE];	// size blockDim.x * NFIELDS
+	__shared__ double qk[NFIELDS][BLOCKSIZE];	// size blockDim.x * NFIELDS
 
 	const double cost = (it < nlat_2) ? ct[it] : 0.0;
 
@@ -387,7 +543,7 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 		ak[j] = al[j];
 		if (j<2*(llim+1)) {
 			#pragma unroll
-			for (int f=0; f<NFIELDS; f++) 	qk[j + f*BLOCKSIZE] = ql[j  + f*ql_dist];
+			for (int f=0; f<NFIELDS; f++) 	qk[f][j] = ql[j  + f*ql_dist];
 		}
 		__syncthreads();
 		int l = 0;
@@ -398,8 +554,8 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 		double re[NFIELDS], ro[NFIELDS];
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
-			re[f] = y0 * qk[0 + f*BLOCKSIZE];
-			ro[f] = y1 * qk[2 + f*BLOCKSIZE];
+			re[f] = y0 * qk[f][0];
+			ro[f] = y1 * qk[f][2];
 		}
 		al+=2;    l+=2;		ka+=2;	kq+=2;
 		while(l<llim) {
@@ -407,22 +563,22 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 				__syncthreads();
 				ak[j] = al[j];
 				#pragma unroll
-				for (int f=0; f<NFIELDS; f++) 	qk[j + f*BLOCKSIZE] = ql[2*l+j  + f*ql_dist];
+				for (int f=0; f<NFIELDS; f++) 	qk[f][j] = ql[2*l+j  + f*ql_dist];
 				ka=0;	kq=0;
 				__syncthreads();
 			}
 			y0  = ak[ka+1]*cost*y1 + ak[ka]*y0;
 			y1  = ak[ka+3]*cost*y0 + ak[ka+2]*y1;
 			#pragma unroll
-			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[2*kq + f*BLOCKSIZE];
+			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[f][2*kq];
 			#pragma unroll
-			for (int f=0; f<NFIELDS; f++)	ro[f] += y1 * qk[2*kq+2 + f*BLOCKSIZE];
+			for (int f=0; f<NFIELDS; f++)	ro[f] += y1 * qk[f][2*kq+2];
 			al+=4;	l+=2;	  ka+=4;    kq+=2;
 		}
 		if (l==llim) {
 			y0  = ak[ka+1]*cost*y1 + ak[ka]*y0;
 			#pragma unroll
-			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[2*kq + f*BLOCKSIZE];
+			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[f][2*kq];
 		}
 		if (it<nlat_2) {
 			// store mangled for complex fft
@@ -442,7 +598,7 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 		y1 = sqrt(1.0 - cost*cost);		// y1 = sin(theta)
 		ak[j] = al[j];
 		#pragma unroll
-		for (int f=0; f<NFIELDS; f++)	if (m+j/2 <= llim) qk[j + f*BLOCKSIZE] = ql[2*m+j + f*ql_dist];
+		for (int f=0; f<NFIELDS; f++)	if (m+j/2 <= llim) qk[f][j] = ql[2*m+j + f*ql_dist];
 
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
@@ -469,20 +625,20 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 				__syncthreads();
 				ak[j] = al[j];
 				#pragma unroll
-				for (int f=0; f<NFIELDS; f++)	if (l+j/2 <= llim)  qk[j + f*BLOCKSIZE] = ql[2*l+j + f*ql_dist];
+				for (int f=0; f<NFIELDS; f++)	if (l+j/2 <= llim)  qk[f][j] = ql[2*l+j + f*ql_dist];
 				ka=0;	kq=0;
 				__syncthreads();
 			}
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) {
-				rer[f] += y0 * qk[2*kq + f*BLOCKSIZE];	// real
-				rei[f] += y0 * qk[2*kq+1 + f*BLOCKSIZE];	// imag
+				rer[f] += y0 * qk[f][2*kq];	// real
+				rei[f] += y0 * qk[f][2*kq+1];	// imag
 			}
 			y0 = ak[ka+1]*(cost*y1) + ak[ka]*y0;
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) {
-				ror[f] += y1 * qk[2*kq+2 + f*BLOCKSIZE];	// real
-				roi[f] += y1 * qk[2*kq+3 + f*BLOCKSIZE];	// imag
+				ror[f] += y1 * qk[f][2*kq+2];	// real
+				roi[f] += y1 * qk[f][2*kq+3];	// imag
 			}
 			y1 = ak[ka+3]*(cost*y0) + ak[ka+2]*y1;
 			l+=2;	al+=4;	 ka+=4;	  kq+=2;
@@ -490,8 +646,8 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 		if (l==llim) {
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) {
-				rer[f] += y0 * qk[2*kq + f*BLOCKSIZE];
-				rei[f] += y0 * qk[2*kq+1 + f*BLOCKSIZE];
+				rer[f] += y0 * qk[f][2*kq];
+				rei[f] += y0 * qk[f][2*kq+1];
 			}
 		}
 
@@ -524,6 +680,436 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 		}
 	}
 }
+
+/*
+/// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
+/// llim MUST BE <= 1800
+/// S can only be 0 (for scalar) or 1 (for spin 1 / vector)
+template<int BLOCKSIZE, int S, int NFIELDS> __global__ void
+leg_m_lowllim2(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int ql_dist=0, const int q_dist=0)
+{
+	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
+	const int im = blockIdx.y;
+	const int j = threadIdx.x;
+	const int m_inc = 2*nlat_2;
+	const int k_inc = 1;
+
+	double ak;		// cache into registers
+	double qk[NFIELDS];		// cache into registers
+
+	const double cost = (it < nlat_2) ? ct[it] : 0.0;
+
+	if (im==0) {
+		ak = al[j&31];			// every warp reads 32 values
+		if (j<2*(llim+1)) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) 	qk[f] = ql[(j&31)  + f*ql_dist];
+		}
+		int l = 0;
+		int ka = 0;	int kq = 0;
+		double y0 = shfl(ak,0);
+		if (S==1) y0 *= rsqrt(1.0 - cost*cost);	// for vectors, divide by sin(theta)
+		double y1 = y0 * shfl(ak,1) * cost;
+		double re[NFIELDS], ro[NFIELDS];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			re[f] = y0 * shfl(qk[f],0);
+			ro[f] = y1 * shfl(qk[f],2);
+		}
+		al+=2;    l+=2;		ka+=2;	kq+=2;
+		while(l<llim) {
+			if (ka+6 >= WARPSZE) {
+				ak = al[j&31];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++) 	qk[f] = ql[2*l+(j&31)  + f*ql_dist];
+				ka=0;	kq=0;
+			}
+			y0  = shfl(ak,ka+1)*cost*y1 + shfl(ak,ka)*y0;
+			y1  = shfl(ak,ka+3)*cost*y0 + shfl(ak,ka+2)*y1;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * shfl(qk[f],2*kq);
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	ro[f] += y1 * shfl(qk[f],2*kq+2);
+			al+=4;	l+=2;	  ka+=4;    kq+=2;
+		}
+		if (l==llim) {
+			y0  = shfl(ak,ka+1)*cost*y1 + shfl(ak,ka)*y0;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * shfl(qk[f],2*kq);
+		}
+		if (it<nlat_2) {
+			// store mangled for complex fft
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				q[it*k_inc + f*q_dist] = re[f]+ro[f];
+				q[(nlat_2*2-1-it)*k_inc + f*q_dist] = re[f]-ro[f];
+			}
+		}
+	} else { 	// m>0
+		double rer[NFIELDS], ror[NFIELDS], rei[NFIELDS], roi[NFIELDS], y0, y1;
+		int m = im*mres;
+		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
+		al += 2*(l+m);
+		ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
+
+		y1 = sqrt(1.0 - cost*cost);		// y1 = sin(theta)
+		ak = al[j&31];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++)	if (m+(j&31)/2 <= llim) qk[f] = ql[2*m+(j&31) + f*ql_dist];
+
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			ror[f] = 0.0;		roi[f] = 0.0;
+			rer[f] = 0.0;		rei[f] = 0.0;
+		}
+		y0 = 1.0;
+		l = m - S;
+		do {		// sin(theta)^(m-S)
+			if (l&1) y0 *= y1;
+			y1 *= y1;
+		} while(l >>= 1);
+
+		y0 *= shfl(ak,0);
+		y1 = shfl(ak,1)*y0*cost;
+
+		int ka = 2;
+		l=m;		al+=2;
+		int kq = 0;
+
+		while (l<llim) {	// compute even and odd parts
+			if (2*kq+6 >= WARPSZE) {
+				ak = al[j&31];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	if (l+(j&31)/2 <= llim)  qk[f] = ql[2*l+(j&31) + f*ql_dist];
+				ka=0;	kq=0;
+			}
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				rer[f] += y0 * shfl(qk[f],2*kq);	// real
+				rei[f] += y0 * shfl(qk[f],2*kq+1);	// imag
+			}
+			y0 = shfl(ak,ka+1)*(cost*y1) + shfl(ak,ka)*y0;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				ror[f] += y1 * shfl(qk[f],2*kq+2);	// real
+				roi[f] += y1 * shfl(qk[f],2*kq+3);	// imag
+			}
+			y1 = shfl(ak,ka+3)*(cost*y0) + shfl(ak,ka+2)*y1;
+			l+=2;	al+=4;	 ka+=4;	  kq+=2;
+		}
+		if (l==llim) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				rer[f] += y0 * shfl(qk[f],2*kq);
+				rei[f] += y0 * shfl(qk[f],2*kq+1);
+			}
+		}
+
+		/// store mangled for complex fft
+		double nr[NFIELDS];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			nr[f] = rer[f]+ror[f];
+			rer[f] = rer[f]-ror[f];
+		}
+		const double sgn = 1 - 2*(j&1);
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			rei[f] = shfl_xor(rei[f], 1);
+			roi[f] = shfl_xor(roi[f], 1);
+		}
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			ror[f] = sgn*(rei[f]+roi[f]);
+			rei[f] = sgn*(rei[f]-roi[f]);
+		}
+		if (it < nlat_2) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				q[im*m_inc + it*k_inc + f*q_dist]                     = nr[f]  - ror[f];
+				q[(nphi-im)*m_inc + it*k_inc + f*q_dist]              = nr[f]  + ror[f];
+				q[im*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist]        = rer[f] + rei[f];
+				q[(nphi-im)*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist] = rer[f] - rei[f];
+			}
+		}
+	}
+}
+
+
+/// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
+/// llim MUST BE <= 1800
+/// S can only be 0 (for scalar) or 1 (for spin 1 / vector)
+template<int BLOCKSIZE, int S, int NFIELDS> __global__ void
+leg_m_lowllim3(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int ql_dist=0, const int q_dist=0)
+{
+	const int it = (BLOCKSIZE-WARPSZE) * blockIdx.x + (threadIdx.x-WARPSZE);
+	const int im = blockIdx.y;
+	const int j = threadIdx.x - WARPSZE;		// negative j for the READER part
+	const int m_inc = 2*nlat_2;
+	const int k_inc = 1;
+
+	const int CACHESIZE = BLOCKSIZE;
+	__shared__ double ak[CACHESIZE];		// size blockDim.x
+	__shared__ double qk[NFIELDS][CACHESIZE];	// size blockDim.x * NFIELDS
+	
+	// NAMED BARRIERS:
+	const int START_LOAD_1 = 0;
+	const int END_LOAD_1 = 1;
+	const int START_LOAD_2 = 2;
+	const int END_LOAD_2 = 3;
+
+	double rer[NFIELDS], ror[NFIELDS], rei[NFIELDS], roi[NFIELDS], y0, y1;
+
+	if (j<0) {		// READER
+		int m = im*mres;
+		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
+		al += 2*(l+m);
+		ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
+
+		namedBarrierWait(START_LOAD_1, BLOCKSIZE);		// load first block ?
+		for (int k = WARPSZE+j; k<CACHESIZE; k+=WARPSZE) {		// read WARPSZE at a time.
+			if (k<2*(llim+1-m)) {
+				ak[k] = al[k];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++) 	qk[f][k] = ql[k  + f*ql_dist];
+			}
+		}
+		namedBarrierArrived(END_LOAD_1, BLOCKSIZE);	// first block loaded
+		
+	} else {		// COMPUTER
+		namedBarrierArrived(START_LOAD_1, BLOCKSIZE);		// load 1st block now!
+
+		const double cost = (it < nlat_2) ? ct[it] : 0.0;
+		y1 = sqrt(1.0 - cost*cost);		// y1 = sin(theta)
+
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			ror[f] = 0.0;		roi[f] = 0.0;
+			rer[f] = 0.0;		rei[f] = 0.0;
+		}
+		
+		if (im>0) {
+			y0 = 1.0;
+			l = m - S;
+			do {		// sin(theta)^(m-S)
+				if (l&1) y0 *= y1;
+				y1 *= y1;
+			} while(l >>= 1);
+		}
+
+		namedBarrierWait(END_LOAD_1, BLOCKSIZE);
+
+		y0 *= ak[0];
+		y1 = ak[1]*y0*cost;
+
+		int ka = 2;
+		l=m;		al+=2;
+		int kq = 0;
+
+		while (l<llim) {	// compute even and odd parts
+			if (2*kq+6 > BLOCKSIZE) {
+				namedBarrierWait(END_LOAD_2, BLOCKSIZE);
+				__syncthreads();
+				ak[j] = al[j];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	if (l+j/2 <= llim)  qk[f][j] = ql[2*l+j + f*ql_dist];
+				ka=0;	kq=0;
+				__syncthreads();
+			}
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				rer[f] += y0 * qk[f][2*kq];	// real
+				rei[f] += y0 * qk[f][2*kq+1];	// imag
+			}
+			y0 = ak[ka+1]*(cost*y1) + ak[ka]*y0;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				ror[f] += y1 * qk[f][2*kq+2];	// real
+				roi[f] += y1 * qk[f][2*kq+3];	// imag
+			}
+			y1 = ak[ka+3]*(cost*y0) + ak[ka+2]*y1;
+			l+=2;	al+=4;	 ka+=4;	  kq+=2;
+		}
+		if (l==llim) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				rer[f] += y0 * qk[f][2*kq];
+				rei[f] += y0 * qk[f][2*kq+1];
+			}
+		}
+
+		/// store mangled for complex fft
+		double nr[NFIELDS];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			nr[f] = rer[f]+ror[f];
+			rer[f] = rer[f]-ror[f];
+		}
+		const double sgn = 1 - 2*(j&1);
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			rei[f] = shfl_xor(rei[f], 1);
+			roi[f] = shfl_xor(roi[f], 1);
+		}
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			ror[f] = sgn*(rei[f]+roi[f]);
+			rei[f] = sgn*(rei[f]-roi[f]);
+		}
+		if (it < nlat_2) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				q[im*m_inc + it*k_inc + f*q_dist]                     = nr[f]  - ror[f];
+				q[(nphi-im)*m_inc + it*k_inc + f*q_dist]              = nr[f]  + ror[f];
+				q[im*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist]        = rer[f] + rei[f];
+				q[(nphi-im)*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist] = rer[f] - rei[f];
+			}
+		}
+	}
+
+
+	if (im==0) {
+		ak[j] = al[j];
+		if (j<2*(llim+1)) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) 	qk[f][j] = ql[j  + f*ql_dist];
+		}
+		__syncthreads();
+		int l = 0;
+		int ka = 0;	int kq = 0;
+		double y0 = ak[0];
+		if (S==1) y0 *= rsqrt(1.0 - cost*cost);	// for vectors, divide by sin(theta)
+		double y1 = y0 * ak[1] * cost;
+		double re[NFIELDS], ro[NFIELDS];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			re[f] = y0 * qk[f][0];
+			ro[f] = y1 * qk[f][2];
+		}
+		al+=2;    l+=2;		ka+=2;	kq+=2;
+		while(l<llim) {
+			if (ka+6 >= BLOCKSIZE) {
+				__syncthreads();
+				ak[j] = al[j];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++) 	qk[f][j] = ql[2*l+j  + f*ql_dist];
+				ka=0;	kq=0;
+				__syncthreads();
+			}
+			y0  = ak[ka+1]*cost*y1 + ak[ka]*y0;
+			y1  = ak[ka+3]*cost*y0 + ak[ka+2]*y1;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[f][2*kq];
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	ro[f] += y1 * qk[f][2*kq+2];
+			al+=4;	l+=2;	  ka+=4;    kq+=2;
+		}
+		if (l==llim) {
+			y0  = ak[ka+1]*cost*y1 + ak[ka]*y0;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[f][2*kq];
+		}
+		if (it<nlat_2) {
+			// store mangled for complex fft
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				q[it*k_inc + f*q_dist] = re[f]+ro[f];
+				q[(nlat_2*2-1-it)*k_inc + f*q_dist] = re[f]-ro[f];
+			}
+		}
+	} else { 	// m>0
+		double rer[NFIELDS], ror[NFIELDS], rei[NFIELDS], roi[NFIELDS], y0, y1;
+		int m = im*mres;
+		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
+		al += 2*(l+m);
+		ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
+
+		y1 = sqrt(1.0 - cost*cost);		// y1 = sin(theta)
+		ak[j] = al[j];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++)	if (m+j/2 <= llim) qk[f][j] = ql[2*m+j + f*ql_dist];
+
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			ror[f] = 0.0;		roi[f] = 0.0;
+			rer[f] = 0.0;		rei[f] = 0.0;
+		}
+		y0 = 1.0;
+		l = m - S;
+		do {		// sin(theta)^(m-S)
+			if (l&1) y0 *= y1;
+			y1 *= y1;
+		} while(l >>= 1);
+
+		__syncthreads();
+		y0 *= ak[0];
+		y1 = ak[1]*y0*cost;
+
+		int ka = 2;
+		l=m;		al+=2;
+		int kq = 0;
+
+		while (l<llim) {	// compute even and odd parts
+			if (2*kq+6 > BLOCKSIZE) {
+				__syncthreads();
+				ak[j] = al[j];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	if (l+j/2 <= llim)  qk[f][j] = ql[2*l+j + f*ql_dist];
+				ka=0;	kq=0;
+				__syncthreads();
+			}
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				rer[f] += y0 * qk[f][2*kq];	// real
+				rei[f] += y0 * qk[f][2*kq+1];	// imag
+			}
+			y0 = ak[ka+1]*(cost*y1) + ak[ka]*y0;
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				ror[f] += y1 * qk[f][2*kq+2];	// real
+				roi[f] += y1 * qk[f][2*kq+3];	// imag
+			}
+			y1 = ak[ka+3]*(cost*y0) + ak[ka+2]*y1;
+			l+=2;	al+=4;	 ka+=4;	  kq+=2;
+		}
+		if (l==llim) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				rer[f] += y0 * qk[f][2*kq];
+				rei[f] += y0 * qk[f][2*kq+1];
+			}
+		}
+
+		/// store mangled for complex fft
+		double nr[NFIELDS];
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			nr[f] = rer[f]+ror[f];
+			rer[f] = rer[f]-ror[f];
+		}
+		const double sgn = 1 - 2*(j&1);
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			rei[f] = shfl_xor(rei[f], 1);
+			roi[f] = shfl_xor(roi[f], 1);
+		}
+		#pragma unroll
+		for (int f=0; f<NFIELDS; f++) {
+			ror[f] = sgn*(rei[f]+roi[f]);
+			rei[f] = sgn*(rei[f]-roi[f]);
+		}
+		if (it < nlat_2) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				q[im*m_inc + it*k_inc + f*q_dist]                     = nr[f]  - ror[f];
+				q[(nphi-im)*m_inc + it*k_inc + f*q_dist]              = nr[f]  + ror[f];
+				q[im*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist]        = rer[f] + rei[f];
+				q[(nphi-im)*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist] = rer[f] - rei[f];
+			}
+		}
+	}
+}
+*/
 
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim can be arbitrarily large (> 1800)
@@ -1094,6 +1680,7 @@ int init_cuda_buffer_fft(shtns_cfg shtns)
 {
 	cudaError_t err = cudaSuccess;
 	int err_count = 0;
+	const unsigned layout = shtns->layout & (256*7);	// isolate layout
 
 	shtns->comp_stream = 0;		// use default stream for computations.
 	shtns->cu_flags &= ~((int)CUSHT_OWN_COMP_STREAM);		// mark the compute stream (=default stream) as NOT managed by shtns.
@@ -1103,14 +1690,27 @@ int init_cuda_buffer_fft(shtns_cfg shtns)
 
 	/* cuFFT init */
 	int nfft = shtns->nphi;
+	//int nreal = 2*(nfft/2+1);
+	shtns->cu_flags = CUSHT_NOFFT;
 	if (nfft > 1) {
 		// cufftPlanMany(cufftHandle *plan, int rank, int *n,   int *inembed, int istride, int idist,   int *onembed, int ostride, int odist,   cufftType type, int batch);
 		cufftResult res;
-		res = cufftPlanMany(&shtns->cufft_plan, 1, &nfft, &nfft, shtns->nlat_2, 1, &nfft, shtns->nlat_2, 1, CUFFT_Z2Z, shtns->nlat_2);
+		if (layout == SHT_PHI_CONTIGUOUS) {
+			printf("cuda SHT error: phi-contiguous not implemented.\n");
+			exit(1);			
+		} else if ((layout == SHT_NATIVE_LAYOUT) && (nfft % 16 == 0) && (shtns->nlat_2 % 16 == 0)) {	// use the fastest data-layout.
+			printf("!!! Use phi-contiguous FFT +transpose: WARNING, the spatial data is neither phi-contiguous nor theta-contiguous !!!\n");
+			res = cufftPlanMany(&shtns->cufft_plan, 1, &nfft, &nfft, 1, shtns->nphi, &nfft, 1, shtns->nphi, CUFFT_Z2Z, shtns->nlat_2);
+			shtns->cu_fft_mode = CUSHT_FFT_TRANSPOSE;
+			//cufftPlanMany(&shtns->cufft_plan, 1, &nfft, &nfft, 1, shtns->nphi, &nreal, 1, shtns->nphi, CUFFT_D2Z, shtns->nlat);
+		} else {		// if (layout & SHT_THETA_CONTIGUOUS) 
+			res = cufftPlanMany(&shtns->cufft_plan, 1, &nfft, &nfft, shtns->nlat_2, 1, &nfft, shtns->nlat_2, 1, CUFFT_Z2Z, shtns->nlat_2);
+			shtns->cu_fft_mode = CUSHT_FFT_THETA_CONTIGUOUS;
+		}
 		if (res != CUFFT_SUCCESS)  err_count ++;
-		//size_t worksize;
-		//cufftGetSize(shtns->cufft_plan, &worksize);
-		//printf("work-area size: %ld \t nlat*nphi = %ld\n", worksize/8, spat_stride);
+		size_t worksize;
+		cufftGetSize(shtns->cufft_plan, &worksize);
+		printf("work-area size: %ld \t nlat*nphi = %ld\n", worksize/8, shtns->spat_stride);
 	}
 
 	// Allocate working arrays for SHT on GPU:
@@ -1119,6 +1719,9 @@ int init_cuda_buffer_fft(shtns_cfg shtns)
 	const size_t nlm_stride = ((2*nlm2+WARPSZE-1)/WARPSZE) * WARPSZE;
 	const size_t spat_stride = ((shtns->nlat*shtns->nphi+WARPSZE-1)/WARPSZE) * WARPSZE;
 	const size_t dual_stride = (spat_stride < nlm_stride) ? nlm_stride : spat_stride;		// we need two spatial buffers to also hold spectral data.
+	if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
+		cudaMalloc( (void **)&shtns->xfft, spat_stride * sizeof(double));
+	}
 	err = cudaMalloc( (void **)&gpu_mem, (2*nlm_stride + 2*dual_stride + spat_stride)*sizeof(double) );		// maximum GPU memory required for SHT
 	if (err != cudaSuccess)	err_count++;
 
@@ -1162,7 +1765,7 @@ int cushtns_init_gpu(shtns_cfg shtns)
 		nblocks = (nlat_2 + threadsPerBlock - 1) / threadsPerBlock;
 	}
 */
-	threadsPerBlock = 0;	//THREADS_PER_BLOCK;
+	threadsPerBlock = MAX_THREADS_PER_BLOCK;	//THREADS_PER_BLOCK;
 	nblocks = (nlat_2 + threadsPerBlock - 1) / threadsPerBlock;		
 	shtns->nblocks = nblocks;
 	shtns->threads_per_block = threadsPerBlock;
@@ -1396,7 +1999,16 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 			// padd missing m's with 0 (m>mmax)
 			if (2*(mmax+1) <= nphi)
 				cudaMemsetAsync( x + (mmax+1)*nlat_2, 0, sizeof(double)*(nphi-2*mmax-1)*2*nlat_2, stream );		// set to zero before fft
-			res = cufftExecZ2Z(shtns->cufft_plan, x, x, CUFFT_INVERSE);
+			if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
+				double* xfft = shtns->xfft;
+				const int block_dim_y = 4;
+				dim3 blocks(NLAT_2/16, NPHI/16);
+				dim3 threads(32, block_dim_y);
+				transpose_cplx<block_dim_y> <<<blocks, threads, 0, stream>>>((double*) x, xfft, NLAT_2, NPHI);
+				res = cufftExecZ2Z(shtns->cufft_plan, (cufftDoubleComplex*) xfft, x, CUFFT_INVERSE);
+			} else {	// THETA_CONTIGUOUS:
+				res = cufftExecZ2Z(shtns->cufft_plan, x, x, CUFFT_INVERSE);
+			}
 		}
 		if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
 	}
@@ -1427,19 +2039,28 @@ void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int 
 		cudaMemsetAsync(d_Qlm + (f*shtns->nlm_stride)/2, 0, sizeof(double)*2*nlm, stream);		// set to zero before we start.
 	}
 	if (nphi == 1) {
-		ileg_m0<THREADS_PER_BLOCK, LSPAN_, S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);
+		ileg_m0<THREADS_PER_BLOCK, LSPAN_, S, NFIELDS><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, spat_dist, shtns->nlm_stride);
 	} else {
 		for (int f=0; f<NFIELDS; f++) {
 			cufftResult res;
 			cufftDoubleComplex *x = (cufftDoubleComplex*) (d_Vr + f*spat_dist);
-			res = cufftExecZ2Z(shtns->cufft_plan, x, x, CUFFT_INVERSE);
+			if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
+				double* xfft = shtns->xfft;
+				res = cufftExecZ2Z(shtns->cufft_plan, x, (cufftDoubleComplex*) xfft, CUFFT_INVERSE);
+				const int block_dim_y = 4;
+				dim3 blocks(NPHI/16, NLAT_2/16);
+				dim3 threads(32, block_dim_y);
+				transpose_cplx<block_dim_y> <<<blocks, threads, 0, stream>>>(xfft, (double*) x, NPHI, NLAT_2);
+			} else {	// THETA_CONTIGUOUS:
+				res = cufftExecZ2Z(shtns->cufft_plan, x, x, CUFFT_INVERSE);
+			}
 			if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
 		}
 		if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
 		dim3 blocks(blocksPerGrid, mmax+1);
 		dim3 threads(threadsPerBlock, 1);
 		if (mmax==0) {
-			ileg_m0<THREADS_PER_BLOCK, LSPAN_, S><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2);
+			ileg_m0<THREADS_PER_BLOCK, LSPAN_, S, NFIELDS><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, spat_dist, shtns->nlm_stride);
 		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
 			ileg_m_lowllim<THREADS_PER_BLOCK, LSPAN_, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi, spat_dist, shtns->nlm_stride);
@@ -1526,8 +2147,8 @@ void cu_spat_to_SHsphtor(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cpl
 	d_vwlm = shtns->gpu_mem;
 
 	// SHT on the GPU
-//	cuda_spat_to_SH<1>(shtns, Vt, (cplx*) d_vwlm, llim+1);
-//	cuda_spat_to_SH<1>(shtns, Vp, (cplx*) (d_vwlm + nlm_stride), llim+1);
+//	cuda_spat_to_SH<1,1>(shtns, Vt, (cplx*) d_vwlm, llim+1);
+//	cuda_spat_to_SH<1,1>(shtns, Vp, (cplx*) (d_vwlm + nlm_stride), llim+1);
 	cuda_spat_to_SH<1,2>(shtns, Vt, (cplx*) d_vwlm, llim+1, Vp-Vt);
 	err = cudaGetLastError();
 	if (err != cudaSuccess) { printf("spat_to_SHsphtor CUDA error : %s!\n", cudaGetErrorString(err));	return; }
