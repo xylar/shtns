@@ -10,17 +10,18 @@
  * 4) allow several variants, which may change occupancy for large sizes ?
  * 5) generalize NFIELDS to all kernels
  * 6) find optimal threads/block for minor kernels too (e.g. sphtor2scal)
+ * 7) try to use transposed fft, to see if it is faster than my own FFT + transpose...   => No, it's not.
  */
 
 /* Session with S. Chauveau from nvidia:
  * useful metrics = achieved_occupancy, cache_hit
  * for leg_m_lowllim, the "while(l<llim)" loop:
- * 		0) full al, ql load before the while loop.
- * 		1) reduce pointer update by moving ql and al updates into the "if" statement.
+ * 		0) full al, ql load before the while loop.	=> DONE
+ * 		1) reduce pointer update by moving ql and al updates into the "if" statement.	=> DONE
  * 	    2a) try to use a double-buffer (indexed by b, switched by b=1-b)		=> only 1 __syncthread() instead of 2.
  * 	OR:	2b) preload al, ql into registers => may reduce the waiting at __syncthreads()
- * 		3) unroll by had the while loop (with an inner-loop of fixed size)
- * 		4) introduce NWAY (1 to 4) to avoid the need of several blocks in theta => one block for all means al, ql are read only once!
+ * 		3) unroll by hand the while loop (with an inner-loop of fixed size)		=> DONE
+ * 		4) introduce NWAY (1 to 4) to avoid the need of several blocks in theta => one block for all means al, ql are read only once!	=> DONE
  * 				=> increases register pressure, but may be OK !
  */
 
@@ -525,7 +526,7 @@ scal2sphtor_kernel(const double* __restrict__ mx, const double* __restrict__ vlm
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim MUST BE <= 1800
 /// S can only be 0 (for scalar) or 1 (for spin 1 / vector)
-template<int BLOCKSIZE, int S, int NFIELDS> __global__ void
+template<int BLOCKSIZE, int S, int NFIELDS, int NW> __global__ void
 leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int ql_dist=0, const int q_dist=0)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
@@ -537,7 +538,14 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 	__shared__ double ak[BLOCKSIZE];		// size blockDim.x
 	__shared__ double qk[NFIELDS][BLOCKSIZE];	// size blockDim.x * NFIELDS
 
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
+	double cost[NW];
+	double y0[NW];
+	double y1[NW];
+	#pragma unroll
+	for (int i=0; i<NW; i++) {
+		const int iit = it+i*BLOCKSIZE;
+		cost[i] = (iit < nlat_2) ? ct[iit] : 0.0;
+	}
 
 	if (im==0) {
 		ak[j] = al[j];
@@ -548,14 +556,17 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 		__syncthreads();
 		int l = 0;
 		int ka = 0;	int kq = 0;
-		double y0 = ak[0];
-		if (S==1) y0 *= rsqrt(1.0 - cost*cost);	// for vectors, divide by sin(theta)
-		double y1 = y0 * ak[1] * cost;
-		double re[NFIELDS], ro[NFIELDS];
+		for (int i=0; i<NW; i++) y0[i] = ak[0];
+		if (S==1) for (int i=0; i<NW; i++) y0[i] *= rsqrt(1.0 - cost[i]*cost[i]);	// for vectors, divide by sin(theta)
+		for (int i=0; i<NW; i++) y1[i] = y0[i] * ak[1] * cost[i];
+		double re[NFIELDS][NW], ro[NFIELDS][NW];
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
-			re[f] = y0 * qk[f][0];
-			ro[f] = y1 * qk[f][2];
+			#pragma unroll
+			for (int i=0; i<NW; i++) {
+				re[f][i] = y0[i] * qk[f][0];
+				ro[f][i] = y1[i] * qk[f][2];
+			}
 		}
 		al+=2;    l+=2;		ka+=2;	kq+=2;
 		while(l<llim) {
@@ -567,115 +578,181 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 				ka=0;	kq=0;
 				__syncthreads();
 			}
-			y0  = ak[ka+1]*cost*y1 + ak[ka]*y0;
-			y1  = ak[ka+3]*cost*y0 + ak[ka+2]*y1;
 			#pragma unroll
-			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[f][2*kq];
+			for (int i=0; i<NW; i++) 	y0[i]  = ak[ka+1]*cost[i]*y1[i] + ak[ka]*y0[i];
 			#pragma unroll
-			for (int f=0; f<NFIELDS; f++)	ro[f] += y1 * qk[f][2*kq+2];
+			for (int i=0; i<NW; i++)	y1[i]  = ak[ka+3]*cost[i]*y0[i] + ak[ka+2]*y1[i];
+			#pragma unroll
+			for (int i=0; i<NW; i++) {
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	re[f][i] += y0[i] * qk[f][2*kq];
+			}
+			#pragma unroll
+			for (int i=0; i<NW; i++) {
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	ro[f][i] += y1[i] * qk[f][2*kq+2];
+			}
 			al+=4;	l+=2;	  ka+=4;    kq+=2;
 		}
 		if (l==llim) {
-			y0  = ak[ka+1]*cost*y1 + ak[ka]*y0;
 			#pragma unroll
-			for (int f=0; f<NFIELDS; f++)	re[f] += y0 * qk[f][2*kq];
+			for (int i=0; i<NW; i++) 	y0[i]  = ak[ka+1]*cost[i]*y1[i] + ak[ka]*y0[i];
+			#pragma unroll
+			for (int i=0; i<NW; i++) {
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	re[f][i] += y0[i] * qk[f][2*kq];
+			}
 		}
-		if (it<nlat_2) {
-			// store mangled for complex fft
-			#pragma unroll
-			for (int f=0; f<NFIELDS; f++) {
-				q[it*k_inc + f*q_dist] = re[f]+ro[f];
-				q[(nlat_2*2-1-it)*k_inc + f*q_dist] = re[f]-ro[f];
+		#pragma unroll
+		for (int i=0; i<NW; i++) {
+			const int iit = it+i*BLOCKSIZE;
+			if (iit < nlat_2) {
+				// store mangled for complex fft
+				const int iit = it+i*BLOCKSIZE;
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++) {
+					q[iit*k_inc + f*q_dist] = re[f][i]+ro[f][i];
+					q[(nlat_2*2-1-iit)*k_inc + f*q_dist] = re[f][i]-ro[f][i];
+				}
 			}
 		}
 	} else { 	// m>0
-		double rer[NFIELDS], ror[NFIELDS], rei[NFIELDS], roi[NFIELDS], y0, y1;
+		double rer[NFIELDS][NW], ror[NFIELDS][NW], rei[NFIELDS][NW], roi[NFIELDS][NW];
 		int m = im*mres;
 		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
 		al += 2*(l+m);
 		ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
 
-		y1 = sqrt(1.0 - cost*cost);		// y1 = sin(theta)
-		ak[j] = al[j];
+		#pragma unroll
+		for (int i=0; i<NW; i++) 	y1[i] = sqrt(1.0 - cost[i]*cost[i]);		// y1 = sin(theta)
+		ak[j] = al[j+2];
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++)	if (m+j/2 <= llim) qk[f][j] = ql[2*m+j + f*ql_dist];
 
 		#pragma unroll
-		for (int f=0; f<NFIELDS; f++) {
-			ror[f] = 0.0;		roi[f] = 0.0;
-			rer[f] = 0.0;		rei[f] = 0.0;
+		for (int i=0; i<NW; i++) {
+			#pragma unroll
+			for (int f=0; f<NFIELDS; f++) {
+				ror[f][i] = 0.0;		roi[f][i] = 0.0;
+				rer[f][i] = 0.0;		rei[f][i] = 0.0;
+			}
+			y0[i] = 1.0;
 		}
-		y0 = 1.0;
 		l = m - S;
 		do {		// sin(theta)^(m-S)
-			if (l&1) y0 *= y1;
-			y1 *= y1;
+			if (l&1) {
+				#pragma unroll
+				for (int i=0; i<NW; i++) y0[i] *= y1[i];
+			}
+			#pragma unroll
+			for (int i=0; i<NW; i++) y1[i] *= y1[i];
 		} while(l >>= 1);
 
+		#pragma unroll
+		for (int i=0; i<NW; i++) y0[i] *= al[0];
+		#pragma unroll
+		for (int i=0; i<NW; i++) y1[i] = al[1]*y0[i]*cost[i];
+
 		__syncthreads();
-		y0 *= ak[0];
-		y1 = ak[1]*y0*cost;
-
-		int ka = 2;
 		l=m;		al+=2;
-		int kq = 0;
-
-		while (l<llim) {	// compute even and odd parts
-			if (2*kq+6 > BLOCKSIZE) {
-				__syncthreads();
-				ak[j] = al[j];
+		while (l<=llim - BLOCKSIZE/2) {	// compute even and odd parts
+			#pragma unroll
+			for (int k = 0; k<BLOCKSIZE; k+=4) {
 				#pragma unroll
-				for (int f=0; f<NFIELDS; f++)	if (l+j/2 <= llim)  qk[f][j] = ql[2*l+j + f*ql_dist];
-				ka=0;	kq=0;
-				__syncthreads();
+				for (int f=0; f<NFIELDS; f++) {
+					#pragma unroll
+					for (int i=0; i<NW; i++) {
+						rer[f][i] += y0[i] * qk[f][k];		// real
+						rei[f][i] += y0[i] * qk[f][k+1];	// imag
+					}
+				}
+				#pragma unroll
+				for (int i=0; i<NW; i++) 	y0[i] = ak[k+1]*(cost[i]*y1[i]) + ak[k]*y0[i];
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++) {
+					#pragma unroll
+					for (int i=0; i<NW; i++) {
+						ror[f][i] += y1[i] * qk[f][k+2];	// real
+						roi[f][i] += y1[i] * qk[f][k+3];	// imag
+					}
+				}
+				#pragma unroll
+				for (int i=0; i<NW; i++) 	y1[i] = ak[k+3]*(cost[i]*y0[i]) + ak[k+2]*y1[i];
 			}
+			al += BLOCKSIZE;
+			l += BLOCKSIZE/2;
+			__syncthreads();
+			ak[j] = al[j];
+			if (l+j/2 <= llim) {
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++)	qk[f][j] = ql[2*l+j + f*ql_dist];
+			}
+			__syncthreads();
+		}
+		int k=0;
+		while (l<llim) {	// compute even and odd parts
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) {
-				rer[f] += y0 * qk[f][2*kq];	// real
-				rei[f] += y0 * qk[f][2*kq+1];	// imag
+				#pragma unroll
+				for (int i=0; i<NW; i++) {
+					rer[f][i] += y0[i] * qk[f][k];		// real
+					rei[f][i] += y0[i] * qk[f][k+1];	// imag
+				}
 			}
-			y0 = ak[ka+1]*(cost*y1) + ak[ka]*y0;
+			#pragma unroll
+			for (int i=0; i<NW; i++) 	y0[i] = ak[k+1]*(cost[i]*y1[i]) + ak[k]*y0[i];
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) {
-				ror[f] += y1 * qk[f][2*kq+2];	// real
-				roi[f] += y1 * qk[f][2*kq+3];	// imag
+				#pragma unroll
+				for (int i=0; i<NW; i++) {
+					ror[f][i] += y1[i] * qk[f][k+2];	// real
+					roi[f][i] += y1[i] * qk[f][k+3];	// imag
+				}
 			}
-			y1 = ak[ka+3]*(cost*y0) + ak[ka+2]*y1;
-			l+=2;	al+=4;	 ka+=4;	  kq+=2;
+			#pragma unroll
+			for (int i=0; i<NW; i++) 	y1[i] = ak[k+3]*(cost[i]*y0[i]) + ak[k+2]*y1[i];
+			l+=2;	k+=4;
 		}
 		if (l==llim) {
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) {
-				rer[f] += y0 * qk[f][2*kq];
-				rei[f] += y0 * qk[f][2*kq+1];
+				#pragma unroll
+				for (int i=0; i<NW; i++) {
+					rer[f][i] += y0[i] * qk[f][k];		// real
+					rei[f][i] += y0[i] * qk[f][k+1];	// imag
+				}
 			}
 		}
 
 		/// store mangled for complex fft
-		double nr[NFIELDS];
 		#pragma unroll
-		for (int f=0; f<NFIELDS; f++) {
-			nr[f] = rer[f]+ror[f];
-			rer[f] = rer[f]-ror[f];
-		}
-		const double sgn = 1 - 2*(j&1);
-		#pragma unroll
-		for (int f=0; f<NFIELDS; f++) {
-			rei[f] = shfl_xor(rei[f], 1);
-			roi[f] = shfl_xor(roi[f], 1);
-		}
-		#pragma unroll
-		for (int f=0; f<NFIELDS; f++) {
-			ror[f] = sgn*(rei[f]+roi[f]);
-			rei[f] = sgn*(rei[f]-roi[f]);
-		}
-		if (it < nlat_2) {
+		for (int i=0; i<NW; i++) {
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) {
-				q[im*m_inc + it*k_inc + f*q_dist]                     = nr[f]  - ror[f];
-				q[(nphi-im)*m_inc + it*k_inc + f*q_dist]              = nr[f]  + ror[f];
-				q[im*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist]        = rer[f] + rei[f];
-				q[(nphi-im)*m_inc + (nlat_2*2-1-it)*k_inc + f*q_dist] = rer[f] - rei[f];
+				rei[f][i] = shfl_xor(rei[f][i], 1);
+				roi[f][i] = shfl_xor(roi[f][i], 1);
+			}
+		}
+		double nr[NFIELDS][NW];
+		const double sgn = 1 - 2*(j&1);
+		#pragma unroll
+		for (int i=0; i<NW; i++) {
+			const int iit = it+i*BLOCKSIZE;
+			if (iit < nlat_2) {
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++) {
+					nr[f][i] =  rer[f][i]+ror[f][i];
+					rer[f][i] = rer[f][i]-ror[f][i];
+					ror[f][i] = sgn*(rei[f][i]+roi[f][i]);
+					rei[f][i] = sgn*(rei[f][i]-roi[f][i]);
+				}
+				#pragma unroll
+				for (int f=0; f<NFIELDS; f++) {
+					q[im*m_inc + iit*k_inc + f*q_dist]                     = nr[f][i]  - ror[f][i];
+					q[(nphi-im)*m_inc + iit*k_inc + f*q_dist]              = nr[f][i]  + ror[f][i];
+					q[im*m_inc + (nlat_2*2-1-iit)*k_inc + f*q_dist]        = rer[f][i] + rei[f][i];
+					q[(nphi-im)*m_inc + (nlat_2*2-1-iit)*k_inc + f*q_dist] = rer[f][i] - rei[f][i];
+				}
 			}
 		}
 	}
@@ -1697,7 +1774,7 @@ int init_cuda_buffer_fft(shtns_cfg shtns)
 		cufftResult res;
 		if (layout == SHT_PHI_CONTIGUOUS) {
 			printf("cuda SHT error: phi-contiguous not implemented.\n");
-			exit(1);			
+			exit(1);
 		} else if ((layout == SHT_NATIVE_LAYOUT) && (nfft % 16 == 0) && (shtns->nlat_2 % 16 == 0)) {	// use the fastest data-layout.
 			printf("!!! Use phi-contiguous FFT +transpose: WARNING, the spatial data is neither phi-contiguous nor theta-contiguous !!!\n");
 			res = cufftPlanMany(&shtns->cufft_plan, 1, &nfft, &nfft, 1, shtns->nphi, &nfft, 1, shtns->nphi, CUFFT_Z2Z, shtns->nlat_2);
@@ -1707,7 +1784,10 @@ int init_cuda_buffer_fft(shtns_cfg shtns)
 			res = cufftPlanMany(&shtns->cufft_plan, 1, &nfft, &nfft, shtns->nlat_2, 1, &nfft, shtns->nlat_2, 1, CUFFT_Z2Z, shtns->nlat_2);
 			shtns->cu_fft_mode = CUSHT_FFT_THETA_CONTIGUOUS;
 		}
-		if (res != CUFFT_SUCCESS)  err_count ++;
+		if (res != CUFFT_SUCCESS) {
+			printf("cufft init FAILED!\n");
+			err_count ++;
+		}
 		size_t worksize;
 		cufftGetSize(shtns->cufft_plan, &worksize);
 		printf("work-area size: %ld \t nlat*nphi = %ld\n", worksize/8, shtns->spat_stride);
@@ -1901,7 +1981,8 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 
 	// Launch the Legendre CUDA Kernel
 	const int threadsPerBlock = MAX_THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
-	const int blocksPerGrid =(nlat/2 + threadsPerBlock*NWAY - 1) / (threadsPerBlock*NWAY);
+	const int NW = 2;
+	const int blocksPerGrid =(nlat/2 + threadsPerBlock*NW - 1) / (threadsPerBlock*NW);
 	double *d_qlm = 0;
 	double *d_q = 0;
 
@@ -1926,7 +2007,7 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 		dim3 blocks(blocksPerGrid, mmax+1);
 		dim3 threads(threadsPerBlock, 1);
 		if (llim <= SHT_L_RESCALE_FLY) {
-			leg_m_lowllim<MAX_THREADS_PER_BLOCK,0,1> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
+			leg_m_lowllim<MAX_THREADS_PER_BLOCK,0,1,NW> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
 		} else {
 			leg_m_highllim<0> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
 		}
@@ -1969,10 +2050,11 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int THREADS_PER_BLOCK = 256;		// good value
+	const int NW = 2;
 
 	// Launch the Legendre CUDA Kernel
 	const int threadsPerBlock = THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
-	const int blocksPerGrid = (nlat_2 + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+	const int blocksPerGrid = (nlat_2 + THREADS_PER_BLOCK*NW - 1) / (THREADS_PER_BLOCK*NW);
 //	const int threadsPerBlock = shtns->threads_per_block;	// can be from 32 to 1024, we should try to measure the fastest !
 //	const int blocksPerGrid = shtns->nblocks;
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
@@ -1987,7 +2069,7 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
 //			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS><<<blocks, threads, (NFIELDS+1)*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, (spat_dist == 0) ? shtns->spat_stride : spat_dist);
-			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
+			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS,NW><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
 		} else {
 			for (int f=0; f<NFIELDS; f++) {
 				leg_m_highllim<S><<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) (d_Qlm + f*shtns->nlm_stride/2), (double*) (d_Vr + f*spat_dist), llim, nlat_2, lmax,mres, nphi);
