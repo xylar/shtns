@@ -141,6 +141,10 @@ struct shtns_info {		// MUST start with "int nlm;"
 	/* matrices for vector transform (to convert to scalar transforms) */
 	double *mx_stdt;	// sparse matrix for  sin(theta).d/dtheta,  couples l-1 and l+1
 	double *mx_van;		// sparse matrix for  sin(theta).d/dtheta + 2*cos(theta),  couples l-1 and l+1
+	/* for the new recurrence of Ishioka */
+	double *clm;	// a_lm, b_lm
+	double *dlm;	// alpha_lm
+	double *elm;	// epsilon_lm
 
 	void* ftable[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 
@@ -712,21 +716,23 @@ struct DtDp {		// theta and phi derivatives stored together.
 	long int k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double an, bn, ani, bni, bs, as, bsi, asi, t; \
+		double wa = wg[k];	double wb = wg[k+1]; \
 		ani = F[im*m_inc + k*k_inc];		bni = F[im*m_inc + k*k_inc +1]; \
 		an  = F[(NPHI-im)*m_inc + k*k_inc];	bn = F[(NPHI-im)*m_inc + k*k_inc +1]; \
 		t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t; \
 		bsi = F[im*m_inc + (NLAT-2 -k)*k_inc];		asi = F[im*m_inc + (NLAT-2-k)*k_inc + 1]; \
 		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
 		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
-		er[k] = an+as;		ei[k] = ani+asi;		er[k+1] = bn+bs;		ei[k+1] = bni+bsi; \
-		od[k] = an-as;		oi[k] = ani-asi;		od[k+1] = bn-bs;		oi[k+1] = bni-bsi; \
+		er[k] = (an+as)*wa;		ei[k] = (ani+asi)*wa;		er[k+1] = (bn+bs)*wb;		ei[k+1] = (bni+bsi)*wb; \
+		wa *= ct[k];	wb *= ct[k+1]; \
+		od[k] = (an-as)*wa;		oi[k] = (ani-asi)*wa;		od[k+1] = (bn-bs)*wb;		oi[k+1] = (bni-bsi)*wb; \
 		k+=2; \
 		} while (k<nk*VSIZE2); }
   #define SYM_ASYM_Q3(F, er, od, ei, oi, k0v) { \
 	long int k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double an, bn, ani, bni, bs, as, bsi, asi, t; \
-		double sina = st[k];	double sinb = st[k+1]; \
+		double sina = st[k]*wg[k];	double sinb = st[k+1]*wg[k+1]; \
 		ani = F[im*m_inc + k*k_inc];		bni = F[im*m_inc + k*k_inc +1]; \
 		an  = F[(NPHI-im)*m_inc + k*k_inc];	bn = F[(NPHI-im)*m_inc + k*k_inc +1]; \
 		t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t; \
@@ -734,6 +740,7 @@ struct DtDp {		// theta and phi derivatives stored together.
 		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
 		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
 		er[k] = (an+as)*sina;	ei[k] = (ani+asi)*sina;		er[k+1] = (bn+bs)*sinb;		ei[k+1] = (bni+bsi)*sinb; \
+		sina *= ct[k];		sinb *= ct[k+1]; \
 		od[k] = (an-as)*sina;	oi[k] = (ani-asi)*sina;		od[k+1] = (bn-bs)*sinb;		oi[k+1] = (bni-bsi)*sinb; \
 		k+=2; \
 		} while (k<nk*VSIZE2); }

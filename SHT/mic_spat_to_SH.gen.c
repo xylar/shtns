@@ -243,20 +243,23 @@ V			l=m-1;
 				}
 			} while(l >>= 1);
 		}
+			double* cl = shtns->clm + im*(2*(LMAX+1) - m+MRES);
 			for (int j=0; j<NW; ++j) {
-				y0[j] *= vall(al[0]);
+				//y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, k+j);
-				y1[j]  = (vall(al[1])*y0[j]) *cost[j];
+				cost[j] *= cost[j];		// cos(theta)^2
+				//y1[j]  = (vall(al[1])*y0[j]) *cost[j];
+				y1[j] = (vall(cl[1])*cost[j] + vall(cl[0]))*y0[j];
+
 			}
-			l=m;	al+=2;
+			l=m;	al+=2;		cl+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
 				for (int j=0; j<NW; ++j) {
-					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
+					rnd tmp = y1[j];
+					y1[j] = (vall(cl[1])*cost[j] + vall(cl[0]))*y1[j] + y0[j];
+					y0[j] = tmp;
 				}
-				for (int j=0; j<NW; ++j) {
-					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
-				}
-				l+=2;	al+=4;
+				l+=2;	cl+=2;
 				if (fabs(vlo(y0[NW-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 					++ny;
 					for (int j=0; j<NW; ++j) {
@@ -268,7 +271,7 @@ V			l=m-1;
 Q			q+=(l-m);
 V			v+=2*(l-m);
 			for (int j=0; j<NW; ++j) {	// prefetch
-				y0[j] *= vread(wg, k+j);		y1[j] *= vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
+				//y0[j] *= vread(wg, k+j);		y1[j] *= vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
 Q				rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( ror, k+j);		roik[j] = vread( roi, k+j);
 V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( tor, k+j);		toik[j] = vread( toi, k+j);
 V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
@@ -286,27 +289,26 @@ V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * perk[j];		ww1 += y0[j] * peik[j];
 Q				q[0] += v2d_reduce(qq0, qq1);
 V				v[0] += v2d_reduce(vv0, vv1);
 V				v[1] += v2d_reduce(ww0, ww1);
-				for (int j=0; j<NW; ++j) {
-					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
-				}
-Q				qq0 = y1[0] * rork[0];
-Q				qq1 = y1[0] * roik[0];
-Q				for (int j=1; j<NW; ++j) {	qq0 += y1[j] * rork[j];		qq1 += y1[j] * roik[j]; }	// real odd, imag odd
-V				vv0 = y1[0] * tork[0];
-V				vv1 = y1[0] * toik[0];
-V				for (int j=1; j<NW; ++j) {	vv0 += y1[j] * tork[j];		vv1 += y1[j] * toik[j]; }	// real odd, imag odd
-V				ww0 = y1[0] * pork[0];
-V				ww1 = y1[0] * poik[0];
-V				for (int j=1; j<NW; ++j) {	ww0 += y1[j] * pork[j];		ww1 += y1[j] * poik[j]; }	// real odd, imag odd
+Q				qq0 = y0[0] * rork[0];
+Q				qq1 = y0[0] * roik[0];
+Q				for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rork[j];		qq1 += y0[j] * roik[j]; }	// real odd, imag odd
+V				vv0 = y0[0] * tork[0];
+V				vv1 = y0[0] * toik[0];
+V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * tork[j];		vv1 += y0[j] * toik[j]; }	// real odd, imag odd
+V				ww0 = y0[0] * pork[0];
+V				ww1 = y0[0] * poik[0];
+V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * pork[j];		ww1 += y0[j] * poik[j]; }	// real odd, imag odd
 Q				q[1] += v2d_reduce(qq0, qq1);
 V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
 Q				q+=2;
 V				v+=4;
 				for (int j=0; j<NW; ++j) {
-					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
+					rnd tmp = y1[j];
+					y1[j] = (vall(cl[1])*cost[j] + vall(cl[0]))*y1[j] + y0[j];
+					y0[j] = tmp;
 				}
-				l+=2;	al+=4;
+				l+=2;	cl+=2;
 			}
 			{
 V				rnd vv0 = y0[0] * terk[0];
@@ -321,13 +323,13 @@ V				v[1] += v2d_reduce(ww0, ww1);
 			if (l==llim) {
 Q				rnd qq0 = y0[0] * rerk[0];
 Q				rnd qq1 = y0[0] * reik[0];
-V				rnd vv0 = y1[0] * tork[0];
-V				rnd vv1 = y1[0] * toik[0];
-V				rnd ww0 = y1[0] * pork[0];
-V				rnd ww1 = y1[0] * poik[0];
+V				rnd vv0 = y0[0] * tork[0];
+V				rnd vv1 = y0[0] * toik[0];
+V				rnd ww0 = y0[0] * pork[0];
+V				rnd ww1 = y0[0] * poik[0];
 Q				for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rerk[j];		qq1 += y0[j] * reik[j];	}	// real even, imag even
-V				for (int j=1; j<NW; ++j) {	vv0 += y1[j] * tork[j];		vv1 += y1[j] * toik[j]; }	// real odd, imag odd
-V				for (int j=1; j<NW; ++j) {	ww0 += y1[j] * pork[j];		ww1 += y1[j] * poik[j]; }	// real odd, imag odd
+V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * tork[j];		vv1 += y0[j] * toik[j]; }	// real odd, imag odd
+V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * pork[j];		ww1 += y0[j] * poik[j]; }	// real odd, imag odd
 Q				q[0] += v2d_reduce(qq0, qq1);
 V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
@@ -340,7 +342,44 @@ Q		v2d *Ql = (v2d*) &Qlm[l];
 V		v2d *Sl = (v2d*) &Slm[l];
 V		v2d *Tl = (v2d*) &Tlm[l];
 
-Q		for (l=0; l<=llim-m; ++l)	Ql[l] = qq[l];
+Q		//for (l=0; l<=llim-m; ++l)	Ql[l] = qq[l];
+		// post-processing for recurrence relation of Ishioka
+		double* dlm = shtns->dlm + im*(2*(LMAX+1) -m+MRES);
+		double* elm = shtns->elm + im*(2*(LMAX+1) -m+MRES);
+		int l=0;
+Q		v2d u0 = vdup(0.0);
+Q		while (l<llim-m) {
+Q			v2d uu = vdup(dlm[l/2]) * qq[l];
+Q			Ql[l] = uu * vdup(elm[l]) + u0;
+Q			Ql[l+1] = qq[l+1] * vdup(dlm[l/2]);
+Q			u0 = uu * vdup(elm[l+1]);
+Q			l+=2;
+Q		}
+Q		if (l==llim-m) {
+Q			v2d uu = vdup(dlm[l/2]) * qq[l];
+Q			Ql[l] = uu * vdup(elm[l]) + u0;
+Q		}
+
+		l=0;
+V		v2d v0 = vdup(0.0);
+V		v2d w0 = vdup(0.0);
+V		while (l<=llim-m) {
+V			v2d vv = vdup(dlm[l/2]) * vw[2*l];
+V			v2d ww = vdup(dlm[l/2]) * vw[2*l+1];
+V			vw[2*l]   = vv * vdup(elm[l]) + v0;
+V			vw[2*l+1] = ww * vdup(elm[l]) + w0;
+V			vw[2*l+2] = vdup(dlm[l/2]) * vw[2*l+2];
+V			vw[2*l+3] = vdup(dlm[l/2]) * vw[2*l+3];
+V			v0 = vv * vdup(elm[l+1]);
+V			w0 = ww * vdup(elm[l+1]);
+V			l+=2;
+V		}
+V		if (l==llim-m+1) {
+V			v2d vv = vdup(dlm[l/2]) * vw[2*l];
+V			v2d ww = vdup(dlm[l/2]) * vw[2*l+1];
+V			vw[2*l]   = vv * vdup(elm[l]) + v0;
+V			vw[2*l+1] = ww * vdup(elm[l]) + w0;
+V		}
 
 V		{	// convert from the two scalar SH to vector SH
 V			// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)

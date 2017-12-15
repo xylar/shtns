@@ -636,6 +636,52 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 			}
 		}
 	}
+
+	// PRE-COMPUTE VALUES FOR NEW RECURRENCE OF ISHIOKA
+	double *elm, *clm, *dlm;
+	elm = (double *) malloc( 6*NLM*sizeof(double) );	// epsilon_lm
+	dlm = elm + 2*NLM;		// alpha_lm
+	clm = elm + 4*NLM;		// a_lm, b_lm
+
+/// - Precompute the factors alm and blm of the recurrence relation :
+	//#pragma omp parallel for schedule(dynamic)
+	for (im=0; im<=MMAX; ++im) {
+		const long m = im*MRES;
+		const long lm0 = im*(2*lmax - (im-1)*MRES);
+		for (long l=m+1, lm=lm0; l<=LMAX+4; l++) {		// start at m+1, as for l=m, elm=0
+			double num = (l-m)*(l+m);
+			double den = (2*l+1)*(2*l-1);
+			elm[lm] = sqrt( num/den );
+			lm++;
+		}
+
+		double alpha = 1.0/elm[lm0];		// alpha_0
+		for (long i=0, lm=lm0; i<=(LMAX-m+1)/2; i++) {
+			//printf("lm=%d, alpha=%g\n",lm,alpha);
+			dlm[lm] = alpha;
+			alpha = (1.0*(1-2*(i&1)))/(alpha*elm[lm+i+2]*elm[lm+i+1]);
+			lm++;
+		}
+
+		//clm[lm0] = alm[lm0];
+		double a0m = alm[lm0];		// initial value is the same, but should be cast into alpha_lm (multiply all alpha_lm by alm[lm0])
+		for (long i=0; i<=(LMAX-m+1)/2; i++) {
+			double a = dlm[lm0+i]*dlm[lm0+i] * (1-2*(i&1));
+			clm[lm0+2*i]   = -a*(elm[lm0+2*i]*elm[lm0+2*i] + elm[lm0+2*i+1]*elm[lm0+2*i+1]);
+			clm[lm0+2*i+1] = a;
+			dlm[lm0+i] *= a0m;		// multiply by coefficient of ymm
+		}
+
+		// change e(l,m), to be e(l,m) * alpha(l/2,m)
+		for (long i=0; i<=(LMAX-m+1)/2; i++) {
+			//elm[lm0+2*i]   *= dlm[lm0 + i];
+			//elm[lm0+2*i+1] *= dlm[lm0 + i];
+			lm++;
+		}
+	}
+	shtns->elm = elm;
+	shtns->dlm = dlm;
+	shtns->clm = clm;
 }
 
 /// \internal returns the value of the Legendre Polynomial of degree l.
