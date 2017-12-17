@@ -29,7 +29,10 @@ QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const lo
 VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
 3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
   {
-	#define NW (NWAY*2)
+	#define NW (NWAY*4)
+	// LSPAN can be 2 or 4
+QX	#define LSPAN 4
+V	#define LSPAN 2
 
 	double *alm, *al;
 	double *wg, *ct, *st;
@@ -268,49 +271,68 @@ V			l=m-1;
 				}
 			}
 		  if (ny == 0) {
+			struct {
+				rnd y[2];
+				rnd ct2;
+Q				rnd rer, rei,  ror, roi;
+V				rnd ter, tei,  tor, toi;
+V				rnd per, pei,  por, poi;
+			} x[NW];
 Q			q+=(l-m);
 V			v+=2*(l-m);
 			for (int j=0; j<NW; ++j) {	// prefetch
 				//y0[j] *= vread(wg, k+j);		y1[j] *= vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
-Q				rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( ror, k+j);		roik[j] = vread( roi, k+j);
-V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( tor, k+j);		toik[j] = vread( toi, k+j);
-V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
+Q			//	rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( ror, k+j);		roik[j] = vread( roi, k+j);
+V			//	terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( tor, k+j);		toik[j] = vread( toi, k+j);
+V			//	perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
+Q				x[j].rer = vread( rer, k+j);	x[j].rei = vread( rei, k+j);	x[j].ror = vread( ror, k+j);	x[j].roi = vread( roi, k+j);
+V				x[j].ter = vread( ter, k+j);	x[j].tei = vread( tei, k+j);	x[j].tor = vread( tor, k+j);	x[j].toi = vread( toi, k+j);
+V				x[j].per = vread( per, k+j);	x[j].pei = vread( pei, k+j);	x[j].por = vread( por, k+j);	x[j].poi = vread( poi, k+j);
+				x[j].y[0] = y0[j];		x[j].y[1] = y1[j];		x[j].ct2 = cost[j];
 			}
-			while (l<llim) {	// compute even and odd parts
-Q				rnd qq0 = y0[0] * rerk[0];
-Q				rnd qq1 = y0[0] * reik[0];
-Q				for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rerk[j];		qq1 += y0[j] * reik[j];	}	// real even, imag even
-V				rnd vv0 = y0[0] * terk[0];
-V				rnd vv1 = y0[0] * teik[0];
-V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * terk[j];		vv1 += y0[j] * teik[j];	}	// real even, imag even
-V				rnd ww0 = y0[0] * perk[0];
-V				rnd ww1 = y0[0] * peik[0];
-V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * perk[j];		ww1 += y0[j] * peik[j];	}	// real even, imag even
-Q				q[0] += v2d_reduce(qq0, qq1);
-V				v[0] += v2d_reduce(vv0, vv1);
-V				v[1] += v2d_reduce(ww0, ww1);
-Q				qq0 = y0[0] * rork[0];
-Q				qq1 = y0[0] * roik[0];
-Q				for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rork[j];		qq1 += y0[j] * roik[j]; }	// real odd, imag odd
-V				vv0 = y0[0] * tork[0];
-V				vv1 = y0[0] * toik[0];
-V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * tork[j];		vv1 += y0[j] * toik[j]; }	// real odd, imag odd
-V				ww0 = y0[0] * pork[0];
-V				ww1 = y0[0] * poik[0];
-V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * pork[j];		ww1 += y0[j] * poik[j]; }	// real odd, imag odd
-Q				q[1] += v2d_reduce(qq0, qq1);
-V				v[2] += v2d_reduce(vv0, vv1);
-V				v[3] += v2d_reduce(ww0, ww1);
-Q				q+=2;
-V				v+=4;
-				for (int j=0; j<NW; ++j) {
-					rnd tmp = y1[j];
-					y1[j] = (vall(cl[1])*cost[j] + vall(cl[0]))*y1[j] + y0[j];
-					y0[j] = tmp;
+QX			while (l<=llim) {	// compute even and odd parts
+V			while (l<=llim+1) {	// compute even and odd parts
+Q				rnd ql[2*LSPAN];
+V				rnd vl[2*LSPAN];		rnd wl[2*LSPAN];
+				for (int ll=0; ll<2*LSPAN; ll++) {
+Q					ql[ll] = vall(0.0);
+V					vl[ll] = vall(0.0);		wl[ll] = vall(0.0);
 				}
-				l+=2;	cl+=2;
+				for (int j=0; j<NW; ++j) {
+					for (int ll=0; ll<LSPAN/2; ll++) {
+Q						ql[4*ll+0] += x[j].y[ll] * x[j].rer;		ql[4*ll+1] += x[j].y[ll] * x[j].rei;
+Q						ql[4*ll+2] += x[j].y[ll] * x[j].ror;		ql[4*ll+3] += x[j].y[ll] * x[j].roi;
+V						vl[4*ll+0] += x[j].y[ll] * x[j].ter;		vl[4*ll+1] += x[j].y[ll] * x[j].tei;
+V						vl[4*ll+2] += x[j].y[ll] * x[j].tor;		vl[4*ll+3] += x[j].y[ll] * x[j].toi;
+V						wl[4*ll+0] += x[j].y[ll] * x[j].per;		wl[4*ll+1] += x[j].y[ll] * x[j].pei;
+V						wl[4*ll+2] += x[j].y[ll] * x[j].por;		wl[4*ll+3] += x[j].y[ll] * x[j].poi;
+					}
+					if (LSPAN==2) {
+						rnd tmp = x[j].y[1];
+						x[j].y[1] = (vall(cl[1])*x[j].ct2 + vall(cl[0]))*x[j].y[1] + x[j].y[0];
+						x[j].y[0] = tmp;
+					} else {	// LSPAN == 4
+						x[j].y[0] = (vall(cl[1])*x[j].ct2 + vall(cl[0]))*x[j].y[1] + x[j].y[0];
+						x[j].y[1] = (vall(cl[3])*x[j].ct2 + vall(cl[2]))*x[j].y[0] + x[j].y[1];						
+					}
+				}
+Q				q[0] += v2d_reduce(ql[0], ql[1]);
+V				v[0] += v2d_reduce(vl[0], vl[1]);
+V				v[1] += v2d_reduce(wl[0], wl[1]);
+				for (int ll=1; ll<LSPAN; ll++) {
+					if (l+ll<=llim) {
+Q						q[ll]     += v2d_reduce(ql[2*ll], ql[2*ll+1]);
+					}
+					if (l+ll<=llim+1) {
+V						v[2*ll]   += v2d_reduce(vl[2*ll], vl[2*ll+1]);
+V						v[2*ll+1] += v2d_reduce(wl[2*ll], wl[2*ll+1]);
+					}
+				}
+Q				q+=LSPAN;
+V				v+=2*LSPAN;
+				l+=LSPAN;	cl+=LSPAN;
 			}
-			{
+	/*		{
 V				rnd vv0 = y0[0] * terk[0];
 V				rnd vv1 = y0[0] * teik[0];
 V				rnd ww0 = y0[0] * perk[0];
@@ -321,19 +343,19 @@ V				v[0] += v2d_reduce(vv0, vv1);
 V				v[1] += v2d_reduce(ww0, ww1);
 			}
 			if (l==llim) {
-Q				rnd qq0 = y0[0] * rerk[0];
-Q				rnd qq1 = y0[0] * reik[0];
+Q		//		rnd qq0 = y0[0] * rerk[0];
+Q		//		rnd qq1 = y0[0] * reik[0];
 V				rnd vv0 = y0[0] * tork[0];
 V				rnd vv1 = y0[0] * toik[0];
 V				rnd ww0 = y0[0] * pork[0];
 V				rnd ww1 = y0[0] * poik[0];
-Q				for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rerk[j];		qq1 += y0[j] * reik[j];	}	// real even, imag even
+Q		//		for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rerk[j];		qq1 += y0[j] * reik[j];	}	// real even, imag even
 V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * tork[j];		vv1 += y0[j] * toik[j]; }	// real odd, imag odd
 V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * pork[j];		ww1 += y0[j] * poik[j]; }	// real odd, imag odd
-Q				q[0] += v2d_reduce(qq0, qq1);
+Q		//		q[0] += v2d_reduce(qq0, qq1);
 V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
-			}
+			}	*/
 		  }
 			k+=NW;
 		} while (k < nk);
@@ -469,3 +491,5 @@ VX	    VFREE(BtF);	// this frees also BpF.
   #endif
 
   }
+
+	#undef LSPAN

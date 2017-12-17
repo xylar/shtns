@@ -61,6 +61,10 @@ S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *BtF, cplx *BpF,
 T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, cplx *BtF, cplx *BpF, const long int llim, const int imlim)
   #endif
   {
+
+	// LSPAN can be 2 or 4
+	#define LSPAN 2
+
   #ifndef SHT_AXISYM
 Q	#define qr(l) vall(creal(Ql[l-1]))
 Q	#define qi(l) vall(cimag(Ql[l-1]))
@@ -387,24 +391,55 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 		  if (ny == 0) {
 QX			const long llim2 = llim;
 V			const long llim2 = llim+1;
-			while (l<llim2) {	// compute even and odd parts
+			while (l<llim2-(LSPAN-2)) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+Q			  if (LSPAN == 4) {
+Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y1[j]  * qr(l+2);		rei[j] += y1[j] * qi(l+2);	}
+Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y1[j]  * qr(l+3);		roi[j] += y1[j] * qi(l+3);	}
+Q			  }
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
+V			  if (LSPAN == 4) {
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y1[j]  * vr(l+2);		tei[j] += y1[j] * vi(l+2);	}
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+3);		toi[j] += y1[j] * vi(l+3);	}
+V			  }
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
+V			  if (LSPAN == 4) {
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y1[j]  * wr(l+2);		pei[j] += y1[j] * wi(l+2);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+3);		poi[j] += y1[j] * wi(l+3);	}				
+V			  }
+			  if (LSPAN == 2) {
+				rnd a[NWAY], yt[NWAY];
+				for (int j=0; j<NWAY; j++) {	a[j] = vall(cl[1])*cost[j] + vall(cl[0]);	yt[j] = y1[j];	}
+				for (int j=0; j<NWAY; ++j) {
+					y1[j] = a[j]*y1[j] + y0[j];
+					y0[j] = yt[j];
+				}
+			  } else {	// LSPAN == 4
+				for (int j=0; j<NWAY; ++j) y0[j] = (vall(cl[1])*cost[j] + vall(cl[0]))*y1[j] + y0[j];
+				for (int j=0; j<NWAY; ++j) y1[j] = (vall(cl[3])*cost[j] + vall(cl[2]))*y0[j] + y1[j];
+			  }
+				l+=LSPAN;	cl+=LSPAN;
+			}
+			if (l<=llim2) {
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
-Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+QX				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+			  if (LSPAN == 4) {
+				if (l<llim2) {
+3				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
-				for (int j=0; j<NWAY; ++j) {
-					rnd tmp = y1[j];
-					y1[j] = (vall(cl[1])*cost[j] + vall(cl[0]))*y1[j] + y0[j];
-					y0[j] = tmp;
-				}
-				l+=2;	cl+=2;
-			}
-			if (l==llim2) {
-QX				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
-V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
-V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
+QX				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+				if (l<llim2-1) {
+3				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y1[j]  * vr(l+2);		tei[j] += y1[j] * vi(l+2);	}
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y1[j]  * wr(l+2);		pei[j] += y1[j] * wi(l+2);	}
+QX				for (int j=0; j<NWAY; ++j) {	rer[j] += y1[j]  * qr(l+2);		rei[j] += y1[j] * qi(l+2);	}
+				}}
+			  }
 			}
 			// correct the odd part:
 			for (int j=0; j<NWAY; ++j) cost[j] = vread(ct, k+j);
@@ -516,3 +551,5 @@ VX			VFREE(BtF);		// this frees also BpF.
   #endif
 
   }
+
+	#undef LSPAN
