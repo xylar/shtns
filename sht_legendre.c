@@ -534,11 +534,11 @@ static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, con
 /// \param[in] with_cs_phase : Condon-Shortley phase (-1)^m is included (1) or not (0)
 /// \param[in] mpos_renorm : Optional renormalization for m>0.
 ///  1.0 (no renormalization) is the "complex" convention, while 0.5 leads to the "real" convention (with FFTW).
-static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
+void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, double mpos_renorm)
 {
 	double *alm, *blm;
-	long int im, m, l, lm, lmax;
 	real t1, t2;
+	const long int lmax = LMAX+1;		// we go to one order beyond LMAX to resolve vector transforms through scalar ones.
 
 #if HAVE_LONG_DOUBLE_WIDER
 	test_long_double();
@@ -552,7 +552,6 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 
 	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
 
-	lmax = LMAX+1;		// we go to one order beyond LMAX to resolve vector transforms through scalar ones.
 	alm = (double *) malloc( (2*NLM)*sizeof(double) );		//  fits exactly into an array of 2*NLM doubles.
 	blm = alm;
 	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
@@ -571,7 +570,7 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 		alm[0] = SQRT(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
 	}
 	t1 *= mpos_renorm;		// renormalization for m>0
-	for (im=1, m=0; im<=MMAX; ++im) {
+	for (int im=1, m=0; im<=MMAX; ++im) {
 		while(m<im*MRES) {
 			++m;
 			t1 *= ((real)m + 0.5)/m;	// t1 *= (m+0.5)/m;
@@ -581,17 +580,22 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 		alm_im(shtns, im)[0] = t2;
 	}
 
+	double *clm, *xlm;
+	const long nlm0 = nlm_calc(LMAX+4, MMAX, MRES);
+	clm = (double *) malloc( 5*nlm0/2 * sizeof(double) );	// a_lm, b_lm
+	xlm = clm + nlm0;
+
 /// - Precompute the factors alm and blm of the recurrence relation :
-	#pragma omp parallel for private(im,m,l,lm, t1, t2) schedule(dynamic)
-	for (im=0; im<=MMAX; ++im) {
-		m = im*MRES;
-		lm = im*(2*lmax - (im-1)*MRES);
+	#pragma omp parallel for private(t1, t2) schedule(dynamic)
+	for (int im=0; im<=MMAX; ++im) {
+		const long m = im*MRES;
+		long lm = im*(2*lmax - (im-1)*MRES);
 		if (norm == sht_schmidt) {		/// <b> For Schmidt semi-normalized </b>
 			t2 = SQRT(2*m+1);
 			alm[lm] /= t2;		/// starting value divided by \f$ \sqrt{2m+1} \f$ 
 			alm[lm+1] = t2;		// l=m+1
 			lm+=2;
-			for (l=m+2; l<=lmax; ++l) {
+			for (long l=m+2; l<=lmax; ++l) {
 				t1 = SQRT((l+m)*(l-m));
 				alm[lm+1] = (2*l-1)/t1;		/// \f[  a_l^m = \frac{2l-1}{\sqrt{(l+m)(l-m)}}  \f]
 				alm[lm] = - t2/t1;			/// \f[  b_l^m = -\sqrt{\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
@@ -602,7 +606,7 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 			// starting value unchanged.
 			alm[lm+1] = SQRT(2*m+3);		// l=m+1
 			lm+=2;
-			for (l=m+2; l<=lmax; ++l) {
+			for (long l=m+2; l<=lmax; ++l) {
 				t1 = (l+m)*(l-m);
 				alm[lm+1] = SQRT(((2*l+1)*(2*l-1))/t1);			/// \f[  a_l^m = \sqrt{\frac{(2l+1)(2l-1)}{(l+m)(l-m)}}  \f]
 				alm[lm] = - SQRT(((2*l+1)*t2)/((2*l-3)*t1));	/// \f[  b_l^m = -\sqrt{\frac{2l+1}{2l-3}\,\frac{(l-1+m)(l-1-m)}{(l+m)(l-m)}}  \f]
@@ -622,7 +626,7 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 			blm[lm] = alm[lm]*t1;
 			blm[lm+1] = t2;
 			lm+=2;
-			for (l=m+2; l<=lmax; ++l) {
+			for (long l=m+2; l<=lmax; ++l) {
 				t1 = alm[lm];
 				t2 = alm[lm+1];
 				if (norm == sht_schmidt) {
@@ -635,53 +639,48 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 				lm+=2;
 			}
 		}
-	}
 
-	// PRE-COMPUTE VALUES FOR NEW RECURRENCE OF ISHIOKA
-	double *elm, *clm, *dlm;
-	elm = (double *) malloc( 6*NLM*sizeof(double) );	// epsilon_lm
-	dlm = elm + 2*NLM;		// alpha_lm
-	clm = elm + 4*NLM;		// a_lm, b_lm
-
-/// - Precompute the factors alm and blm of the recurrence relation :
-	//#pragma omp parallel for schedule(dynamic)
-	for (im=0; im<=MMAX; ++im) {
-		const long m = im*MRES;
+		/// PRE-COMPUTE VALUES FOR NEW RECURRENCE OF ISHIOKA
 		const long lm0 = im*(2*lmax - (im-1)*MRES);
-		for (long l=m+1, lm=lm0; l<=LMAX+4; l++) {		// start at m+1, as for l=m, elm=0
-			double num = (l-m)*(l+m);
-			double den = (2*l+1)*(2*l-1);
-			elm[lm] = sqrt( num/den );
-			lm++;
+		real* elm = (real*) malloc( 3*(LMAX+4-m)/2 * sizeof(real) );
+		real* dlm = elm + LMAX+4-m;
+		for (long l=m+1; l<=LMAX+4; l++) {		// start at m+1, as for l=m, elm=0
+			real num = (l-m)*(l+m);
+			real den = (2*l+1)*(2*l-1);
+			elm[l-(m+1)] = SQRT( num/den );
 		}
 
-		double alpha = 1.0/elm[lm0];		// alpha_0
-		for (long i=0, lm=lm0; i<=(LMAX-m+1)/2; i++) {
-			//printf("lm=%d, alpha=%g\n",lm,alpha);
-			dlm[lm] = alpha;
-			alpha = (1.0*(1-2*(i&1)))/(alpha*elm[lm+i+2]*elm[lm+i+1]);
-			lm++;
+		real alpha = 1.0L/elm[0];		// alpha_0
+		for (long i=0; i<=(LMAX-m+1)/2; i++) {
+			dlm[i] = alpha;
+			alpha = (1.0L*(1-2*(i&1)))/(alpha*elm[2*i+2]*elm[2*i+1]);
 		}
 
 		//clm[lm0] = alm[lm0];
-		double a0m = alm[lm0];		// initial value is the same, but should be cast into alpha_lm (multiply all alpha_lm by alm[lm0])
-		for (long i=0; i<=(LMAX-m+1)/2; i++) {
-			double a = dlm[lm0+i]*dlm[lm0+i] * (1-2*(i&1));
-			clm[lm0+2*i]   = -a*(elm[lm0+2*i]*elm[lm0+2*i] + elm[lm0+2*i+1]*elm[lm0+2*i+1]);
-			clm[lm0+2*i+1] = a;
-			dlm[lm0+i] *= a0m;		// multiply by coefficient of ymm
+		real a0m = alm[lm0];		// initial value is the same, but should be cast into alpha_lm (multiply all alpha_lm by alm[lm0])
+		long lm1 = (im+1)*(2*lmax - (im)*MRES);
+		for (long i=0; i<(LMAX-m+1)/2; i++) {
+			real a = dlm[i]*dlm[i] * (1-2*(i&1));
+			clm[lm0/2+2*i]   = -a*(elm[2*i]*elm[2*i] + elm[2*i+1]*elm[2*i+1]);
+			clm[lm0/2+2*i+1] = a;
+			//if (lm0/2 + 2*i+1 >= lm1/2) printf("error at m=%d, i=%d (%ld >= %ld)\n",m,i, lm0/2 + 2*i+1, lm1/2);
+		//	dlm[i] *= a0m;
 		}
 
+		const long lm3 = 3*im*(2*(LMAX+4) - (im-1)*MRES)/4;
+		long lm2 = 3*(im+1)*(2*(LMAX+4) - (im)*MRES)/4;
 		// change e(l,m), to be e(l,m) * alpha(l/2,m)
 		for (long i=0; i<=(LMAX-m+1)/2; i++) {
-			//elm[lm0+2*i]   *= dlm[lm0 + i];
-			//elm[lm0+2*i+1] *= dlm[lm0 + i];
-			lm++;
+			real a = dlm[i] * a0m;		// multiply by coefficient of ymm
+			xlm[lm3 + 3*i]   = elm[2*i] * a;
+			xlm[lm3 + 3*i+1] = a;
+			xlm[lm3 + 3*i+2] = elm[2*i+1] * a;
+			//if (lm3 + 3*i+2 >= lm2) printf("error at m=%d, i=%d (%ld >= %ld)\n",m,i, lm3 + 3*i+2, lm2);
 		}
+		free(elm);
 	}
-	shtns->elm = elm;
-	shtns->dlm = dlm;
 	shtns->clm = clm;
+	shtns->xlm = xlm;
 }
 
 /// \internal returns the value of the Legendre Polynomial of degree l.

@@ -246,7 +246,7 @@ V			l=m-1;
 				}
 			} while(l >>= 1);
 		}
-			double* cl = shtns->clm + im*(2*(LMAX+1) - m+MRES);
+			double* cl = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
 			for (int j=0; j<NW; ++j) {
 				//y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, k+j);
@@ -364,44 +364,44 @@ Q		v2d *Ql = (v2d*) &Qlm[l];
 V		v2d *Sl = (v2d*) &Slm[l];
 V		v2d *Tl = (v2d*) &Tlm[l];
 
-Q		//for (l=0; l<=llim-m; ++l)	Ql[l] = qq[l];
 		// post-processing for recurrence relation of Ishioka
-		double* dlm = shtns->dlm + im*(2*(LMAX+1) -m+MRES);
-		double* elm = shtns->elm + im*(2*(LMAX+1) -m+MRES);
-		int l=0;
+		{
+		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+		long l=0;	long ll=0;
 Q		v2d u0 = vdup(0.0);
 Q		while (l<llim-m) {
-Q			v2d uu = vdup(dlm[l/2]) * qq[l];
-Q			Ql[l] = uu * vdup(elm[l]) + u0;
-Q			Ql[l+1] = qq[l+1] * vdup(dlm[l/2]);
-Q			u0 = uu * vdup(elm[l+1]);
-Q			l+=2;
+Q			v2d uu = qq[l];
+Q			Ql[l] = uu * vdup(xlm[ll]) + u0;
+Q			Ql[l+1] = qq[l+1] * vdup(xlm[ll+1]);
+Q			u0 = uu * vdup(xlm[ll+2]);
+Q			l+=2;	ll+=3;
 Q		}
 Q		if (l==llim-m) {
-Q			v2d uu = vdup(dlm[l/2]) * qq[l];
-Q			Ql[l] = uu * vdup(elm[l]) + u0;
+Q			v2d uu = qq[l];
+Q			Ql[l] = uu * vdup(xlm[ll]) + u0;
 Q		}
 
-		l=0;
+		l=0;	ll=0;
 V		v2d v0 = vdup(0.0);
 V		v2d w0 = vdup(0.0);
 V		while (l<=llim-m) {
-V			v2d vv = vdup(dlm[l/2]) * vw[2*l];
-V			v2d ww = vdup(dlm[l/2]) * vw[2*l+1];
-V			vw[2*l]   = vv * vdup(elm[l]) + v0;
-V			vw[2*l+1] = ww * vdup(elm[l]) + w0;
-V			vw[2*l+2] = vdup(dlm[l/2]) * vw[2*l+2];
-V			vw[2*l+3] = vdup(dlm[l/2]) * vw[2*l+3];
-V			v0 = vv * vdup(elm[l+1]);
-V			w0 = ww * vdup(elm[l+1]);
-V			l+=2;
+V			v2d vv = vw[2*l];
+V			v2d ww = vw[2*l+1];
+V			vw[2*l]   = vv * vdup(xlm[ll]) + v0;
+V			vw[2*l+1] = ww * vdup(xlm[ll]) + w0;
+V			vw[2*l+2] = vdup(xlm[ll+1]) * vw[2*l+2];
+V			vw[2*l+3] = vdup(xlm[ll+1]) * vw[2*l+3];
+V			v0 = vv * vdup(xlm[ll+2]);
+V			w0 = ww * vdup(xlm[ll+2]);
+V			l+=2;	ll+=3;
 V		}
 V		if (l==llim-m+1) {
-V			v2d vv = vdup(dlm[l/2]) * vw[2*l];
-V			v2d ww = vdup(dlm[l/2]) * vw[2*l+1];
-V			vw[2*l]   = vv * vdup(elm[l]) + v0;
-V			vw[2*l+1] = ww * vdup(elm[l]) + w0;
+V			v2d vv = vw[2*l];
+V			v2d ww = vw[2*l+1];
+V			vw[2*l]   = vv * vdup(xlm[ll]) + v0;
+V			vw[2*l+1] = ww * vdup(xlm[ll]) + w0;
 V		}
+		}
 
 V		{	// convert from the two scalar SH to vector SH
 V			// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)

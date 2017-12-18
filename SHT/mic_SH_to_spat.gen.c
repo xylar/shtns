@@ -76,7 +76,6 @@ V	#define wi(l) vall( ((double*) VWl)[4*(l)+3] )
   #endif
 	unsigned m0, mstep;
 	long int nk,k,l,m;
-	double *alm, *al;
 	double *ct, *st;
 Q	cplx Ql[llim+2] SSE;
 V	cplx VWl[llim*2+4] SSE;
@@ -125,7 +124,7 @@ Q		double* const Ql0 = (double*) Ql;
 S		double* const Sl0 = (double*) VWl;
 T		double* const Tl0 = ((double*) VWl) + llim;
  		l=1;
-		alm = shtns->alm;
+		const double* restrict alm = shtns->alm;
 Q		Ql0[0] = (double) Qlm[0];		// l=0
 		do {		// for m=0, compress the complex Q,S,T to double
 Q			Ql0[l] = creal( Qlm[l] );	//	Ql[l+1] = (double) Qlm[l+1];
@@ -135,7 +134,8 @@ T			Tl0[l-1] = creal( Tlm[l] );	//	Tl[l] = (double) Tlm[l+1];
 		} while(l<=llim);
 		k=0;
 		do {
-			l=0;	al = alm;
+			l=0;
+			const double* restrict al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
 V			rnd sint[NWAY], dy0[NWAY], dy1[NWAY];
 Q			rnd re[NWAY], ro[NWAY];
@@ -229,7 +229,6 @@ T			BpF[k*k_inc] = pnr[k]   + I*psr[k];
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 		l = (im*(2*(LMAX+1)-(m+MRES)))>>1;		// l = LiM(shtns, 0,im);
-		alm = shtns->alm + 2*(l+m);		// shtns->alm + im*(2*(LMAX+1) -m+MRES);
 
 QX		k=m; do {		// copy input coefficients to a local array
 QX			((v2d*)Ql)[k-1] = ((v2d*)Qlm)[l+k];
@@ -275,49 +274,50 @@ V			VWl[2*llim+3] = wt;
 V		}
 
 		// pre-processing for recurrence relation of Ishioka
-		double* dlm = shtns->dlm + im*(2*(LMAX+1) -m+MRES);
-		double* elm = shtns->elm + im*(2*(LMAX+1) -m+MRES);
-		int l=m;
-Q		cplx qq = Ql[l-1] * elm[(l-m)];
+		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+		const double* restrict clm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
+		{
+		long l=m;	long ll=0;
+Q		cplx qq = Ql[l-1] * xlm[0];
 Q		while (l<llim-1) {
 Q			cplx qq2 = Ql[l+1];
-Q			Ql[l-1]   = (qq  +  qq2 * elm[(l-m)+1]) * dlm[(l-m)/2];
-Q			Ql[l] *= dlm[(l-m)/2];
-Q			l+=2;
-Q			qq = qq2 * elm[(l-m)];
+Q			Ql[l-1]   = (qq  +  qq2 * xlm[ll+2]);
+Q			Ql[l] *= xlm[ll+1];
+Q			ll+=3;	l+=2;
+Q			qq = qq2 * xlm[ll];
 Q		}
-Q		Ql[l-1]   = qq * dlm[(l-m)/2];
+Q		Ql[l-1]   = qq;
 Q		if (l<llim) {
-Q			Ql[l] *= dlm[(l-m)/2];
+Q			Ql[l] *= xlm[ll+1];
 Q		} else Ql[l] = 0.0;
 
-V		l=m;
-V		cplx vv = VWl[2*l]   * elm[(l-m)];
-V		cplx ww = VWl[2*l+1] * elm[(l-m)];
+V		l=m;	ll=0;
+V		cplx vv = VWl[2*l]   * xlm[0];
+V		cplx ww = VWl[2*l+1] * xlm[0];
 V		while (l<llim) {
 V			cplx vv2 = VWl[2*(l+2)];
 V			cplx ww2 = VWl[2*(l+2)+1];
-V			VWl[2*l]   = (vv  +  vv2 * elm[(l-m)+1]) * dlm[(l-m)/2];
-V			VWl[2*l+1] = (ww  +  ww2 * elm[(l-m)+1]) * dlm[(l-m)/2];
-V			VWl[2*l+2] *= dlm[(l-m)/2];
-V			VWl[2*l+3] *= dlm[(l-m)/2];
-V			l+=2;
-V			vv = vv2 * elm[(l-m)];
-V			ww = ww2 * elm[(l-m)];
+V			VWl[2*l]   = (vv  +  vv2 * xlm[ll+2]);
+V			VWl[2*l+1] = (ww  +  ww2 * xlm[ll+2]);
+V			VWl[2*l+2] *= xlm[ll+1];
+V			VWl[2*l+3] *= xlm[ll+1];
+V			ll+=3;	l+=2;
+V			vv = vv2 * xlm[ll];
+V			ww = ww2 * xlm[ll];
 V		}
-V		VWl[2*l]   = vv * dlm[(l-m)/2];
-V		VWl[2*l+1] = ww * dlm[(l-m)/2];
+V		VWl[2*l]   = vv;
+V		VWl[2*l+1] = ww;
 V		if (l<=llim) {
-V			VWl[2*l+2] *= dlm[(l-m)/2];
-V			VWl[2*l+3] *= dlm[(l-m)/2];
+V			VWl[2*l+2] *= xlm[ll+1];
+V			VWl[2*l+3] *= xlm[ll+1];
 V		}
+		}
 
 		k = shtns->tm[im] / VSIZE2;			// stay on vector boundary
 		#if VSIZE2 == 1
 			k -= k&1;		// we operate without vectors, but we still need complex alignement (2 doubles).
 		#endif
 		do {
-			al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
 Q			rnd rer[NWAY], rei[NWAY], ror[NWAY], roi[NWAY];
 V			rnd ter[NWAY], tei[NWAY], tor[NWAY], toi[NWAY];
@@ -357,23 +357,21 @@ V		#endif
 				}
 			} while(l >>= 1);
 		}
-			double* cl = shtns->clm + im*(2*(LMAX+1) - m+MRES);
+			const double* restrict cl = clm;
 			for (int j=0; j<NWAY; ++j) {
-				//y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, j+k);
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
 				cost[j] *= cost[j];
 			}
 			for (int j=0; j<NWAY; ++j) {
-				//y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
 				y1[j] = (vall(cl[1])*cost[j] + vall(cl[0]))*y0[j];
 V				por[j] = vall(0.0);		tei[j] = vall(0.0);
 V				tor[j] = vall(0.0);		pei[j] = vall(0.0);
 V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
 V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
-			l=m;		al+=2;		cl+=2;
+			l=m;		cl+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
 				for (int j=0; j<NWAY; ++j) {
 					rnd tmp = y1[j];

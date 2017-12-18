@@ -237,44 +237,46 @@ V			VWl[2*llim+2]   = vs;
 V			VWl[2*llim+3] = wt;
 V		}
 
+
 		// pre-processing for recurrence relation of Ishioka
-		double* dlm = shtns->dlm + im*(2*(LMAX+1) -m+MRES);
-		double* elm = shtns->elm + im*(2*(LMAX+1) -m+MRES);
-		int l=m;
-Q		v2d qq = Ql[l] * vdup(elm[(l-m)]);
+		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+		const double* restrict clm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;	// shift pointer to address by l
+		{
+		long l=m;	long ll=0;
+Q		v2d qq = Ql[l] * vdup(xlm[0]);
 Q		while (l<llim-1) {
 Q			v2d qq2 = Ql[l+2];
-Q			QQl[l]   = (qq  +  qq2 * vdup(elm[(l-m)+1])) * vdup(dlm[(l-m)/2]);
-Q			QQl[l+1] = Ql[l+1] * vdup(dlm[(l-m)/2]);
-Q			l+=2;
-Q			qq = qq2 * vdup(elm[(l-m)]);
+Q			QQl[l]   = (qq  +  qq2 * vdup(xlm[ll+2]));
+Q			QQl[l+1] = Ql[l+1] * vdup(xlm[ll+1]);
+Q			ll+=3;	l+=2;
+Q			qq = qq2 * vdup(xlm[ll]);
 Q		}
-Q		QQl[l]   = qq * vdup(dlm[(l-m)/2]);
+Q		QQl[l]   = qq;
 Q		if (l<llim) {
-Q			QQl[l+1] = Ql[l+1] * vdup(dlm[(l-m)/2]);
+Q			QQl[l+1] = Ql[l+1] * vdup(xlm[ll+1]);
 Q		} else QQl[l+1] = vdup(0.0);
 
-V		l=m;
-V		v2d vv = VWl[2*l]   * vdup(elm[(l-m)]);
-V		v2d ww = VWl[2*l+1] * vdup(elm[(l-m)]);
+V		l=m;	ll=0;
+V		v2d vv = VWl[2*l]   * vdup(xlm[0]);
+V		v2d ww = VWl[2*l+1] * vdup(xlm[0]);
 V		while (l<llim) {
 V			v2d vv2 = VWl[2*(l+2)];
 V			v2d ww2 = VWl[2*(l+2)+1];
-V			VWl[2*l]   = (vv  +  vv2 * vdup(elm[(l-m)+1])) * vdup(dlm[(l-m)/2]);
-V			VWl[2*l+1] = (ww  +  ww2 * vdup(elm[(l-m)+1])) * vdup(dlm[(l-m)/2]);
-V			VWl[2*l+2] *= vdup(dlm[(l-m)/2]);
-V			VWl[2*l+3] *= vdup(dlm[(l-m)/2]);
-V			l+=2;
-V			vv = vv2 * vdup(elm[(l-m)]);
-V			ww = ww2 * vdup(elm[(l-m)]);
+V			VWl[2*l]   = (vv  +  vv2 * vdup(xlm[ll+2]));
+V			VWl[2*l+1] = (ww  +  ww2 * vdup(xlm[ll+2]));
+V			VWl[2*l+2] *= vdup(xlm[ll+1]);
+V			VWl[2*l+3] *= vdup(xlm[ll+1]);
+V			ll+=3;	l+=2;
+V			vv = vv2 * vdup(xlm[ll]);
+V			ww = ww2 * vdup(xlm[ll]);
 V		}
-V		VWl[2*l]   = vv * vdup(dlm[(l-m)/2]);
-V		VWl[2*l+1] = ww * vdup(dlm[(l-m)/2]);
+V		VWl[2*l]   = vv;
+V		VWl[2*l+1] = ww;
 V		if (l<=llim) {
-V			VWl[2*l+2] *= vdup(dlm[(l-m)/2]);
-V			VWl[2*l+3] *= vdup(dlm[(l-m)/2]);
+V			VWl[2*l+2] *= vdup(xlm[ll+1]);
+V			VWl[2*l+3] *= vdup(xlm[ll+1]);
 V		}
-
+		}
 
 		k=0;	l=shtns->tm[im];
 	#if _GCC_VEC_
@@ -353,16 +355,14 @@ V		#endif
 				}
 			} while(l >>= 1);
 		}
-  			double* cl = shtns->clm + im*(2*(LMAX+1) - m+MRES);
+  			double* cl = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
 			for (int j=0; j<NWAY; ++j) {
-				//y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, j+k);
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
 				cost[j] *= cost[j];		// cos(theta)^2
 			}
 			for (int j=0; j<NWAY; ++j) {
-				//y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
 				y1[j] = (vall(cl[1])*cost[j] + vall(cl[0]))*y0[j];
 V				por[j] = vall(0.0);		tei[j] = vall(0.0);
 V				tor[j] = vall(0.0);		pei[j] = vall(0.0);
