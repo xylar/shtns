@@ -103,6 +103,7 @@ __device__ double atomicAdd(double* address, double val)
 	#define _all(p) __all_sync(0xFFFFFFFF, p)
 #endif
 
+/*
 __device__ __forceinline__ int getLaneId() {
   int laneId;
   asm("mov.s32 %0, %laneid;" : "=r"(laneId) );
@@ -116,11 +117,12 @@ __device__ __forceinline__ void namedBarrierWait(int name, int numThreads) {
 __device__ __forceinline__ void namedBarrierArrived(int name, int numThreads) {
   asm volatile("bar.arrive %0, %1;" : : "r"(name), "r"(numThreads) : "memory");
 }
+*/
 
 /// dim0, dim1 : size in complex numbers !
 /// BLOCK_DIM_Y must be between 1 and 16
 template<int BLOCK_DIM_Y> __global__ void
-transpose_cplx(const double* in, double* out, const int dim0, const int dim1)
+transpose_cplx_kernel(const double* in, double* out, const int dim0, const int dim1)
 {
 	const int TILE_DIM = WARPSZE/2;		// 16 double2 per warp, read as 32 doubles.
     __shared__ double shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
@@ -153,39 +155,20 @@ transpose_cplx(const double* in, double* out, const int dim0, const int dim1)
     }
 }
 
-/*
-template<typename T>
-__global__
-void transpose32(const T * in, T * out, unsigned dim0, unsigned dim1)
+/// dim0, dim1 must be multiple of 16.
+static void
+transpose_cplx(cudaStream_t stream, const double* in, double* out, const int dim0, const int dim1)
 {
-	const int TILE_DIM = 32;
-    __shared__ T shrdMem[TILE_DIM][TILE_DIM+1];
- 
-    unsigned lx = threadIdx.x;
-    unsigned ly = threadIdx.y;
- 
-    unsigned gx = lx + blockDim.x * blockIdx.x;
-    unsigned gy = ly + TILE_DIM   * blockIdx.y;
- 
-    for (unsigned repeat = 0; repeat < TILE_DIM; repeat += blockDim.y) {
-        unsigned gy_ = gy+repeat;
-        shrdMem[ly + repeat][lx] = in[gy_ * dim0 + gx];
-    }
-    __syncthreads();
- 
-    gx = lx + blockDim.x * blockIdx.y;
-    gy = ly + TILE_DIM   * blockIdx.x;
- 
-    for (unsigned repeat = 0; repeat < TILE_DIM; repeat += blockDim.y) {
-        unsigned gy_ = gy+repeat;
-        out[gy_ * dim1 + gx] = shrdMem[lx][ly + repeat];
-    }
+	const int block_dim_y = 4;		// good performance with this (MUST be between 1 and 16)
+	dim3 blocks(dim0/16, dim1/16);
+	dim3 threads(32, block_dim_y);
+	transpose_cplx_kernel<block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1);
 }
-*/
+
 
 /// On KEPLER, This kernel is fastest with THREADS_PER_BLOCK=256 and NWAY=1
 template<int S> __global__ void
-leg_m0(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2)
+leg_m0_kernel(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2)
 {
 	// im = 0
 	const int it = blockDim.x * blockIdx.x + threadIdx.x;
@@ -272,6 +255,28 @@ leg_m0(const double *al, const double *ct, const double *ql, double *q, const in
 	*/
 }
 
+template<int S, int NFIELDS>
+static void leg_m0(shtns_cfg shtns, const double *ql, double *q, const int llim, int spat_dist = 0)
+{
+	const int nlat_2 = shtns->nlat_2;
+	double *d_alm = shtns->d_alm;
+	double *d_ct = shtns->d_ct;
+	cudaStream_t stream = shtns->comp_stream;
+
+	const int BLOCKSIZE = 256;		// good value
+	const int NW = 1;
+
+	// Launch the Legendre CUDA Kernel
+	const int threadsPerBlock = BLOCKSIZE;	// can be from 32 to 1024, we should try to measure the fastest !
+	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
+	if (spat_dist == 0) spat_dist = shtns->spat_stride;
+	for (int f=0; f<NFIELDS; f++) {
+		leg_m0_kernel<S> <<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2);
+	}
+}
+
+
+/*
 __inline__ __device__
 void warp_reduce_add_4(double& re, double& ro, double& ie, double& io) {
   for (int offset = warpSize/2; offset > 0; offset >>= 1) {
@@ -296,10 +301,10 @@ void warp_reduce_add(double& ev) {
 	ev += shfl_down(ev, offset);
   }
 }
-
+*/
 
 template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
-ileg_m0(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int q_dist=0, const int ql_dist=0)
+ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int q_dist=0, const int ql_dist=0)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -421,6 +426,26 @@ ileg_m0(const double* __restrict__ al, const double* __restrict__ ct, const doub
 	}
 }
 
+template<int S, int NFIELDS>
+static void ileg_m0(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+{
+	const int nlat_2 = shtns->nlat_2;
+	double *d_alm = shtns->d_alm;
+	double *d_ct = shtns->d_ct;
+	cudaStream_t stream = shtns->comp_stream;
+
+	const int BLOCKSIZE = 256/NFIELDS;
+	const int LSPAN_ = 8/NFIELDS;
+	const int NW = 1;
+
+	const int threadsPerBlock = BLOCKSIZE;	// can be from 32 to 1024, we should try to measure the fastest !
+	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
+	if (q_dist == 0) q_dist = shtns->spat_stride;
+	if (ql_dist == 0) ql_dist = shtns->nlm_stride;
+	ileg_m0_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, q, ql, llim, nlat_2, q_dist, ql_dist);
+}
+
+
 /** \internal convert from vector SH to scalar SH
 	Vlm =  st*d(Slm)/dtheta + I*m*Tlm
 	Wlm = -st*d(Tlm)/dtheta + I*m*Slm
@@ -526,10 +551,12 @@ scal2sphtor_kernel(const double* __restrict__ mx, const double* __restrict__ vlm
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim MUST BE <= 1800
 /// S can only be 0 (for scalar) or 1 (for spin 1 / vector)
-template<int BLOCKSIZE, int S, int NFIELDS, int NW> __global__ void
-leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int ql_dist=0, const int q_dist=0)
+template<int BLOCKSIZE, int S, int NFIELDS, int NW>
+static __global__ void leg_m_lowllim_kernel(
+	const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ ql, double *q, 
+	const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int ql_dist=0, const int q_dist=0)
 {
-	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
+	const int it = BLOCKSIZE*NW * blockIdx.x + threadIdx.x;
 	const int im = blockIdx.y;
 	const int j = threadIdx.x;
 	const int m_inc = 2*nlat_2;
@@ -776,11 +803,35 @@ leg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, cons
 	}
 }
 
+template<int S, int NFIELDS>
+static void leg_m_lowllim(shtns_cfg shtns, const double *ql, double *q, const int llim, int spat_dist=0)
+{
+	const int lmax = shtns->lmax;
+	const int mres = shtns->mres;
+	const int nlat_2 = shtns->nlat_2;
+	const int nphi = shtns->nphi;
+	int mmax = shtns->mmax;
+	double *d_alm = shtns->d_alm;
+	double *d_ct = shtns->d_ct;
+	cudaStream_t stream = shtns->comp_stream;
+
+	const int BLOCKSIZE = 256;		// good value
+	const int NW = 2;
+
+	// Launch the Legendre CUDA Kernel
+	const int threadsPerBlock = BLOCKSIZE;	// can be from 32 to 1024, we should try to measure the fastest !
+	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
+	if (spat_dist == 0) spat_dist = shtns->spat_stride;
+	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
+	dim3 blocks(blocksPerGrid, mmax+1);
+	dim3 threads(threadsPerBlock, 1);
+	leg_m_lowllim_kernel<BLOCKSIZE, S, NFIELDS, NW> <<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) ql, (double*) q, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
+}
 
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim can be arbitrarily large (> 1800)
 template<int S> __global__ void
-leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
+leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
 {
 	const int it = blockDim.x * blockIdx.x + threadIdx.x;
 	const int im = blockIdx.y;
@@ -920,9 +971,38 @@ leg_m_highllim(const double *al, const double *ct, const double *ql, double *q, 
 	}
 }
 
+template<int S, int NFIELDS>
+static void leg_m_highllim(shtns_cfg shtns, const double *ql, double *q, const int llim, int spat_dist = 0)
+{
+	const int lmax = shtns->lmax;
+	const int mres = shtns->mres;
+	const int nlat_2 = shtns->nlat_2;
+	const int nphi = shtns->nphi;
+	int mmax = shtns->mmax;
+	double *d_alm = shtns->d_alm;
+	double *d_ct = shtns->d_ct;
+	cudaStream_t stream = shtns->comp_stream;
+
+	const int BLOCKSIZE = 256;		// good value
+	const int NW = 1;
+
+	// Launch the Legendre CUDA Kernel
+	const int threadsPerBlock = BLOCKSIZE;	// can be from 32 to 1024, we should try to measure the fastest !
+	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
+	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
+	if (spat_dist == 0) spat_dist = shtns->spat_stride;
+	dim3 blocks(blocksPerGrid, mmax+1);
+	dim3 threads(threadsPerBlock, 1);
+	for (int f=0; f<NFIELDS; f++) {
+		leg_m_highllim_kernel<S> <<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2, lmax,mres, nphi);
+	}
+}
+
+
+
 
 template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
-ileg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int q_dist=0, const int ql_dist=0)
+ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int q_dist=0, const int ql_dist=0)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -1154,10 +1234,35 @@ ileg_m_lowllim(const double* __restrict__ al, const double* __restrict__ ct, con
 	}
 }
 
+template<int S, int NFIELDS> 
+static void ileg_m_lowllim(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+{
+	const int lmax = shtns->lmax;
+	const int mres = shtns->mres;
+	const int nlat_2 = shtns->nlat_2;
+	const int nphi = shtns->nphi;
+	int mmax = shtns->mmax;
+	double *d_alm = shtns->d_alm;
+	double *d_ct = shtns->d_ct;
+	cudaStream_t stream = shtns->comp_stream;
+
+	const int BLOCKSIZE = 256/NFIELDS;
+	const int LSPAN_ = 8/NFIELDS;
+	const int NW = 1;
+
+	const int threadsPerBlock = BLOCKSIZE;	// can be from 32 to 1024, we should try to measure the fastest !
+	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
+	if (q_dist == 0) q_dist = shtns->spat_stride;
+	if (ql_dist == 0) ql_dist = shtns->nlm_stride;
+	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
+	dim3 blocks(blocksPerGrid, mmax+1);
+	dim3 threads(threadsPerBlock, 1);
+	ileg_m_lowllim_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) q, (double*) ql, llim, nlat_2, lmax,mres, nphi, q_dist, ql_dist);
+}
 
 
 template<int BLOCKSIZE, int LSPAN, int S> __global__ void
-ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
+ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -1323,6 +1428,34 @@ ileg_m_highllim(const double *al, const double *ct, const double *q, double *ql,
 			if (BLOCKSIZE > WARPSZE)	__syncthreads();
 			l+=LSPAN;
 		}
+	}
+}
+
+template<int S, int NFIELDS>
+static void ileg_m_highllim(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+{
+	const int lmax = shtns->lmax;
+	const int mres = shtns->mres;
+	const int nlat_2 = shtns->nlat_2;
+	const int nphi = shtns->nphi;
+	int mmax = shtns->mmax;
+	double *d_alm = shtns->d_alm;
+	double *d_ct = shtns->d_ct;
+	cudaStream_t stream = shtns->comp_stream;
+
+	const int BLOCKSIZE = 256/NFIELDS;
+	const int LSPAN_ = 8/NFIELDS;
+	const int NW = 1;
+
+	const int threadsPerBlock = BLOCKSIZE;	// can be from 32 to 1024, we should try to measure the fastest !
+	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
+	if (q_dist == 0) q_dist = shtns->spat_stride;
+	if (ql_dist == 0) ql_dist = shtns->nlm_stride;
+	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
+	dim3 blocks(blocksPerGrid, mmax+1);
+	dim3 threads(threadsPerBlock, 1);
+	for (int f=0; f<NFIELDS; f++) {
+		ileg_m_highllim_kernel<BLOCKSIZE, LSPAN_, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, q + f*q_dist, ql + f*ql_dist, llim, nlat_2, lmax,mres, nphi);
 	}
 }
 
@@ -1565,8 +1698,6 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 	const int nlat = shtns->nlat;
 	const int nphi = shtns->nphi;
 	const long nspat = shtns->nspat;
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
 
 	// Launch the Legendre CUDA Kernel
 	const int threadsPerBlock = MAX_THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
@@ -1588,7 +1719,7 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 		err = cudaMemcpy(d_qlm, Ql0, (llim+1)*sizeof(double), cudaMemcpyHostToDevice);
 		if (err != cudaSuccess)  printf("failed copy qlm\n");
 
-		leg_m0<0> <<< blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2);
+		leg_m0<0,1> (shtns, d_qlm, d_q, llim);
 	} else {
 		err = cudaMemcpy(d_qlm, Qlm, 2*nlm*sizeof(double), cudaMemcpyHostToDevice);
 		if (err != cudaSuccess)  printf("failed copy qlm\n");
@@ -1596,9 +1727,10 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 		dim3 blocks(blocksPerGrid, mmax+1);
 		dim3 threads(threadsPerBlock, 1);
 		if (llim <= SHT_L_RESCALE_FLY) {
-			leg_m_lowllim<MAX_THREADS_PER_BLOCK,0,1,NW> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
+			leg_m_lowllim<0,1>(shtns, d_qlm, d_q, llim);
 		} else {
-			leg_m_highllim<0> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
+//			leg_m_highllim<0> <<< blocks, threads, 2*threadsPerBlock*sizeof(double), shtns->comp_stream >>> (d_alm, d_ct, d_qlm, d_q, llim, nlat/2, lmax,mres, nphi);
+			leg_m_highllim<0,1>(shtns, d_qlm, d_q, llim);
 		}
 		// padd missing m's with 0 (m>mmax)
 		if (2*(mmax+1) <= nphi)
@@ -1629,41 +1761,24 @@ void SH_to_spat_gpu_hostfft(shtns_cfg shtns, cplx *Qlm, double *Vr, const long i
 template<int S, int NFIELDS>
 void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int llim, int spat_dist = 0)
 {
-	const int lmax = shtns->lmax;
 	int mmax = shtns->mmax;
 	const int mres = shtns->mres;
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
 	cudaStream_t stream = shtns->comp_stream;
 
-	const int THREADS_PER_BLOCK = 256;		// good value
-	const int NW = 2;
-
-	// Launch the Legendre CUDA Kernel
-	const int threadsPerBlock = THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
-	const int blocksPerGrid = (nlat_2 + THREADS_PER_BLOCK*NW - 1) / (THREADS_PER_BLOCK*NW);
-//	const int threadsPerBlock = shtns->threads_per_block;	// can be from 32 to 1024, we should try to measure the fastest !
-//	const int blocksPerGrid = shtns->nblocks;
+	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
-	if (nphi == 1) {
-		leg_m0<S><<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
+	if (mmax==0) {
+		leg_m0<S,NFIELDS>(shtns, (double*) d_Qlm, (double*) d_Vr, llim);
 	} else {
-		if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
-		dim3 blocks(blocksPerGrid, mmax+1);
-		dim3 threads(threadsPerBlock, 1);
-		if (mmax==0) {
-			leg_m0<S><<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2);
-		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
-//			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS><<<blocks, threads, (NFIELDS+1)*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, (spat_dist == 0) ? shtns->spat_stride : spat_dist);
-			leg_m_lowllim<THREADS_PER_BLOCK,S,NFIELDS,NW><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Qlm, (double*) d_Vr, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
+			leg_m_lowllim<S,NFIELDS>(shtns, (double*) d_Qlm, (double*) d_Vr, llim, spat_dist);
 		} else {
-			for (int f=0; f<NFIELDS; f++) {
-				leg_m_highllim<S><<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, (double*) (d_Qlm + f*shtns->nlm_stride/2), (double*) (d_Vr + f*spat_dist), llim, nlat_2, lmax,mres, nphi);
-			}
+			leg_m_highllim<S,NFIELDS>(shtns, (double*) d_Qlm, (double*) d_Vr, llim);
 		}
+	}
+	if (nphi > 1) {
 		cufftResult res;
 		for (int f=0; f<NFIELDS; f++) {
 			cufftDoubleComplex* x = (cufftDoubleComplex*) (d_Vr + f*spat_dist);
@@ -1672,10 +1787,7 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 				cudaMemsetAsync( x + (mmax+1)*nlat_2, 0, sizeof(double)*(nphi-2*mmax-1)*2*nlat_2, stream );		// set to zero before fft
 			if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
 				double* xfft = shtns->xfft;
-				const int block_dim_y = 4;
-				dim3 blocks(NLAT_2/16, NPHI/16);
-				dim3 threads(32, block_dim_y);
-				transpose_cplx<block_dim_y> <<<blocks, threads, 0, stream>>>((double*) x, xfft, NLAT_2, NPHI);
+				transpose_cplx(stream, (double*) x, xfft, NLAT_2, NPHI);
 				res = cufftExecZ2Z(shtns->cufft_plan, (cufftDoubleComplex*) xfft, x, CUFFT_INVERSE);
 			} else {	// THETA_CONTIGUOUS:
 				res = cufftExecZ2Z(shtns->cufft_plan, x, x, CUFFT_INVERSE);
@@ -1689,28 +1801,18 @@ void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int 
 template<int S, int NFIELDS>
 void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int llim, int spat_dist = 0)
 {
-	const int lmax = shtns->lmax;
 	int mmax = shtns->mmax;
 	const int mres = shtns->mres;
-	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
 	const int nlm = shtns->nlm +S*(mmax+1);	// use more space for vector transform !!!
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
 	cudaStream_t stream = shtns->comp_stream;		// default stream
 
-	const int THREADS_PER_BLOCK = 256/NFIELDS;
-	const int LSPAN_ = 8/NFIELDS;
-
-	// Launch the Legendre CUDA Kernel
-	const int threadsPerBlock = THREADS_PER_BLOCK;	// can be from 32 to 1024, we should try to measure the fastest !
-	const int blocksPerGrid =(nlat_2 + threadsPerBlock - 1) / (threadsPerBlock*NWAY);
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	for (int f=0; f<NFIELDS; f++) {
 		cudaMemsetAsync(d_Qlm + (f*shtns->nlm_stride)/2, 0, sizeof(double)*2*nlm, stream);		// set to zero before we start.
 	}
 	if (nphi == 1) {
-		ileg_m0<THREADS_PER_BLOCK, LSPAN_, S, NFIELDS><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, spat_dist, shtns->nlm_stride);
+		ileg_m0<S, NFIELDS>(shtns, (double*) d_Vr, (double*) d_Qlm, llim, spat_dist, shtns->nlm_stride);
 	} else {
 		for (int f=0; f<NFIELDS; f++) {
 			cufftResult res;
@@ -1718,27 +1820,20 @@ void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int 
 			if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
 				double* xfft = shtns->xfft;
 				res = cufftExecZ2Z(shtns->cufft_plan, x, (cufftDoubleComplex*) xfft, CUFFT_INVERSE);
-				const int block_dim_y = 4;
-				dim3 blocks(NPHI/16, NLAT_2/16);
-				dim3 threads(32, block_dim_y);
-				transpose_cplx<block_dim_y> <<<blocks, threads, 0, stream>>>(xfft, (double*) x, NPHI, NLAT_2);
+				transpose_cplx(stream, xfft, (double*) x, NPHI, NLAT_2);
 			} else {	// THETA_CONTIGUOUS:
 				res = cufftExecZ2Z(shtns->cufft_plan, x, x, CUFFT_INVERSE);
 			}
 			if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
 		}
 		if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
-		dim3 blocks(blocksPerGrid, mmax+1);
-		dim3 threads(threadsPerBlock, 1);
 		if (mmax==0) {
-			ileg_m0<THREADS_PER_BLOCK, LSPAN_, S, NFIELDS><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, spat_dist, shtns->nlm_stride);
+			ileg_m0<S, NFIELDS>(shtns, (double*) d_Vr, (double*) d_Qlm, llim, spat_dist, shtns->nlm_stride);
 		} else
 		if (llim <= SHT_L_RESCALE_FLY) {
-			ileg_m_lowllim<THREADS_PER_BLOCK, LSPAN_, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) d_Vr, (double*) d_Qlm, llim, nlat_2, lmax,mres,nphi, spat_dist, shtns->nlm_stride);
+			ileg_m_lowllim<S, NFIELDS>(shtns, (double*) d_Vr, (double*) d_Qlm, llim, spat_dist, shtns->nlm_stride);
 		} else {
-			for (int f=0; f<NFIELDS; f++) {
-				ileg_m_highllim<THREADS_PER_BLOCK, LSPAN_, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) (d_Vr + f*spat_dist), (double*) (d_Qlm + f*shtns->nlm_stride/2), llim, nlat_2, lmax,mres,nphi);
-			}
+			ileg_m_highllim<S, NFIELDS>(shtns, (double*) d_Vr, (double*) d_Qlm, llim, spat_dist, shtns->nlm_stride);
 		}
 	}
 }
