@@ -423,7 +423,7 @@ V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
     // NPHI > 1 as SHT_AXISYM is not defined.
 	#if _GCC_VEC_
   	if (shtns->fftc_mode >= 0) {
-		if (shtns->fftc_mode == 0) {
+		if (shtns->fftc_mode != 1) {
 Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);

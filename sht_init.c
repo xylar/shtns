@@ -530,6 +530,9 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 
 // complex fft for fly transform is a bit different.
 	if (layout & SHT_PHI_CONTIGUOUS) {		// out-of-place split dft
+		#ifdef HAVE_LIBCUFFT
+			shtns_runerr(" phi-contiguous transform not available with CUDA support.");
+		#endif
 		fftw_iodim dim, many;
 		shtns->fftc_mode = 1;
 		//default internal
@@ -548,16 +551,35 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	
 		#if SHT_VERBOSE > 1
 		if (verbose>1) {
-			printf("          fftw cost ifftc=%lg,  fftc=%lg  ",fftw_cost(shtns->ifftc), fftw_cost(shtns->fftc));	fflush(stdout);
+			printf("          [phi-contiguous] fftw cost ifftc=%lg,  fftc=%lg  ",fftw_cost(shtns->ifftc), fftw_cost(shtns->fftc));	fflush(stdout);
 		}
 		#endif
+	#ifdef HAVE_LIBCUFFT
+	} else if (!(layout & SHT_THETA_CONTIGUOUS)) {		// use the fastest layout compatible with cuFFT
+		/* fftw_plan fftw_plan_many_dft(int rank, const int *n, int howmany,
+                             fftw_complex *in, const int *inembed,
+                             int istride, int idist,
+                             fftw_complex *out, const int *onembed,
+                             int ostride, int odist,
+                             int sign, unsigned flags);	*/
+		shtns->fftc_mode = 2;	// out-of-place
+		// Fourier -> spatial
+		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (cplx*) Sh, &nfft, 1, nfft, FFTW_BACKWARD, shtns->fftw_plan_mode);		
+		// spatial -> Fourier
+		shtns->fftc = fftw_plan_many_dft(1, &nfft, NLAT/2, (cplx*) Sh, &nfft, 1, nfft, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+		#if SHT_VERBOSE > 1
+		if (verbose>1) {
+			printf("          [native cuFFT] fftw cost ifftc=%lg,  fftc=%lg  ",fftw_cost(shtns->ifftc), fftw_cost(shtns->fftc));	fflush(stdout);
+		}
+		#endif
+	#endif
 	} else {	//if (layout & SHT_THETA_CONTIGUOUS) {		// use only in-place here, supposed to be faster.
 		shtns->fftc_mode = 0;
 		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 		shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
 		#if SHT_VERBOSE > 1
 		if (verbose>1) {
-			printf("          fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
+			printf("          [theta-contiguous] fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);
 		}
 		#endif
 	}

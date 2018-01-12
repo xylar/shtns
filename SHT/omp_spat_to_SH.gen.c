@@ -368,25 +368,25 @@ V	BtF = Vt;	BpF = Vp;
 		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
 	if (shtns->fftc_mode >= 0) {
-	    if (shtns->fftc_mode == 0) {	// in-place
-V		  #ifdef HAVE_LIBFFTW3_OMP
-Q			fftw_execute_dft(shtns->fftc,(cplx*)BrF, (cplx*)BrF);
-V			fftw_execute_dft(shtns->fftc,(cplx*)BtF, (cplx*)BtF);
-V			fftw_execute_dft(shtns->fftc,(cplx*)BpF, (cplx*)BpF);
-V		  #endif
-		} else {	// alloc memory for the transpose FFT
+		if (shtns->fftc_mode > 0) {		// out-of-place
 			unsigned long nv = shtns->nspat;
 QX			BrF = (double*) VMALLOC( nv * sizeof(double) );
 VX			BtF = (double*) VMALLOC( 2*nv * sizeof(double) );
 VX			BpF = BtF + nv;
 3			BrF = (double*) VMALLOC( 3*nv * sizeof(double) );
-3			BtF = BrF + nv;		BpF = BtF + nv;
-V		  #ifdef HAVE_LIBFFTW3_OMP
+3			BtF = BrF + nv;		BpF = BtF + nv;			
+		}
+V	  #ifdef HAVE_LIBFFTW3_OMP
+	    if (shtns->fftc_mode != 1) {	// regular FFT
+Q			fftw_execute_dft(shtns->fftc,(cplx*)Vr, (cplx*)BrF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)Vt, (cplx*)BtF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)Vp, (cplx*)BpF);
+		} else {	// split FFT
 Q			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, BrF+1, BrF);
 V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, BtF+1, BtF);
 V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
-V		  #endif
 	    }
+V	  #endif
 	}
   #endif
 	imlim += 1;
@@ -395,13 +395,14 @@ V		  #endif
   {
 	#ifndef SHT_AXISYM
 V	#ifndef HAVE_LIBFFTW3_OMP
+V	if (shtns->fftc_mode > 0) {
 V		if (shtns->fftc_mode == 0) {	// in-place
 3			#pragma omp single nowait
-3			fftw_execute_dft(shtns->fftc,(cplx*)BrF, (cplx*)BrF);
+3			fftw_execute_dft(shtns->fftc,(cplx*)Vr, (cplx*)BrF);
 V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->fftc,(cplx*)BtF, (cplx*)BtF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)Vt, (cplx*)BtF);
 V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->fftc,(cplx*)BpF, (cplx*)BpF);
+V			fftw_execute_dft(shtns->fftc,(cplx*)Vp, (cplx*)BpF);
 V		} else if (shtns->fftc_mode > 0) {	// split out-of-place
 3			#pragma omp single nowait
 3			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, ((double*)BrF)+1, ((double*)BrF));
@@ -411,6 +412,7 @@ V			#pragma omp single nowait
 V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*)BpF));
 V		}
 V		#pragma omp barrier
+V	}
 V	#endif
 	#endif
 QX	GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);

@@ -450,7 +450,7 @@ T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
   #ifndef SHT_AXISYM
     // NPHI > 1 as SHT_AXISYM is not defined.
   	if (shtns->fftc_mode >= 0) {
-		if (shtns->fftc_mode == 0) {
+		if (shtns->fftc_mode != 1) {
 Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);

@@ -481,20 +481,22 @@ T		GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
 V	#ifndef HAVE_LIBFFTW3_OMP
 V	  #pragma omp barrier
 V	  #if _GCC_VEC_
-V		if (shtns->fftc_mode == 0) {
+V		if (shtns->fftc_mode >= 0) {
+V		if (shtns->fftc_mode != 1) {
 3			#pragma omp single nowait
 3			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
 V			#pragma omp single nowait
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
 V			#pragma omp single nowait
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
-V		} else if (shtns->fftc_mode > 0) {		// split dft
+V		} else {		// split dft
 3			#pragma omp single nowait
 3			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
 V			#pragma omp single nowait
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
 V			#pragma omp single nowait
 V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
+V		}
 V		}
 V	  #else
 3		#pragma omp single nowait
@@ -513,7 +515,7 @@ V	#endif
     // NPHI > 1 as SHT_AXISYM is not defined.
 	#if _GCC_VEC_
   	if (shtns->fftc_mode >= 0) {
-		if (shtns->fftc_mode == 0) {
+		if (shtns->fftc_mode != 1) {
 V		  #ifdef HAVE_LIBFFTW3_OMP
 Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
 V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
