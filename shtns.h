@@ -67,7 +67,7 @@ enum shtns_type {
 
 #define SHT_SCALAR_ONLY (256*16)	///< don't compute vector matrices. (add to flags in shtns_set_grid)
 #define SHT_LOAD_SAVE_CFG (256*64)	///< try to load and save the config. (add to flags in shtns_set_grid)
-#define SHT_ALLOW_GPU (256*128)		///< do not attempt to use a GPU
+#define SHT_ALLOW_GPU (256*128)		///< allows to use a GPU. This needs special care because the same plan cannot be used simultaneously by different threads anymore.
 
 
 #ifndef SHTNS_PRIVATE

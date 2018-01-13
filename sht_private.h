@@ -167,14 +167,13 @@ struct shtns_info {		// MUST start with "int nlm;"
 	/* cuda stuff */
 	short cu_flags;
 	short cu_fft_mode;
-	short nblocks;				///< number of blocks
-	short threads_per_block;	///< number of threads per block
 	double* d_alm;
 	double* d_ct;
 	double* d_mx_stdt;
 	double* d_mx_van;
 	double* gpu_mem;
 	double* xfft;
+	double* xfft_cpu;
 	size_t nlm_stride, spat_stride;
 	cudaStream_t xfer_stream, comp_stream;		// the cuda streams
 	cufftHandle cufft_plan;						// the cufft Handle
