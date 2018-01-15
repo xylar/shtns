@@ -117,9 +117,11 @@ AS_IF([test "x$enable_many_core" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 
+nvcc_flags=""
 # Disable precomputed matrix support with openmp: to avoid bugs arising with icc + openmp.
 AS_IF([test "x$enable_openmp" = "xyes"], [
   	enable_mem=no
+	nvcc_flags="-Xcompiler -fopenmp"
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 	dnl AC_CHECK_HEADERS([omp.h])
@@ -140,7 +142,6 @@ AS_IF([test "x$enable_cuda" = "xyes"], [
 	objs="$objs sht_gpu.o"
 	target="libshtns_cuda.a"
 
-	nvcc_flags=""
 	AC_MSG_CHECKING([whether nvcc supports Kepler gpu])
 	AS_IF([nvcc sht_gpu.cu -c -arch=sm_30 --dryrun > /dev/null 2>&1], [
 	    nvcc_flags="$nvcc_flags -gencode=arch=compute_30,code=sm_30"

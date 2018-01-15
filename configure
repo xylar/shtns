@@ -3925,10 +3925,12 @@ fi
 
 fi
 
+nvcc_flags=""
 # Disable precomputed matrix support with openmp: to avoid bugs arising with icc + openmp.
 if test "x$enable_openmp" = "xyes"; then :
 
   	enable_mem=no
+	nvcc_flags="-Xcompiler -fopenmp"
 
   OPENMP_CFLAGS=
   # Check whether --enable-openmp was given.
@@ -4113,7 +4115,6 @@ fi
 	objs="$objs sht_gpu.o"
 	target="libshtns_cuda.a"
 
-	nvcc_flags=""
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports Kepler gpu" >&5
 $as_echo_n "checking whether nvcc supports Kepler gpu... " >&6; }
 	if nvcc sht_gpu.cu -c -arch=sm_30 --dryrun > /dev/null 2>&1; then :

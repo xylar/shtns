@@ -973,48 +973,48 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 		const int ofs = j & 0xFFE0;
 
 		while ( _all(ny<0) && (l<llim) ) {
-		if (ka+4 >= WARPSZE) {
-			ak[j] = al[(j&31)];
-			ka=0;
-		}
-		y1 = ak[ka+1+ofs]*cost*y0 + ak[ka+ofs]*y1;
-		y0 = ak[ka+3+ofs]*cost*y1 + ak[ka+2+ofs]*y0;
-		l+=2;	al+=4;	ka+=4;
-		if (fabs(y1) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
-		{	// rescale when value is significant
-			++ny;
-			y0 *= 1.0/SHT_SCALE_FACTOR;
-			y1 *= 1.0/SHT_SCALE_FACTOR;
-		}
+			if (ka+4 >= WARPSZE) {
+				ak[j] = al[(j&31)];
+				ka=0;
+			}
+			y1 = ak[ka+1+ofs]*cost*y0 + ak[ka+ofs]*y1;
+			y0 = ak[ka+3+ofs]*cost*y1 + ak[ka+2+ofs]*y0;
+			l+=2;	al+=4;	ka+=4;
+			if (fabs(y1) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
+			{	// rescale when value is significant
+				++ny;
+				y0 *= 1.0/SHT_SCALE_FACTOR;
+				y1 *= 1.0/SHT_SCALE_FACTOR;
+			}
 		}
 
 		ka = WARPSZE;
 		while (l<llim) {
-		if (ka+4 >= WARPSZE) {		// cache coefficients
-			ak[j] = al[(j&31)];
-			qk[j] = ql[2*l+(j&31)];
-			ka = 0;
-		}
-		y1 = ak[ka+1+ofs]*cost*y0 + ak[ka+ofs]*y1;
-		if (ny==0) {
-			rer += y0 * qk[ka+ofs];	// real
-			rei += y0 * qk[ka+1+ofs];	// imag
-			ror += y1 * qk[ka+2+ofs];	// real
-			roi += y1 * qk[ka+3+ofs];	// imag
-		}
-		else if (fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
-		{	// rescale when value is significant
-			++ny;
-			y0 *= 1.0/SHT_SCALE_FACTOR;
-			y1 *= 1.0/SHT_SCALE_FACTOR;
-		}
-		l+=2;	al+=4;
-		y0 = ak[ka+3+ofs]*cost*y1 + ak[ka+2+ofs]*y0;
-		ka+=4;
+			if (ka+4 >= WARPSZE) {		// cache coefficients
+				ak[j] = al[(j&31)];
+				qk[j] = ql[2*l+(j&31)];
+				ka = 0;
+			}
+			y1 = ak[ka+1+ofs]*cost*y0 + ak[ka+ofs]*y1;
+			if (ny==0) {
+				rer += y0 * qk[ka+ofs];	// real
+				rei += y0 * qk[ka+1+ofs];	// imag
+				ror += y1 * qk[ka+2+ofs];	// real
+				roi += y1 * qk[ka+3+ofs];	// imag
+			}
+			else if (fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
+			{	// rescale when value is significant
+				++ny;
+				y0 *= 1.0/SHT_SCALE_FACTOR;
+				y1 *= 1.0/SHT_SCALE_FACTOR;
+			}
+			l+=2;	al+=4;
+			y0 = ak[ka+3+ofs]*cost*y1 + ak[ka+2+ofs]*y0;
+			ka+=4;
 		}
 		if ((l==llim) && (ny==0)) {
-		rer += y0 * ql[2*l];
-		rei += y0 * ql[2*l+1];
+			rer += y0 * ql[2*l];
+			rei += y0 * ql[2*l+1];
 		}
 	}
 
