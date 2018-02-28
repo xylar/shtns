@@ -3759,6 +3759,28 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_sht_nlm_cplx_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  unsigned int result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:sht_nlm_cplx_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_nlm_cplx_get" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  result = (unsigned int)(unsigned int) ((arg1)->nlm_cplx);
+  resultobj = SWIG_From_unsigned_SS_int((unsigned int)(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_new_sht(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
   PyObject *resultobj = 0;
   int arg1 ;
@@ -5605,6 +5627,46 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_nlm_cplx_calc(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  long arg1 ;
+  long arg2 ;
+  long arg3 ;
+  long val1 ;
+  int ecode1 = 0 ;
+  long val2 ;
+  int ecode2 = 0 ;
+  long val3 ;
+  int ecode3 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  long result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOO:nlm_cplx_calc",&obj0,&obj1,&obj2)) SWIG_fail;
+  ecode1 = SWIG_AsVal_long(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "nlm_cplx_calc" "', argument " "1"" of type '" "long""'");
+  } 
+  arg1 = (long)(val1);
+  ecode2 = SWIG_AsVal_long(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "nlm_cplx_calc" "', argument " "2"" of type '" "long""'");
+  } 
+  arg2 = (long)(val2);
+  ecode3 = SWIG_AsVal_long(obj2, &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "nlm_cplx_calc" "', argument " "3"" of type '" "long""'");
+  } 
+  arg3 = (long)(val3);
+  result = (long)nlm_cplx_calc(arg1,arg2,arg3);
+  resultobj = SWIG_From_long((long)(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_set_verbosity(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   int arg1 ;
@@ -5647,6 +5709,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_nphi_get", _wrap_sht_nphi_get, METH_VARARGS, (char *)"sht_nphi_get(sht self) -> unsigned short const"},
 	 { (char *)"sht_nlat_get", _wrap_sht_nlat_get, METH_VARARGS, (char *)"sht_nlat_get(sht self) -> unsigned short const"},
 	 { (char *)"sht_nspat_get", _wrap_sht_nspat_get, METH_VARARGS, (char *)"sht_nspat_get(sht self) -> unsigned int const"},
+	 { (char *)"sht_nlm_cplx_get", _wrap_sht_nlm_cplx_get, METH_VARARGS, (char *)"sht_nlm_cplx_get(sht self) -> unsigned int const"},
 	 { (char *)"new_sht", (PyCFunction) _wrap_new_sht, METH_VARARGS | METH_KEYWORDS, (char *)"new_sht(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal, int nthreads=0) -> sht"},
 	 { (char *)"delete_sht", _wrap_delete_sht, METH_VARARGS, (char *)"delete_sht(sht self)"},
 	 { (char *)"sht_set_grid", (PyCFunction) _wrap_sht_set_grid, METH_VARARGS | METH_KEYWORDS, (char *)"sht_set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double polar_opt=1.0e-8, int nl_order=1)"},
@@ -5691,6 +5754,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_SHqst_to_spat_m", _wrap_sht_SHqst_to_spat_m, METH_VARARGS, (char *)"sht_SHqst_to_spat_m(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp, PyObject * im)"},
 	 { (char *)"sht_swigregister", sht_swigregister, METH_VARARGS, NULL},
 	 { (char *)"nlm_calc", _wrap_nlm_calc, METH_VARARGS, (char *)"nlm_calc(long lmax, long mmax, long mres) -> long"},
+	 { (char *)"nlm_cplx_calc", _wrap_nlm_cplx_calc, METH_VARARGS, (char *)"nlm_cplx_calc(long lmax, long mmax, long mres) -> long"},
 	 { (char *)"set_verbosity", _wrap_set_verbosity, METH_VARARGS, (char *)"set_verbosity(int arg1)"},
 	 { (char *)"print_version", _wrap_print_version, METH_VARARGS, (char *)"print_version()"},
 	 { NULL, NULL, 0, NULL }
@@ -6435,6 +6499,7 @@ SWIG_init(void) {
   SWIG_Python_SetConstant(d, "SHT_SOUTH_POLE_FIRST",SWIG_From_int((int)((256*32))));
   SWIG_Python_SetConstant(d, "SHT_SCALAR_ONLY",SWIG_From_int((int)((256*16))));
   SWIG_Python_SetConstant(d, "SHT_LOAD_SAVE_CFG",SWIG_From_int((int)((256*64))));
+  SWIG_Python_SetConstant(d, "SHT_ALLOW_GPU",SWIG_From_int((int)((256*128))));
 #if PY_VERSION_HEX >= 0x03000000
   return m;
 #else

@@ -118,6 +118,7 @@ SHT_PHI_CONTIGUOUS = _shtns.SHT_PHI_CONTIGUOUS
 SHT_SOUTH_POLE_FIRST = _shtns.SHT_SOUTH_POLE_FIRST
 SHT_SCALAR_ONLY = _shtns.SHT_SCALAR_ONLY
 SHT_LOAD_SAVE_CFG = _shtns.SHT_LOAD_SAVE_CFG
+SHT_ALLOW_GPU = _shtns.SHT_ALLOW_GPU
 class sht(_object):
     """Proxy of C shtns_info struct."""
 
@@ -147,6 +148,9 @@ class sht(_object):
     __swig_getmethods__["nspat"] = _shtns.sht_nspat_get
     if _newclass:
         nspat = _swig_property(_shtns.sht_nspat_get)
+    __swig_getmethods__["nlm_cplx"] = _shtns.sht_nlm_cplx_get
+    if _newclass:
+        nlm_cplx = _swig_property(_shtns.sht_nlm_cplx_get)
 
     def __init__(self, lmax, mmax=-1, mres=1, norm=sht_orthonormal, nthreads=0):
         """__init__(shtns_info self, int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal, int nthreads=0) -> sht"""
@@ -536,6 +540,10 @@ sht_swigregister(sht)
 def nlm_calc(lmax, mmax, mres):
     """nlm_calc(long lmax, long mmax, long mres) -> long"""
     return _shtns.nlm_calc(lmax, mmax, mres)
+
+def nlm_cplx_calc(lmax, mmax, mres):
+    """nlm_cplx_calc(long lmax, long mmax, long mres) -> long"""
+    return _shtns.nlm_cplx_calc(lmax, mmax, mres)
 
 def set_verbosity(arg1):
     """set_verbosity(int arg1)"""

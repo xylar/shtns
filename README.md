@@ -68,7 +68,7 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
-* v2.10  (28 Feb 2018)
+* v3.0  (28 Feb 2018)
 	- support for nvidia Kepler & Pascal GPU with `--enable-cuda` (including automatic offload).
 	- Java JNI wrapper (beta, see `shtns_jni` folder -- thanks to Julien Pierret).
 
