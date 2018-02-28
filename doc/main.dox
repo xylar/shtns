@@ -4,25 +4,26 @@
  * SHTns is a high performance library for Spherical Harmonic Transform written in C, aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.\n
  *
  * Main features :
- * - <b>\link bench blazingly fast\endlink</b>
- * - distributed under the open source \link license CeCILL License\endlink (GPL compatible)
- * - both <b>scalar and \link vsh vector transforms\endlink</b>
- * - backward and forward (synthesis and analysis) functions
- * - flexible truncation
- * - spatial data can be stored in latitude-major or longitude-major order arrays.
- * - various conventions (normalization and Condon-Shortley phase)
- * - can be used from <b>Fortran, c/c++, and Python</b> programs
- * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature)
- * - support for <b>regular grids</b> (but they require twice the number of nodes than Gauss grid)
- * - support for SSE2, SSE3 and <b>AVX</b> vectorization with gcc.
- * - <b>parallel transforms with OpenMP</b> (for Gauss grid only).
+ * - <b>\link bench blazingly fast\endlink</b>.
+ * - distributed under the open source \link license CeCILL License\endlink (GPL compatible).
+ * - both <b>scalar and \link vsh vector transforms\endlink</b>.
+ * - backward and forward (synthesis and analysis) functions.
+ * - flexible truncation (degree, order, azimuthal periodicity).
+ * - spatial data can be stored in latitude-major or longitude-major arrays.
+ * - various conventions (normalization and Condon-Shortley phase).
+ * - can be used from <b>Fortran, c/c++, and Python</b> programs.
+ * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature).
+ * - support for <b>regular grids</b> (but they require twice the number of nodes than Gauss grid).
+ * - support for SSE2, SSE3 and <b>AVX, AVX2, AVX-512</b> vectorization, as well as Xeon Phi (KNL), Blue Gene/Q and AltiVec VSX.
+ * - <b>parallel transforms with OpenMP</b>.
+ * - *Beta*: automatic <b>\link gpu GPU off-loading\endlink</b> with nvidia cuda (Kepler & Pascal).
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
- * - ability to choose the optimal spatial sizes for a given spherical harmonic truncation.
- * - <b>on-the-fly transforms</b> : saving memory and bandwidth, and can even be faster depending on architecture.
+ * - <b>on-the-fly transforms</b> : saving memory and bandwidth, they are even faster on modern architecture.
  * - accurate up to spherical harmonic degree l=16383 (at least).
  * - \link rotation rotation functions\endlink to rotate spherical harmonics (beta).
  * - \link operators special spectral operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
- * - scalar transforms for complex spatial fields.
+ * - scalar transforms and rotations for complex spatial fields.
+ * - SHT at fixed m (without fft, aka Legendre transform - beta).
  *
  * Using several \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *
@@ -613,6 +614,73 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
 
 */
 
+
+
+/** \page gpu Using SHTns with GPU (CUDA).
+
+SHTns supports nvidia Kepler and Pascal GPUs, using optimized cuda transforms.
+There are two ways on usign GPUs with SHTns: automatic off-loading where the GPUs are used transparently (not much to change in your code)
+and SHTns handles all the data transfers between GPU and CPU memory.
+In addition, routines for performing transforms of data residing already on the GPU are provided.
+
+In all cases, you must first configure SHTns to use cuda:
+
+\code ./configure --enable-cuda
+make
+make install \endcode
+
+\section offload Automatic off-loading
+
+To enable automatic off-loading (if possible and if faster), simply add \c SHT_ALLOW_GPU to the shtns_type argument of \ref shtns_set_grid_auto.
+
+\code
+sht_mode |= SHT_ALLOW_GPU
+shtns_set_grid_auto(shtns, shtmode, polaropt, nlorder, &NLAT, &NPHI);
+\endcode
+
+\warning the transforms are no more guaranteed to be thread-safe, because the GPU ones are not.
+Please make sure to use different shtns configs (or plans) if you want to call transform functions from multiple threads.
+See also \ref cloning below.
+
+For best performance, you must also allocate memory for your spatial and spectral arrays using \ref shtns_malloc and subsequently free it with \ref shtns_free.
+This way, so-called "pinned" memory is used when cuda is enabled, allowing faster data transfer between host and device.
+
+If you are not calling transform functions from multiple threads, you have nothing more to do.
+
+Here is a table giving an idea of the performance, comparing intel broadwell, intel KNL, and nvidia Pascal:
+
+<div>
+<table><tr>
+<td><b>machine</b></td>  <td>\ref SH_to_spat</td>  <td>\ref spat_to_SH</td> </tr><tr>
+<td>Broadwell, 20 cores</td>  <td>7.80 ms</td> <td>8.41 ms</td> </tr><tr>
+<td>KNL 7250, 68 cores</td>   <td>3.65 ms</td> <td><b>3.61 ms</b></td> </tr><tr>
+<td>Pascal P100 GPU (including transfer)</td>     <td><b>3.46 ms</b></td> <td>4.24 ms</td> </tr></table>
+
+<i>Average wall time for forward or backward scalar transform on various machines.
+The transform were performed using \c time_SHT with \c lmax=1023 and \c -nlorder=2 (dealiasing for non-linear terms).
+Note that the GPU timings include the time to transfer data (auto-offload mode) from and to the IBM Power8 host through nvlink.
+All timings include the FFT.</i>
+</div>
+
+
+\section cushtns On-device transforms
+
+On device transforms are declared in \ref shtns_cuda.h. Basically the regular transform functions have been prefixed by \c cu_ to indicate that they
+work on device memory. See \ref cuda.
+In principle, it is also possible to use cuda *unified memory* allocated by \c cudaMallocManaged(), but this has not been tested.
+
+As for the automatic off-loading, the \link cuda GPU transforms\endlink are <b>NOT thread-safe</b> 
+and the same shtns config should never been used from simultaneous threads.
+To help the user to create clones of the same shtns config, \link cloning cloning functions\endlink for GPU transforms have been added.
+
+\section cloning Cloning shtns configs
+
+The function \ref cushtns_clone creates a new identical configuration, but with new GPU ressources (temporary buffers, streams, ...).
+The user can give custom cuda streams or let shtns set his own (by passing 0 for each cuda stream).
+
+The resulting shtns config can be used concurently with the original one. Repeat the cloning for each concurrent thread.
+
+*/
 
 /** \page license License
   \brief CeCILL Free Software License Agreement
