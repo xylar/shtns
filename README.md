@@ -15,7 +15,7 @@ FEATURES:
 - flexible truncation (degree, order, azimuthal periodicity).
 - spatial data can be stored in latitude-major or longitude-major arrays.
 - various conventions (normalization and Condon-Shortley phase).
-- can be used from **Fortran, c/c++, and Python** programs.
+- can be used from **Fortran, c/c++, Python, and Java** programs.
 - highly efficient Gauss algorithm working with Gauss nodes (based on
   Gauss-Legendre quadrature).
 - support for **regular grids** (but they require twice the number of nodes than Gauss grid)
@@ -69,7 +69,8 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 * v2.10  (28 Feb 2018)
-	- support nvidia Kepler & Pascal GPU with `--enable-cuda` (including automatic offload).
+	- support for nvidia Kepler & Pascal GPU with `--enable-cuda` (including automatic offload).
+	- Java JNI wrapper (beta, see `shtns_jni` folder -- thanks to Julien Pierret).
 
 * v2.9  (11 Nov 2017)
 	- New `shtns_malloc()` and `shtns_free()` functions to allocate/free optimally
@@ -87,7 +88,7 @@ CHANGE LOG:
 * v2.8  (10 Jul 2017)
 	- Regular grids are back and improved (on-the-fly + exact quadrature weights).
 	- Merge with shtns-magic, providing optional support for the MagIC code
-	  with --enable-magic-layout (thanks to Bertrand Putigny)
+	  with --enable-magic-layout (thanks to Bertrand Putigny).
 
 * v2.7  (24 Feb 2017)
 	- Faster vector transforms: up to 2 times faster.

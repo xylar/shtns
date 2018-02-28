@@ -11,7 +11,7 @@
  * - flexible truncation (degree, order, azimuthal periodicity).
  * - spatial data can be stored in latitude-major or longitude-major arrays.
  * - various conventions (normalization and Condon-Shortley phase).
- * - can be used from <b>Fortran, c/c++, and Python</b> programs.
+ * - can be used from <b>Fortran, c/c++, Python, and Java</b> programs.
  * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature).
  * - support for <b>regular grids</b> (but they require twice the number of nodes than Gauss grid).
  * - support for SSE2, SSE3 and <b>AVX, AVX2, AVX-512</b> vectorization, as well as Xeon Phi (KNL), Blue Gene/Q and AltiVec VSX.
@@ -614,6 +614,12 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
 
 */
 
+/** \page java Using SHTns with Java
+
+SHTns provides a JNI wrapper (courtesy of Julien Pierret) that allows basic usage from Java programs.
+See the \c shtns_jni folder.
+
+*/
 
 
 /** \page gpu Using SHTns with GPU (CUDA).
