@@ -1,7 +1,7 @@
 **SHTns is a high performance library for Spherical Harmonic Transform written in C,
 aimed at numerical simulation (fluid flows, mhd, ...) in spherical geometries.**
 
-Copyright (c) 2010-2016 Centre National de la Recherche Scientifique.
+Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
 written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
 SHTns is distributed under the open source [CeCILL License](http://www.cecill.info/licences/Licence_CeCILL_V2.1-en.html)
 (GPL compatible) located in the LICENSE file.
@@ -18,9 +18,11 @@ FEATURES:
 - can be used from **Fortran, c/c++, and Python** programs.
 - highly efficient Gauss algorithm working with Gauss nodes (based on
   Gauss-Legendre quadrature).
+- support for **regular grids** (but they require twice the number of nodes than Gauss grid)
 - support for SSE2, SSE3, **AVX, AVX2, AVX-512** vectorization, as well as 
   Xeon Phi (KNL), Blue Gene/Q and AltiVec VSX.
 - **parallel transforms with OpenMP**.
+- *Beta*: automatic **GPU off-loading** with nvidia cuda (Kepler & Pascal).
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).
 - **on-the-fly transforms** : saving memory and bandwidth, they are even faster
   on modern architectures.
@@ -66,6 +68,9 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
+* v2.10  (28 Feb 2018)
+	- support nvidia Kepler & Pascal GPU with `--enable-cuda` (including automatic offload).
+
 * v2.9  (11 Nov 2017)
 	- New `shtns_malloc()` and `shtns_free()` functions to allocate/free optimally
 	  aligned memory.
