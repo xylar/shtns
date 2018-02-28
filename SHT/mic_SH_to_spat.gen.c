@@ -27,6 +27,30 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
+  #ifndef SHTNS4MAGIC
+	#define CSTORE_MIC(cmem, k_polar_opt_2, nr, ni, sr, si) \
+		k=0;	while (k<(k_polar_opt_2)) {	\
+			cmem[im*m_inc + k*k_inc] = 0.0;				cmem[(NPHI-im)*m_inc + k*k_inc] = 0.0; \
+			cmem[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	cmem[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0; \
+			++k; } \
+		k*=2;	do { \
+			cmem[im*m_inc + (k/2)*k_inc]                 = (nr[k]-ni[k+1]) + I*(nr[k+1]+ni[k]); \
+			cmem[(NPHI-im)*m_inc + (k/2)*k_inc]          = (nr[k]+ni[k+1]) + I*(nr[k+1]-ni[k]); \
+			cmem[im*m_inc + (NLAT_2-1-k/2)*k_inc]        = (sr[k+1]-si[k]) + I*(sr[k]+si[k+1]); \
+			cmem[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (sr[k+1]+si[k]) + I*(sr[k]-si[k+1]); \
+			k+=2;	} while(k < NLAT_2);
+  #else    /* SHTNS4MAGIC */
+	#define CSTORE_MIC(cmem, k_polar_opt_2, nr, ni, sr, si) \
+		k=0;	while (k<2*(k_polar_opt_2)) {	\
+			cmem[im*m_inc + k*k_inc] = 0.0;		cmem[(NPHI-im)*m_inc + k*k_inc] = 0.0; \
+			++k; } \
+		do { \
+			cmem[im*m_inc + k*k_inc]        = (nr[k]-si[k]) + I*(sr[k]+ni[k]); \
+			cmem[(NPHI-im)*m_inc + k*k_inc] = (nr[k]+si[k]) + I*(sr[k]-ni[k]); \
+			++k;	} while(k < NLAT_2);
+  #endif
+
+
 	static
 3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, cplx *BrF, cplx *BtF, cplx *BpF, const long int llim, const int imlim)
 QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *BrF, const long int llim, const int imlim)
@@ -116,6 +140,9 @@ T			rnd pe[NWAY], po[NWAY];
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(ct, j+k);
 V				sint[j] = -vread(st, j+k);
+V				#ifdef SHTNS4MAGIC
+V				sint[j] *= -sint[j];
+V				#endif
 				y0[j] = vall(al[0]);
 V				dy0[j] = vall(0.0);
 Q				re[j] = y0[j] * vall(Ql0[0]);
@@ -165,7 +192,7 @@ T					po[j] -= dy0[j] * vall(Tl0[l-1]);
 				}
 			}
 
-			for (int j=0; j<NWAY; ++j) {
+			for (int j=0; j<NWAY; ++j) {	// merge symmetric and antisymmetric parts.
 Q				vstor(rnr, j+k, re[j]+ro[j]);		vstor(rsr, j+k, re[j]-ro[j]);
 S				vstor(tnr, j+k, te[j]+to[j]);		vstor(tsr, j+k, te[j]-to[j]);
 T				vstor(pnr, j+k, pe[j]+po[j]);		vstor(psr, j+k, pe[j]-po[j]);
@@ -173,7 +200,8 @@ T				vstor(pnr, j+k, pe[j]+po[j]);		vstor(psr, j+k, pe[j]-po[j]);
 			k+=NWAY;
 		} while (k < nk);
 
-		k=0;  do {	// merge symmetric and antisymmetric parts.
+		#ifndef SHTNS4MAGIC
+		k=0;  do {
 Q			BrF[(k/2)*k_inc]            = rnr[k]   + I*rnr[k+1];
 Q			BrF[(NLAT_2-1 - k/2)*k_inc] = rsr[k+1] + I*rsr[k];
 S			BtF[(k/2)*k_inc]            = tnr[k]   + I*tnr[k+1];
@@ -182,7 +210,14 @@ T			BpF[(k/2)*k_inc]            = pnr[k]   + I*pnr[k+1];
 T			BpF[(NLAT_2-1 - k/2)*k_inc] = psr[k+1] + I*psr[k];
 			k+=2;
 		} while(k < NLAT_2);
-
+		#else  /* SHTNS4MAGIC */
+		k=0;  do {
+Q			BrF[k*k_inc] = rnr[k]   + I*rsr[k];
+S			BtF[k*k_inc] = tnr[k]   + I*tsr[k];
+T			BpF[k*k_inc] = pnr[k]   + I*psr[k];
+			k++;
+		} while(k < NLAT_2);
+		#endif
 		m0=mstep;
 	}
 
@@ -250,7 +285,11 @@ V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 				y0[j] = vall(1.0);
 			}
 Q			l=m;
+V		#ifndef SHTNS4MAGIC
 V			l=m-1;
+V		#else
+V			l=m;
+V		#endif
 			long int ny = 0;
 		if ((int)llim <= SHT_L_RESCALE_FLY) {
 			do {		// sin(theta)^m
@@ -328,8 +367,10 @@ QX				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * 
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
 			}
+3		#ifndef SHTNS4MAGIC
 3			for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
 3			for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
+3		#endif
 		  }
 		  
 			for (int j=0; j<NWAY; ++j) {
@@ -343,46 +384,11 @@ V				vstor(pni, j+k, pei[j]+poi[j]);		vstor(psi, j+k, pei[j]-poi[j]);
 			k+=NWAY;
 		} while (k < nk);
 
+		// STORE, for complex FFT
 		l = shtns->tm[im] >> 1;		// stay on a 16 byte boundary
-Q		k=0;	while (k<l) {	// polar optimization
-Q			BrF[im*m_inc + k*k_inc] = 0.0;				BrF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
-Q			BrF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BrF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
-Q			++k;
-Q		}
-Q		k*=2;	do {
-Q			BrF[im*m_inc + (k/2)*k_inc] = (rnr[k]-rni[k+1]) + I*(rnr[k+1]+rni[k]);
-Q			BrF[(NPHI-im)*m_inc + (k/2)*k_inc] = (rnr[k]+rni[k+1]) + I*(rnr[k+1]-rni[k]);
-Q			BrF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (rsr[k+1]-rsi[k]) + I*(rsr[k]+rsi[k+1]);
-Q			BrF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (rsr[k+1]+rsi[k]) + I*(rsr[k]-rsi[k+1]);
-Q			k+=2;
-Q		} while(k < NLAT_2);
-
-V		k=0;	while (k<l) {	// polar optimization
-V			BtF[im*m_inc + k*k_inc] = 0.0;				BtF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
-V			BtF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BtF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
-V			++k;
-V		}
-V		k*=2;	do {
-V			BtF[im*m_inc + (k/2)*k_inc] = (tnr[k]-tni[k+1]) + I*(tnr[k+1]+tni[k]);
-V			BtF[(NPHI-im)*m_inc + (k/2)*k_inc] = (tnr[k]+tni[k+1]) + I*(tnr[k+1]-tni[k]);
-V			BtF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (tsr[k+1]-tsi[k]) + I*(tsr[k]+tsi[k+1]);
-V			BtF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (tsr[k+1]+tsi[k]) + I*(tsr[k]-tsi[k+1]);
-V			k+=2;
-V		} while(k < NLAT_2);
-
-V		k=0;	while (k<l) {	// polar optimization
-V			BpF[im*m_inc + k*k_inc] = 0.0;				BpF[(NPHI-im)*m_inc + k*k_inc] = 0.0;
-V			BpF[im*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;	BpF[(NPHI-im)*m_inc + (NLAT_2-l+k)*k_inc] = 0.0;
-V			++k;
-V		}
-V		k*=2;	do {
-V			BpF[im*m_inc + (k/2)*k_inc] = (pnr[k]-pni[k+1]) + I*(pnr[k+1]+pni[k]);
-V			BpF[(NPHI-im)*m_inc + (k/2)*k_inc] = (pnr[k]+pni[k+1]) + I*(pnr[k+1]-pni[k]);
-V			BpF[im*m_inc + (NLAT_2-1-k/2)*k_inc] = (psr[k+1]-psi[k]) + I*(psr[k]+psi[k+1]);
-V			BpF[(NPHI-im)*m_inc + (NLAT_2-1-k/2)*k_inc] = (psr[k+1]+psi[k]) + I*(psr[k]-psi[k+1]);
-V			k+=2;
-V		} while(k < NLAT_2);
-
+Q		CSTORE_MIC(BrF, l, rnr, rni, rsr, rsi);
+V		CSTORE_MIC(BtF, l, tnr, tni, tsr, tsi);
+V		CSTORE_MIC(BpF, l, pnr, pni, psr, psi);
 	}
 
 	while(im <= NPHI-imlim) {	// padding for high m's
