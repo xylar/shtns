@@ -40,12 +40,16 @@ extern "C" {
 /// pointer to data structure describing an SHT, returned by shtns_init() or shtns_create().
 typedef struct shtns_info* shtns_cfg;
 
+/// pointer to data structure describing a rotation, returned by shtns_rotation_create().
+typedef struct shtns_rot_* shtns_rot;
+
 /// different Spherical Harmonic normalizations.
 /// see also section \ref norm for details.
 enum shtns_norm {
 	sht_orthonormal,	///< orthonormalized spherical harmonics (default).
 	sht_fourpi,			///< Geodesy and spectral analysis : 4.pi normalization.
-	sht_schmidt			///< Schmidt semi-normalized : 4.pi/(2l+1)
+	sht_schmidt,		///< Schmidt semi-normalized : 4.pi/(2l+1)
+	sht_for_rotations	///< \internal normalization to generate wigner-d matrices internally, with otherwise limited functionality.
 };
 #define SHT_NO_CS_PHASE (256*4)		///< don't include Condon-Shortley phase (add to last argument of \ref shtns_create)
 #define SHT_REAL_NORM (256*8)		///< use a "real" normalization. (add to last argument of \ref shtns_create)
@@ -189,6 +193,29 @@ void SH_Yrotate(shtns_cfg, cplx *Qlm, double alpha, cplx *Rlm);
 void SH_Yrotate90(shtns_cfg, cplx *Qlm, cplx *Rlm);
 /// Rotate SH representation around X axis by 90 degrees.
 void SH_Xrotate90(shtns_cfg, cplx *Qlm, cplx *Rlm);
+
+
+shtns_rot shtns_rotation_create(const int lmax);
+void shtns_rotation_destroy(shtns_rot r);
+void shtns_rotation_set_angle(shtns_rot r, const double beta);
+void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx);
+void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm);
+//void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm);
+
+//@}
+
+/// \name Generation of Legendre associated functions
+//@{
+/// Compute values of legendre polynomials noramalized for spherical harmonics,
+/// for a range of l=m..lmax, at given m and x, using stable recurrence.
+/// Requires a previous call to \ref shtns_create().
+/// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
+/// \param[in] lmax maximum degree computed
+/// \param[in] im = m/MRES with m the SH order
+/// \param[in] x argument, x=cos(theta).
+/// \param[out] yl is a double array of size (lmax-m+1) filled with the values (of increasing degree l).
+void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl);
+void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl);
 //@}
 
 /// \name Special operator functions

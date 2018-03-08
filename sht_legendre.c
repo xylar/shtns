@@ -236,7 +236,7 @@ done:
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
 /// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
-static void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl)
+void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl)
 {
 	double *al;
 	int l, m, ny;
@@ -349,7 +349,7 @@ done:
 /// \param sint = sqrt(1-x^2) to avoid recomputation of sqrt.
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
 /// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
-static void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
+void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
 {
 	double *al;
 	int l,m, ny;
@@ -563,7 +563,7 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 
 /// - Compute and store the prefactor (independant of x) of the starting value for the recurrence :
 /// \f[  Y_m^m(x) = Y_0^0 \ \sqrt{ \prod_{k=1}^{m} \frac{2k+1}{2k} } \ \ (-1)^m \ (1-x^2)^{m/2}  \f]
-	if ((norm == sht_fourpi)||(norm == sht_schmidt)) {
+	if (norm != sht_orthonormal) {
 		t1 = 1.0;
 		alm[0] = t1;		/// \f$ Y_0^0 = 1 \f$  for Schmidt or 4pi-normalized 
 	} else {
@@ -586,7 +586,7 @@ static void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_
 	for (im=0; im<=MMAX; ++im) {
 		m = im*MRES;
 		lm = im*(2*lmax - (im-1)*MRES);
-		if (norm == sht_schmidt) {		/// <b> For Schmidt semi-normalized </b>
+		if ((norm == sht_schmidt)||(norm == sht_for_rotations)) {		/// <b> For Schmidt semi-normalized </b>
 			t2 = SQRT(2*m+1);
 			alm[lm] /= t2;		/// starting value divided by \f$ \sqrt{2m+1} \f$ 
 			alm[lm+1] = t2;		// l=m+1
@@ -872,3 +872,7 @@ static void clenshaw_curtis_nodes_explicit(real *x, real *w, const int n)
 }
 
 */
+
+
+
+

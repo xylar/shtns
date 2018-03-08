@@ -365,7 +365,7 @@ void SH_Yrotate90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm)
 	if (lmax == 1) {
 		Rlm[0] = Qlm[0];	// l=0 is invariant.
 		int l=1;											// rotation matrix for rotY(90), l=1 : m=[0, 1r, 1i]
-			double q0 = creal(Qlm[LiM(shtns, l, 0)]);									//[m=0]       0       0    sqrt(2)
+			double q0 = creal(Qlm[LiM(shtns, l, 0)]);									//[m=0]       0     sqrt(2)  0
 			Rlm[LiM(shtns, l, 0)] = sqrt(2.0) * creal(Qlm[LiM(shtns, l, 1)]);			//[m=1r] -sqrt(2)/2   0      0
 			Rlm[LiM(shtns, l ,1)] = I*cimag(Qlm[LiM(shtns, l, 1)]) - sqrt(0.5) * q0;	//[m=1i]      0       0      1
 		return;
@@ -918,7 +918,7 @@ static void spat_xsint_2real_to_cplx(shtns_cfg shtns, double *zr, double *zi, cp
 // if (l<=MMAX) : l*(l+1) + m
 // if (l>=MMAX) : l*(2*mmax+1) - mmax*mmax + m  = mmax*(2*l-mmax) + l+m
 ///\internal
-static void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
+void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
 {
 	// combine into complex coefficients
 	unsigned ll = 0;
@@ -944,7 +944,7 @@ static void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm)
 }
 
 ///\internal
-static void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
+void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
 {
 	// extract complex coefficients corresponding to real and imag
 	unsigned ll = 0;
@@ -1392,5 +1392,171 @@ void spat_xsint_to_SHsphtor_l(shtns_cfg shtns, double *vt, double *vp, cplx *Slm
 {
 	spat_xsint_2real(shtns, shtns->st_1, vt, vp);
 	spat_to_SHsphtor_l(shtns, vt,vp, Slm, Tlm, ltr);
+}
+
+
+
+//* GUMEROV's algorithm to generate the Wigner-d matrices describing rotation of Spherical Harmonics
+//* see https://arxiv.org/abs/1403.7698  or  https://doi.org/10.1007/978-3-319-13230-3_5
+//* Thanks to Alex J. Yuffa, ayuffa@gmail.com  for his suggestions and help.
+
+struct shtns_rot_ {		// describe a rotation matrix
+	shtns_cfg sht;
+	int lmax;
+	double beta;		// rotation angle
+	double* plm_beta;
+};
+
+/// Allocate memory and precompute some recurrence coefficients for rotation (independent of angle).
+shtns_rot shtns_rotation_create(const int lmax)
+{
+	shtns_rot r = (shtns_rot) malloc(sizeof(struct shtns_rot_));
+	r->lmax = lmax;
+	r->plm_beta = (double*) malloc( sizeof(double) * nlm_calc(lmax+1, lmax+1, 1) );
+	r->sht = shtns_create(lmax+1, lmax+1, 1, sht_for_rotations | SHT_NO_CS_PHASE);		// need SH up to lmax+1, with Schmidt semi-normalization.
+	return r;
+}
+
+void shtns_rotation_destroy(shtns_rot r)
+{
+	if (r) {
+		shtns_destroy(r->sht);
+		if (r->plm_beta) free(r->plm_beta);
+		free(r);
+	}
+}
+
+/// Set the rotation angle, and compute associated Legendre functions.
+void shtns_rotation_set_angle(shtns_rot r, const double beta)
+{
+	if ((beta < 0) || (beta > M_PI)) {
+		printf("ERROR: angle must be between 0 and pi\n");
+		exit(1);
+	}
+
+	// step 0 : compute plm(beta)
+	const double cos_beta = cos(beta);
+	r->beta = beta;
+	const int lmax = r->lmax + 1;			// need SH up to lmax+1.
+	#pragma omp for schedule(dynamic)
+	for (int m=0; m<=lmax; m++) {
+		const long ofs = m*(lmax+2) - (m*(m+1))/2;
+		legendre_sphPlm_array(r->sht, lmax, m, cos_beta, r->plm_beta + ofs);
+	}
+}
+
+/// Generate spherical-harmonic rotation matrix for given degree l (Wigner-d matrix), using GUMEROV's algorithm
+/// see https://arxiv.org/abs/1403.7698  or  https://doi.org/10.1007/978-3-319-13230-3_5
+/// Thanks to Alex J. Yuffa, ayuffa@gmail.com  for his suggestions and help.
+/// \param[out] mx is an (2*l+1)*(2*l+1) array that will be filled with the Wigner-d matrix elements.
+void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
+{
+	double* mx0 = mx;
+	// step 1:
+	if (l==0) {
+		mx[0] = 1;
+		return;
+	}
+	if (l > r->lmax) {
+		printf("ERROR: l <= lmax not satified.\n");
+		exit(1);
+	}
+
+	const int lmax = r->lmax + 1;
+	const double cos_beta = cos(r->beta);
+	const double sin_beta = sin(r->beta);
+	const double* const plm_beta = r->plm_beta;
+
+	// shift mx to index by negative values:
+	mx += l*(2*l+1)  + l;
+
+	mx[0] = plm_beta[l];		// d(m'=0, m=0)
+	// step 2+3:  d(m'=0,m) and d(m'=1,m)
+	double cb_p1 = (1. + cos_beta)*0.5;
+	double cb_m1 = (1. - cos_beta)*0.5;
+	const double d_1 = 1.0/((l)*(l+1.));
+	for (int m=1; m<=l; m++) {
+		const long ofs_m = m*(lmax+2) - (m*(m+1))/2;
+		const long ofs_mm1 = (m-1)*(lmax+2) - ((m-1)*m)/2;
+		const long ofs_mp1 = (m+1)*(lmax+2) - ((m+1)*(m+2))/2;
+		mx[m] = plm_beta[ofs_m + (l-m)];			// m'=0 : copy plm values (eq 32)
+
+		double a  = sqrt( ((l+1+m)*(l+1-m)) * d_1 ) * sin_beta;
+		double b1 = sqrt( ((l-m+1)*(l-m+2)) * d_1 ) * cb_p1;
+		double b2 = sqrt( ((l+m+1)*(l+m+2)) * d_1 ) * cb_m1;
+		mx[(2*l+1) + m] = b2*plm_beta[ofs_mp1 + (l+1)-(m+1)]  +  b1*plm_beta[ofs_mm1 + (l+1)-(m-1)]   + a*plm_beta[ofs_m + (l+1)-m];		// m'=1 (eq 105)
+	}
+
+	double clm[2*l+1];		// temporary array holding clm
+	for (int m=-l; m<=l; m++)  clm[l+m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
+
+	// step 4:	recursively compute d(m',m),  m'=2..l; m=m'..l
+	for (int mp=2; mp<=l; mp++) {
+		const double c_1 = 1.0/clm[l+mp-1];
+		const double cmp2 = clm[l+mp-2];
+		for (int m=mp; m<l; m++) {			
+			double H = cmp2 * mx[(2*l+1)*(mp-2) + m] + clm[l+m-1] * mx[(2*l+1)*(mp-1) + (m-1)] - clm[l+m] * mx[(2*l+1)*(mp-1) + (m+1)];	// eq 106
+			mx[(2*l+1)*mp + m] = H * c_1;		// d(m',m)
+		}
+		const int m=l;
+			double H = cmp2 * mx[(2*l+1)*(mp-2) + m] + clm[l+m-1] * mx[(2*l+1)*(mp-1) + (m-1)];	// eq 106
+			mx[(2*l+1)*mp + m] = H * c_1;		// d(m',m)
+	}
+
+	// step 5:	recursively compute d(m',m),  m'=-1..-l; m=-m'..l-1
+	for (int mp=-1; mp>=-l; mp--) {
+		const double c_1 = 1.0/clm[l+mp];
+		const double cmp1 = clm[l+mp+1];
+		for (int m=-mp; m<l; m++) {
+			double H = cmp1 * mx[(2*l+1)*(mp+2) + m] - clm[l+m-1] * mx[(2*l+1)*(mp+1) + (m-1)] + clm[l+m] * mx[(2*l+1)*(mp+1) + (m+1)];	// eq 108
+			mx[(2*l+1)*mp + m] = H * c_1;		// d(m',m)
+		}
+		const int m=l;
+			double H = cmp1 * mx[(2*l+1)*(mp+2) + m] - clm[l+m-1] * mx[(2*l+1)*(mp+1) + (m-1)];	// eq 108
+			mx[(2*l+1)*mp + m] = H * c_1;		// d(m',m)
+	}
+
+	// step 6: fill matrix using symmetries
+	for (int m=1; m<=l; m++) {
+		for (int mp=-m; mp<m; mp++) {
+			int parity = (1-2*((m-mp)&1));
+			mx[(2*l+1)*m + mp] = mx[(2*l+1)*mp + m] * parity;
+		}
+	}
+	for (int m=1; m<=l; m++) {
+		for (int mp=-m+1; mp<=m; mp++) {
+			int parity = (1-2*((m-mp)&1));
+			mx[(2*l+1)*(-mp) - m] = mx[(2*l+1)*mp + m] * parity;
+			if (mp != m) {
+				mx[(2*l+1)*(-m) - mp] = mx[(2*l+1)*mp + m];
+			}
+		}
+	}
+}
+
+/// rotate Zlm, store the result in Rlm
+void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
+{
+	const int lmax = r->lmax;
+
+	#pragma omp for schedule(dynamic)
+	for (int l=1; l<=lmax; l++) {
+		double* mx0 = (double*) malloc( sizeof(double) * (2*l+1)*(2*l+1) );
+		memset(mx0, 0, sizeof(double)*(2*l+1)*(2*l+1));
+		shtns_rotation_wigner_d_matrix(r, l, mx0);
+
+		const cplx* zl = Zlm + l*(l+1);
+		cplx* rl = Rlm + l*(l+1);
+		// apply the matrix
+		for (int m=-l; m<=l; m++) {
+			const double* mxm = mx0 + (l+m)*(2*l+1) + l;		// shift to index by mp (allowing negative values)
+			cplx rm = 0.0;
+			for (int mp=-l; mp<=l; mp++)	rm += zl[mp] * mxm[mp];
+			//for (int mp=-l; mp<=l; mp++)	rm += zl[mp] * mx0[(2*l+1)*(l+mp) + l+m];	/// => transpose, means rotation of angle -beta
+			rl[m] = rm;
+		}
+
+		free(mx0);
+	}
 }
 

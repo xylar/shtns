@@ -1469,6 +1469,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	}
 
 	switch(SHT_NORM) {
+		case sht_for_rotations:
 		case sht_schmidt:
 			shtns->Y00_1 = 1.0;		shtns->Y10_ct = 1.0;
 			break;
