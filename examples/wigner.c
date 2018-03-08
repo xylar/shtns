@@ -62,7 +62,6 @@ int main()
 	struct timeval t1, t2, t3;
 	const int lmax = 1000;
 	const double beta = M_PI/3;
-	double* mx;
 	shtns_rot rot;
 	shtns_cfg sht;
 
@@ -74,22 +73,35 @@ int main()
 	gettimeofday(&t3, NULL);
 	printf("rotation: creation time=%.3g ms   set_angle time=%.3g ms\n", tdiff(&t1,&t2), tdiff(&t2,&t3));
 
-	const int l = 2;
-	mx = (double*) malloc( sizeof(double) * (2*l+1)*(2*l+1) );
-	memset(mx, 0, sizeof(double)*(2*l+1)*(2*l+1));
-	shtns_rotation_wigner_d_matrix(rot, l, mx);			
-	write_mx("Wigner-d_l2", mx, 2*l+1, 2*l+1);
+	{
+		const int l = 2;
+		double* mx = (double*) malloc( sizeof(double) * (2*l+1)*(2*l+1) );
+		memset(mx, 0, sizeof(double)*(2*l+1)*(2*l+1));
+		shtns_rotation_wigner_d_matrix(rot, l, mx);			
+		write_mx("Wigner-d_l2", mx, 2*l+1, 2*l+1);
 
-	printf("# rotation matrix for l=%d:\n#  ", l);
-	for (int j=0; j<2*l+1; j++) printf("%10d ", j-l);
-	for (int i=0; i<2*l+1; i++) {
-		printf("\n%3d ", i-l);
-		for (int j=0; j<2*l+1; j++) {
-			double x = mx[i*(2*l+1) + j];
-			printf("%10.5g ", (fabs(x) < 1e-14) ? 0.0 : x);
+		printf("# rotation matrix for l=%d:\n#  ", l);
+		for (int j=0; j<2*l+1; j++) printf("%10d ", j-l);
+		for (int i=0; i<2*l+1; i++) {
+			printf("\n%3d ", i-l);
+			for (int j=0; j<2*l+1; j++) {
+				double x = mx[i*(2*l+1) + j];
+				printf("%10.5g ", (fabs(x) < 1e-14) ? 0.0 : x);
+			}
 		}
+		printf("\n");
+		free(mx);
 	}
-	printf("\n");
+
+	{
+		const int l = 9;
+		double* mx = (double*) malloc( sizeof(double) * (2*l+1)*(2*l+1) );
+		memset(mx, 0, sizeof(double)*(2*l+1)*(2*l+1));
+		shtns_rotation_wigner_d_matrix(rot, l, mx);			
+		write_mx("Wigner-d_l9", mx, 2*l+1, 2*l+1);
+		free(mx);
+	}
+
 	
 	//// TEST ////
 	
@@ -105,6 +117,7 @@ int main()
 	cplx* Rlm = malloc(sizeof(cplx) * (lmax+1)*(lmax+1));
 	memset(Rlm, 0, sizeof(cplx)*(lmax+1)*(lmax+1));
 
+	Qlm[0] = 1;
 	Qlm[LiM(sht,5,2)] = 1;
 	Qlm[LiM(sht,7,3)] = I;
 	write_vect("qlm",(double *)Qlm,nlm*2);

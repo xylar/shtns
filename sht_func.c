@@ -1445,18 +1445,10 @@ void shtns_rotation_set_angle(shtns_rot r, const double beta)
 	}
 }
 
-/// Generate spherical-harmonic rotation matrix for given degree l (Wigner-d matrix), using GUMEROV's algorithm
-/// see https://arxiv.org/abs/1403.7698  or  https://doi.org/10.1007/978-3-319-13230-3_5
-/// Thanks to Alex J. Yuffa, ayuffa@gmail.com  for his suggestions and help.
-/// \param[out] mx is an (2*l+1)*(2*l+1) array that will be filled with the Wigner-d matrix elements.
-void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
+/// lw is the line-width. Use lw=2*l+1 for the full matrix, or l+1 for a compressed matrix.
+/// It always has 2*l+1 lines.
+void quarter_wigner_d_matrix(shtns_rot r, const int l, double* mx, const int compressed)
 {
-	double* mx0 = mx;
-	// step 1:
-	if (l==0) {
-		mx[0] = 1;
-		return;
-	}
 	if (l > r->lmax) {
 		printf("ERROR: l <= lmax not satified.\n");
 		exit(1);
@@ -1467,8 +1459,9 @@ void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
 	const double sin_beta = sin(r->beta);
 	const double* const plm_beta = r->plm_beta;
 
+	const int lw = (compressed) ? l+1 : 2*l+1;
 	// shift mx to index by negative values:
-	mx += l*(2*l+1)  + l;
+	mx += l*lw + l*(compressed==0);
 
 	mx[0] = plm_beta[l];		// d(m'=0, m=0)
 	// step 2+3:  d(m'=0,m) and d(m'=1,m)
@@ -1484,7 +1477,7 @@ void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
 		double a  = sqrt( ((l+1+m)*(l+1-m)) * d_1 ) * sin_beta;
 		double b1 = sqrt( ((l-m+1)*(l-m+2)) * d_1 ) * cb_p1;
 		double b2 = sqrt( ((l+m+1)*(l+m+2)) * d_1 ) * cb_m1;
-		mx[(2*l+1) + m] = b2*plm_beta[ofs_mp1 + (l+1)-(m+1)]  +  b1*plm_beta[ofs_mm1 + (l+1)-(m-1)]   + a*plm_beta[ofs_m + (l+1)-m];		// m'=1 (eq 105)
+		mx[lw + m] = b2*plm_beta[ofs_mp1 + (l+1)-(m+1)]  +  b1*plm_beta[ofs_mm1 + (l+1)-(m-1)]   + a*plm_beta[ofs_m + (l+1)-m];		// m'=1 (eq 105)
 	}
 
 	double clm[2*l+1];		// temporary array holding clm
@@ -1495,12 +1488,12 @@ void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
 		const double c_1 = 1.0/clm[l+mp-1];
 		const double cmp2 = clm[l+mp-2];
 		for (int m=mp; m<l; m++) {			
-			double H = cmp2 * mx[(2*l+1)*(mp-2) + m] + clm[l+m-1] * mx[(2*l+1)*(mp-1) + (m-1)] - clm[l+m] * mx[(2*l+1)*(mp-1) + (m+1)];	// eq 106
-			mx[(2*l+1)*mp + m] = H * c_1;		// d(m',m)
+			double H = cmp2 * mx[lw*(mp-2) + m] + clm[l+m-1] * mx[lw*(mp-1) + (m-1)] - clm[l+m] * mx[lw*(mp-1) + (m+1)];	// eq 106
+			mx[lw*mp + m] = H * c_1;		// d(m',m)
 		}
 		const int m=l;
-			double H = cmp2 * mx[(2*l+1)*(mp-2) + m] + clm[l+m-1] * mx[(2*l+1)*(mp-1) + (m-1)];	// eq 106
-			mx[(2*l+1)*mp + m] = H * c_1;		// d(m',m)
+			double H = cmp2 * mx[lw*(mp-2) + m] + clm[l+m-1] * mx[lw*(mp-1) + (m-1)];	// eq 106
+			mx[lw*mp + m] = H * c_1;		// d(m',m)
 	}
 
 	// step 5:	recursively compute d(m',m),  m'=-1..-l; m=-m'..l-1
@@ -1508,28 +1501,49 @@ void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
 		const double c_1 = 1.0/clm[l+mp];
 		const double cmp1 = clm[l+mp+1];
 		for (int m=-mp; m<l; m++) {
-			double H = cmp1 * mx[(2*l+1)*(mp+2) + m] - clm[l+m-1] * mx[(2*l+1)*(mp+1) + (m-1)] + clm[l+m] * mx[(2*l+1)*(mp+1) + (m+1)];	// eq 108
-			mx[(2*l+1)*mp + m] = H * c_1;		// d(m',m)
+			double H = cmp1 * mx[lw*(mp+2) + m] - clm[l+m-1] * mx[lw*(mp+1) + (m-1)] + clm[l+m] * mx[lw*(mp+1) + (m+1)];	// eq 108
+			mx[lw*mp + m] = H * c_1;		// d(m',m)
 		}
 		const int m=l;
-			double H = cmp1 * mx[(2*l+1)*(mp+2) + m] - clm[l+m-1] * mx[(2*l+1)*(mp+1) + (m-1)];	// eq 108
-			mx[(2*l+1)*mp + m] = H * c_1;		// d(m',m)
+			double H = cmp1 * mx[lw*(mp+2) + m] - clm[l+m-1] * mx[lw*(mp+1) + (m-1)];	// eq 108
+			mx[lw*mp + m] = H * c_1;		// d(m',m)
+	}	
+}
+
+
+/// Generate spherical-harmonic rotation matrix for given degree l (Wigner-d matrix), using GUMEROV's algorithm
+/// see https://arxiv.org/abs/1403.7698  or  https://doi.org/10.1007/978-3-319-13230-3_5
+/// Thanks to Alex J. Yuffa, ayuffa@gmail.com  for his suggestions and help.
+/// \param[out] mx is an (2*l+1)*(2*l+1) array that will be filled with the Wigner-d matrix elements.
+void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
+{
+	// step 1:
+	if (l==0) {
+		mx[0] = 1;
+		return;
+	}
+	if (l > r->lmax) {
+		printf("ERROR: l <= lmax not satified.\n");
+		exit(1);
 	}
 
+	quarter_wigner_d_matrix(r, l, mx, 0);		// generate quarter of wigner-d matrix (but full storage)
+
+	// shift mx to index by negative values:
+	mx += l*(2*l+1) + l;
+
 	// step 6: fill matrix using symmetries
-	for (int m=1; m<=l; m++) {
-		for (int mp=-m; mp<m; mp++) {
-			int parity = (1-2*((m-mp)&1));
-			mx[(2*l+1)*m + mp] = mx[(2*l+1)*mp + m] * parity;
-		}
+	for (int m=1; m<=l; m++) {		// diagonals
+		mx[(2*l+1)*m + -m]   = mx[(2*l+1)*(-m) + m];
+		mx[(2*l+1)*(-m) - m] = mx[(2*l+1)*m + m];
 	}
-	for (int m=1; m<=l; m++) {
-		for (int mp=-m+1; mp<=m; mp++) {
-			int parity = (1-2*((m-mp)&1));
-			mx[(2*l+1)*(-mp) - m] = mx[(2*l+1)*mp + m] * parity;
-			if (mp != m) {
-				mx[(2*l+1)*(-m) - mp] = mx[(2*l+1)*mp + m];
-			}
+	for (int mp=-l+1; mp<l; mp++) {		// off-diagonals
+		for (int m=abs(mp)+1; m<=l; m++) {
+			double x = mx[(2*l+1)*mp + m];
+			double parity = (1-2*((m-mp)&1));
+			mx[(2*l+1)*(-m) - mp] = x;
+			mx[(2*l+1)*m + mp]    = x * parity;
+			mx[(2*l+1)*(-mp) - m] = x * parity;
 		}
 	}
 }
@@ -1539,20 +1553,43 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 {
 	const int lmax = r->lmax;
 
+	Rlm[0] = Zlm[0];		// copy l=0
+
 	#pragma omp for schedule(dynamic)
 	for (int l=1; l<=lmax; l++) {
-		double* mx0 = (double*) malloc( sizeof(double) * (2*l+1)*(2*l+1) );
-		memset(mx0, 0, sizeof(double)*(2*l+1)*(2*l+1));
-		shtns_rotation_wigner_d_matrix(r, l, mx0);
+		const int lw = l+1;		// line width of compressed matrix.
+		double* mx0 = (double*) malloc( sizeof(double) * (2*l+1)*lw );
+		memset(mx0, 0, sizeof(double)*(2*l+1)*lw);
+
+		quarter_wigner_d_matrix(r, l, mx0, 1);		// 1 : compressed matrix (saves memory and time)
+		const double* mx = mx0 + l*lw;		// allow indexing by negative m and m'
 
 		const cplx* zl = Zlm + l*(l+1);
 		cplx* rl = Rlm + l*(l+1);
 		// apply the matrix
 		for (int m=-l; m<=l; m++) {
-			const double* mxm = mx0 + (l+m)*(2*l+1) + l;		// shift to index by mp (allowing negative values)
 			cplx rm = 0.0;
-			for (int mp=-l; mp<=l; mp++)	rm += zl[mp] * mxm[mp];
-			//for (int mp=-l; mp<=l; mp++)	rm += zl[mp] * mx0[(2*l+1)*(l+mp) + l+m];	/// => transpose, means rotation of angle -beta
+			// only 1/4 of the matrix is read (4 times).
+			for (int mp=l; mp>=abs(m); mp--) {			// third domain (right) : populated.
+				rm += zl[mp] * mx[m*lw + mp];
+			}
+			if (m<0) {
+				for (int mp=-m-1; mp>=m; mp--) {		// second domain (top)
+					rm += zl[mp] * mx[-mp*lw - m];		// exchange m and m' and change signs  => no parity factor
+				}
+			} else {
+				for (int mp=m-1; mp>=-m; mp-=2) {		// second domain (bottom) => always even number of elements
+					rm -= zl[mp] * mx[mp*lw + m];		// exchange m and m' (negative parity)
+					rm += zl[mp-1] * mx[(mp-1)*lw + m];	// exchange m and m' (positive parity)
+				}
+			}
+			for (int mp=-abs(m)-1; mp >-l; mp-=2) {		// first domain (left)
+				rm -= zl[mp] * mx[-m*lw - mp];			// change sign of m and m'
+				rm += zl[mp-1] * mx[-m*lw - (mp-1)];	// change sign of m and m'
+			}
+			if ((l+m)&1) {	int mp = -l;	// boundary condition.
+				rm -= zl[mp] * mx[-m*lw - mp];			// change sign of m and m'				
+			}
 			rl[m] = rm;
 		}
 
