@@ -1548,7 +1548,9 @@ void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
 	}
 }
 
-/// rotate Zlm, store the result in Rlm
+/*
+/// rotate Zlm, store the result in Rlm. Generates quarter of Wigner-d matrices internally.
+/// Reference implementation.
 void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 {
 	const int lmax = r->lmax;
@@ -1594,6 +1596,129 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 		}
 
 		free(mx0);
+	}
+}
+*/
+
+/// rotate Zlm, store the result in Rlm, without ever storing the wigner-d matrices (on-the-fly operation)
+void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
+{
+	const int lmax = r->lmax+1;
+	const double cos_beta = cos(r->beta);
+	const double sin_beta = sin(r->beta);
+	const double* const plm_beta = r->plm_beta;
+
+	Rlm[0] = Zlm[0];		// copy l=0 (invariant by rotation)
+
+	#pragma omp parallel for schedule(dynamic,1)
+	for (int l=lmax-1; l>0; l--) {
+		const int lw = l+1;		// line width of matrix.
+		v2d* rl = (v2d*) malloc(sizeof(double) * (2*(2*l+1) + 5*lw +2));	// 1 cplx temp array (2l+1), + 5 lines of storage (lw) + a bit
+		double* const m0 = (double*) (rl + 2*l+1);
+		memset(rl, 0, sizeof(cplx)*(2*l+1));		// zero the temp dest array.
+		rl += l;	// shift pointer to allow indexing by m = -l to l
+		const v2d* zl = (v2d*)Zlm + l*(l+1);		// source array, index by mp = -l to l, assumed aligned for sse2
+
+		m0[0] = plm_beta[l];		// d(m'=0, m=0)
+		m0[lw] = 0.0;				// required, but for what ??
+		v2d r0 = zl[0]*vdup(m0[0]);		// accumulator for rl[0]
+
+		// step 2+3:  d(m'=0,m) and d(m'=1,m)
+		const double cb_p1 = (1. + cos_beta)*0.5;
+		const double cb_m1 = (1. - cos_beta)*0.5;
+		const double d_1 = 1.0/((l)*(l+1.));
+		v2d r1 = vdup(0.0);		// accumulator for rl[1]
+		v2d rm1 = vdup(0.0);		// accumulator for rl[-1]
+		double parity = -1;
+		long ofs_m = (lmax+2) - 1;	// m*(lmax+2) - (m*(m+1))/2  for m=1
+		long ofs_mm1 = 0;			// m*(lmax+2) - (m*(m+1))/2  for m=0
+		for (int m=1; m<=l; m++) {
+			double H = plm_beta[ofs_m + (l-m)];			// m'=0 : copy plm values (eq 32)
+			m0[m] = H;
+			r0 += zl[m] * vdup(H);		// right quadrant (m>0)
+			r0 += zl[-m] * vdup(H*parity);		// left quadrant (m<0) : change signs => parity factor
+			const double a  = sqrt( ((l+1+m)*(l+1-m)) * d_1 ) * sin_beta;
+			rl[-m] += zl[0] * vdup(H);		// top quadrant (m<0) : exchange m and m' and change signs  => no parity factor
+			rl[m] += zl[0] * vdup(H*parity);			// bottom quadrant (m>0) : exchange m and m' => parity factor
+			const double b1 = sqrt( ((l-m+1)*(l-m+2)) * d_1 ) * cb_p1;
+			long ofs_mp1 = (m+1)*(lmax+2) - ((m+1)*(m+2))/2;
+			const double b2 = sqrt( ((l+m+1)*(l+m+2)) * d_1 ) * cb_m1;
+			parity = -parity;
+			H = b2*plm_beta[ofs_mp1 + (l+1)-(m+1)]  +  b1*plm_beta[ofs_mm1 + (l+1)-(m-1)]   + a*plm_beta[ofs_m + (l+1)-m];		// m'=1 (eq 105)
+			m0[lw+m] = H;
+			r1 += zl[m] * vdup(H);		// right quadrant (m>0)
+			ofs_mm1 = ofs_m;
+			rm1 += zl[-m] * vdup(H*parity);		// left quadrant: change signs => parity factor
+			ofs_m = ofs_mp1;
+			if (m>1) {	// avoid duplicates
+				rl[-m] += zl[-1] * vdup(H);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
+				rl[m]  += zl[1] * vdup(H*parity);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+			}
+		}
+		rl[-1] += rm1;
+		rl[0] = r0;
+		rl[1] += r1;
+
+		double* clm = m0 + 4*lw +1;		// array holding clm (size l+2, adressing by m=-1 to l)
+		for (int m=-1; m<l; m++)  clm[m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
+		clm[l] = 0.0;		// boundary condition handled with this
+
+		// step 4:	recursively compute and apply d(m',m),  m'=2..l; m=m'..l
+		double* mx0 = m0 + 2*lw;
+		double* mx1 = m0 + 3*lw;
+		memcpy(mx0, m0, sizeof(double)*2*lw);		// first copy the previous lines, as we will need them again (m'=0 and m'=1).
+		for (int mp=2; mp<=l; mp++) {
+			const double c_1 = 1.0/clm[mp-1];
+			const double cmp2 = clm[mp-2];
+			v2d rmp = vdup(0.0);
+			v2d rmmp = vdup(0.0);
+			double parity = 1;
+			for (int m=mp; m<=l; m++) {
+				double H = cmp2 * mx0[m] + clm[m-1] * mx1[m-1] - clm[m] * mx1[m+1];	// eq 106
+				H *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				mx0[m] = H;			// d(m',m) -> overwrite d(m'-2,m)
+				rmp += zl[m] * vdup(H);	//mx[mp*lw + m];		// right quadrant (m>0, mp>0)
+				rmmp += zl[-m] * vdup(H*parity);	// left quadrant, change signs => parity factor
+				if (m>mp) {	// avoid duplicates
+					rl[-m] += zl[-mp] * vdup(H);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
+					rl[m]  += zl[mp] * vdup(H*parity);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+				}
+				parity = -parity;
+			}
+			rl[-mp] += rmmp;
+			rl[mp] += rmp;
+			double* t = mx0;		mx0 = mx1;	mx1 = t;	// cycle the buffers for lines.
+		}
+
+		// step 5:	recursively compute d(m',m),  m'=-1..-l; m=-m'..l-1
+		mx1 = m0 + 2*lw;
+		mx0 = m0 + 3*lw;
+		memcpy(mx1, m0, sizeof(double)*2*lw);		// first copy the initial lines (m'=0 and m'=1).
+		for (int mp=-1; mp>=-l; mp--) {
+			const double c_1 = 1.0/clm[-mp-1];  // 1.0/clm[l+mp];
+			const double cmp1 = clm[-mp-2];	// clm[l+mp+1];
+			v2d rmp = vdup(0.0);
+			v2d rmmp = vdup(0.0);
+			double parity = 1;
+			for (int m=-mp; m<=l; m++) {
+				double H = cmp1 * mx0[m] - clm[m-1] * mx1[m-1] + clm[m] * mx1[m+1];	// eq 108
+				H *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				mx0[m] = H;			// d(m',m) -> overwrite d(m'+2,m)
+				rmp += zl[m] * vdup(H);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
+				rmmp += zl[-m] * vdup(H*parity);	// left quadrant, change signs => parity factor
+				if (m>-mp) {	// avoid duplicates
+					rl[-m] += zl[-mp] * vdup(H);	// top quadrant (-m<0) : exchange m and m' and change signs => no parity factor
+					rl[m]  += zl[mp] * vdup(H*parity);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+				}
+				parity = -parity;
+			}
+			rl[-mp] += rmmp;
+			rl[mp] += rmp;
+			double* t = mx0;		mx0 = mx1;	mx1 = t;	// cycle the buffers for lines.
+		}
+
+		memcpy(Rlm + l*l, rl-l, sizeof(cplx)*(2*l+1));		// copy to destination (avoid false sharing when doing openmp).
+		free(rl - l);
 	}
 }
 

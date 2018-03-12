@@ -61,10 +61,12 @@ int main()
 {
 	struct timeval t1, t2, t3;
 	const int lmax = 1000;
-	const double beta = M_PI/3;
+	const double beta = M_PI/2;
 	shtns_rot rot;
 	shtns_cfg sht;
 
+	printf("Rotation using Wigner-d matrices, at lmax=%d\n",lmax);
+	srand( time(NULL) );	// initialize random numbers.
 
 	gettimeofday(&t1, NULL);
 	rot = shtns_rotation_create(lmax);
@@ -73,7 +75,7 @@ int main()
 	gettimeofday(&t3, NULL);
 	printf("rotation: creation time=%.3g ms   set_angle time=%.3g ms\n", tdiff(&t1,&t2), tdiff(&t2,&t3));
 
-	{
+	if (lmax>=2) {
 		const int l = 2;
 		double* mx = (double*) malloc( sizeof(double) * (2*l+1)*(2*l+1) );
 		memset(mx, 0, sizeof(double)*(2*l+1)*(2*l+1));
@@ -93,7 +95,7 @@ int main()
 		free(mx);
 	}
 
-	{
+	if (lmax >=9) {
 		const int l = 9;
 		double* mx = (double*) malloc( sizeof(double) * (2*l+1)*(2*l+1) );
 		memset(mx, 0, sizeof(double)*(2*l+1)*(2*l+1));
@@ -112,16 +114,26 @@ int main()
 	memset(Qlm, 0, sizeof(cplx)*nlm);
 	cplx* Slm = malloc(sizeof(cplx) * nlm);
 	memset(Slm, 0, sizeof(cplx)*nlm);
+	cplx* Tlm = malloc(sizeof(cplx) * nlm);
+	memset(Tlm, 0, sizeof(cplx)*nlm);
 	cplx* Zlm = malloc(sizeof(cplx) * (lmax+1)*(lmax+1));
 	memset(Zlm, 0, sizeof(cplx)*(lmax+1)*(lmax+1));
 	cplx* Rlm = malloc(sizeof(cplx) * (lmax+1)*(lmax+1));
 	memset(Rlm, 0, sizeof(cplx)*(lmax+1)*(lmax+1));
 
 	Qlm[0] = 1;
-	Qlm[LiM(sht,5,2)] = 1;
-	Qlm[LiM(sht,7,3)] = I;
-	write_vect("qlm",(double *)Qlm,nlm*2);
-	
+//	Qlm[LiM(sht,5,2)] = 1;
+//	Qlm[LiM(sht,7,3)] = I;
+//	write_vect("qlm",(double *)Qlm,nlm*2);
+
+// test case...
+	printf("generating random test case...\n");
+	double t = 1.0 / (RAND_MAX/2);
+	for (int i=0;i<nlm;i++) {
+		Qlm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+	}
+	for (int i=0;i<=lmax;i++)	Qlm[i] = creal(Qlm[i]);		// m=0 is REAL
+
 	SH_2real_to_cplx(sht,Qlm,Slm,Zlm);
 	printf("norm=%g\n", SHnorm(sht,Zlm));
 
@@ -130,9 +142,26 @@ int main()
 	gettimeofday(&t2, NULL);
 	printf("norm=%g    time=%.3g ms\n", SHnorm(sht,Rlm), tdiff(&t1,&t2));
 
-//	shtns_rotation_apply_cplx(rot,Rlm,Zlm);		printf("norm=%g\n", SHnorm(sht,Zlm));
-//	shtns_rotation_apply_cplx(rot,Zlm,Rlm);		printf("norm=%g\n", SHnorm(sht,Rlm));
-	SH_cplx_to_2real(sht,Rlm, Qlm,Slm);
+	shtns_rotation_apply_cplx(rot,Rlm,Zlm);		printf("norm=%g\n", SHnorm(sht,Zlm));
+	shtns_rotation_apply_cplx(rot,Zlm,Rlm);		printf("norm=%g\n", SHnorm(sht,Rlm));
+	gettimeofday(&t1, NULL);
+	shtns_rotation_apply_cplx(rot,Rlm,Zlm);
+	gettimeofday(&t2, NULL);
+	printf("norm=%g    time=%.3g ms\n", SHnorm(sht,Zlm), tdiff(&t1,&t2));
+	SH_cplx_to_2real(sht,Zlm, Tlm,Slm);
 
-	write_vect("rlm",(double *)Qlm,nlm*2);
+	// evaluate error:
+	double emax = 0.0;		int imax = 0;
+	double esum = 0.0;
+	for (int i=0;i<nlm;i++) {
+		double qr = creal(Qlm[i]);		double qi = cimag(Qlm[i]);
+		double sr = creal(Tlm[i]);		double si = cimag(Tlm[i]);
+		double e = (sr-qr)*(sr-qr) + (si-qi)*(si-qi);
+		if (e > emax) { emax = e;  imax=i; }
+		esum += e;
+	}
+	printf("after 4 90° rotations along Y:    rms error = %.3g,   max error = %.3g (lm=%d)\n", sqrt(esum/nlm), sqrt(emax), imax);
+
+
+//	write_vect("rlm",(double *)Tlm,nlm*2);
 }
