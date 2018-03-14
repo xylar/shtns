@@ -1610,6 +1610,9 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 
 	Rlm[0] = Zlm[0];		// copy l=0 (invariant by rotation)
 
+	const double cb_p1 = (1. + cos_beta)*0.5;
+	const double cb_m1 = (1. - cos_beta)*0.5;
+
 	#pragma omp parallel for schedule(dynamic,1)
 	for (int l=lmax-1; l>0; l--) {
 		const int lw = l+1;		// line width of matrix.
@@ -1624,8 +1627,6 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 		v2d r0 = zl[0]*vdup(m0[0]);		// accumulator for rl[0]
 
 		// step 2+3:  d(m'=0,m) and d(m'=1,m)
-		const double cb_p1 = (1. + cos_beta)*0.5;
-		const double cb_m1 = (1. - cos_beta)*0.5;
 		const double d_1 = 1.0/((l)*(l+1.));
 		v2d r1 = vdup(0.0);		// accumulator for rl[1]
 		v2d rm1 = vdup(0.0);		// accumulator for rl[-1]
@@ -1668,22 +1669,47 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 		double* mx1 = m0 + 3*lw;
 		memcpy(mx0, m0, sizeof(double)*2*lw);		// first copy the previous lines, as we will need them again (m'=0 and m'=1).
 		for (int mp=2; mp<=l; mp++) {
-			const double c_1 = 1.0/clm[mp-1];
 			const double cmp2 = clm[mp-2];
+			double clm_1 = clm[mp-1];
+			const double c_1 = 1.0/clm_1;
+			double mx1_1 = mx1[mp-1];
+			double mx1_0 = mx1[mp];
 			v2d rmp = vdup(0.0);
 			v2d rmmp = vdup(0.0);
-			double parity = 1;
-			for (int m=mp; m<=l; m++) {
-				double H = cmp2 * mx0[m] + clm[m-1] * mx1[m-1] - clm[m] * mx1[m+1];	// eq 106
-				H *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
-				mx0[m] = H;			// d(m',m) -> overwrite d(m'-2,m)
-				rmp += zl[m] * vdup(H);	//mx[mp*lw + m];		// right quadrant (m>0, mp>0)
-				rmmp += zl[-m] * vdup(H*parity);	// left quadrant, change signs => parity factor
+			v2d zlmmp = zl[-mp];
+			v2d zlmp = zl[mp];
+			int m = mp;
+			for (; m<l; m+=2) {
+				double clm0 = clm[m];
+				double clm1 = clm[m+1];
+				double mx11 = mx1[m+1];
+				double mx12 = mx1[m+2];
+				double H0 = cmp2 * mx0[m]   + clm_1 * mx1_1 - clm0 * mx11;	// eq 106
+				double H1 = cmp2 * mx0[m+1] +  clm0 * mx1_0 - clm1 * mx12;
+				clm_1 = clm1;		mx1_1 = mx11;	mx1_0 = mx12;		// cycle coefficients and matrix elements.
+				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				H1 *= c_1;
+				mx0[m] = H0;			// d(m',m) -> overwrite d(m'-2,m)
+				mx0[m+1] = H1;			// d(m',m) -> overwrite d(m'-2,m)
+				rmp  += zl[m]  * vdup(H0) + zl[m+1]  * vdup(H1);	//mx[mp*lw + m];		// right quadrant (m>0, mp>0)
+				rmmp += zl[-m] * vdup(H0) - zl[-m-1] * vdup(H1);	// left quadrant, change signs => parity factor
+				rl[-m-1] += zlmmp * vdup(H1);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
 				if (m>mp) {	// avoid duplicates
-					rl[-m] += zl[-mp] * vdup(H);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
-					rl[m]  += zl[mp] * vdup(H*parity);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+					rl[-m] += zlmmp * vdup(H0);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
+					rl[m]  += zlmp * vdup(H0);	// bottom quadrant (m>0) : exchange m and m' => parity factor
 				}
-				parity = -parity;
+				rl[m+1] -= zlmp * vdup(H1);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+			}
+			if (m==l) {
+				double H0 = cmp2 * mx0[m]   + clm_1 * mx1_1;	// eq 106
+				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				mx0[m] = H0;			// d(m',m) -> overwrite d(m'-2,m)
+				rmp  += zl[m]  * vdup(H0);	//mx[mp*lw + m];		// right quadrant (m>0, mp>0)
+				rmmp += zl[-m] * vdup(H0);	// left quadrant, change signs => parity factor
+				if (m>mp) {	// avoid duplicates
+					rl[-m] += zlmmp * vdup(H0);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
+					rl[m]  += zlmp * vdup(H0);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+				}
 			}
 			rl[-mp] += rmmp;
 			rl[mp] += rmp;
@@ -1695,22 +1721,47 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 		mx0 = m0 + 3*lw;
 		memcpy(mx1, m0, sizeof(double)*2*lw);		// first copy the initial lines (m'=0 and m'=1).
 		for (int mp=-1; mp>=-l; mp--) {
-			const double c_1 = 1.0/clm[-mp-1];  // 1.0/clm[l+mp];
 			const double cmp1 = clm[-mp-2];	// clm[l+mp+1];
+			double clm_1 = clm[-mp-1];
+			const double c_1 = 1.0/clm_1;  // 1.0/clm[l+mp];
+			double mx1_1 = mx1[-mp-1];
+			double mx1_0 = mx1[-mp];
 			v2d rmp = vdup(0.0);
 			v2d rmmp = vdup(0.0);
-			double parity = 1;
-			for (int m=-mp; m<=l; m++) {
-				double H = cmp1 * mx0[m] - clm[m-1] * mx1[m-1] + clm[m] * mx1[m+1];	// eq 108
-				H *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
-				mx0[m] = H;			// d(m',m) -> overwrite d(m'+2,m)
-				rmp += zl[m] * vdup(H);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
-				rmmp += zl[-m] * vdup(H*parity);	// left quadrant, change signs => parity factor
+			v2d zlmmp = zl[-mp];
+			v2d zlmp = zl[mp];
+			int m = -mp;
+			for (; m<l; m+=2) {
+				double clm0 = clm[m];
+				double clm1 = clm[m+1];
+				double mx11 = mx1[m+1];
+				double mx12 = mx1[m+2];
+				double H0 = cmp1 * mx0[m]   - clm_1 * mx1_1 + clm0 * mx11;	// eq 108
+				double H1 = cmp1 * mx0[m+1] -  clm0 * mx1_0 + clm1 * mx12;
+				clm_1 = clm1;		mx1_1 = mx11;	mx1_0 = mx12;		// cycle coefficients and matrix elements.
+				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				H1 *= c_1;
+				mx0[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
+				mx0[m+1] = H1;			// d(m',m) -> overwrite d(m'+2,m)
+				rmp += zl[m] * vdup(H0)  + zl[m+1] * vdup(H1);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
+				rmmp += zl[-m] * vdup(H0)  - zl[-m-1] * vdup(H1);	// left quadrant, change signs => parity factor
+				rl[-m-1] += zlmmp * vdup(H1);	// top quadrant (-m<0) : exchange m and m' and change signs => no parity factor
 				if (m>-mp) {	// avoid duplicates
-					rl[-m] += zl[-mp] * vdup(H);	// top quadrant (-m<0) : exchange m and m' and change signs => no parity factor
-					rl[m]  += zl[mp] * vdup(H*parity);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+					rl[-m] += zlmmp * vdup(H0);	// top quadrant (-m<0) : exchange m and m' and change signs => no parity factor
+					rl[m]  += zlmp * vdup(H0);	// bottom quadrant (m>0) : exchange m and m' => parity factor
 				}
-				parity = -parity;
+				rl[m+1]  -= zlmp * vdup(H1);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+			}
+			if(m==l) {
+				double H0 = cmp1 * mx0[m]   - clm_1 * mx1_1;	// eq 108
+				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				mx0[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
+				rmp += zl[m] * vdup(H0);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
+				rmmp += zl[-m] * vdup(H0);	// left quadrant, change signs => parity factor
+				if (m>-mp) {	// avoid duplicates
+					rl[-m] += zlmmp * vdup(H0);	// top quadrant (-m<0) : exchange m and m' and change signs => no parity factor
+					rl[m]  += zlmp * vdup(H0);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+				}
 			}
 			rl[-mp] += rmmp;
 			rl[mp] += rmp;
