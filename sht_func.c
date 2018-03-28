@@ -1507,7 +1507,7 @@ void quarter_wigner_d_matrix(shtns_rot r, const int l, double* mx, const int com
 			mx[-lw*mp + m] = H_ * c_1;		// d(-m',m)
 		}
 		const int m=l;
-			double H  = cmp2 * mx[lw*(mp-2) + m]  + clm[m-1] * mx[lw*(mp-1) + (m-1)];		// eq 106
+			double H  = cmp2 * mx[lw*(mp-2) + m]  + clm[m-1] * mx[lw*(mp-1) + (m-1)];	// eq 106
 			double H_ = cmp2 * mx[-lw*(mp-2) + m] - clm[m-1] * mx[-lw*(mp-1) + (m-1)];	// eq 108
 			mx[lw*mp + m]  = H  * c_1;		// d(m',m)
 			mx[-lw*mp + m] = H_ * c_1;		// d(-m',m)
@@ -1623,11 +1623,18 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 	#pragma omp parallel for schedule(dynamic,1)
 	for (int l=lmax-1; l>0; l--) {
 		const int lw = l+1;		// line width of matrix.
-		cplx* rl = (cplx*) malloc(sizeof(double) * (2*(2*l+1) + 5*lw +2));	// 1 cplx temp array (2l+1), + 5 lines of storage (lw) + a bit
-		double* const m0 = (double*) (rl + 2*l+1);
-		memset(rl, 0, sizeof(cplx)*(2*l+1));		// zero the temp dest array.
-		rl += l;	// shift pointer to allow indexing by m = -l to l
-		const cplx* ql = (cplx*)Qlm + l*(l+1);		// source array, index by mp = -l to l, assumed aligned for sse2
+		cplx* const rl = (cplx*) malloc(sizeof(double) * (4*(l+1) + 5*lw +2));	// 2 real temp array 2*(l+1), + 5 lines of storage (lw) + a bit
+		cplx* const ql = rl + (l+1);
+		double* const m0 = (double*) (rl + 2*(l+1));
+		memset(rl, 0, sizeof(cplx)*(2*l+1));		// zero the temp destination array.
+
+		// gather all m's for given l of source array:
+		long lm = l;
+		ql[0] = creal(Qlm[lm]);			// m=0
+		for (int m=1; m<=l; m++) {
+			lm += lmax-m;
+			((v2d*)ql)[m] = ((v2d*)Qlm)[lm];
+		}
 
 		m0[0] = plm_beta[l];		// d(m'=0, m=0)
 		m0[lw] = 0.0;				// required, as a boundary condition
@@ -1725,8 +1732,6 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 			const double cmp2 = clm[mp-2];
 			double clm_1 = clm[mp-1];
 			const double c_1 = 1.0/clm_1;
-			//v2d mx1_1 = *((v2d*)(mx1+mp-1));
-			//v2d mx1__1 = *((v2d*)(mx1_+mp-1));
 
 			v2d rmp = vdup(0.0);
 			v2d zlmp = ((v2d*)ql)[mp];
@@ -1752,13 +1757,12 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 				rnd mx00_ = *((rndu*)(mx0_+m));
 
 				rnd H  = (vall(cmp2) * mx00   + clm_1 * mx1_1  - clm0 * mx11)  * vall(c_1);		// eq 106
-				rnd H_ = (vall(cmp2) * mx00_  - clm_1 * mx1__1 + clm0 * mx11_) * vall(c_1);	// eq 108
-				//mx1__1 = mx11_;		mx1_1 = mx11;
+				rnd H_ = (vall(cmp2) * mx00_  - clm_1 * mx1__1 + clm0 * mx11_) * vall(c_1);		// eq 108
 				*((rndu*)(mx0+m)) = H;
 				*((rndu*)(mx0_+m)) = H_;
 			}
-	/*		v2d mx1_1 =  *((v2du*)(mx1+m-1));
-			v2d mx1__1 =  *((v2du*)(mx1_+m-1));
+	/*		v2d mx1_1 = *((v2d*)(mx1+mp-1));
+			v2d mx1__1 = *((v2d*)(mx1_+mp-1));
 			for (; m<l; m+=2) {
 				v2d clm_1 = *((v2du*)(clm+m-1));
 				v2d clm0 =  *((v2du*)(clm+m));
@@ -1823,12 +1827,14 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 			double* t_ = mx0_;		mx0_ = mx1_;	mx1_ = t_;	// cycle the buffers for lines.
 		}
 
-		// reconstruct m<0:
-		for (int mp=1; mp<=l; mp++) {
-			rl[-mp] = conj(rl[mp]) * (1-2*(mp&1));
+		// scatter all m's for current l into dest array:
+		lm = l;
+		Rlm[lm] = creal(rl[0]);			// m=0
+		for (int m=1; m<=l; m++) {
+			lm += lmax-m;
+			((v2d*)Rlm)[lm] = ((v2d*)rl)[m];
 		}
-		memcpy(Rlm + l*l, rl-l, sizeof(cplx)*(2*l+1));		// copy to destination (avoid false sharing when doing openmp).
-		free(rl-l);
+		free(rl);
 	}
 }
 

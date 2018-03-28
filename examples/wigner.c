@@ -57,6 +57,23 @@ double SHnorm(shtns_cfg shtns, cplx* zlm)
 	return sqrt(x);
 }
 
+double SHnorm_real(shtns_cfg shtns, cplx* zlm)
+{
+	double x=0;
+	int lmax = shtns->lmax;
+	for (int l=0; l<=lmax; l++) {
+		double r = creal(zlm[l]);
+		x += r*r;
+	}
+	x *= 0.5;
+	for (int lm=lmax+1; lm<shtns->nlm; lm++) {
+		double r = creal(zlm[lm]);
+		double i = cimag(zlm[lm]);
+		x += r*r + i*i;
+	}
+	return sqrt(x+x);
+}
+
 int main()
 {
 	struct timeval t1, t2, t3;
@@ -131,36 +148,69 @@ int main()
 	double t = 1.0 / (RAND_MAX/2);
 	for (int i=0;i<nlm;i++) {
 		Qlm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		//Slm[i] = t*((double) (rand() - RAND_MAX/2)) + I*t*((double) (rand() - RAND_MAX/2));
+		Slm[i] = 0.0;
 	}
 	for (int i=0;i<=lmax;i++)	Qlm[i] = creal(Qlm[i]);		// m=0 is REAL
+	for (int i=0;i<=lmax;i++)	Slm[i] = 0.0;	//creal(Slm[i]);		// m=0 is REAL
 
-	SH_2real_to_cplx(sht,Qlm,Slm,Zlm);
-	printf("norm=%g\n", SHnorm(sht,Zlm));
+	{
+		printf("*** real field ***\n");
+		printf("norm=%g\n", SHnorm_real(sht,Qlm));
+		gettimeofday(&t1, NULL);
+		shtns_rotation_apply_real(rot,Qlm,Zlm);
+		gettimeofday(&t2, NULL);
+		printf("norm=%g    time=%.3g ms\n", SHnorm_real(sht,Zlm), tdiff(&t1,&t2));
+		shtns_rotation_apply_real(rot,Zlm,Rlm);		printf("norm=%g\n", SHnorm_real(sht,Rlm));
+		shtns_rotation_apply_real(rot,Rlm,Zlm);		printf("norm=%g\n", SHnorm_real(sht,Zlm));
+		gettimeofday(&t1, NULL);
+		shtns_rotation_apply_real(rot,Zlm,Rlm);
+		gettimeofday(&t2, NULL);
+		printf("norm=%g    time=%.3g ms\n", SHnorm_real(sht,Rlm), tdiff(&t1,&t2));
 
-	gettimeofday(&t1, NULL);
-	shtns_rotation_apply_cplx(rot,Zlm,Rlm);
-	gettimeofday(&t2, NULL);
-	printf("norm=%g    time=%.3g ms\n", SHnorm(sht,Rlm), tdiff(&t1,&t2));
-
-	shtns_rotation_apply_cplx(rot,Rlm,Zlm);		printf("norm=%g\n", SHnorm(sht,Zlm));
-	shtns_rotation_apply_cplx(rot,Zlm,Rlm);		printf("norm=%g\n", SHnorm(sht,Rlm));
-	gettimeofday(&t1, NULL);
-	shtns_rotation_apply_cplx(rot,Rlm,Zlm);
-	gettimeofday(&t2, NULL);
-	printf("norm=%g    time=%.3g ms\n", SHnorm(sht,Zlm), tdiff(&t1,&t2));
-	SH_cplx_to_2real(sht,Zlm, Tlm,Slm);
-
-	// evaluate error:
-	double emax = 0.0;		int imax = 0;
-	double esum = 0.0;
-	for (int i=0;i<nlm;i++) {
-		double qr = creal(Qlm[i]);		double qi = cimag(Qlm[i]);
-		double sr = creal(Tlm[i]);		double si = cimag(Tlm[i]);
-		double e = (sr-qr)*(sr-qr) + (si-qi)*(si-qi);
-		if (e > emax) { emax = e;  imax=i; }
-		esum += e;
+		// evaluate error:
+		double emax = 0.0;		int imax = 0;
+		double esum = 0.0;
+		for (int i=0;i<nlm;i++) {
+			double qr = creal(Qlm[i]);		double qi = cimag(Qlm[i]);
+			double sr = creal(Rlm[i]);		double si = cimag(Rlm[i]);
+			double e = (sr-qr)*(sr-qr) + (si-qi)*(si-qi);
+			if (e > emax) { emax = e;  imax=i; }
+			esum += e;
+		}
+		printf("after 4 90° rotations along Y:    rms error = %.3g,   max error = %.3g (lm=%d)\n", sqrt(esum/nlm), sqrt(emax), imax);
 	}
-	printf("after 4 90° rotations along Y:    rms error = %.3g,   max error = %.3g (lm=%d)\n", sqrt(esum/nlm), sqrt(emax), imax);
+	
+	{
+		printf("\n*** complex field ***\n");
+		SH_2real_to_cplx(sht,Qlm,Slm,Zlm);
+		printf("norm=%g\n", SHnorm(sht,Zlm));
+
+		gettimeofday(&t1, NULL);
+		shtns_rotation_apply_cplx(rot,Zlm,Rlm);
+		gettimeofday(&t2, NULL);
+		printf("norm=%g    time=%.3g ms\n", SHnorm(sht,Rlm), tdiff(&t1,&t2));
+
+		shtns_rotation_apply_cplx(rot,Rlm,Zlm);		printf("norm=%g\n", SHnorm(sht,Zlm));
+		shtns_rotation_apply_cplx(rot,Zlm,Rlm);		printf("norm=%g\n", SHnorm(sht,Rlm));
+		gettimeofday(&t1, NULL);
+		shtns_rotation_apply_cplx(rot,Rlm,Zlm);
+		gettimeofday(&t2, NULL);
+		printf("norm=%g    time=%.3g ms\n", SHnorm(sht,Zlm), tdiff(&t1,&t2));
+		SH_cplx_to_2real(sht,Zlm, Tlm,Slm);
+
+		// evaluate error:
+		double emax = 0.0;		int imax = 0;
+		double esum = 0.0;
+		for (int i=0;i<nlm;i++) {
+			double qr = creal(Qlm[i]);		double qi = cimag(Qlm[i]);
+			double sr = creal(Tlm[i]);		double si = cimag(Tlm[i]);
+			double e = (sr-qr)*(sr-qr) + (si-qi)*(si-qi);
+			if (e > emax) { emax = e;  imax=i; }
+			esum += e;
+		}
+		printf("after 4 90° rotations along Y:    rms error = %.3g,   max error = %.3g (lm=%d)\n", sqrt(esum/nlm), sqrt(emax), imax);
+	}
 
 
 //	write_vect("rlm",(double *)Tlm,nlm*2);

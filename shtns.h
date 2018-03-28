@@ -200,7 +200,7 @@ void shtns_rotation_destroy(shtns_rot r);
 void shtns_rotation_set_angle(shtns_rot r, const double beta);
 void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx);
 void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm);
-//void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm);
+void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm);
 
 //@}
 
