@@ -1480,34 +1480,38 @@ void quarter_wigner_d_matrix(shtns_rot r, const int l, double* mx, const int com
 		mx[lw + m] = b2*plm_beta[ofs_mp1 + (l+1)-(m+1)]  +  b1*plm_beta[ofs_mm1 + (l+1)-(m-1)]   + a*plm_beta[ofs_m + (l+1)-m];		// m'=1 (eq 105)
 	}
 
-	double clm[2*l+1];		// temporary array holding clm
-	for (int m=-l; m<=l; m++)  clm[l+m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
+	double clm[l+1];		// temporary array holding clm
+	for (int m=0; m<l; m++)  clm[m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
+	clm[l] = 0.0;		// boundary condition handled with this
 
-	// step 4:	recursively compute d(m',m),  m'=2..l; m=m'..l
-	for (int mp=2; mp<=l; mp++) {
-		const double c_1 = 1.0/clm[l+mp-1];
-		const double cmp2 = clm[l+mp-2];
-		for (int m=mp; m<l; m++) {			
-			double H = cmp2 * mx[lw*(mp-2) + m] + clm[l+m-1] * mx[lw*(mp-1) + (m-1)] - clm[l+m] * mx[lw*(mp-1) + (m+1)];	// eq 106
-			mx[lw*mp + m] = H * c_1;		// d(m',m)
+	// step 5:	recursively compute d(m',m),  m'=-1; m=-m'..l
+	{ const int mp=-1;	// m'=-1
+		const double c_1 = 1.0/clm[0];
+		for (int m=-mp; m<l; m++) {
+			double H = mx[lw*(mp+2) + m] + c_1*( -clm[m-1] * mx[lw*(mp+1) + (m-1)] + clm[m] * mx[lw*(mp+1) + (m+1)]);	// eq 108
+			mx[lw*mp + m] = H;		// d(m',m)
 		}
 		const int m=l;
-			double H = cmp2 * mx[lw*(mp-2) + m] + clm[l+m-1] * mx[lw*(mp-1) + (m-1)];	// eq 106
-			mx[lw*mp + m] = H * c_1;		// d(m',m)
+			double H = mx[lw*(mp+2) + m] - c_1*clm[m-1] * mx[lw*(mp+1) + (m-1)];	// eq 108
+			mx[lw*mp + m] = H;		// d(m',m)
 	}
 
-	// step 5:	recursively compute d(m',m),  m'=-1..-l; m=-m'..l-1
-	for (int mp=-1; mp>=-l; mp--) {
-		const double c_1 = 1.0/clm[l+mp];
-		const double cmp1 = clm[l+mp+1];
-		for (int m=-mp; m<l; m++) {
-			double H = cmp1 * mx[lw*(mp+2) + m] - clm[l+m-1] * mx[lw*(mp+1) + (m-1)] + clm[l+m] * mx[lw*(mp+1) + (m+1)];	// eq 108
-			mx[lw*mp + m] = H * c_1;		// d(m',m)
+	// step 4+5 merged:	recursively compute d(m',m),  m'=2..l; m=m'..l  AND m'=-2..-l; m=-m'..l
+	for (int mp=2; mp<=l; mp++) {
+		const double c_1 = 1.0/clm[mp-1];
+		const double cmp2 = clm[mp-2];
+		for (int m=mp; m<l; m++) {
+			double H  = cmp2 * mx[lw*(mp-2) + m]  + clm[m-1] * mx[lw*(mp-1) + (m-1)]  - clm[m] * mx[lw*(mp-1) + (m+1)];		// eq 106
+			double H_ = cmp2 * mx[-lw*(mp-2) + m] - clm[m-1] * mx[-lw*(mp-1) + (m-1)] + clm[m] * mx[-lw*(mp-1) + (m+1)];	// eq 108
+			mx[lw*mp + m]  = H  * c_1;		// d(m',m)
+			mx[-lw*mp + m] = H_ * c_1;		// d(-m',m)
 		}
 		const int m=l;
-			double H = cmp1 * mx[lw*(mp+2) + m] - clm[l+m-1] * mx[lw*(mp+1) + (m-1)];	// eq 108
-			mx[lw*mp + m] = H * c_1;		// d(m',m)
-	}	
+			double H  = cmp2 * mx[lw*(mp-2) + m]  + clm[m-1] * mx[lw*(mp-1) + (m-1)];		// eq 106
+			double H_ = cmp2 * mx[-lw*(mp-2) + m] - clm[m-1] * mx[-lw*(mp-1) + (m-1)];	// eq 108
+			mx[lw*mp + m]  = H  * c_1;		// d(m',m)
+			mx[-lw*mp + m] = H_ * c_1;		// d(-m',m)
+	}
 }
 
 
@@ -1658,7 +1662,8 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 		rl[1] += r1;
 
 		double* clm = m0 + 4*lw +1;		// array holding clm (size l+2, adressing by m=-1 to l)
-		for (int m=-1; m<l; m++)  clm[m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
+		clm[-1] = 0.0;
+		for (int m=0; m<l; m++)  clm[m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
 		clm[l] = 0.0;		// boundary condition handled with this
 
 		// step 5:	recursively compute d(m',m),  for m'=-1;  m=1..l
@@ -1668,14 +1673,13 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 		#if _GCC_VEC_
 		s2d conj_parity = {-1.0, 1.0};		// change sign of real or imaginary part only.
 		#endif
-		{ int mp = -1;
-			const double cmp1 = clm[-mp-2];	// clm[l+mp+1];
-			double clm_1 = clm[-mp-1];
+		{ const int mp = -1;
+			double clm_1 = clm[0];
 			const double c_1 = 1.0/clm_1;  // 1.0/clm[l+mp];
 			double mx1_1 = mx1_[-mp-1];
 			double mx1_0 = mx1_[-mp];
 			v2d rmp = vdup(0.0);
-			#if _GCC_VEC_ && __SSE2__
+			#if _GCC_VEC_
 			v2d zlmp = ((v2d*)ql)[-mp] * conj_parity;
 			#else
 			cplx zlmp = conj(ql[-mp]) * (1-2*(mp&1));
@@ -1686,11 +1690,9 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 				double clm1 = clm[m+1];
 				double mx11 = mx1_[m+1];
 				double mx12 = mx1_[m+2];
-				double H0 = cmp1 * mx0_[m]   - clm_1 * mx1_1 + clm0 * mx11;	// eq 108
-				double H1 = cmp1 * mx0_[m+1] -  clm0 * mx1_0 + clm1 * mx12;
+				double H0 = mx0_[m]   + c_1*( -clm_1 * mx1_1 + clm0 * mx11 );	// eq 108
+				double H1 = mx0_[m+1] + c_1*(  -clm0 * mx1_0 + clm1 * mx12 );
 				clm_1 = clm1;		mx1_1 = mx11;	mx1_0 = mx12;		// cycle coefficients and matrix elements.
-				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
-				H1 *= c_1;
 				mx0_[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
 				mx0_[m+1] = H1;			// d(m',m) -> overwrite d(m'+2,m)
 				rmp += ((v2d*)ql)[m] * vdup(H0)  + ((v2d*)ql)[m+1] * vdup(H1);	// left quadrant, change signs => parity factor
@@ -1700,15 +1702,14 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 				((v2d*)rl)[m+1]  -= zlmp * vdup(H1);	// bottom quadrant (m>0) : exchange m and m' => parity factor
 			}
 			if (m==l) {
-				double H0 = cmp1 * mx0_[m]   - clm_1 * mx1_1;	// eq 108
-				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				double H0 = mx0_[m]   - c_1 * clm_1 * mx1_1;	// eq 108
 				mx0_[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
 				rmp += ((v2d*)ql)[m] * vdup(H0);	// left quadrant, change signs => parity factor
 				if (m>-mp) {	// avoid duplicates
 					((v2d*)rl)[m]  += zlmp * vdup(H0);	// bottom quadrant (m>0) : exchange m and m' => parity factor
 				}
 			}
-			#if _GCC_VEC_ && __SSE2__
+			#if _GCC_VEC_
 			((v2d*)rl)[-mp] += rmp * conj_parity;
 			#else
 			rl[-mp] += conj(rmp)*(1-2*(mp&1));		// -mp > 0
@@ -1730,7 +1731,7 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 			v2d rmp = vdup(0.0);
 			v2d zlmp = ((v2d*)ql)[mp];
 			v2d rmp_ = vdup(0.0);
-			#if _GCC_VEC_ && __SSE2__
+			#if _GCC_VEC_
 			v2d zlmp_ = zlmp * conj_parity;
 			#else
 			cplx zlmp_ = conj(zlmp) * (1-2*(mp&1));
@@ -1750,11 +1751,9 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 				rnd mx00  = *((rndu*)(mx0+m));
 				rnd mx00_ = *((rndu*)(mx0_+m));
 
-				rnd H = vall(cmp2) * mx00   + clm_1 * mx1_1 - clm0 * mx11;		// eq 106
-				rnd H_ = vall(cmp2) * mx00_  - clm_1 * mx1__1 + clm0 * mx11_;	// eq 108
+				rnd H  = (vall(cmp2) * mx00   + clm_1 * mx1_1  - clm0 * mx11)  * vall(c_1);		// eq 106
+				rnd H_ = (vall(cmp2) * mx00_  - clm_1 * mx1__1 + clm0 * mx11_) * vall(c_1);	// eq 108
 				//mx1__1 = mx11_;		mx1_1 = mx11;
-				H *= vall(c_1);
-				H_ *= vall(c_1);
 				*((rndu*)(mx0+m)) = H;
 				*((rndu*)(mx0_+m)) = H_;
 			}
@@ -1814,7 +1813,7 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 					((v2d*)rl)[m]  += zlmp * vdup(H0) + zlmp_ * vdup(H0_);	// bottom quadrant (m>0) : exchange m and m' => parity factor
 				}
 			}
-			#if _GCC_VEC_ && __SSE2__
+			#if _GCC_VEC_
 			((v2d*)rl)[mp] += rmp + rmp_ * conj_parity;
 			#else
 			rl[mp] += rmp + conj(rmp_)*(1-2*(mp&1));		// -mp > 0
@@ -1894,15 +1893,15 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 		rl[1] += r1;
 
 		double* clm = m0 + 4*lw +1;		// array holding clm (size l+2, adressing by m=-1 to l)
-		for (int m=-1; m<l; m++)  clm[m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
+		clm[-1] = 0.0;		// also for BC.
+		for (int m=0; m<l; m++)  clm[m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
 		clm[l] = 0.0;		// boundary condition handled with this
 
 		// step 5:	recursively compute d(m',m),  for m'=-1;  m=1..l
 		double* mx1_ = m0 + 2*lw;
 		double* mx0_ = m0 + 3*lw;
 		memcpy(mx1_, m0, sizeof(double)*2*lw);		// first copy the initial lines (m'=0 and m'=1).
-		{ int mp = -1;		// m'=-1
-			const double cmp1 = clm[-mp-2];	// clm[l+mp+1];
+		{ const int mp = -1;		// m'=-1
 			double clm_1 = clm[-mp-1];
 			const double c_1 = 1.0/clm_1;  // 1.0/clm[l+mp];
 			double mx1_1 = mx1_[-mp-1];
@@ -1917,11 +1916,9 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 				double clm1 = clm[m+1];
 				double mx11 = mx1_[m+1];
 				double mx12 = mx1_[m+2];
-				double H0 = cmp1 * mx0_[m]   - clm_1 * mx1_1 + clm0 * mx11;	// eq 108
-				double H1 = cmp1 * mx0_[m+1] -  clm0 * mx1_0 + clm1 * mx12;
+				double H0 = mx0_[m]   + c_1*( - clm_1 * mx1_1 + clm0 * mx11);	// eq 108
+				double H1 = mx0_[m+1] + c_1*( -  clm0 * mx1_0 + clm1 * mx12);
 				clm_1 = clm1;		mx1_1 = mx11;	mx1_0 = mx12;		// cycle coefficients and matrix elements.
-				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
-				H1 *= c_1;
 				mx0_[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
 				mx0_[m+1] = H1;			// d(m',m) -> overwrite d(m'+2,m)
 				rmp += zl[m] * vdup(H0)  + zl[m+1] * vdup(H1);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
@@ -1934,8 +1931,7 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 				rl[m+1]  -= zlmp * vdup(H1);	// bottom quadrant (m>0) : exchange m and m' => parity factor
 			}
 			if(m==l) {
-				double H0 = cmp1 * mx0_[m]   - clm_1 * mx1_1;	// eq 108
-				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				double H0 = mx0_[m]   - c_1 * clm_1 * mx1_1;	// eq 108
 				mx0_[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
 				rmp += zl[m] * vdup(H0);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
 				rmmp += zl[-m] * vdup(H0);	// left quadrant, change signs => parity factor
@@ -1976,13 +1972,11 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 				rnd mx00  = *((rndu*)(mx0+m));
 				rnd mx00_ = *((rndu*)(mx0_+m));
 
-				rnd H = vall(cmp2) * mx00   + clm_1 * mx1_1 - clm0 * mx11;		// eq 106
-				rnd H_ = vall(cmp2) * mx00_  - clm_1 * mx1__1 + clm0 * mx11_;	// eq 108
+				rnd H  = (vall(cmp2) * mx00   + clm_1 * mx1_1  - clm0 * mx11)  * vall(c_1);		// eq 106
+				rnd H_ = (vall(cmp2) * mx00_  - clm_1 * mx1__1 + clm0 * mx11_) * vall(c_1);		// eq 108
 				//mx1__1 = mx11_;		mx1_1 = mx11;
-				H *= vall(c_1);
-				H_ *= vall(c_1);
-				*((rndu*)(mx0+m)) = H;
-				*((rndu*)(mx0_+m)) = H_;
+				*((rndu*)(mx0+m)) = H;			// d(m',m) -> overwrite d(m'-2,m)
+				*((rndu*)(mx0_+m)) = H_;		// d(-m',m) -> overwrite d(-m'+2,m)
 			}
 	/*		v2d mx1_1 =  *((v2du*)(mx1+m-1));
 			v2d mx1__1 =  *((v2du*)(mx1_+m-1));
@@ -2012,12 +2006,10 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 				double mx1__1 = mx1_[m-1];
 				double mx11 = mx1[m+1];
 				double mx11_ = mx1_[m+1];
-				double H0 = cmp2 * mx0[m]   + clm_1 * mx1_1  - clm0 * mx11;		// eq 106
-				double H0_ = cmp2 * mx0_[m] - clm_1 * mx1__1 + clm0 * mx11_;	// eq 108
-				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
-				H0_ *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				double H0  = (cmp2 * mx0[m]  + clm_1 * mx1_1  - clm0 * mx11)  * c_1;	// eq 106
+				double H0_ = (cmp2 * mx0_[m] - clm_1 * mx1__1 + clm0 * mx11_) * c_1;	// eq 108
 				mx0[m] = H0;			// d(m',m) -> overwrite d(m'-2,m)
-				mx0_[m] = H0_;			// d(m',m) -> overwrite d(m'+2,m)
+				mx0_[m] = H0_;			// d(-m',m) -> overwrite d(-m'+2,m)
 			}
 
 			m = mp;
