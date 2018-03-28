@@ -1897,68 +1897,16 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 		for (int m=-1; m<l; m++)  clm[m] = sqrt( (l-m)*(l+m+1) );		// precompute clm
 		clm[l] = 0.0;		// boundary condition handled with this
 
-		// step 4:	recursively compute and apply d(m',m),  m'=2..l; m=m'..l
-		double* mx0 = m0 + 2*lw;
-		double* mx1 = m0 + 3*lw;
-		memcpy(mx0, m0, sizeof(double)*2*lw);		// first copy the previous lines, as we will need them again (m'=0 and m'=1).
-		for (int mp=2; mp<=l; mp++) {
-			const double cmp2 = clm[mp-2];
-			double clm_1 = clm[mp-1];
-			const double c_1 = 1.0/clm_1;
-			double mx1_1 = mx1[mp-1];
-			double mx1_0 = mx1[mp];
-			v2d rmp = vdup(0.0);
-			v2d rmmp = vdup(0.0);
-			v2d zlmmp = zl[-mp];
-			v2d zlmp = zl[mp];
-			int m = mp;
-			for (; m<l; m+=2) {
-				double clm0 = clm[m];
-				double clm1 = clm[m+1];
-				double mx11 = mx1[m+1];
-				double mx12 = mx1[m+2];
-				double H0 = cmp2 * mx0[m]   + clm_1 * mx1_1 - clm0 * mx11;	// eq 106
-				double H1 = cmp2 * mx0[m+1] +  clm0 * mx1_0 - clm1 * mx12;
-				clm_1 = clm1;		mx1_1 = mx11;	mx1_0 = mx12;		// cycle coefficients and matrix elements.
-				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
-				H1 *= c_1;
-				mx0[m] = H0;			// d(m',m) -> overwrite d(m'-2,m)
-				mx0[m+1] = H1;			// d(m',m) -> overwrite d(m'-2,m)
-				rmp  += zl[m]  * vdup(H0) + zl[m+1]  * vdup(H1);	//mx[mp*lw + m];		// right quadrant (m>0, mp>0)
-				rmmp += zl[-m] * vdup(H0) - zl[-m-1] * vdup(H1);	// left quadrant, change signs => parity factor
-				rl[-m-1] += zlmmp * vdup(H1);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
-				if (m>mp) {	// avoid duplicates
-					rl[-m] += zlmmp * vdup(H0);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
-					rl[m]  += zlmp * vdup(H0);	// bottom quadrant (m>0) : exchange m and m' => parity factor
-				}
-				rl[m+1] -= zlmp * vdup(H1);	// bottom quadrant (m>0) : exchange m and m' => parity factor
-			}
-			if (m==l) {
-				double H0 = cmp2 * mx0[m]   + clm_1 * mx1_1;	// eq 106
-				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
-				mx0[m] = H0;			// d(m',m) -> overwrite d(m'-2,m)
-				rmp  += zl[m]  * vdup(H0);	//mx[mp*lw + m];		// right quadrant (m>0, mp>0)
-				rmmp += zl[-m] * vdup(H0);	// left quadrant, change signs => parity factor
-				if (m>mp) {	// avoid duplicates
-					rl[-m] += zlmmp * vdup(H0);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
-					rl[m]  += zlmp * vdup(H0);	// bottom quadrant (m>0) : exchange m and m' => parity factor
-				}
-			}
-			rl[-mp] += rmmp;
-			rl[mp] += rmp;
-			double* t = mx0;		mx0 = mx1;	mx1 = t;	// cycle the buffers for lines.
-		}
-
-		// step 5:	recursively compute d(m',m),  m'=-1..-l; m=-m'..l-1
-		mx1 = m0 + 2*lw;
-		mx0 = m0 + 3*lw;
-		memcpy(mx1, m0, sizeof(double)*2*lw);		// first copy the initial lines (m'=0 and m'=1).
-		for (int mp=-1; mp>=-l; mp--) {
+		// step 5:	recursively compute d(m',m),  for m'=-1;  m=1..l
+		double* mx1_ = m0 + 2*lw;
+		double* mx0_ = m0 + 3*lw;
+		memcpy(mx1_, m0, sizeof(double)*2*lw);		// first copy the initial lines (m'=0 and m'=1).
+		{ int mp = -1;		// m'=-1
 			const double cmp1 = clm[-mp-2];	// clm[l+mp+1];
 			double clm_1 = clm[-mp-1];
 			const double c_1 = 1.0/clm_1;  // 1.0/clm[l+mp];
-			double mx1_1 = mx1[-mp-1];
-			double mx1_0 = mx1[-mp];
+			double mx1_1 = mx1_[-mp-1];
+			double mx1_0 = mx1_[-mp];
 			v2d rmp = vdup(0.0);
 			v2d rmmp = vdup(0.0);
 			v2d zlmmp = zl[-mp];
@@ -1967,15 +1915,15 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 			for (; m<l; m+=2) {
 				double clm0 = clm[m];
 				double clm1 = clm[m+1];
-				double mx11 = mx1[m+1];
-				double mx12 = mx1[m+2];
-				double H0 = cmp1 * mx0[m]   - clm_1 * mx1_1 + clm0 * mx11;	// eq 108
-				double H1 = cmp1 * mx0[m+1] -  clm0 * mx1_0 + clm1 * mx12;
+				double mx11 = mx1_[m+1];
+				double mx12 = mx1_[m+2];
+				double H0 = cmp1 * mx0_[m]   - clm_1 * mx1_1 + clm0 * mx11;	// eq 108
+				double H1 = cmp1 * mx0_[m+1] -  clm0 * mx1_0 + clm1 * mx12;
 				clm_1 = clm1;		mx1_1 = mx11;	mx1_0 = mx12;		// cycle coefficients and matrix elements.
 				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
 				H1 *= c_1;
-				mx0[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
-				mx0[m+1] = H1;			// d(m',m) -> overwrite d(m'+2,m)
+				mx0_[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
+				mx0_[m+1] = H1;			// d(m',m) -> overwrite d(m'+2,m)
 				rmp += zl[m] * vdup(H0)  + zl[m+1] * vdup(H1);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
 				rmmp += zl[-m] * vdup(H0)  - zl[-m-1] * vdup(H1);	// left quadrant, change signs => parity factor
 				rl[-m-1] += zlmmp * vdup(H1);	// top quadrant (-m<0) : exchange m and m' and change signs => no parity factor
@@ -1986,9 +1934,9 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 				rl[m+1]  -= zlmp * vdup(H1);	// bottom quadrant (m>0) : exchange m and m' => parity factor
 			}
 			if(m==l) {
-				double H0 = cmp1 * mx0[m]   - clm_1 * mx1_1;	// eq 108
+				double H0 = cmp1 * mx0_[m]   - clm_1 * mx1_1;	// eq 108
 				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
-				mx0[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
+				mx0_[m] = H0;			// d(m',m) -> overwrite d(m'+2,m)
 				rmp += zl[m] * vdup(H0);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
 				rmmp += zl[-m] * vdup(H0);	// left quadrant, change signs => parity factor
 				if (m>-mp) {	// avoid duplicates
@@ -1998,7 +1946,111 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 			}
 			rl[-mp] += rmmp;
 			rl[mp] += rmp;
-			double* t = mx0;		mx0 = mx1;	mx1 = t;	// cycle the buffers for lines.
+			double* t = mx0_;		mx0_ = mx1_;	mx1_ = t;	// cycle the buffers for lines.
+		}
+
+		// step 4 + 5 merged:	recursively compute and apply d(m',m),  m'=2..l; m=m'..l  AND  m'=-2..-l; m=-m'..l
+		double* mx0 = m0;
+		double* mx1 = m0 + lw;
+		for (int mp=2; mp<=l; mp++) {
+			const double cmp2 = clm[mp-2];
+			double clm_1 = clm[mp-1];
+			const double c_1 = 1.0/clm_1;
+			//v2d mx1_1 = *((v2d*)(mx1+mp-1));
+			//v2d mx1__1 = *((v2d*)(mx1_+mp-1));
+			v2d rmp = vdup(0.0);
+			v2d rmmp = vdup(0.0);
+			v2d zlmmp = zl[-mp];
+			v2d zlmp = zl[mp];
+			int m = mp;
+			for (; m<=l-(VSIZE2-1); m+=VSIZE2) {
+				rnd clm_1 = *((rndu*)(clm+m-1));
+				rnd clm0 =  *((rndu*)(clm+m));
+
+				rnd mx1_1 =  *((rndu*)(mx1+m-1));
+				rnd mx11 =  *((rndu*)(mx1+m+1));
+
+				rnd mx1__1 =  *((rndu*)(mx1_+m-1));
+				rnd mx11_  =  *((rndu*)(mx1_+m+1));
+
+				rnd mx00  = *((rndu*)(mx0+m));
+				rnd mx00_ = *((rndu*)(mx0_+m));
+
+				rnd H = vall(cmp2) * mx00   + clm_1 * mx1_1 - clm0 * mx11;		// eq 106
+				rnd H_ = vall(cmp2) * mx00_  - clm_1 * mx1__1 + clm0 * mx11_;	// eq 108
+				//mx1__1 = mx11_;		mx1_1 = mx11;
+				H *= vall(c_1);
+				H_ *= vall(c_1);
+				*((rndu*)(mx0+m)) = H;
+				*((rndu*)(mx0_+m)) = H_;
+			}
+	/*		v2d mx1_1 =  *((v2du*)(mx1+m-1));
+			v2d mx1__1 =  *((v2du*)(mx1_+m-1));
+			for (; m<l; m+=2) {
+				v2d clm_1 = *((v2du*)(clm+m-1));
+				v2d clm0 =  *((v2du*)(clm+m));
+
+				v2d mx11 =  *((v2du*)(mx1+m+1));
+
+				v2d mx11_  =  *((v2du*)(mx1_+m+1));
+
+				v2d mx00  = *((v2du*)(mx0+m));
+				v2d mx00_ = *((v2du*)(mx0_+m));
+
+				v2d H = vdup(cmp2) * mx00   + clm_1 * mx1_1 - clm0 * mx11;		// eq 106
+				v2d H_ = vdup(cmp2) * mx00_  - clm_1 * mx1__1 + clm0 * mx11_;	// eq 108
+				mx1__1 = mx11_;		mx1_1 = mx11;
+				H *= vdup(c_1);
+				H_ *= vdup(c_1);
+				*((v2du*)(mx0+m)) = H;
+				*((v2du*)(mx0_+m)) = H_;
+			}	*/
+			for (; m<=l; m++) {
+				double clm_1 = clm[m-1];
+				double clm0 = clm[m];
+				double mx1_1 = mx1[m-1];
+				double mx1__1 = mx1_[m-1];
+				double mx11 = mx1[m+1];
+				double mx11_ = mx1_[m+1];
+				double H0 = cmp2 * mx0[m]   + clm_1 * mx1_1  - clm0 * mx11;		// eq 106
+				double H0_ = cmp2 * mx0_[m] - clm_1 * mx1__1 + clm0 * mx11_;	// eq 108
+				H0 *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				H0_ *= c_1;			//mx[lw*mp + m] = H * c_1;		// d(m',m)
+				mx0[m] = H0;			// d(m',m) -> overwrite d(m'-2,m)
+				mx0_[m] = H0_;			// d(m',m) -> overwrite d(m'+2,m)
+			}
+
+			m = mp;
+			for (; m<l; m+=2) {
+				double H0 = mx0[m];		double H1 = mx0[m+1];
+				double H0_ = mx0_[m];	double H1_ = mx0_[m+1];
+				rmp  += zl[m]  * vdup(H0)  + zl[m+1]  * vdup(H1);	//mx[mp*lw + m];		// right quadrant (m>0, mp>0)
+				rmmp += zl[m]  * vdup(H0_) + zl[m+1]  * vdup(H1_);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
+				rmmp += zl[-m] * vdup(H0)  - zl[-m-1] * vdup(H1);	// left quadrant, change signs => parity factor
+				rmp  += zl[-m] * vdup(H0_) - zl[-m-1] * vdup(H1_);	// left quadrant, change signs => parity factor
+				rl[-m-1] += zlmmp * vdup(H1)  +   zlmp  * vdup(H1_);			// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
+				if (m>mp) {	// avoid duplicates
+					rl[-m] += zlmmp * vdup(H0)  +  zlmp  * vdup(H0_);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
+					rl[m]  += zlmp  * vdup(H0)  +  zlmmp * vdup(H0_);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+				}
+				rl[m+1] -= zlmp  * vdup(H1)  +  zlmmp * vdup(H1_);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+			}
+			if (m==l) {
+				double H0 = mx0[m];
+				double H0_ = mx0_[m];
+				rmp  += zl[m]  * vdup(H0);	//mx[mp*lw + m];		// right quadrant (m>0, mp>0)
+				rmmp += zl[m]  * vdup(H0_);	//mx[mp*lw + m];		// right quadrant (m>0, mp<0)
+				rmmp += zl[-m] * vdup(H0);	// left quadrant, change signs => parity factor
+				rmp  += zl[-m] * vdup(H0_);	// left quadrant, change signs => parity factor
+				if (m>mp) {	// avoid duplicates
+					rl[-m] += zlmmp * vdup(H0)  +  zlmp  * vdup(H0_);	// top quadrant (m<0) : exchange m and m' and change signs => no parity factor
+					rl[m]  += zlmp  * vdup(H0)  +  zlmmp * vdup(H0_);	// bottom quadrant (m>0) : exchange m and m' => parity factor
+				}
+			}
+			rl[-mp] += rmmp;
+			rl[mp] += rmp;
+			double* t = mx0;		mx0 = mx1;		mx1 = t;	// cycle the buffers for lines.
+			double* t_ = mx0_;		mx0_ = mx1_;	mx1_ = t_;	// cycle the buffers for lines.
 		}
 
 		memcpy(Rlm + l*l, rl-l, sizeof(cplx)*(2*l+1));		// copy to destination (avoid false sharing when doing openmp).
