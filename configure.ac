@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[3.0],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[3.0.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -105,16 +105,16 @@ AS_IF([test "x$enable_python" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 
-# for MagIC code, also disable matrix transforms and switch to many-core.
-AS_IF([test "x$enable_magic_layout" != "xno"], [
-  	enable_mem=no
-	AC_DEFINE([SHTNS4MAGIC],[1],[I need the transforms compatible with the MagIC code, to speed it up!])
-])
-
 # On many-core systems, enable openmp by default, and disable precomputed matrix support.
 AS_IF([test "x$enable_many_core" != "xno"], [
   	enable_mem=no
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
+])
+# for MagIC code, also disable matrix transforms and switch to many-core code (possibly without openmp).
+AS_IF([test "x$enable_magic_layout" != "xno"], [
+  	enable_mem=no
+	enable_many_core=yes		# optimize for many-core architecture
+	AC_DEFINE([SHTNS4MAGIC],[1],[I need the transforms compatible with the MagIC code, to speed it up!])
 ])
 
 nvcc_flags=""
@@ -185,7 +185,7 @@ AS_IF([test "x$enable_mkl" = "xyes"], [
 	# fftw3
 	AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.]))
 	AS_IF([test "x$enable_openmp" = "xyes"], [
-		AC_CHECK_LIB([fftw3_omp], [fftw_init_threads],,AC_MSG_WARN([FFTW3 does not support OpenMP. Bad multi-threaded performance expected.]))
+		AC_CHECK_LIB([fftw3_omp], [fftw_init_threads],,AC_MSG_ERROR([FFTW3 does not support OpenMP. Did you compile it with --enable-openmp ?.]))
 	])
 ])
 
@@ -217,7 +217,7 @@ AS_IF([test "x$enable_python" != "xno"], [
 	AC_SUBST([numpy_inc])
 	AC_SUBST([python_inc])
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
-	target="_shtns.so"		# build python extension instead of C library.
+	target="_shtns.so"	# build python extension instead of C library.
 	install="install-py"	# install python extension instead of C library.
 ])
 

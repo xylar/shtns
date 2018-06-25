@@ -622,10 +622,10 @@ See the \c shtns_jni folder.
 */
 
 
-/** \page gpu Using SHTns with GPU (CUDA).
+/** \page gpu Using SHTns with GPU (CUDA)
 
 SHTns supports nvidia Kepler and Pascal GPUs, using optimized cuda transforms.
-There are two ways on usign GPUs with SHTns: automatic off-loading where the GPUs are used transparently (not much to change in your code)
+There are two ways to use GPUs with SHTns: automatic off-loading where the GPU is used transparently (not much to change in your code)
 and SHTns handles all the data transfers between GPU and CPU memory.
 In addition, routines for performing transforms of data residing already on the GPU are provided.
 

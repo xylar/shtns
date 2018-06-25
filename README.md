@@ -68,6 +68,10 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
+* v3.0.1  (25 Jun 2018)
+	- fix typo preventing compilation of AVX512 code-path.
+	- improved configure script to avoid some compilation issues.
+
 * v3.0  (28 Feb 2018)
 	- support for nvidia Kepler & Pascal GPU with `--enable-cuda` (including automatic offload).
 	- Java JNI wrapper (beta, see `shtns_jni` folder -- thanks to Julien Pierret).
