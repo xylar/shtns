@@ -451,7 +451,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 			((s4d*)mem)[(idx)*4+2] = _mm512_extractf64x4_pd(aa, 1);	\
 			((s4d*)mem)[(idx)*4+3] = _mm512_extractf64x4_pd(bb, 1);	\
 			rr = (rnd)_mm512_permutex_pd(er-od, 0x8D);	ii = (rnd)_mm512_permutex_pd(ei-oi, 0x8D);	\
-			aa = (rnd)_mm256_unpacklo_pd(rr, ii);	bb = (rnd)_mm256_unpackhi_pd(rr, ii);	\
+			aa = (rnd)_mm512_unpacklo_pd(rr, ii);	bb = (rnd)_mm512_unpackhi_pd(rr, ii);	\
 			((s4d*)mem)[NLAT-1-(idx)*4] = _mm512_castpd512_pd256(aa);	\
 			((s4d*)mem)[NLAT-2-(idx)*4] = _mm512_castpd512_pd256(bb);	\
 			((s4d*)mem)[NLAT-3-(idx)*4] = _mm512_extractf64x4_pd(aa, 1);	\
