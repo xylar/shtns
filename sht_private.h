@@ -133,6 +133,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	fftw_plan ifft, fft;		// plans for FFTW.
 	fftw_plan ifftc, fftc;
+	fftw_plan ifft_cplx, fft_cplx;		// for complex-valued spatial fields.
 
 	/* Legendre function generation arrays */
 	double *alm;	// coefficient list for Legendre function recurrence (size 2*NLM)

@@ -970,37 +970,60 @@ static void SH_cplx_to_2real(shtns_cfg shtns, cplx* Zlm, cplx* Rlm, cplx* Ilm)
 	}
 }
 
+
 /// complex scalar transform.
 /// in: complex spatial field z.
 /// out: alm[LM(shtns,l,m)] is the SH coefficients of order l and degree m (with -l <= m <= l)
 /// for a total of nlm_cplx_calc(lmax,mmax,mres) coefficients.
 void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 {
-	long int nspat = shtns->nspat;
-	double *re, *im;
-	cplx *rlm, *ilm;
+	const long int nspat = shtns->nspat;
+	cplx *rlm, *ilm, *Q, *mem;
 
 	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
 
 	// alloc temporary fields
-	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
-	im = re + nspat;
-	rlm = (cplx*) (re + 2*nspat);
+	mem = (cplx*) VMALLOC( (nspat+2*NLM)*sizeof(cplx) );
+	rlm = mem + nspat;
 	ilm = rlm + NLM;
 
-	// split z into real and imag parts.
-	for (int k=0; k<nspat; k++) {
-		re[k] = creal(z[k]);		im[k] = cimag(z[k]);
+	Q = z;
+	if (NPHI>1) {
+		if (shtns->fftc_mode != 0) Q = mem;			// out-of-place transform
+		fftw_execute_dft(shtns->fft_cplx, z, Q);
 	}
 
-	// perform two real transforms:
-	spat_to_SH(shtns, re, rlm);
-	spat_to_SH(shtns, im, ilm);
+	const double norm = 1.0/NPHI;
+	#pragma omp parallel for schedule(static,1)
+	for (int m=0; m<=MMAX; m++) {
+	if (m==0) {	// m=0
+		spat_to_SH_ml(shtns, 0, Q,      rlm, LMAX);						// real
+		spat_to_SH_ml(shtns, 0, (cplx*)(((double*)Q)+1), ilm, LMAX);	// imag
+		int lm = 0;
+		int ll = 0;
+		for (int l=0; l<=LMAX; l++) {
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+			alm[ll] = (creal(rlm[lm]) + I*creal(ilm[lm]))*norm;		// m=0
+			lm++;
+		}
+	} else {
+		long lm = LM(shtns,m,m);
+		spat_to_SH_ml(shtns, m, Q + (NPHI-m)*NLAT, rlm + lm, LMAX);		// m>0
+		spat_to_SH_ml(shtns, m, Q + m*NLAT,        ilm + lm, LMAX);		// m<0
+		int ll = (m-1)*m;
+		for (int l=m; l<=LMAX; l++) {
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+			cplx rr = rlm[lm];	// +m
+			cplx ii = ilm[lm];	// -m
+			alm[ll+m] = rr*norm;
+			if (m&1) ii = -ii;				// m<0, m odd
+			alm[ll-m] = ii*norm;
+			lm++;
+		}
+	}
+	}
 
-	// combine into complex coefficients
-	SH_2real_to_cplx(shtns, rlm, ilm, alm);
-
-	VFREE(re);
+	VFREE(mem);
 }
 
 /// complex scalar transform.
@@ -1009,37 +1032,65 @@ void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 /// out: complex spatial field z.
 void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 {
-	long int nspat = shtns->nspat;
-	double *re, *im;
-	cplx *rlm, *ilm;
+	const long int nspat = shtns->nspat;
+	cplx *rlm, *ilm, *Q, *mem;
 
 	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
 
 	// alloc temporary fields
-	re = (double*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
-	im = re + nspat;
-	rlm = (cplx*) (re + 2*nspat);
+	mem = (cplx*) VMALLOC( 2*(nspat + NLM*2)*sizeof(double) );
+	rlm = mem + nspat;
 	ilm = rlm + NLM;
+	
+	Q = z;
+	if ((NPHI>1) && (shtns->fftc_mode != 0)) Q = mem;			// out-of-place transform
 
-	// extract complex coefficients corresponding to real and imag
-	SH_cplx_to_2real(shtns, alm, rlm, ilm);
+	#pragma omp parallel for schedule(static,1)
+	for (int m=0; m<=MMAX; m++) {
+	if (m==0) {	// m=0
+		int lm = 0;
+		int ll = 0;
+		for (int l=0; l<=LMAX; l++) {
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+			rlm[lm] = creal(alm[ll]);
+			ilm[lm] = cimag(alm[ll]);
+			lm++;
+		}
+		cplx tmp[NLAT] SSE;
+		SH_to_spat_ml(shtns, 0, rlm, Q,   LMAX);
+		SH_to_spat_ml(shtns, 0, ilm, tmp, LMAX);
+		for (int it=0; it<NLAT; it++) {
+			((double*)Q)[2*it+1] = creal(tmp[it]);		// copy imaginary part to destination array.
+		}
+		// fill m>MMAX with zeros!
+		for (long i=(MMAX+1)*NLAT; i<(NPHI-MMAX)*NLAT; i++)	 Q[i] = 0.0;
+	} else {
+		long lm = LM(shtns,m,m);
+		int ll = (m-1)*m;
+		for (int l=m; l<=LMAX; l++) {			// gather from cplx rep
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+			cplx rr = alm[ll+m];	// +m
+			cplx ii = alm[ll-m];	// -m
+			if (m&1) ii = -ii;				// m<0, m odd
+			rlm[lm] = rr;
+			ilm[lm] = ii;
+			lm++;
+		}
+		lm = LM(shtns,m,m);
+		SH_to_spat_ml(shtns, m, rlm + lm, Q + m*NLAT,        LMAX);		// m>0
+		SH_to_spat_ml(shtns, m, ilm + lm, Q + (NPHI-m)*NLAT, LMAX);		// m<0
+	}
+	}
 
-	// perform two real transforms:
-	SH_to_spat(shtns, rlm, re);
-	SH_to_spat(shtns, ilm, im);
-
-	// combine into z
-	for (int k=0; k<nspat; k++)
-		z[k] = re[k] + I*im[k];
-
-	VFREE(re);
+	if (NPHI>1) fftw_execute_dft(shtns->ifft_cplx, Q, z);
+	VFREE(mem);
 }
 
 
 /// complex vector transform (2D).
 /// in: slm, tlm are the spheroidal/toroidal SH coefficients of order l and degree m (with -l <= m <= l)
 /// out: zt, zp are respectively the theta and phi components of the complex spatial vector field.
-void SHsphtor_to_spat_cplx(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx *zp)
+void SHsphtor_to_spat_cplx_old(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx *zp)
 {
 	long int nspat = shtns->nspat;
 	double *zt_r, *zt_i, *zp_r, *zp_i;
@@ -1074,6 +1125,79 @@ void SHsphtor_to_spat_cplx(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx
 	VFREE(zt_r);
 }
 
+/// complex vector transform (2D).
+/// in: slm, tlm are the spheroidal/toroidal SH coefficients of order l and degree m (with -l <= m <= l)
+/// out: zt, zp are respectively the theta and phi components of the complex spatial vector field.
+void SHsphtor_to_spat_cplx(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx *zp)
+{
+	const long int nspat = shtns->nspat;
+	cplx *zzt, *zzp, *mem, *stlm;
+
+	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
+
+	// alloc temporary fields
+	mem = (cplx*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
+	stlm = mem + 2*nspat;
+
+	zzt = zt;		zzp = zp;
+	if ((NPHI>1) && (shtns->fftc_mode != 0)) {	zzt = mem;	zzp = mem + nspat;  }			// out-of-place transform
+
+	#pragma omp parallel for schedule(static,1)
+	for (int m=0; m<=MMAX; m++) {
+		const long stride = LMAX+1-m;
+		if (m==0) {	// m=0
+			int lm = 0;
+			int ll = 0;
+			for (int l=0; l<=LMAX; l++) {			// gather from cplx rep
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+				stlm[lm]          = creal(slm[ll]);
+				stlm[lm+2*stride] = cimag(slm[ll]);
+				stlm[lm+stride]   = creal(tlm[ll]);
+				stlm[lm+3*stride] = cimag(tlm[ll]);
+				lm++;
+			}
+			cplx tt[NLAT] SSE;
+			cplx pp[NLAT] SSE;
+			SHsphtor_to_spat_ml(shtns, 0, stlm,          stlm+stride,   zzt, zzp, LMAX);
+			SHsphtor_to_spat_ml(shtns, 0, stlm+2*stride, stlm+3*stride, tt,  pp,  LMAX);
+			for (int it=0; it<NLAT; it++) {
+				((double*)zzt)[2*it+1] = creal(tt[it]);		// copy imaginary part to destination array.
+				((double*)zzp)[2*it+1] = creal(pp[it]);
+			}
+			// fill m>MMAX with zeros!
+			for (long i=(MMAX+1)*NLAT; i<(NPHI-MMAX)*NLAT; i++)	{
+				zzt[i] = 0.0;		zzp[i] = 0.0;
+			}
+		} else {
+			long lm = 4 * LM(shtns,m,m);
+			int ll = (m-1)*m;
+			for (int l=m; l<=LMAX; l++) {			// gather from cplx rep
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+				cplx sr = slm[ll+m];	// +m
+				cplx si = slm[ll-m];	// -m
+				cplx tr = tlm[ll+m];	// +m
+				cplx ti = tlm[ll-m];	// -m
+				if (m&1) {				// m<0, m odd
+					si = -si;
+					ti = -ti;
+				}
+				stlm[lm] = sr;          stlm[lm+2*stride] = si;
+				stlm[lm+stride] = tr;	stlm[lm+3*stride] = ti;
+				lm++;
+			}
+			lm = 4 * LM(shtns,m,m);
+			SHsphtor_to_spat_ml(shtns, m,  stlm+lm,          stlm+stride+lm,   zzt + m*NLAT,        zzp + m*NLAT,        LMAX);		// m>0
+			SHsphtor_to_spat_ml(shtns, -m, stlm+2*stride+lm, stlm+3*stride+lm, zzt + (NPHI-m)*NLAT, zzp + (NPHI-m)*NLAT, LMAX);		// m<0
+		}
+	}
+
+	if (NPHI>1) {
+		fftw_execute_dft(shtns->ifft_cplx, zzt, zt);
+		fftw_execute_dft(shtns->ifft_cplx, zzp, zp);
+	}
+	VFREE(mem);
+}
+
 
 /// complex vector transform (2D).
 /// zt,zp: theta,phi components of the complex spatial vector field.
@@ -1081,109 +1205,211 @@ void SHsphtor_to_spat_cplx(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx
 /// for a total of shtns->nlm_cplx = nlm_cplx_calc(lmax, mmax, mres) coefficients.
 void spat_cplx_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm, cplx *tlm)
 {
-	long int nspat = shtns->nspat;
-	double *zt_r, *zt_i, *zp_r, *zp_i;
-	cplx *slm_r, *slm_i, *tlm_r, *tlm_i;
+	const long int nspat = shtns->nspat;
+	cplx *zzt, *zzp, *mem, *stlm;
 
 	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
 
 	// alloc temporary fields
-	zt_r = (double*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
-	zp_r = zt_r + nspat;
-	zt_i = zt_r + 2*nspat;
-	zp_i = zt_r + 3*nspat;
-	slm_r = (cplx*) (zt_r + 4*nspat);
-	tlm_r = slm_r + NLM;
-	slm_i = slm_r + 2*NLM;
-	tlm_i = slm_r + 3*NLM;
+	mem = (cplx*) VMALLOC( (2*nspat + NLM*4)*sizeof(cplx) );
+	stlm = mem + 2*nspat;
 
-	// split zt and zp into real and imag parts.
-	for (int k=0; k<nspat; k++) {
-		zt_r[k] = creal(zt[k]);		zt_i[k] = cimag(zt[k]);
-	}
-	for (int k=0; k<nspat; k++) {
-		zp_r[k] = creal(zp[k]);		zp_i[k] = cimag(zp[k]);
+	zzt = zt;		zzp = zp;
+	if (NPHI>1) {
+		if (shtns->fftc_mode != 0) {
+			zzt = mem;		zzp = mem + nspat;	// out-of-place transform
+		}
+		fftw_execute_dft(shtns->fft_cplx, zt, zzt);
+		fftw_execute_dft(shtns->fft_cplx, zp, zzp);
 	}
 
-	// perform two real transforms:
-	spat_to_SHsphtor(shtns, zt_r,zp_r, slm_r,tlm_r);	// real
-	spat_to_SHsphtor(shtns, zt_i,zp_i, slm_i,tlm_i);	// imag
+	const double norm = 1.0/NPHI;
+	#pragma omp parallel for schedule(static,1)
+	for (int m=0; m<=MMAX; m++) {
+		const long stride = LMAX+1-m;
+		if (m==0) {	// m=0
+			spat_to_SHsphtor_ml(shtns, 0, zzt, zzp,     stlm, stlm+stride, LMAX);	// real
+			spat_to_SHsphtor_ml(shtns, 0, (cplx*)(((double*)zzt)+1), (cplx*)(((double*)zzp)+1), stlm+2*stride, stlm+3*stride, LMAX);	// imag
+			int lm = 0;
+			int ll = 0;
+			for (int l=0; l<=LMAX; l++) {
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+				slm[ll] = (creal(stlm[lm])        + I*creal(stlm[lm+2*stride]))*norm;		// m=0
+				tlm[ll] = (creal(stlm[lm+stride]) + I*creal(stlm[lm+3*stride]))*norm;		// m=0
+				lm++;
+			}
+		} else {
+			long lm = 4 * LM(shtns,m,m);
+			spat_to_SHsphtor_ml(shtns, m,  zzt + (NPHI-m)*NLAT, zzp + (NPHI-m)*NLAT, stlm+lm,          stlm+lm+stride,   LMAX);		// m>0
+			spat_to_SHsphtor_ml(shtns, -m, zzt + m*NLAT,        zzp + m*NLAT,        stlm+lm+2*stride, stlm+lm+3*stride, LMAX);		// m<0
+			int ll = (m-1)*m;
+			for (int l=m; l<=LMAX; l++) {
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;	
+				cplx sr = stlm[lm];				// +m
+				cplx tr = stlm[lm+stride];		// +m
+				cplx si = stlm[lm+2*stride];	// -m
+				cplx ti = stlm[lm+3*stride];	// -m
+				slm[ll+m] = sr*norm;
+				tlm[ll+m] = tr*norm;
+				if (m&1) {	si = -si;		ti = -ti;  }				// m<0, m odd
+				slm[ll-m] = si*norm;
+				tlm[ll-m] = ti*norm;
+				lm++;
+			}
+		}
+	}
 
-	// combine into complex coefficients
-	SH_2real_to_cplx(shtns, slm_r, slm_i, slm);
-	SH_2real_to_cplx(shtns, tlm_r, tlm_i, tlm);
-
-	VFREE(zt_r);
+	VFREE(mem);
 }
+
 
 /// same as \ref SHsphtor_to_spat_cplx but multiply by sin(theta) after the transform.
 void SHsphtor_to_spat_cplx_xsint(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx *zp)
 {
-	long int nspat = shtns->nspat;
-	double *zt_r, *zt_i, *zp_r, *zp_i;
-	cplx *slm_r, *slm_i, *tlm_r, *tlm_i;
+	const long int nspat = shtns->nspat;
+	const double* const st = shtns->st;
+	cplx *zzt, *zzp, *mem, *stlm;
 
 	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
 
 	// alloc temporary fields
-	zt_r = (double*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
-	zp_r = zt_r + nspat;
-	zt_i = zt_r + 2*nspat;
-	zp_i = zt_r + 3*nspat;
-	slm_r = (cplx*) (zt_r + 4*nspat);
-	tlm_r = slm_r + NLM;
-	slm_i = slm_r + 2*NLM;
-	tlm_i = slm_r + 3*NLM;
+	mem = (cplx*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
+	stlm = mem + 2*nspat;
 
-	// extract complex coefficients corresponding to real and imag
-	SH_cplx_to_2real(shtns, slm, slm_r, slm_i);
-	SH_cplx_to_2real(shtns, tlm, tlm_r, tlm_i);
+	zzt = zt;		zzp = zp;
+	if ((NPHI>1) && (shtns->fftc_mode != 0)) {	zzt = mem;	zzp = mem + nspat;  }			// out-of-place transform
 
-	// perform two real transforms:
-	SHsphtor_to_spat(shtns, slm_r, tlm_r, zt_r, zp_r);
-	SHsphtor_to_spat(shtns, slm_i, tlm_i, zt_i, zp_i);
+	#pragma omp parallel for schedule(static,1)
+	for (int m=0; m<=MMAX; m++) {
+		const long stride = LMAX+1-m;
+		if (m==0) {	// m=0
+			int lm = 0;
+			int ll = 0;
+			for (int l=0; l<=LMAX; l++) {			// gather from cplx rep
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+				stlm[lm]          = creal(slm[ll]);
+				stlm[lm+2*stride] = cimag(slm[ll]);
+				stlm[lm+stride]   = creal(tlm[ll]);
+				stlm[lm+3*stride] = cimag(tlm[ll]);
+				lm++;
+			}
+			cplx tt[NLAT] SSE;
+			cplx pp[NLAT] SSE;
+			SHsphtor_to_spat_ml(shtns, 0, stlm,          stlm+stride,   zzt, zzp, LMAX);
+			SHsphtor_to_spat_ml(shtns, 0, stlm+2*stride, stlm+3*stride, tt,  pp,  LMAX);
+			for (int it=0; it<NLAT; it++) {		// copy imaginary part to destination array and multiply by sin(theta)
+				double sint = st[it];
+				((double*)zzt)[2*it+1] = creal(tt[it]) * sint;
+				((double*)zzp)[2*it+1] = creal(pp[it]) * sint;
+			}
+			// fill m>MMAX with zeros!
+			for (long i=(MMAX+1)*NLAT; i<(NPHI-MMAX)*NLAT; i++)	{
+				zzt[i] = 0.0;		zzp[i] = 0.0;
+			}
+		} else {
+			long lm = 4 * LM(shtns,m,m);
+			int ll = (m-1)*m;
+			for (int l=m; l<=LMAX; l++) {			// gather from cplx rep
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+				cplx sr = slm[ll+m];	// +m
+				cplx si = slm[ll-m];	// -m
+				cplx tr = tlm[ll+m];	// +m
+				cplx ti = tlm[ll-m];	// -m
+				if (m&1) {				// m<0, m odd
+					si = -si;
+					ti = -ti;
+				}
+				stlm[lm] = sr;          stlm[lm+2*stride] = si;
+				stlm[lm+stride] = tr;	stlm[lm+3*stride] = ti;
+				lm++;
+			}
+			lm = 4 * LM(shtns,m,m);
+			SHsphtor_to_spat_ml(shtns, m,  stlm+lm,          stlm+stride+lm,   zzt + m*NLAT,        zzp + m*NLAT,        LMAX);		// m>0
+			SHsphtor_to_spat_ml(shtns, -m, stlm+2*stride+lm, stlm+3*stride+lm, zzt + (NPHI-m)*NLAT, zzp + (NPHI-m)*NLAT, LMAX);		// m<0
+			for (int k=0; k<NLAT; k++) {		// multiply by sin(theta)
+				double sint = st[k];
+				zzt[m*NLAT        +k] *= sint;		zzt[(NPHI-m)*NLAT +k] *= sint;
+				zzp[m*NLAT        +k] *= sint;		zzp[(NPHI-m)*NLAT +k] *= sint;
+			}
+		}
+	}
 
-	// combine into zt and zp, while multiplying by sin(theta):
-	spat_xsint_2real_to_cplx(shtns, zt_r, zt_i, zt);
-	spat_xsint_2real_to_cplx(shtns, zp_r, zp_i, zp);
-
-	VFREE(zt_r);
+	if (NPHI>1) {
+		fftw_execute_dft(shtns->ifft_cplx, zzt, zt);
+		fftw_execute_dft(shtns->ifft_cplx, zzp, zp);
+	}
+	VFREE(mem);
 }
 
 
 /// same as \ref spat_cplx_to_SHsphtor but divide by sin(theta) before the transform.
 void spat_cplx_xsint_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm, cplx *tlm)
 {
-	long int nspat = shtns->nspat;
-	const double* st_1 = shtns->st_1;
-	double *zt_r, *zt_i, *zp_r, *zp_i;
-	cplx *slm_r, *slm_i, *tlm_r, *tlm_i;
+	const long int nspat = shtns->nspat;
+	const double* const st_1 = shtns->st_1;
+	cplx *zzt, *zzp, *mem, *stlm;
 
 	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
 
 	// alloc temporary fields
-	zt_r = (double*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
-	zp_r = zt_r + nspat;
-	zt_i = zt_r + 2*nspat;
-	zp_i = zt_r + 3*nspat;
-	slm_r = (cplx*) (zt_r + 4*nspat);
-	tlm_r = slm_r + NLM;
-	slm_i = slm_r + 2*NLM;
-	tlm_i = slm_r + 3*NLM;
+	mem = (cplx*) VMALLOC( (2*nspat + NLM*4)*sizeof(cplx) );
+	stlm = mem + 2*nspat;
 
-	// split zt and zp into real and imag parts, while dividing by sin(theta)
-	spat_sint_cplx_to_2real(shtns, zt, zt_r, zt_i);
-	spat_sint_cplx_to_2real(shtns, zp, zp_r, zp_i);
+	zzt = zt;		zzp = zp;
+	if (NPHI>1) {
+		if (shtns->fftc_mode != 0) {
+			zzt = mem;		zzp = mem + nspat;	// out-of-place transform
+		}
+		fftw_execute_dft(shtns->fft_cplx, zt, zzt);
+		fftw_execute_dft(shtns->fft_cplx, zp, zzp);
+	}
 
-	// perform two real transforms:
-	spat_to_SHsphtor(shtns, zt_r,zp_r, slm_r,tlm_r);	// real
-	spat_to_SHsphtor(shtns, zt_i,zp_i, slm_i,tlm_i);	// imag
+	const double norm = 1.0/NPHI;
+	#pragma omp parallel for schedule(static,1)
+	for (int m=0; m<=MMAX; m++) {
+		const long stride = LMAX+1-m;
+		if (m==0) {	// m=0
+			for (int k=0; k<NLAT; k++) {	// divide by sin(theta)
+				double sint_1 = st_1[k];
+				zzt[k] *= sint_1;		zzp[k] *= sint_1;
+			}
+			spat_to_SHsphtor_ml(shtns, 0, zzt, zzp,     stlm, stlm+stride, LMAX);	// real
+			spat_to_SHsphtor_ml(shtns, 0, (cplx*)(((double*)zzt)+1), (cplx*)(((double*)zzp)+1), stlm+2*stride, stlm+3*stride, LMAX);	// imag
+			int lm = 0;
+			int ll = 0;
+			for (int l=0; l<=LMAX; l++) {
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+				slm[ll] = (creal(stlm[lm])        + I*creal(stlm[lm+2*stride]))*norm;		// m=0
+				tlm[ll] = (creal(stlm[lm+stride]) + I*creal(stlm[lm+3*stride]))*norm;		// m=0
+				lm++;
+			}
+		} else {
+			long lm = 4 * LM(shtns,m,m);
+			for (int k=0; k<NLAT; k++) {	// divide by sin(theta)
+				double sint_1 = st_1[k];
+				zzt[m*NLAT +k] *= sint_1;		zzt[(NPHI-m)*NLAT +k] *= sint_1;
+				zzp[m*NLAT +k] *= sint_1;		zzp[(NPHI-m)*NLAT +k] *= sint_1;
+			}
+			spat_to_SHsphtor_ml(shtns, m,  zzt + (NPHI-m)*NLAT, zzp + (NPHI-m)*NLAT, stlm+lm,          stlm+lm+stride,   LMAX);		// m>0
+			spat_to_SHsphtor_ml(shtns, -m, zzt + m*NLAT,        zzp + m*NLAT,        stlm+lm+2*stride, stlm+lm+3*stride, LMAX);		// m<0
+			int ll = (m-1)*m;
+			for (int l=m; l<=LMAX; l++) {
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;	
+				cplx sr = stlm[lm];				// +m
+				cplx tr = stlm[lm+stride];		// +m
+				cplx si = stlm[lm+2*stride];	// -m
+				cplx ti = stlm[lm+3*stride];	// -m
+				slm[ll+m] = sr*norm;
+				tlm[ll+m] = tr*norm;
+				if (m&1) {	si = -si;		ti = -ti;  }				// m<0, m odd
+				slm[ll-m] = si*norm;
+				tlm[ll-m] = ti*norm;
+				lm++;
+			}
+		}
+	}
 
-	// combine into complex coefficients
-	SH_2real_to_cplx(shtns, slm_r, slm_i, slm);
-	SH_2real_to_cplx(shtns, tlm_r, tlm_i, tlm);
-
-	VFREE(zt_r);
+	VFREE(mem);
 }
 
 

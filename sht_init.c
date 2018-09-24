@@ -532,8 +532,8 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	#endif
 
 // Allocate dummy Spatial Fields.
-	ShF = (cplx *) VMALLOC(ncplx * NLAT * sizeof(cplx));
-	Sh = (double *) VMALLOC(ncplx * NLAT * sizeof(cplx));
+	ShF = (cplx *) VMALLOC(ncplx * NLAT*2 * sizeof(cplx));		// *2 for complex-valued fields
+	Sh = (double *) VMALLOC(ncplx * NLAT*2 * sizeof(cplx));
 	fft = NULL;		ifft = NULL;	fft2 = NULL;	ifft2 = NULL;
 
 // complex fft for fly transform is a bit different.
@@ -553,7 +553,11 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2*NPHI;
 		shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
 		shtns->k_stride_a = NPHI;		shtns->m_stride_a = 2;
-	
+		
+		// for complex transform it is much simpler (out-of-place):
+		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, NLAT, 1, (cplx*)Sh, &nfft, 1, NPHI, FFTW_BACKWARD, shtns->fftw_plan_mode);
+		shtns->fft_cplx =  fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, 1, NPHI, (cplx*)Sh, &nfft, NLAT, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+
 		#if SHT_VERBOSE > 1
 		if (verbose>1) {
 			printf("          [phi-contiguous] fftw cost ifftc=%lg,  fftc=%lg  ",fftw_cost(shtns->ifftc), fftw_cost(shtns->fftc));	fflush(stdout);
@@ -576,6 +580,10 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		shtns->fftc_mode = 0;
 		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 		shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
+
+		// complex-values spatial fields (in-place):
+		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, NLAT, 1, ShF, &nfft, NLAT, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+		shtns->fft_cplx = shtns->ifft_cplx;		// same thing, with m>0 and m<0 exchanged.
 		#if SHT_VERBOSE > 1
 		if (verbose>1) {
 			printf("          [theta-contiguous] fftw cost ifftc=%lg  ",fftw_cost(shtns->ifftc));	fflush(stdout);

@@ -587,6 +587,8 @@ T				S2D_CSTORE2_4MAGIC(BpF, k+j, pe[j], po[j], vall(0), vall(0))
 		} while (k < nk);
 
 	} else {	// im > 0
+V		const int ms = im*MRES;		// signed m.
+		im = abs(im);			// positive im
 V		v2d VWl[llim*2+4];
 		m = im*MRES;
 		l = im*(2*(LMAX+1) -m);		// to compute position in NLM array.
@@ -597,7 +599,7 @@ T		Tlm -= m;
 
 V		{	// convert from vector SH to scalar SH
 V			double* mx = shtns->mx_stdt + l-m;
-V			s2d em = vdup(m);
+V			s2d em = vdup(ms);
 S			v2d sl = ((v2d*)Slm)[m];
 T			v2d tl = ((v2d*)Tlm)[m];
 V			v2d vs = vdup( 0.0 );

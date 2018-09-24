@@ -498,6 +498,9 @@ V				((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 		#endif
 		
 	} else {		// im > 0
+V		const int ms = im*MRES;		// signed m.
+		im = abs(im);			// positive im
+
 		for (k=nk*VSIZE2; k<(nk-1+NWAY)*VSIZE2; ++k) {
 Q			rei[k] = 0.0;		roi[k] = 0.0;
 V			tei[k] = 0.0;		toi[k] = 0.0;
@@ -670,7 +673,7 @@ Q				Qlm[l] = qq[2*l] + I*qq[2*l+1];
 Q			}
 Q		#endif
 
-V		SH_2scal_to_vect_reduce(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, m, vw, (v2d*)Slm, (v2d*)Tlm);
+V		SH_2scal_to_vect_reduce(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, ms, vw, (v2d*)Slm, (v2d*)Tlm);
 
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1-m; l<=LMAX-m; ++l) {
