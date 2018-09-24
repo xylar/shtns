@@ -3479,6 +3479,16 @@ SWIGINTERN void shtns_info_SHtor_to_spat(struct shtns_info *self,PyObject *Tlm,P
 		if (check_spatial(2,Vt, self->nspat) && check_spatial(3,Vp, self->nspat) && check_spectral(1,Tlm, self->nlm))
 		SHtor_to_spat(self, PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp));
 	}
+SWIGINTERN void shtns_info_spat_cplx_to_SHsphtor(struct shtns_info *self,PyObject *Vt,PyObject *Vp,PyObject *Slm,PyObject *Tlm){
+		int n = self->lmax + 1;
+		if (check_spectral(1,Vt, self->nspat) && check_spectral(2,Vp, self->nspat) && check_spectral(3,Slm, n*n) && check_spectral(4,Tlm, n*n))
+			spat_cplx_to_SHsphtor(self, PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Slm), PyArray_Data(Tlm));
+	}
+SWIGINTERN void shtns_info_SHsphtor_to_spat_cplx(struct shtns_info *self,PyObject *Slm,PyObject *Tlm,PyObject *Vt,PyObject *Vp){
+		int n = self->lmax + 1;
+		if (check_spectral(3,Vt, self->nspat) && check_spectral(4,Vp, self->nspat) && check_spectral(1,Slm, n*n) && check_spectral(2,Tlm, n*n))
+			SHsphtor_to_spat_cplx(self, PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp));
+	}
 SWIGINTERN void shtns_info_spat_to_SHqst(struct shtns_info *self,PyObject *Vr,PyObject *Vt,PyObject *Vp,PyObject *Qlm,PyObject *Slm,PyObject *Tlm){
 		if (check_spatial(1,Vr, self->nspat) && check_spatial(2,Vt, self->nspat) && check_spatial(3,Vp, self->nspat)
 			&& check_spectral(4,Qlm, self->nlm) && check_spectral(5,Slm, self->nlm) && check_spectral(6,Tlm, self->nlm))
@@ -3488,6 +3498,18 @@ SWIGINTERN void shtns_info_SHqst_to_spat(struct shtns_info *self,PyObject *Qlm,P
 		if (check_spatial(4,Vr, self->nspat) && check_spatial(5,Vt, self->nspat) && check_spatial(6,Vp, self->nspat)
 			&& check_spectral(1,Qlm, self->nlm) && check_spectral(2,Slm, self->nlm) && check_spectral(3,Tlm, self->nlm))
 		SHqst_to_spat(self, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp));
+	}
+SWIGINTERN void shtns_info_spat_cplx_to_SHqst(struct shtns_info *self,PyObject *Vr,PyObject *Vt,PyObject *Vp,PyObject *Qlm,PyObject *Slm,PyObject *Tlm){
+		int n = self->lmax + 1;
+		if (check_spectral(1,Vr, self->nspat) && check_spectral(2,Vt, self->nspat) && check_spectral(3,Vp, self->nspat)
+			&& check_spectral(4,Qlm, n*n) && check_spectral(5,Slm, n*n) && check_spectral(6,Tlm, n*n))
+		spat_cplx_to_SHqst(self, PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm));
+	}
+SWIGINTERN void shtns_info_SHqst_to_spat_cplx(struct shtns_info *self,PyObject *Qlm,PyObject *Slm,PyObject *Tlm,PyObject *Vr,PyObject *Vt,PyObject *Vp){
+		int n = self->lmax + 1;
+		if (check_spatial(4,Vr, self->nspat) && check_spatial(5,Vt, self->nspat) && check_spatial(6,Vp, self->nspat)
+			&& check_spectral(1,Qlm, n*n) && check_spectral(2,Slm, n*n) && check_spectral(3,Tlm, n*n))
+		SHqst_to_spat_cplx(self, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp));
 	}
 SWIGINTERN double shtns_info_SH_to_point(struct shtns_info *self,PyObject *Qlm,double cost,double phi){
 		if (check_spectral(1,Qlm, self->nlm))	return SH_to_point(self, PyArray_Data(Qlm), cost, phi);
@@ -3562,43 +3584,43 @@ SWIGINTERN PyObject *shtns_info_SH_mul_mx(struct shtns_info *self,PyObject *mx,P
 	}
 SWIGINTERN void shtns_info_spat_to_SH_m(struct shtns_info *self,PyObject *Vr,PyObject *Qlm,PyObject *im){
 		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;
-		if ((im_ >= 0) && check_spectral(1,Vr, self->nlat) && check_spectral(2,Qlm, ltr+1 - im_*self->mres))
+		if (check_spectral(1,Vr, self->nlat) && check_spectral(2,Qlm, ltr+1 - abs(im_)*self->mres))
 			spat_to_SH_ml(self, im_, PyArray_Data(Vr), PyArray_Data(Qlm), ltr);
 	}
 SWIGINTERN void shtns_info_SH_to_spat_m(struct shtns_info *self,PyObject *Qlm,PyObject *Vr,PyObject *im){
 		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;
-		if ((im_ >= 0) && check_spectral(2,Vr, self->nlat) && check_spectral(1,Qlm, ltr+1 - im_*self->mres))
+		if (check_spectral(2,Vr, self->nlat) && check_spectral(1,Qlm, ltr+1 - abs(im_)*self->mres))
 			SH_to_spat_ml(self, im_, PyArray_Data(Qlm), PyArray_Data(Vr), ltr);
 	}
 SWIGINTERN void shtns_info_spat_to_SHsphtor_m(struct shtns_info *self,PyObject *Vt,PyObject *Vp,PyObject *Slm,PyObject *Tlm,PyObject *im){
-		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - im_*self->mres;
-		if ((im_ >= 0) && check_spectral(1,Vt, self->nlat) && check_spectral(2,Vp, self->nlat) && check_spectral(3,Slm, nelem) && check_spectral(4,Tlm, nelem))
+		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - abs(im_)*self->mres;
+		if (check_spectral(1,Vt, self->nlat) && check_spectral(2,Vp, self->nlat) && check_spectral(3,Slm, nelem) && check_spectral(4,Tlm, nelem))
 			spat_to_SHsphtor_ml(self, im_, PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Slm), PyArray_Data(Tlm), ltr);
 	}
 SWIGINTERN void shtns_info_SHsphtor_to_spat_m(struct shtns_info *self,PyObject *Slm,PyObject *Tlm,PyObject *Vt,PyObject *Vp,PyObject *im){
-		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - im_*self->mres;
-		if ((im_ >= 0) && check_spectral(3,Vt, self->nlat) && check_spectral(4,Vp, self->nlat) && check_spectral(1,Slm, nelem) && check_spectral(2,Tlm, nelem))
+		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - abs(im_)*self->mres;
+		if (check_spectral(3,Vt, self->nlat) && check_spectral(4,Vp, self->nlat) && check_spectral(1,Slm, nelem) && check_spectral(2,Tlm, nelem))
 			SHsphtor_to_spat_ml(self, im_, PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 SWIGINTERN void shtns_info_SHsph_to_spat_m(struct shtns_info *self,PyObject *Slm,PyObject *Vt,PyObject *Vp,PyObject *im){
-		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - im_*self->mres;
-		if ((im_ >= 0) && check_spectral(2,Vt, self->nlat) && check_spectral(3,Vp, self->nlat) && check_spectral(1,Slm, nelem))
+		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - abs(im_)*self->mres;
+		if (check_spectral(2,Vt, self->nlat) && check_spectral(3,Vp, self->nlat) && check_spectral(1,Slm, nelem))
 		SHsph_to_spat_ml(self, im_, PyArray_Data(Slm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 SWIGINTERN void shtns_info_SHtor_to_spat_m(struct shtns_info *self,PyObject *Tlm,PyObject *Vt,PyObject *Vp,PyObject *im){
-		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - im_*self->mres;
-		if ((im_ >= 0) && check_spectral(2,Vt, self->nlat) && check_spectral(3,Vp, self->nlat) && check_spectral(1,Tlm, nelem))
+		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - abs(im_)*self->mres;
+		if (check_spectral(2,Vt, self->nlat) && check_spectral(3,Vp, self->nlat) && check_spectral(1,Tlm, nelem))
 		SHtor_to_spat_ml(self, im_, PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 SWIGINTERN void shtns_info_spat_to_SHqst_m(struct shtns_info *self,PyObject *Vr,PyObject *Vt,PyObject *Vp,PyObject *Qlm,PyObject *Slm,PyObject *Tlm,PyObject *im){
-		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - im_*self->mres;
-		if ((im_ >= 0) && check_spectral(1,Vr, self->nlat) && check_spectral(2,Vt, self->nlat) && check_spectral(3,Vp, self->nlat)
+		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - abs(im_)*self->mres;
+		if (check_spectral(1,Vr, self->nlat) && check_spectral(2,Vt, self->nlat) && check_spectral(3,Vp, self->nlat)
 			&& check_spectral(4,Qlm, nelem) && check_spectral(5,Slm, nelem) && check_spectral(6,Tlm, nelem))
 		spat_to_SHqst_ml(self, im_, PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), ltr);
 	}
 SWIGINTERN void shtns_info_SHqst_to_spat_m(struct shtns_info *self,PyObject *Qlm,PyObject *Slm,PyObject *Tlm,PyObject *Vr,PyObject *Vt,PyObject *Vp,PyObject *im){
-		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - im_*self->mres;
-		if ((im_ >= 0) && check_spectral(4,Vr, self->nlat) && check_spectral(5,Vt, self->nlat) && check_spectral(6,Vp, self->nlat)
+		int im_ = PyLong_AsLong(im);		int ltr = self->lmax;		int nelem = ltr+1 - abs(im_)*self->mres;
+		if (check_spectral(4,Vr, self->nlat) && check_spectral(5,Vt, self->nlat) && check_spectral(6,Vp, self->nlat)
 			&& check_spectral(1,Qlm, nelem) && check_spectral(2,Slm, nelem) && check_spectral(3,Tlm, nelem))
 		SHqst_to_spat_ml(self, im_, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
@@ -4654,6 +4676,86 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_sht_spat_cplx_to_SHsphtor(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  PyObject *arg2 = (PyObject *) 0 ;
+  PyObject *arg3 = (PyObject *) 0 ;
+  PyObject *arg4 = (PyObject *) 0 ;
+  PyObject *arg5 = (PyObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  PyObject * obj4 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOOOO:sht_spat_cplx_to_SHsphtor",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_spat_cplx_to_SHsphtor" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  arg2 = obj1;
+  arg3 = obj2;
+  arg4 = obj3;
+  arg5 = obj4;
+  {
+    shtns_error = 0;	// clear exception
+    shtns_info_spat_cplx_to_SHsphtor(arg1,arg2,arg3,arg4,arg5);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_sht_SHsphtor_to_spat_cplx(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  PyObject *arg2 = (PyObject *) 0 ;
+  PyObject *arg3 = (PyObject *) 0 ;
+  PyObject *arg4 = (PyObject *) 0 ;
+  PyObject *arg5 = (PyObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  PyObject * obj4 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOOOO:sht_SHsphtor_to_spat_cplx",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_SHsphtor_to_spat_cplx" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  arg2 = obj1;
+  arg3 = obj2;
+  arg4 = obj3;
+  arg5 = obj4;
+  {
+    shtns_error = 0;	// clear exception
+    shtns_info_SHsphtor_to_spat_cplx(arg1,arg2,arg3,arg4,arg5);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_sht_spat_to_SHqst(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
@@ -4734,6 +4836,98 @@ SWIGINTERN PyObject *_wrap_sht_SHqst_to_spat(PyObject *SWIGUNUSEDPARM(self), PyO
   {
     shtns_error = 0;	// clear exception
     shtns_info_SHqst_to_spat(arg1,arg2,arg3,arg4,arg5,arg6,arg7);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_sht_spat_cplx_to_SHqst(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  PyObject *arg2 = (PyObject *) 0 ;
+  PyObject *arg3 = (PyObject *) 0 ;
+  PyObject *arg4 = (PyObject *) 0 ;
+  PyObject *arg5 = (PyObject *) 0 ;
+  PyObject *arg6 = (PyObject *) 0 ;
+  PyObject *arg7 = (PyObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  PyObject * obj4 = 0 ;
+  PyObject * obj5 = 0 ;
+  PyObject * obj6 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOOOOOO:sht_spat_cplx_to_SHqst",&obj0,&obj1,&obj2,&obj3,&obj4,&obj5,&obj6)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_spat_cplx_to_SHqst" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  arg2 = obj1;
+  arg3 = obj2;
+  arg4 = obj3;
+  arg5 = obj4;
+  arg6 = obj5;
+  arg7 = obj6;
+  {
+    shtns_error = 0;	// clear exception
+    shtns_info_spat_cplx_to_SHqst(arg1,arg2,arg3,arg4,arg5,arg6,arg7);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_sht_SHqst_to_spat_cplx(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  PyObject *arg2 = (PyObject *) 0 ;
+  PyObject *arg3 = (PyObject *) 0 ;
+  PyObject *arg4 = (PyObject *) 0 ;
+  PyObject *arg5 = (PyObject *) 0 ;
+  PyObject *arg6 = (PyObject *) 0 ;
+  PyObject *arg7 = (PyObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  PyObject * obj4 = 0 ;
+  PyObject * obj5 = 0 ;
+  PyObject * obj6 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOOOOOO:sht_SHqst_to_spat_cplx",&obj0,&obj1,&obj2,&obj3,&obj4,&obj5,&obj6)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_SHqst_to_spat_cplx" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  arg2 = obj1;
+  arg3 = obj2;
+  arg4 = obj3;
+  arg5 = obj4;
+  arg6 = obj5;
+  arg7 = obj6;
+  {
+    shtns_error = 0;	// clear exception
+    shtns_info_SHqst_to_spat_cplx(arg1,arg2,arg3,arg4,arg5,arg6,arg7);
     if (shtns_error) {
       // test for exception
       SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
@@ -5732,8 +5926,12 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_SHsphtor_to_spat", _wrap_sht_SHsphtor_to_spat, METH_VARARGS, (char *)"sht_SHsphtor_to_spat(sht self, PyObject * Slm, PyObject * Tlm, PyObject * Vt, PyObject * Vp)"},
 	 { (char *)"sht_SHsph_to_spat", _wrap_sht_SHsph_to_spat, METH_VARARGS, (char *)"sht_SHsph_to_spat(sht self, PyObject * Slm, PyObject * Vt, PyObject * Vp)"},
 	 { (char *)"sht_SHtor_to_spat", _wrap_sht_SHtor_to_spat, METH_VARARGS, (char *)"sht_SHtor_to_spat(sht self, PyObject * Tlm, PyObject * Vt, PyObject * Vp)"},
+	 { (char *)"sht_spat_cplx_to_SHsphtor", _wrap_sht_spat_cplx_to_SHsphtor, METH_VARARGS, (char *)"sht_spat_cplx_to_SHsphtor(sht self, PyObject * Vt, PyObject * Vp, PyObject * Slm, PyObject * Tlm)"},
+	 { (char *)"sht_SHsphtor_to_spat_cplx", _wrap_sht_SHsphtor_to_spat_cplx, METH_VARARGS, (char *)"sht_SHsphtor_to_spat_cplx(sht self, PyObject * Slm, PyObject * Tlm, PyObject * Vt, PyObject * Vp)"},
 	 { (char *)"sht_spat_to_SHqst", _wrap_sht_spat_to_SHqst, METH_VARARGS, (char *)"sht_spat_to_SHqst(sht self, PyObject * Vr, PyObject * Vt, PyObject * Vp, PyObject * Qlm, PyObject * Slm, PyObject * Tlm)"},
 	 { (char *)"sht_SHqst_to_spat", _wrap_sht_SHqst_to_spat, METH_VARARGS, (char *)"sht_SHqst_to_spat(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp)"},
+	 { (char *)"sht_spat_cplx_to_SHqst", _wrap_sht_spat_cplx_to_SHqst, METH_VARARGS, (char *)"sht_spat_cplx_to_SHqst(sht self, PyObject * Vr, PyObject * Vt, PyObject * Vp, PyObject * Qlm, PyObject * Slm, PyObject * Tlm)"},
+	 { (char *)"sht_SHqst_to_spat_cplx", _wrap_sht_SHqst_to_spat_cplx, METH_VARARGS, (char *)"sht_SHqst_to_spat_cplx(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp)"},
 	 { (char *)"sht_SH_to_point", _wrap_sht_SH_to_point, METH_VARARGS, (char *)"sht_SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"},
 	 { (char *)"sht_SH_to_grad_point", _wrap_sht_SH_to_grad_point, METH_VARARGS, (char *)"sht_SH_to_grad_point(sht self, PyObject * DrSlm, PyObject * Slm, double cost, double phi)"},
 	 { (char *)"sht_SHqst_to_point", _wrap_sht_SHqst_to_point, METH_VARARGS, (char *)"sht_SHqst_to_point(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, double cost, double phi)"},

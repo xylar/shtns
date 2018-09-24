@@ -313,7 +313,6 @@ inline static PyObject* SpatArray_New(int size) {
 		if (check_spatial(3,gp, $self->nspat) && check_spatial(2,gt, $self->nspat) && check_spectral(1,alm, $self->nlm))
 			SH_to_spat_grad($self, PyArray_Data(alm), PyArray_Data(gt), PyArray_Data(gp));
 	}*/
-
 	/* 2D vectors */
 	void spat_to_SHsphtor(PyObject *Vt, PyObject *Vp, PyObject *Slm, PyObject *Tlm) {
 		if (check_spatial(1,Vt, $self->nspat) && check_spatial(2,Vp, $self->nspat) && check_spectral(3,Slm, $self->nlm) && check_spectral(4,Tlm, $self->nlm))
@@ -331,7 +330,17 @@ inline static PyObject* SpatArray_New(int size) {
 		if (check_spatial(2,Vt, $self->nspat) && check_spatial(3,Vp, $self->nspat) && check_spectral(1,Tlm, $self->nlm))
 		SHtor_to_spat($self, PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp));
 	}
-
+	/* complex-valued spatial 2D vectors */
+	void spat_cplx_to_SHsphtor(PyObject *Vt, PyObject *Vp, PyObject *Slm, PyObject *Tlm) {
+		int n = $self->lmax + 1;
+		if (check_spectral(1,Vt, $self->nspat) && check_spectral(2,Vp, $self->nspat) && check_spectral(3,Slm, n*n) && check_spectral(4,Tlm, n*n))
+			spat_cplx_to_SHsphtor($self, PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Slm), PyArray_Data(Tlm));
+	}
+	void SHsphtor_to_spat_cplx(PyObject *Slm, PyObject *Tlm, PyObject *Vt, PyObject *Vp) {
+		int n = $self->lmax + 1;
+		if (check_spectral(3,Vt, $self->nspat) && check_spectral(4,Vp, $self->nspat) && check_spectral(1,Slm, n*n) && check_spectral(2,Tlm, n*n))
+			SHsphtor_to_spat_cplx($self, PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp));
+	}
 	/* 3D vectors */
 	void spat_to_SHqst(PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *Qlm, PyObject *Slm, PyObject *Tlm) {
 		if (check_spatial(1,Vr, $self->nspat) && check_spatial(2,Vt, $self->nspat) && check_spatial(3,Vp, $self->nspat)
@@ -342,6 +351,19 @@ inline static PyObject* SpatArray_New(int size) {
 		if (check_spatial(4,Vr, $self->nspat) && check_spatial(5,Vt, $self->nspat) && check_spatial(6,Vp, $self->nspat)
 			&& check_spectral(1,Qlm, $self->nlm) && check_spectral(2,Slm, $self->nlm) && check_spectral(3,Tlm, $self->nlm))
 		SHqst_to_spat($self, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp));
+	}
+	/* complex-valued spatial 3D vectors */
+	void spat_cplx_to_SHqst(PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *Qlm, PyObject *Slm, PyObject *Tlm) {
+		int n = $self->lmax + 1;
+		if (check_spectral(1,Vr, $self->nspat) && check_spectral(2,Vt, $self->nspat) && check_spectral(3,Vp, $self->nspat)
+			&& check_spectral(4,Qlm, n*n) && check_spectral(5,Slm, n*n) && check_spectral(6,Tlm, n*n))
+		spat_cplx_to_SHqst($self, PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm));
+	}
+	void SHqst_to_spat_cplx(PyObject *Qlm, PyObject *Slm, PyObject *Tlm, PyObject *Vr, PyObject *Vt, PyObject *Vp) {
+		int n = $self->lmax + 1;
+		if (check_spatial(4,Vr, $self->nspat) && check_spatial(5,Vt, $self->nspat) && check_spatial(6,Vp, $self->nspat)
+			&& check_spectral(1,Qlm, n*n) && check_spectral(2,Slm, n*n) && check_spectral(3,Tlm, n*n))
+		SHqst_to_spat_cplx($self, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp));
 	}
 
 	%pythoncode %{
@@ -419,33 +441,72 @@ inline static PyObject* SpatArray_New(int size) {
 			self.SHsph_to_spat(slm,vt,vp)
 			return vt,vp
 
-		def synth_cplx(self,alm):
+		def synth_cplx(self,*arg):
 			"""
-			spectral to spatial transform, for complex valued scalar data.
-			z = synth(alm) : compute the spatial representation of the scalar alm
+			spectral to spatial transform, for complex-valued scalar or vector data.
+			z = synth(zlm) : compute the complex-valued spatial representation of the scalar zlm
+			vtheta,vphi = synth(slm,tlm) : compute the complex-valued 2D spatial vector from its spectral spheroidal/toroidal scalars (slm,tlm)
+			vr,vtheta,vphi = synth(qlm,slm,tlm) : compute the complex-valued 3D spatial vector from its spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm)
 			"""
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
 			if self.lmax != self.mmax: raise RuntimeError("complex SH requires lmax=mmax and mres=1.")
-			if alm.size != (self.lmax+1)**2: raise RuntimeError("spectral array has wrong size.")
-			if alm.dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
-			if alm.flags.contiguous == False: alm = alm.copy()		# contiguous array required.
-			z = np.empty(self.spat_shape, dtype=complex)
-			self.SH_to_spat_cplx(alm,z)
-			return z
 
-		def analys_cplx(self,z):
+			n = len(arg)
+			if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
+			q = list(arg)
+			for i in range(0,n):
+				if q[i].size != (self.lmax+1)**2: raise RuntimeError("spectral array has wrong size.")
+				if q[i].dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
+				if q[i].flags.contiguous == False: q[i] = q[i].copy()		# contiguous array required.
+			if n==1:	#scalar transform
+				z = np.empty(self.spat_shape, dtype=complex)
+				self.SH_to_spat_cplx(q[0],z)
+				return z
+			elif n==2:	# 2D vector transform
+				zt = np.empty(self.spat_shape, dtype=complex)       # v_theta
+				zp = np.empty(self.spat_shape, dtype=complex)       # v_phi
+				self.SHsphtor_to_spat_cplx(q[0],q[1],zt,zp)
+				return zt,zp
+			else:		# 3D vector transform
+				zr = np.empty(self.spat_shape, dtype=complex)		# v_r
+				zt = np.empty(self.spat_shape, dtype=complex)		# v_theta
+				zp = np.empty(self.spat_shape, dtype=complex)		# v_phi
+				self.SHqst_to_spat(q[0],q[1],q[2],zr,zt,zp)
+				return vr,vt,vp
+
+		def analys_cplx(self,*arg):
 			"""
-			spatial to spectral transform, for complex valued scalar data.
-			alm = analys(z) : compute the spherical harmonic representation of the complex scalar z
+			spatial to spectral transform, for complex-valued scalar or vector data.
+			zlm = analys(z) : compute the spherical harmonic representation of the complex scalar z
+			slm,tlm = analys(vtheta,vphi) : compute the spectral spheroidal/toroidal scalars (slm,tlm) from complex-valued 2D vector components (vtheta, vphi)
+			qlm,slm,tlm = synth(vr,vtheta,vphi) : compute the spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm) from complex-valued 3D vector components (vr,vtheta,vphi)
 			"""
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
 			if self.lmax != self.mmax: raise RuntimeError("complex SH requires lmax=mmax and mres=1.")
-			if z.shape != self.spat_shape: raise RuntimeError("spatial array has wrong shape.")
-			if z.dtype.num != np.dtype('complex128').num: raise RuntimeError("spatial array should be dtype=complex128.")
-			if z.flags.contiguous == False: z = z.copy()		# contiguous array required.
-			alm = np.empty((self.lmax+1)**2, dtype=complex)
-			self.spat_cplx_to_SH(z,alm)
-			return alm
+
+			n = len(arg)
+			if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
+			v = list(arg)
+			for i in range(0,n):
+				if v[i].shape != self.spat_shape: raise RuntimeError("spatial array has wrong shape.")
+				if v[i].dtype.num != np.dtype('complex128').num: raise RuntimeError("spatial array should be dtype=complex128.")
+				if v[i].flags.contiguous == False: v[i] = v[i].copy()		# contiguous array required.
+			if n==1:
+				q = np.empty((self.lmax+1)**2, dtype=complex)
+				self.spat_cplx_to_SH(v[0],q)
+				return q
+			elif n==2:
+				s = np.empty((self.lmax+1)**2, dtype=complex)
+				t = np.empty((self.lmax+1)**2, dtype=complex)
+				self.spat_cplx_to_SHsphtor(v[0],v[1],s,t)
+				return s,t
+			else:
+				q = np.empty((self.lmax+1)**2, dtype=complex)
+				s = np.empty((self.lmax+1)**2, dtype=complex)
+				t = np.empty((self.lmax+1)**2, dtype=complex)
+				self.spat_cplx_to_SHqst(v[0],v[1],v[2],q,s,t)
+				return q,s,t
+
 
 		def zidx(self, l,m):
 			"""
@@ -473,7 +534,7 @@ inline static PyObject* SpatArray_New(int size) {
 		def spat_array_cplx(self):
 			"""return a numpy array of 2D complex spatial field."""
 			if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
-			return np.zeros(self.spat_shape, dtype=complex128)
+			return np.zeros(self.spat_shape, dtype='complex128')
 	%}
 
 	/* local evaluations */
@@ -565,43 +626,43 @@ inline static PyObject* SpatArray_New(int size) {
 	/* Legendre transforms (no fft) at given order m */
 	void spat_to_SH_m(PyObject *Vr, PyObject *Qlm, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;
-		if ((im_ >= 0) && check_spectral(1,Vr, $self->nlat) && check_spectral(2,Qlm, ltr+1 - im_*$self->mres))
+		if (check_spectral(1,Vr, $self->nlat) && check_spectral(2,Qlm, ltr+1 - abs(im_)*$self->mres))
 			spat_to_SH_ml($self, im_, PyArray_Data(Vr), PyArray_Data(Qlm), ltr);
 	}
 	void SH_to_spat_m(PyObject *Qlm, PyObject *Vr, PyObject *im) {
 		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;
-		if ((im_ >= 0) && check_spectral(2,Vr, $self->nlat) && check_spectral(1,Qlm, ltr+1 - im_*$self->mres))
+		if (check_spectral(2,Vr, $self->nlat) && check_spectral(1,Qlm, ltr+1 - abs(im_)*$self->mres))
 			SH_to_spat_ml($self, im_, PyArray_Data(Qlm), PyArray_Data(Vr), ltr);
 	}
 	void spat_to_SHsphtor_m(PyObject *Vt, PyObject *Vp, PyObject *Slm, PyObject *Tlm, PyObject *im) {
-		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
-		if ((im_ >= 0) && check_spectral(1,Vt, $self->nlat) && check_spectral(2,Vp, $self->nlat) && check_spectral(3,Slm, nelem) && check_spectral(4,Tlm, nelem))
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - abs(im_)*$self->mres;
+		if (check_spectral(1,Vt, $self->nlat) && check_spectral(2,Vp, $self->nlat) && check_spectral(3,Slm, nelem) && check_spectral(4,Tlm, nelem))
 			spat_to_SHsphtor_ml($self, im_, PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Slm), PyArray_Data(Tlm), ltr);
 	}
 	void SHsphtor_to_spat_m(PyObject *Slm, PyObject *Tlm, PyObject *Vt, PyObject *Vp, PyObject *im) {
-		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
-		if ((im_ >= 0) && check_spectral(3,Vt, $self->nlat) && check_spectral(4,Vp, $self->nlat) && check_spectral(1,Slm, nelem) && check_spectral(2,Tlm, nelem))
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - abs(im_)*$self->mres;
+		if (check_spectral(3,Vt, $self->nlat) && check_spectral(4,Vp, $self->nlat) && check_spectral(1,Slm, nelem) && check_spectral(2,Tlm, nelem))
 			SHsphtor_to_spat_ml($self, im_, PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 	void SHsph_to_spat_m(PyObject *Slm, PyObject *Vt, PyObject *Vp, PyObject *im) {
-		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
-		if ((im_ >= 0) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat) && check_spectral(1,Slm, nelem))
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - abs(im_)*$self->mres;
+		if (check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat) && check_spectral(1,Slm, nelem))
 		SHsph_to_spat_ml($self, im_, PyArray_Data(Slm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 	void SHtor_to_spat_m(PyObject *Tlm, PyObject *Vt, PyObject *Vp, PyObject *im) {
-		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
-		if ((im_ >= 0) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat) && check_spectral(1,Tlm, nelem))
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - abs(im_)*$self->mres;
+		if (check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat) && check_spectral(1,Tlm, nelem))
 		SHtor_to_spat_ml($self, im_, PyArray_Data(Tlm), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
 	void spat_to_SHqst_m(PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *Qlm, PyObject *Slm, PyObject *Tlm, PyObject *im) {
-		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
-		if ((im_ >= 0) && check_spectral(1,Vr, $self->nlat) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat)
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - abs(im_)*$self->mres;
+		if (check_spectral(1,Vr, $self->nlat) && check_spectral(2,Vt, $self->nlat) && check_spectral(3,Vp, $self->nlat)
 			&& check_spectral(4,Qlm, nelem) && check_spectral(5,Slm, nelem) && check_spectral(6,Tlm, nelem))
 		spat_to_SHqst_ml($self, im_, PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), ltr);
 	}
 	void SHqst_to_spat_m(PyObject *Qlm, PyObject *Slm, PyObject *Tlm, PyObject *Vr, PyObject *Vt, PyObject *Vp, PyObject *im) {
-		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - im_*$self->mres;
-		if ((im_ >= 0) && check_spectral(4,Vr, $self->nlat) && check_spectral(5,Vt, $self->nlat) && check_spectral(6,Vp, $self->nlat)
+		int im_ = PyLong_AsLong(im);		int ltr = $self->lmax;		int nelem = ltr+1 - abs(im_)*$self->mres;
+		if (check_spectral(4,Vr, $self->nlat) && check_spectral(5,Vt, $self->nlat) && check_spectral(6,Vp, $self->nlat)
 			&& check_spectral(1,Qlm, nelem) && check_spectral(2,Slm, nelem) && check_spectral(3,Tlm, nelem))
 		SHqst_to_spat_ml($self, im_, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}

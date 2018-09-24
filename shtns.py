@@ -303,6 +303,16 @@ class sht(_object):
         return _shtns.sht_SHtor_to_spat(self, Tlm, Vt, Vp)
 
 
+    def spat_cplx_to_SHsphtor(self, Vt, Vp, Slm, Tlm):
+        """spat_cplx_to_SHsphtor(sht self, PyObject * Vt, PyObject * Vp, PyObject * Slm, PyObject * Tlm)"""
+        return _shtns.sht_spat_cplx_to_SHsphtor(self, Vt, Vp, Slm, Tlm)
+
+
+    def SHsphtor_to_spat_cplx(self, Slm, Tlm, Vt, Vp):
+        """SHsphtor_to_spat_cplx(sht self, PyObject * Slm, PyObject * Tlm, PyObject * Vt, PyObject * Vp)"""
+        return _shtns.sht_SHsphtor_to_spat_cplx(self, Slm, Tlm, Vt, Vp)
+
+
     def spat_to_SHqst(self, Vr, Vt, Vp, Qlm, Slm, Tlm):
         """spat_to_SHqst(sht self, PyObject * Vr, PyObject * Vt, PyObject * Vp, PyObject * Qlm, PyObject * Slm, PyObject * Tlm)"""
         return _shtns.sht_spat_to_SHqst(self, Vr, Vt, Vp, Qlm, Slm, Tlm)
@@ -311,6 +321,16 @@ class sht(_object):
     def SHqst_to_spat(self, Qlm, Slm, Tlm, Vr, Vt, Vp):
         """SHqst_to_spat(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp)"""
         return _shtns.sht_SHqst_to_spat(self, Qlm, Slm, Tlm, Vr, Vt, Vp)
+
+
+    def spat_cplx_to_SHqst(self, Vr, Vt, Vp, Qlm, Slm, Tlm):
+        """spat_cplx_to_SHqst(sht self, PyObject * Vr, PyObject * Vt, PyObject * Vp, PyObject * Qlm, PyObject * Slm, PyObject * Tlm)"""
+        return _shtns.sht_spat_cplx_to_SHqst(self, Vr, Vt, Vp, Qlm, Slm, Tlm)
+
+
+    def SHqst_to_spat_cplx(self, Qlm, Slm, Tlm, Vr, Vt, Vp):
+        """SHqst_to_spat_cplx(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp)"""
+        return _shtns.sht_SHqst_to_spat_cplx(self, Qlm, Slm, Tlm, Vr, Vt, Vp)
 
 
     def synth(self,*arg):
@@ -387,33 +407,72 @@ class sht(_object):
     	self.SHsph_to_spat(slm,vt,vp)
     	return vt,vp
 
-    def synth_cplx(self,alm):
+    def synth_cplx(self,*arg):
     	"""
-    	spectral to spatial transform, for complex valued scalar data.
-    	z = synth(alm) : compute the spatial representation of the scalar alm
+    	spectral to spatial transform, for complex-valued scalar or vector data.
+    	z = synth(zlm) : compute the complex-valued spatial representation of the scalar zlm
+    	vtheta,vphi = synth(slm,tlm) : compute the complex-valued 2D spatial vector from its spectral spheroidal/toroidal scalars (slm,tlm)
+    	vr,vtheta,vphi = synth(qlm,slm,tlm) : compute the complex-valued 3D spatial vector from its spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm)
     	"""
     	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
     	if self.lmax != self.mmax: raise RuntimeError("complex SH requires lmax=mmax and mres=1.")
-    	if alm.size != (self.lmax+1)**2: raise RuntimeError("spectral array has wrong size.")
-    	if alm.dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
-    	if alm.flags.contiguous == False: alm = alm.copy()		# contiguous array required.
-    	z = np.empty(self.spat_shape, dtype=complex)
-    	self.SH_to_spat_cplx(alm,z)
-    	return z
 
-    def analys_cplx(self,z):
+    	n = len(arg)
+    	if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
+    	q = list(arg)
+    	for i in range(0,n):
+    		if q[i].size != (self.lmax+1)**2: raise RuntimeError("spectral array has wrong size.")
+    		if q[i].dtype.num != np.dtype('complex128').num: raise RuntimeError("spectral array should be dtype=complex.")
+    		if q[i].flags.contiguous == False: q[i] = q[i].copy()		# contiguous array required.
+    	if n==1:	#scalar transform
+    		z = np.empty(self.spat_shape, dtype=complex)
+    		self.SH_to_spat_cplx(q[0],z)
+    		return z
+    	elif n==2:	# 2D vector transform
+    		zt = np.empty(self.spat_shape, dtype=complex)       # v_theta
+    		zp = np.empty(self.spat_shape, dtype=complex)       # v_phi
+    		self.SHsphtor_to_spat_cplx(q[0],q[1],zt,zp)
+    		return zt,zp
+    	else:		# 3D vector transform
+    		zr = np.empty(self.spat_shape, dtype=complex)		# v_r
+    		zt = np.empty(self.spat_shape, dtype=complex)		# v_theta
+    		zp = np.empty(self.spat_shape, dtype=complex)		# v_phi
+    		self.SHqst_to_spat(q[0],q[1],q[2],zr,zt,zp)
+    		return vr,vt,vp
+
+    def analys_cplx(self,*arg):
     	"""
-    	spatial to spectral transform, for complex valued scalar data.
-    	alm = analys(z) : compute the spherical harmonic representation of the complex scalar z
+    	spatial to spectral transform, for complex-valued scalar or vector data.
+    	zlm = analys(z) : compute the spherical harmonic representation of the complex scalar z
+    	slm,tlm = analys(vtheta,vphi) : compute the spectral spheroidal/toroidal scalars (slm,tlm) from complex-valued 2D vector components (vtheta, vphi)
+    	qlm,slm,tlm = synth(vr,vtheta,vphi) : compute the spectral radial/spheroidal/toroidal scalars (qlm,slm,tlm) from complex-valued 3D vector components (vr,vtheta,vphi)
     	"""
     	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
     	if self.lmax != self.mmax: raise RuntimeError("complex SH requires lmax=mmax and mres=1.")
-    	if z.shape != self.spat_shape: raise RuntimeError("spatial array has wrong shape.")
-    	if z.dtype.num != np.dtype('complex128').num: raise RuntimeError("spatial array should be dtype=complex128.")
-    	if z.flags.contiguous == False: z = z.copy()		# contiguous array required.
-    	alm = np.empty((self.lmax+1)**2, dtype=complex)
-    	self.spat_cplx_to_SH(z,alm)
-    	return alm
+
+    	n = len(arg)
+    	if (n>3) or (n<1): raise RuntimeError("1,2 or 3 arguments required.")
+    	v = list(arg)
+    	for i in range(0,n):
+    		if v[i].shape != self.spat_shape: raise RuntimeError("spatial array has wrong shape.")
+    		if v[i].dtype.num != np.dtype('complex128').num: raise RuntimeError("spatial array should be dtype=complex128.")
+    		if v[i].flags.contiguous == False: v[i] = v[i].copy()		# contiguous array required.
+    	if n==1:
+    		q = np.empty((self.lmax+1)**2, dtype=complex)
+    		self.spat_cplx_to_SH(v[0],q)
+    		return q
+    	elif n==2:
+    		s = np.empty((self.lmax+1)**2, dtype=complex)
+    		t = np.empty((self.lmax+1)**2, dtype=complex)
+    		self.spat_cplx_to_SHsphtor(v[0],v[1],s,t)
+    		return s,t
+    	else:
+    		q = np.empty((self.lmax+1)**2, dtype=complex)
+    		s = np.empty((self.lmax+1)**2, dtype=complex)
+    		t = np.empty((self.lmax+1)**2, dtype=complex)
+    		self.spat_cplx_to_SHqst(v[0],v[1],v[2],q,s,t)
+    		return q,s,t
+
 
     def zidx(self, l,m):
     	"""
@@ -441,7 +500,7 @@ class sht(_object):
     def spat_array_cplx(self):
     	"""return a numpy array of 2D complex spatial field."""
     	if self.nlat == 0: raise RuntimeError("Grid not set. Call .set_grid() mehtod.")
-    	return np.zeros(self.spat_shape, dtype=complex128)
+    	return np.zeros(self.spat_shape, dtype='complex128')
 
 
     def SH_to_point(self, Qlm, cost, phi):
