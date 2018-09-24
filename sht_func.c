@@ -863,56 +863,6 @@ static void spat_xsint_2real(shtns_cfg shtns, const double* st, double* vt, doub
 	}
 }
 
-///\internal
-static void spat_sint_cplx_to_2real(shtns_cfg shtns, cplx *z, double *zr, double *zi)
-{
-	const int nlat = shtns->nlat;
-	const double* st_1 = shtns->st_1;
-	if (shtns->k_stride_a == 1) {				// theta contiguous
-		const int nspat = shtns->nspat;
-		for (int k=0, j=0; k<nspat; k++) {
-			const double x = st_1[j];
-			if (++j >= nlat) j=0;
-			zr[k] = creal(z[k]) * x;		zi[k] = cimag(z[k]) * x;
-		}
-	} else {	// phi contiguous
-		const int nphi = shtns->nphi;
-		long k=0;
-		for (int it=0; it<nlat; it++) {
-			const double x = st_1[it];
-			for (int ip=0; ip<nphi; ip++) {
-				zr[k] = creal(z[k]) * x;		zi[k] = cimag(z[k]) * x;
-				++k;
-			}
-		}
-	}
-}
-
-///\internal
-static void spat_xsint_2real_to_cplx(shtns_cfg shtns, double *zr, double *zi, cplx *z)
-{
-	const int nlat = shtns->nlat;
-	const double* st = shtns->st;
-	if (shtns->k_stride_a == 1) {				// theta contiguous
-		const int nspat = shtns->nspat;
-		for (int k=0, j=0; k<nspat; k++) {
-			const double x = st[j];
-			if (++j >= nlat) j=0;
-			z[k] = (zr[k] + I*zi[k]) * x;
-		}
-	} else {	// phi contiguous
-		const int nphi = shtns->nphi;
-		long k=0;
-		for (int it=0; it<nlat; it++) {
-			const double x = st[it];
-			for (int ip=0; ip<nphi; ip++) {
-				z[k] = (zr[k] + I*zi[k]) * x;
-				++k;
-			}
-		}
-	}
-}
-
 
 // SPAT_CPLX transform indexing scheme:
 // if (l<=MMAX) : l*(l+1) + m
@@ -994,7 +944,7 @@ void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm)
 	}
 
 	const double norm = 1.0/NPHI;
-	#pragma omp parallel for schedule(static,1)
+	#pragma omp parallel for schedule(static,1) num_threads(shtns->nthreads)
 	for (int m=0; m<=MMAX; m++) {
 	if (m==0) {	// m=0
 		spat_to_SH_ml(shtns, 0, Q,      rlm, LMAX);						// real
@@ -1045,7 +995,7 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 	Q = z;
 	if ((NPHI>1) && (shtns->fftc_mode != 0)) Q = mem;			// out-of-place transform
 
-	#pragma omp parallel for schedule(static,1)
+	#pragma omp parallel for schedule(static,1) num_threads(shtns->nthreads)
 	for (int m=0; m<=MMAX; m++) {
 	if (m==0) {	// m=0
 		int lm = 0;
@@ -1087,43 +1037,6 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 }
 
 
-/// complex vector transform (2D).
-/// in: slm, tlm are the spheroidal/toroidal SH coefficients of order l and degree m (with -l <= m <= l)
-/// out: zt, zp are respectively the theta and phi components of the complex spatial vector field.
-void SHsphtor_to_spat_cplx_old(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx *zp)
-{
-	long int nspat = shtns->nspat;
-	double *zt_r, *zt_i, *zp_r, *zp_i;
-	cplx *slm_r, *slm_i, *tlm_r, *tlm_i;
-
-	if (MRES != 1) shtns_runerr("complex SH requires mres=1.");
-
-	// alloc temporary fields
-	zt_r = (double*) VMALLOC( 4*(nspat + NLM*2)*sizeof(double) );
-	zp_r = zt_r + nspat;
-	zt_i = zt_r + 2*nspat;
-	zp_i = zt_r + 3*nspat;
-	slm_r = (cplx*) (zt_r + 4*nspat);
-	tlm_r = slm_r + NLM;
-	slm_i = slm_r + 2*NLM;
-	tlm_i = slm_r + 3*NLM;
-
-	// extract complex coefficients corresponding to real and imag
-	SH_cplx_to_2real(shtns, slm, slm_r, slm_i);
-	SH_cplx_to_2real(shtns, tlm, tlm_r, tlm_i);
-
-	// perform two real transforms:
-	SHsphtor_to_spat(shtns, slm_r, tlm_r, zt_r, zp_r);
-	SHsphtor_to_spat(shtns, slm_i, tlm_i, zt_i, zp_i);
-
-	// combine into zt and zp
-	for (int k=0; k<nspat; k++)
-		zt[k] = zt_r[k] + I*zt_i[k];
-	for (int k=0; k<nspat; k++)
-		zp[k] = zp_r[k] + I*zp_i[k];
-
-	VFREE(zt_r);
-}
 
 /// complex vector transform (2D).
 /// in: slm, tlm are the spheroidal/toroidal SH coefficients of order l and degree m (with -l <= m <= l)
@@ -1142,7 +1055,7 @@ void SHsphtor_to_spat_cplx(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt, cplx
 	zzt = zt;		zzp = zp;
 	if ((NPHI>1) && (shtns->fftc_mode != 0)) {	zzt = mem;	zzp = mem + nspat;  }			// out-of-place transform
 
-	#pragma omp parallel for schedule(static,1)
+	#pragma omp parallel for schedule(static,1) num_threads(shtns->nthreads)
 	for (int m=0; m<=MMAX; m++) {
 		const long stride = LMAX+1-m;
 		if (m==0) {	// m=0
@@ -1224,7 +1137,7 @@ void spat_cplx_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm, cplx 
 	}
 
 	const double norm = 1.0/NPHI;
-	#pragma omp parallel for schedule(static,1)
+	#pragma omp parallel for schedule(static,1) num_threads(shtns->nthreads)
 	for (int m=0; m<=MMAX; m++) {
 		const long stride = LMAX+1-m;
 		if (m==0) {	// m=0
@@ -1279,7 +1192,7 @@ void SHsphtor_to_spat_cplx_xsint(shtns_cfg shtns, cplx *slm, cplx *tlm, cplx *zt
 	zzt = zt;		zzp = zp;
 	if ((NPHI>1) && (shtns->fftc_mode != 0)) {	zzt = mem;	zzp = mem + nspat;  }			// out-of-place transform
 
-	#pragma omp parallel for schedule(static,1)
+	#pragma omp parallel for schedule(static,1) num_threads(shtns->nthreads)
 	for (int m=0; m<=MMAX; m++) {
 		const long stride = LMAX+1-m;
 		if (m==0) {	// m=0
@@ -1365,7 +1278,7 @@ void spat_cplx_xsint_to_SHsphtor(shtns_cfg shtns, cplx *zt, cplx *zp, cplx *slm,
 	}
 
 	const double norm = 1.0/NPHI;
-	#pragma omp parallel for schedule(static,1)
+	#pragma omp parallel for schedule(static,1) num_threads(shtns->nthreads)
 	for (int m=0; m<=MMAX; m++) {
 		const long stride = LMAX+1-m;
 		if (m==0) {	// m=0
