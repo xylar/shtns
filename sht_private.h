@@ -738,3 +738,56 @@ struct DtDp {		// theta and phi derivatives stored together.
 	} while(k < nk*VSIZE2); }
 #endif
 
+
+static void SH_2scal_to_vect_reduce(const double *mx, const double* l_2, int llim, int m, rnd* vw, v2d* Sl, v2d* Tl)
+{	// convert from the two scalar SH to vector SH
+	// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
+	// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
+	// double* mx = shtns->mx_van + 2*LM(shtns,m,m);	//(im*(2*(LMAX+1)-(m+MRES))) + 2*m;
+	s2d em = vdup(m);
+	m = abs(m);
+	v2d vl = v2d_reduce(vw[0], vw[1]);
+	v2d wl = v2d_reduce(vw[2], vw[3]);
+	v2d sl1 = vdup( 0.0 );
+	v2d tl1 = vdup( 0.0 );
+	for (int l=0; l<=llim-m; l++) {
+		s2d mxu = vdup( mx[2*l] );
+		s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
+		v2d sl = addi( sl1 ,  em*wl );
+		v2d tl = addi( tl1 ,  em*vl );
+		sl1 =  mxl*vl;			// vs for next iter
+		tl1 = -mxl*wl;			// wt for next iter
+		vl = v2d_reduce(vw[4*l+4], vw[4*l+5]);		// kept for next iteration
+		wl = v2d_reduce(vw[4*l+6], vw[4*l+7]);
+		sl += mxu*vl;
+		tl -= mxu*wl;
+		Sl[l] = -sl * vdup(l_2[l+m]);
+		Tl[l] = -tl * vdup(l_2[l+m]);
+	}
+}
+
+static void SH_2scal_to_vect(const double *mx, const double* l_2, int llim, int m, v2d* vw, v2d* Sl, v2d* Tl)
+{	// convert from the two scalar SH to vector SH
+	// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
+	// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
+	s2d em = vdup(m);
+	m = abs(m);
+	v2d vl = vw[0];
+	v2d wl = vw[1];
+	v2d sl1 = vdup( 0.0 );
+	v2d tl1 = vdup( 0.0 );
+	for (int l=0; l<=llim-m; l++) {
+		s2d mxu = vdup( mx[2*l] );
+		s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
+		v2d sl = addi( sl1 ,  em*wl );
+		v2d tl = addi( tl1 ,  em*vl );
+		sl1 =  mxl*vl;			// vs for next iter
+		tl1 = -mxl*wl;			// wt for next iter
+		vl = vw[2*l+2];		// kept for next iteration
+		wl = vw[2*l+3];
+		sl += mxu*vl;
+		tl -= mxu*wl;
+		Sl[l] = -sl * vdup(l_2[l+m]);
+		Tl[l] = -tl * vdup(l_2[l+m]);
+	}
+}

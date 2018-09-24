@@ -325,32 +325,7 @@ Q				Ql[l] = qq[2*l] + I*qq[2*l+1];
 Q			}
 Q		#endif
 
-V		{	// convert from the two scalar SH to vector SH
-V			// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
-V			// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
-V			double* mx = shtns->mx_van + 2*LM(shtns,m,m);	//(im*(2*(LMAX+1)-(m+MRES))) + 2*m;
-V			s2d em = vdup(m);
-V			v2d vl = v2d_reduce(vw[0], vw[1]);
-V			v2d wl = v2d_reduce(vw[2], vw[3]);
-V			v2d sl = vdup( 0.0 );
-V			v2d tl = vdup( 0.0 );
-V			for (int l=0; l<=llim-m; l++) {
-V				s2d mxu = vdup( mx[2*l] );
-V				s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
-V				sl = addi( sl ,  em*wl );
-V				tl = addi( tl ,  em*vl );
-V				v2d sl1 =  mxl*vl;			// vs for next iter
-V				v2d tl1 = -mxl*wl;			// wt for next iter
-V				vl = v2d_reduce(vw[4*l+4], vw[4*l+5]);		// kept for next iteration
-V				wl = v2d_reduce(vw[4*l+6], vw[4*l+7]);
-V				sl += mxu*vl;
-V				tl -= mxu*wl;
-V				Sl[l] = -sl * vdup(l_2[l+m]);
-V				Tl[l] = -tl * vdup(l_2[l+m]);
-V				sl = sl1;
-V				tl = tl1;
-V			}
-V		}
+V		SH_2scal_to_vect_reduce(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, m, vw, Sl, Tl);
 
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1-m; l<=LMAX-m; ++l) {
@@ -523,7 +498,6 @@ V				((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 		#endif
 		
 	} else {		// im > 0
-
 		for (k=nk*VSIZE2; k<(nk-1+NWAY)*VSIZE2; ++k) {
 Q			rei[k] = 0.0;		roi[k] = 0.0;
 V			tei[k] = 0.0;		toi[k] = 0.0;
@@ -696,32 +670,7 @@ Q				Qlm[l] = qq[2*l] + I*qq[2*l+1];
 Q			}
 Q		#endif
 
-V		{	// convert from the two scalar SH to vector SH
-V			// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
-V			// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
-V			double* mx = shtns->mx_van + 2*LM(shtns,m,m);	//(im*(2*(LMAX+1)-(m+MRES))) + 2*m;
-V			s2d em = vdup(m);
-V			v2d vl = v2d_reduce(vw[0], vw[1]);
-V			v2d wl = v2d_reduce(vw[2], vw[3]);
-V			v2d sl = vdup( 0.0 );
-V			v2d tl = vdup( 0.0 );
-V			for (int l=0; l<=llim-m; l++) {
-V				s2d mxu = vdup( mx[2*l] );
-V				s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
-V				sl = addi( sl ,  em*wl );
-V				tl = addi( tl ,  em*vl );
-V				v2d sl1 =  mxl*vl;			// vs for next iter
-V				v2d tl1 = -mxl*wl;			// wt for next iter
-V				vl = v2d_reduce(vw[4*l+4], vw[4*l+5]);		// kept for next iteration
-V				wl = v2d_reduce(vw[4*l+6], vw[4*l+7]);
-V				sl += mxu*vl;
-V				tl -= mxu*wl;
-V				((v2d*)Slm)[l] = -sl * vdup(l_2[l+m]);
-V				((v2d*)Tlm)[l] = -tl * vdup(l_2[l+m]);
-V				sl = sl1;
-V				tl = tl1;
-V			}
-V		}
+V		SH_2scal_to_vect_reduce(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, m, vw, (v2d*)Slm, (v2d*)Tlm);
 
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1-m; l<=LMAX-m; ++l) {

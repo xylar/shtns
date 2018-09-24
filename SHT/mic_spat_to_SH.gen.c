@@ -342,32 +342,7 @@ V		v2d *Tl = (v2d*) &Tlm[l];
 
 Q		for (l=0; l<=llim-m; ++l)	Ql[l] = qq[l];
 
-V		{	// convert from the two scalar SH to vector SH
-V			// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
-V			// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
-V			double* mx = shtns->mx_van + 2*LM(shtns,m,m);	//(im*(2*(LMAX+1)-(m+MRES))) + 2*m;
-V			s2d em = vdup(m);
-V			v2d vl = vw[0];
-V			v2d wl = vw[1];
-V			v2d sl = vdup( 0.0 );
-V			v2d tl = vdup( 0.0 );
-V			for (int l=0; l<=llim-m; l++) {
-V				s2d mxu = vdup( mx[2*l] );
-V				s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
-V				sl = addi( sl ,  em*wl );
-V				tl = addi( tl ,  em*vl );
-V				v2d sl1 =  mxl*vl;			// vs for next iter
-V				v2d tl1 = -mxl*wl;			// wt for next iter
-V				vl = vw[2*l+2];		// kept for next iteration
-V				wl = vw[2*l+3];
-V				sl += mxu*vl;
-V				tl -= mxu*wl;
-V				Sl[l] = -sl * vdup(l_2[l+m]);
-V				Tl[l] = -tl * vdup(l_2[l+m]);
-V				sl = sl1;
-V				tl = tl1;
-V			}
-V		}
+V		SH_2scal_to_vect(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, m, vw, Sl, Tl);
 
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1-m; l<=LMAX-m; ++l) {
