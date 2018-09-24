@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
- * nathanael.schaeffer@ujf-grenoble.fr
+ * nathanael.schaeffer@univ-grenoble-alpes.fr
  * 
  * This software is governed by the CeCILL license under French law and
  * abiding by the rules of distribution of free software. You can use,
@@ -249,67 +249,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#endif
 #endif
 
-#if _GCC_VEC_ && __VECTOR4DOUBLE__
-	// support Blue Gene/Q QPX vectors
-	#define MIN_ALIGNMENT 32
-	#define VSIZE 2
-	typedef complex double v2d __attribute__((aligned (16)));		// vector that contains a complex number
-	typedef double s2d __attribute__((aligned (16)));		// scalar number
-	#define VSIZE2 4
-	#define _SIMD_NAME_ "qpx"
-	typedef vector4double rnd;		// vector of 4 doubles.
-	#define vall(x) vec_splats(x)
-	#define vread(mem, idx) vec_lda((idx)*32, ((double*)mem))
-	#define vstor(mem, idx, v) vec_sta(v, (idx)*32, ((double*)mem))
-	inline static double reduce_add(rnd a) {
-		a += vec_perm(a, a, vec_gpci(02301));
-		a += vec_perm(a, a, vec_gpci(01032));
-		return( a[0] );
-	}
-	inline static v2d v2d_reduce(rnd a, rnd b) {
-		a = vec_perm(a, b, vec_gpci(00426)) + vec_perm(a, b, vec_gpci(01537));
-		a += vec_perm(a, a, vec_gpci(02301));
-		return a[0] + I*a[1];
-	}
-	//#define v2d_reduce(a, b) ( reduce_add(a) +I* reduce_add(b) )
-	#define addi(a,b) ((a) + I*(b))
-
-	#define S2D_STORE(mem, idx, ev, od) \
-		vstor(mem, idx, ev+od); \
-		vstor((double*)mem + NLAT-VSIZE2 - (idx)*VSIZE2, 0, vec_perm(ev-od, ev-od, vec_gpci(03210)));
-	#define S2D_CSTORE(mem, idx, er, od, ei, oi)	{	\
-		rnd aa = vec_perm(ei+oi, ei+oi, vec_gpci(01032)) + (er+od); \
-		rnd bb = (er + od) - vec_perm(ei+oi, ei+oi, vec_gpci(01032)); \
-		vstor(mem, idx, vec_perm(bb, aa, vec_gpci(00527))); \
-		vstor(((double*)mem) + (NPHI-2*im)*NLAT, idx, vec_perm(aa, bb, vec_gpci(00527))); \
-		aa = vec_perm(er-od, er-od, vec_gpci(01032)) + (ei-oi); \
-		bb = vec_perm(er-od, er-od, vec_gpci(01032)) - (ei-oi); \
-		vstor(((double*)mem) + NLAT, -(idx+1), vec_perm(bb, aa, vec_gpci(02705))); \
-		vstor(((double*)mem) + (NPHI+1-2*im)*NLAT, -(idx+1), vec_perm(aa, bb, vec_gpci(02705))); }
-	// TODO: S2D_CSTORE2 has not been tested and is probably wrong...
-	#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	{	\
-		rnd aa = vec_perm(er+od, ei+oi, vec_gpci(00415)); \
-		rnd bb = vec_perm(er+od, ei+oi, vec_gpci(02637)); \
-		vstor(mem, idx*2, aa); \
-		vstor(mem, idx*2+1, bb); \
-		aa = vec_perm(er-od, ei-oi, vec_gpci(00415)); \
-		bb = vec_perm(er-od, ei-oi, vec_gpci(02637)); \
-		vstor(mem, NLAT_2-1-idx*2, aa); \
-		vstor(mem, NLAT_2-2-idx*2, bb); }
-
-	#define vdup(x) (x)
-
-	#define vlo(a) (a[0])
-
-	#define vcplx_real(a) creal(a)
-	#define vcplx_imag(a) cimag(a)
-
-	#define VMALLOC(s)	malloc(s)
-	#define VFREE(s)	free(s)
-	#ifdef SHTNS4MAGIC
-		#error "Blue Gene/Q not supported."
-	#endif
-#elif _GCC_VEC_ && __VSX__
+#if _GCC_VEC_ && __VSX__
 	// support VSX (IBM Power)
 	#include <altivec.h>
 	#define MIN_ALIGNMENT 16
@@ -797,3 +737,4 @@ struct DtDp {		// theta and phi derivatives stored together.
 		k+=1; \
 	} while(k < nk*VSIZE2); }
 #endif
+
