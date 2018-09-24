@@ -577,7 +577,7 @@ Q			double* q = (double *) qq;	//Qlm;
 V			double* v = (double *) vw;
 V			double* t = (double *) vw;
 		#endif
-		for (l=llim-m; l>=0; l--) {
+		for (l=llim+1-m; l>=0; l--) {
 Q			q[0] = vall(0.0);		q[1] = vall(0.0);		q+=2;
 V			v[0] = vall(0.0);		v[1] = vall(0.0);
 V			v[2] = vall(0.0);		v[3] = vall(0.0);		v+=4;
