@@ -40,6 +40,7 @@ V	double *l_2;
   #else
 	const int k_inc = 1;
   #endif
+V	int robert_form;
 Q	rnd qq[2*llim+4];
 V	rnd vw[4*llim+8];
 
@@ -95,6 +96,7 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, ((double*)BpF)+1, ((double*
 	#if _GCC_VEC_
 	  nk = ((unsigned) nk+(VSIZE2-1))/VSIZE2;
 	#endif
+V	robert_form = shtns->robert_form;
 V	l_2 = shtns->l_2;
 		alm = shtns->blm;
 		// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
@@ -132,6 +134,13 @@ Q				rerk[j] = vread(rer, k+j);		rork[j] = vread(ror, k+j);		// cache into regis
 V				terk[j] = vread(ter, k+j);		tork[j] = vread(tor, k+j);
 V				perk[j] = vread(per, k+j);		pork[j] = vread(por, k+j);
 			}
+V			if (robert_form) {
+V				for (int j=0; j<NWAY; ++j) {
+V					rnd st_1 = vread(shtns->st_1, k+j);
+V					terk[j] *= st_1;	tork[j] *= st_1;
+V					perk[j] *= st_1;	pork[j] *= st_1;
+V				}
+V			}
 			al+=2;	l=1;
 			while(l<llim) {
 				for (int j=0; j<NWAY; ++j) {
@@ -284,6 +293,13 @@ Q				rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( 
 V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( tor, k+j);		toik[j] = vread( toi, k+j);
 V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
 			}
+V			if (robert_form) {
+V				for (int j=0; j<NWAY; ++j) {
+V					rnd st_1 = vread(shtns->st_1, k+j);
+V					terk[j] *= st_1;	teik[j] *= st_1;	tork[j] *= st_1;	toik[j] *= st_1;
+V					perk[j] *= st_1;	peik[j] *= st_1;	pork[j] *= st_1;	poik[j] *= st_1;
+V				}
+V			}
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j)	{	q[0] += y0[j] * rerk[j];	q[1] += y0[j] * reik[j];	}
 V				for (int j=0; j<NWAY; ++j)	{	v[0] += y0[j] * terk[j];	v[1] += y0[j] * teik[j];	}
@@ -365,6 +381,7 @@ VX	static void GEN3(spat_to_SHsphtor_m_fly,NWAY,SUFFIX)(shtns_cfg shtns, int im,
 V	double *l_2;
 	long int nk, k, l,m;
 	double alm0_rescale;
+V	int robert_form;
 Q	rnd qq[2*llim+4];
 V	rnd vw[4*llim+8];
 
@@ -386,6 +403,7 @@ V	double poi[NLAT_2 + NWAY*VSIZE2] SSE;
 	  nk = ((unsigned) nk+(VSIZE2-1))/VSIZE2;
 	#endif
 	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
+V	robert_form = shtns->robert_form;
 V	l_2 = shtns->l_2;
 
 	for (k=nk*VSIZE2; k<(nk-1+NWAY)*VSIZE2; ++k) {
@@ -399,6 +417,10 @@ V		per[k] = 0.0;		por[k] = 0.0;
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 V			#ifndef SHTNS4MAGIC
 V			double n = creal(Vt[k]);		double s = creal(Vt[NLAT-1-k]);
+V			if (robert_form) {
+V				double st_1 = shtns->st_1[k];
+V				n *= st_1;		s *= st_1;
+V			}
 V			#else
 V			double st_1 = shtns->st_1[k];
 V			double n = creal(Vt[2*k])*st_1;		double s = creal(Vt[2*k+1])*st_1;
@@ -408,6 +430,10 @@ V		} while(++k < nk*VSIZE2);
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 V			#ifndef SHTNS4MAGIC
 V			double n = creal(Vp[k]);		double s = creal(Vp[NLAT-1-k]);
+V			if (robert_form) {
+V				double st_1 = shtns->st_1[k];
+V				n *= st_1;		s *= st_1;
+V			}
 V			#else
 V			double st_1 = shtns->st_1[k];
 V			double n = creal(Vp[2*k])*st_1;		double s = creal(Vp[2*k+1])*st_1;
@@ -526,6 +552,10 @@ V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 V		do {	// compute symmetric and antisymmetric parts.
 V			#ifndef SHTNS4MAGIC
 V			cplx n = Vt[k];			cplx s = Vt[NLAT-1-k];
+V			if (robert_form) {
+V				double st_1 = shtns->st_1[k];
+V				n *= st_1;		s *= st_1;
+V			}
 V			#else
 V			double st_1 = shtns->st_1[k];
 V			cplx n = Vt[2*k]*st_1;	cplx s = Vt[2*k+1]*st_1;
@@ -537,6 +567,10 @@ V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 V		do {	// compute symmetric and antisymmetric parts.
 V			#ifndef SHTNS4MAGIC
 V			cplx n = Vp[k];			cplx s = Vp[NLAT-1-k];
+V			if (robert_form) {
+V				double st_1 = shtns->st_1[k];
+V				n *= st_1;		s *= st_1;
+V			}
 V			#else
 V			double st_1 = shtns->st_1[k];
 V			cplx n = Vp[2*k]*st_1;	cplx s = Vp[2*k+1]*st_1;

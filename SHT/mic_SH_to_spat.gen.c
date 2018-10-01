@@ -74,6 +74,7 @@ V	#define wi(l) vall( ((double*) VWl)[4*(l)+3] )
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
+V	int robert_form;
 Q	cplx Ql[llim+2] SSE;
 V	cplx VWl[llim*2+4] SSE;
 
@@ -96,6 +97,7 @@ V	double psi[NLAT_2 + NWAY*VSIZE2 -1] SSE;
 	ct = shtns->ct;		st = shtns->st;
 	nk = NLAT_2;
 	nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
+V	robert_form = shtns->robert_form;
 
 	// ACCESS PATTERN
 	const int k_inc = 1;		const int m_inc = NLAT/2;
@@ -149,6 +151,11 @@ Q				re[j] = y0[j] * vall(Ql0[0]);
 S				to[j] = dy0[j];
 T				po[j] = dy0[j];
 			}
+V			#ifndef SHTNS4MAGIC
+V			if (robert_form) {
+V				for (int j=0; j<NWAY; ++j) sint[j] *= -sint[j];
+V			}
+V			#endif
 			for (int j=0; j<NWAY; ++j) {
 				y1[j]  = vall(al[0]*al[1]) * cost[j];
 V				dy1[j] = vall(al[0]*al[1]) * sint[j];
@@ -284,11 +291,9 @@ V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 				cost[j] = vread(st, k+j);
 				y0[j] = vall(1.0);
 			}
-Q			l=m;
+			l=m;
 V		#ifndef SHTNS4MAGIC
-V			l=m-1;
-V		#else
-V			l=m;
+V			if (robert_form == 0) l=m-1;
 V		#endif
 			long int ny = 0;
 		if ((int)llim <= SHT_L_RESCALE_FLY) {
@@ -368,8 +373,10 @@ V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * v
 V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
 			}
 3		#ifndef SHTNS4MAGIC
-3			for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
-3			for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
+3			if (robert_form == 0) {
+3				for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
+3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
+3			}
 3		#endif
 		  }
 		  

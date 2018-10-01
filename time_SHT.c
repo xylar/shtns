@@ -653,6 +653,7 @@ int main(int argc, char *argv[])
 	int point = 0;
 	int vector = 0;
 	int loadsave = 0;
+	int robert_form = 0;
 	char name[20];
 	FILE* fw;
 
@@ -690,6 +691,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"vector") == 0) vector = 1;
 		if (strcmp(name,"point") == 0) point = 1;
 		if (strcmp(name,"loadsave") == 0) loadsave = 1;
+		if (strcmp(name,"robert") == 0) robert_form = 1;
 	}
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
@@ -699,6 +701,7 @@ int main(int argc, char *argv[])
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	shtns_use_threads(nthreads);		// 0 : means automatically chooses the number of threads.
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
+	shtns_robert_form(shtns, robert_form);
 	NLM = shtns->nlm;
 	shtns_set_grid_auto(shtns, shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
 

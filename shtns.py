@@ -219,6 +219,11 @@ class sht(_object):
         return _shtns.sht_shlm_e1(self, l, m)
 
 
+    def robert_form(self, v=1):
+        """for v>0, use Robert form, ie spatial VECTOR fields are multiplied by sin(colatitude). The scalar transforms are unaffected."""
+        return _shtns.sht_robert_form(self, v)
+
+
     def __ct(self):
         """__ct(sht self) -> PyObject *"""
         return _shtns.sht___ct(self)

@@ -50,6 +50,7 @@ V	#define wi(l) vall( ((double*) VWl)[4*(l)+3] )
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
+V	int robert_form;
 QX	double Ql0[llim+2];
 V	v2d VWl[llim*2+4];
 
@@ -58,6 +59,7 @@ V	v2d VWl[llim*2+4];
 	#if _GCC_VEC_
 		nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
 	#endif
+V	robert_form = shtns->robert_form;
 
 	#ifndef _OPENMP
 		m0 = 0;		mstep = 1;
@@ -113,6 +115,11 @@ Q				re[j] = y0[j] * vall(Ql0[0]);
 S				to[j] = dy0[j];
 T				po[j] = dy0[j];
 			}
+V			#ifndef SHTNS4MAGIC
+V			if (robert_form) {
+V				for (int j=0; j<NWAY; ++j) sint[j] *= -sint[j];
+V			}
+V			#endif
 			for (int j=0; j<NWAY; ++j) {
 				y1[j]  = vall(al[0]*al[1]) * cost[j];
 V				dy1[j] = vall(al[0]*al[1]) * sint[j];
@@ -280,11 +287,9 @@ V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 				cost[j] = vread(st, k+j);
 				y0[j] = vall(1.0);
 			}
-Q			l=m;
+			l=m;
 V		#ifndef SHTNS4MAGIC
-V			l=m-1;
-V		#else
-V			l=m;
+V			if (robert_form == 0) l=m-1;
 V		#endif
 			long int ny = 0;
 		if ((int)llim <= SHT_L_RESCALE_FLY) {
@@ -364,8 +369,10 @@ V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] *
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 			}
 3		#ifndef SHTNS4MAGIC
-3			for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
-3			for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
+3			if (robert_form == 0) {
+3				for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
+3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
+3			}
 3		#endif
 		  }
 		#ifndef SHTNS4MAGIC

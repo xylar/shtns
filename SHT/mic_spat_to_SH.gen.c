@@ -40,6 +40,7 @@ V	double *l_2;
   #ifndef SHT_AXISYM
 	unsigned im;
   #endif
+V	int robert_form;
 Q	v2d qq[llim+2];
 V	v2d vw[2*llim+4];
 
@@ -63,6 +64,7 @@ V	double poi[NLAT_2 + NW*VSIZE2] SSE;
 	  nk = ((unsigned) nk+(VSIZE2-1))/VSIZE2;
 	#endif
 	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
+V	robert_form = shtns->robert_form;
 V	l_2 = shtns->l_2;
 	for (k=nk*VSIZE2; k<(nk-1+NW)*VSIZE2; ++k) {		// never written, so this is now done for all m's
 Q		rer[k] = 0.0;		ror[k] = 0.0;
@@ -118,6 +120,13 @@ Q				rerk[j] = vread(rer, k+j);		rork[j] = vread(ror, k+j);		// cache into regis
 V				terk[j] = vread(ter, k+j);		tork[j] = vread(tor, k+j);
 V				perk[j] = vread(per, k+j);		pork[j] = vread(por, k+j);
 			}
+V			if (robert_form) {
+V				for (int j=0; j<NWAY; ++j) {
+V					rnd st_1 = vread(shtns->st_1, k+j);
+V					terk[j] *= st_1;	tork[j] *= st_1;
+V					perk[j] *= st_1;	pork[j] *= st_1;
+V				}
+V			}
 			al+=2;	l=1;
 			while(l<llim) {
 				for (int j=0; j<NW; ++j) {
@@ -273,6 +282,13 @@ Q				rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( 
 V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( tor, k+j);		toik[j] = vread( toi, k+j);
 V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
 			}
+V			if (robert_form) {
+V				for (int j=0; j<NWAY; ++j) {
+V					rnd st_1 = vread(shtns->st_1, k+j);
+V					terk[j] *= st_1;	teik[j] *= st_1;	tork[j] *= st_1;	toik[j] *= st_1;
+V					perk[j] *= st_1;	peik[j] *= st_1;	pork[j] *= st_1;	poik[j] *= st_1;
+V				}
+V			}
 			while (l<llim) {	// compute even and odd parts
 Q				rnd qq0 = y0[0] * rerk[0];
 Q				rnd qq1 = y0[0] * reik[0];

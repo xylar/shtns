@@ -126,6 +126,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	short fftc_mode;			///< how to perform the complex fft : -1 = no fft; 0 = interleaved/native; 1 = split/transpose.
 	unsigned short nthreads;	///< number of threads (openmp).
 	unsigned short *tm;			///< start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
+	short robert_form;			///< flag for Robert formulation: if true, the vector synthesis are multiplied by sin(theta) and the analysis are divided by sin(theta).
 	int k_stride_a;				///< stride in theta direction
 	int m_stride_a;				///< stride in phi direction (m)
 	double *wg;					///< Gauss weights for Gauss-Legendre quadrature.

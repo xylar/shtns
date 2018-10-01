@@ -168,7 +168,7 @@ inline static PyObject* SpatArray_New(int size) {
 	~shtns_info() {
 		shtns_destroy($self);		// free memory.
 	}
-
+	
 	%pythonappend set_grid %{
 		## array giving the cosine of the colatitude for the grid.
 		self.cos_theta = self.__ct()
@@ -214,6 +214,9 @@ inline static PyObject* SpatArray_New(int size) {
 	double shlm_e1(unsigned l, unsigned m) {
 		return shlm_e1($self, l, m);
 	}
+
+	%feature("autodoc", "for v>0, use Robert form, ie spatial VECTOR fields are multiplied by sin(colatitude). The scalar transforms are unaffected.") robert_form;
+	void robert_form(int v=1) {  shtns_robert_form($self, v);  }
 
 	/* returns useful data */
 	PyObject* __ct() {		// grid must have been initialized.

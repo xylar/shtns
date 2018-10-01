@@ -3393,6 +3393,7 @@ SWIG_AsVal_unsigned_SS_int (PyObject * obj, unsigned int *val)
 SWIGINTERN double shtns_info_shlm_e1(struct shtns_info *self,unsigned int l,unsigned int m){
 		return shlm_e1(self, l, m);
 	}
+SWIGINTERN void shtns_info_robert_form(struct shtns_info *self,int v){  shtns_robert_form(self, v);  }
 SWIGINTERN PyObject *shtns_info___ct(struct shtns_info *self){		// grid must have been initialized.
 		PyObject *obj;
 		double *ct;
@@ -4169,6 +4170,45 @@ SWIGINTERN PyObject *_wrap_sht_shlm_e1(PyObject *SWIGUNUSEDPARM(self), PyObject 
     }
   }
   resultobj = SWIG_From_double((double)(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_sht_robert_form(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  int arg2 = (int) 1 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  int val2 ;
+  int ecode2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O|O:sht_robert_form",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_robert_form" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  if (obj1) {
+    ecode2 = SWIG_AsVal_int(obj1, &val2);
+    if (!SWIG_IsOK(ecode2)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "sht_robert_form" "', argument " "2"" of type '" "int""'");
+    } 
+    arg2 = (int)(val2);
+  }
+  {
+    shtns_error = 0;	// clear exception
+    shtns_info_robert_form(arg1,arg2);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
   return resultobj;
 fail:
   return NULL;
@@ -5912,6 +5952,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"sht_sh10_ct", _wrap_sht_sh10_ct, METH_VARARGS, (char *)"sht_sh10_ct(sht self) -> double"},
 	 { (char *)"sht_sh11_st", _wrap_sht_sh11_st, METH_VARARGS, (char *)"sht_sh11_st(sht self) -> double"},
 	 { (char *)"sht_shlm_e1", _wrap_sht_shlm_e1, METH_VARARGS, (char *)"sht_shlm_e1(sht self, unsigned int l, unsigned int m) -> double"},
+	 { (char *)"sht_robert_form", _wrap_sht_robert_form, METH_VARARGS, (char *)"for v>0, use Robert form, ie spatial VECTOR fields are multiplied by sin(colatitude). The scalar transforms are unaffected."},
 	 { (char *)"sht___ct", _wrap_sht___ct, METH_VARARGS, (char *)"sht___ct(sht self) -> PyObject *"},
 	 { (char *)"sht_gauss_wts", _wrap_sht_gauss_wts, METH_VARARGS, (char *)"sht_gauss_wts(sht self) -> PyObject *"},
 	 { (char *)"sht_mul_ct_matrix", _wrap_sht_mul_ct_matrix, METH_VARARGS, (char *)"sht_mul_ct_matrix(sht self) -> PyObject *"},

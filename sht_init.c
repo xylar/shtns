@@ -1263,6 +1263,7 @@ void shtns_print_cfg(shtns_cfg shtns)
 	printf("Lmax=%d, Mmax*Mres=%d, Mres=%d, Nlm=%d  [%d threads, ",LMAX, MMAX*MRES, MRES, NLM, shtns->nthreads);
 	if (shtns->norm & SHT_REAL_NORM) printf("'real' norm, ");
 	if (shtns->norm & SHT_NO_CS_PHASE) printf("no Condon-Shortley phase, ");
+	if (shtns->robert_form) printf("Robert form, ");
 	if (SHT_NORM == sht_fourpi) printf("4.pi normalized]\n");
 	else if (SHT_NORM == sht_schmidt) printf("Schmidt semi-normalized]\n");
 	else printf("orthonormalized]\n");
@@ -1425,6 +1426,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		#ifdef HAVE_LIBCUFFT
 		shtns->d_alm = NULL;		// this marks the gpu as disabled.
 		#endif
+		shtns->robert_form = 0;		// no Robert form by default.
 	}
 
 	// copy sizes.
@@ -1872,6 +1874,12 @@ shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nl
 	return shtns;
 }
 
+/// set the use of Robert form. If robert != 0, the vector synthesis returns a field multiplied by sin(theta), while the analysis divides by sin(theta) before the transform.
+void shtns_robert_form(shtns_cfg shtns, int robert)
+{
+	shtns->robert_form = robert;
+}
+
 /** Enables OpenMP parallel transforms, if available (see \ref compil).
  Call before any initialization of shtns to use mutliple threads. Returns the actual number of threads.
  \li If num_threads > 0, specifies the maximum number of threads that should be used.
@@ -1906,7 +1914,6 @@ int shtns_use_gpu(int device_id)
 	return -1;
 #endif
 }
-
 
 /// fill the given array with Gauss weights. returns the number of weights written, which
 /// may be zero if the grid is not a Gauss grid.
