@@ -687,9 +687,8 @@ struct DtDp {		// theta and phi derivatives stored together.
 #else /* SHTNS4MAGIC */
   #define SYM_ASYM_M0_V(F, er, od) { \
 	long int k=0; do { \
-		double st_1 = 1.0/st[k]; \
 		double an = F[2*k*k_inc];		double as = F[2*k*k_inc +1]; \
-		er[k] = (an+as)*st_1;			od[k] = (an-as)*st_1; \
+		er[k] = an+as;			od[k] = an-as; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
   #define SYM_ASYM_M0_Q(F, er, od, acc0) { \
@@ -729,11 +728,10 @@ struct DtDp {		// theta and phi derivatives stored together.
 	k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double ar,ai,br,bi, sr,si,nr,ni; \
-		double sina = 1.0/st[k]; \
 		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
 		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
-		nr = (ar + br)*sina;		ni = (ai - bi)*sina; \
-		sr = (ai + bi)*sina;		si = (br - ar)*sina; \
+		nr = ar + br;		ni = ai - bi; \
+		sr = ai + bi;		si = br - ar; \
 		er[k] = nr+sr;		ei[k] = ni+si; \
 		od[k] = nr-sr;		oi[k] = ni-si; \
 		k+=1; \

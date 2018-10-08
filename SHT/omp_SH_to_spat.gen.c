@@ -106,20 +106,15 @@ T			rnd pe[NWAY], po[NWAY];
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(ct, j+k);
 V				sint[j] = -vread(st, j+k);
-V			#ifdef SHTNS4MAGIC
-V				sint[j] *= -sint[j];
-V			#endif
 				y0[j] = vall(al[0]);
 V				dy0[j] = vall(0.0);
 Q				re[j] = y0[j] * vall(Ql0[0]);
 S				to[j] = dy0[j];
 T				po[j] = dy0[j];
 			}
-V			#ifndef SHTNS4MAGIC
 V			if (robert_form) {
 V				for (int j=0; j<NWAY; ++j) sint[j] *= -sint[j];
 V			}
-V			#endif
 			for (int j=0; j<NWAY; ++j) {
 				y1[j]  = vall(al[0]*al[1]) * cost[j];
 V				dy1[j] = vall(al[0]*al[1]) * sint[j];
@@ -288,9 +283,7 @@ V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 				y0[j] = vall(1.0);
 			}
 			l=m;
-V		#ifndef SHTNS4MAGIC
 V			if (robert_form == 0) l=m-1;
-V		#endif
 			long int ny = 0;
 		if ((int)llim <= SHT_L_RESCALE_FLY) {
 			do {		// sin(theta)^m
@@ -368,12 +361,10 @@ Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * q
 V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] * vi(l+1);	}
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 			}
-3		#ifndef SHTNS4MAGIC
 3			if (robert_form == 0) {
 3				for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
 3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
 3			}
-3		#endif
 		  }
 		#ifndef SHTNS4MAGIC
 			for (int j=0; j<NWAY; ++j) {

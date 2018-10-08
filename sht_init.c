@@ -1426,7 +1426,11 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		#ifdef HAVE_LIBCUFFT
 		shtns->d_alm = NULL;		// this marks the gpu as disabled.
 		#endif
+		#ifdef SHTNS4MAGIC
+		shtns->robert_form = 1;		// Robert form by default for MagIC (mutliply spatial vector fields by sin(theta))
+		#else
 		shtns->robert_form = 0;		// no Robert form by default.
+		#endif
 	}
 
 	// copy sizes.

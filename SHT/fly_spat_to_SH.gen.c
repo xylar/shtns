@@ -417,27 +417,25 @@ V		per[k] = 0.0;		por[k] = 0.0;
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 V			#ifndef SHTNS4MAGIC
 V			double n = creal(Vt[k]);		double s = creal(Vt[NLAT-1-k]);
+V			#else
+V			double n = creal(Vt[2*k]);		double s = creal(Vt[2*k+1]);
+V			#endif
 V			if (robert_form) {
 V				double st_1 = shtns->st_1[k];
 V				n *= st_1;		s *= st_1;
 V			}
-V			#else
-V			double st_1 = shtns->st_1[k];
-V			double n = creal(Vt[2*k])*st_1;		double s = creal(Vt[2*k+1])*st_1;
-V			#endif
 V			ter[k] = n+s;			tor[k] = n-s;
 V		} while(++k < nk*VSIZE2);
 V		k=0;	do {	// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
 V			#ifndef SHTNS4MAGIC
 V			double n = creal(Vp[k]);		double s = creal(Vp[NLAT-1-k]);
+V			#else
+V			double n = creal(Vp[2*k]);		double s = creal(Vp[2*k+1]);
+V			#endif
 V			if (robert_form) {
 V				double st_1 = shtns->st_1[k];
 V				n *= st_1;		s *= st_1;
 V			}
-V			#else
-V			double st_1 = shtns->st_1[k];
-V			double n = creal(Vp[2*k])*st_1;		double s = creal(Vp[2*k+1])*st_1;
-V			#endif
 V			per[k] = n+s;			por[k] = n-s;
 V		} while(++k < nk*VSIZE2);
 Q		double r0 = 0.0;
@@ -552,14 +550,13 @@ V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 V		do {	// compute symmetric and antisymmetric parts.
 V			#ifndef SHTNS4MAGIC
 V			cplx n = Vt[k];			cplx s = Vt[NLAT-1-k];
+V			#else
+V			cplx n = Vt[2*k];	cplx s = Vt[2*k+1];
+V			#endif
 V			if (robert_form) {
 V				double st_1 = shtns->st_1[k];
 V				n *= st_1;		s *= st_1;
 V			}
-V			#else
-V			double st_1 = shtns->st_1[k];
-V			cplx n = Vt[2*k]*st_1;	cplx s = Vt[2*k+1]*st_1;
-V			#endif
 V			ter[k] = creal(n+s);	tei[k] = cimag(n+s);
 V			tor[k] = creal(n-s);	toi[k] = cimag(n-s);
 V		} while (++k<nk*VSIZE2);
@@ -567,14 +564,13 @@ V		k = ((l*VSIZE2)>>1)*2;		// k must be even here.
 V		do {	// compute symmetric and antisymmetric parts.
 V			#ifndef SHTNS4MAGIC
 V			cplx n = Vp[k];			cplx s = Vp[NLAT-1-k];
+V			#else
+V			cplx n = Vp[2*k];	cplx s = Vp[2*k+1];
+V			#endif
 V			if (robert_form) {
 V				double st_1 = shtns->st_1[k];
 V				n *= st_1;		s *= st_1;
 V			}
-V			#else
-V			double st_1 = shtns->st_1[k];
-V			cplx n = Vp[2*k]*st_1;	cplx s = Vp[2*k+1]*st_1;
-V			#endif
 V			per[k] = creal(n+s);	pei[k] = cimag(n+s);
 V			por[k] = creal(n-s);	poi[k] = cimag(n-s);
 V		} while (++k<nk*VSIZE2);

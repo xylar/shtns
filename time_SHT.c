@@ -631,6 +631,7 @@ void usage()
 	printf(" -nlorder : define non-linear order to be resolved.\n");
 	printf(" -schmidt : use schmidt semi-normalization.\n");
 	printf(" -4pi : use 4pi normalization.\n");
+	printf(" -robert : use Robert form, ie spatial vector fields are multiplied by sin(colatitude).\n");
   #ifdef _OPENMP
 	printf(" -nth=<n> : use n threads.\n");
   #endif
