@@ -697,7 +697,6 @@ enable_python
 enable_long_double
 enable_f77
 enable_simd
-enable_mem
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1337,7 +1336,6 @@ Optional Features:
   --disable-f77           Do not include F77 wrapper to call SHTns library
                           from Fortran
   --disable-simd          Do not use vector extensions (SSE2, AVX or MIC)
-  --disable-mem           Do not use matrix precomputed and stored in memory.
   --disable-openmp        do not use OpenMP
 
 Some influential environment variables:
@@ -2310,11 +2308,6 @@ fi
 # Check whether --enable-simd was given.
 if test "${enable_simd+set}" = set; then :
   enableval=$enable_simd;
-fi
-
-# Check whether --enable-mem was given.
-if test "${enable_mem+set}" = set; then :
-  enableval=$enable_mem;
 fi
 
 
@@ -4487,7 +4480,7 @@ $as_echo "#define _GCC_VEC_ 1" >>confdefs.h
 fi
 
 # Disable MEM ?
-if test "x$enable_mem" != "xno"; then :
+if test "x$enable_mem" == "xyes"; then :
 
 
 $as_echo "#define SHTNS_MEM 1" >>confdefs.h

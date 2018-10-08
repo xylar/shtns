@@ -36,8 +36,6 @@ AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX or MIC)]))
-AC_ARG_ENABLE([mem],
-	AS_HELP_STRING([--disable-mem], [Do not use matrix precomputed and stored in memory.]))
 
 dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
 dnl generated configure script that the expansion does not occur until
@@ -236,7 +234,7 @@ AS_IF([test "x$enable_simd" != "xno"], [
 ])
 
 # Disable MEM ?
-AS_IF([test "x$enable_mem" != "xno"], [
+AS_IF([test "x$enable_mem" == "xyes"], [
 	AC_DEFINE([SHTNS_MEM],[1],[Include algorithms using precomputed matrix stored in memory)])
 	objs="$objs sht_mem.o"		# compile mem transforms
 ])
