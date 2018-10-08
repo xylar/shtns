@@ -121,7 +121,7 @@ V				terk[j] = vread(ter, k+j);		tork[j] = vread(tor, k+j);
 V				perk[j] = vread(per, k+j);		pork[j] = vread(por, k+j);
 			}
 V			if (robert_form) {
-V				for (int j=0; j<NWAY; ++j) {
+V				for (int j=0; j<NW; ++j) {
 V					rnd st_1 = vread(shtns->st_1, k+j);
 V					terk[j] *= st_1;	tork[j] *= st_1;
 V					perk[j] *= st_1;	pork[j] *= st_1;
@@ -283,7 +283,7 @@ V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( 
 V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
 			}
 V			if (robert_form) {
-V				for (int j=0; j<NWAY; ++j) {
+V				for (int j=0; j<NW; ++j) {
 V					rnd st_1 = vread(shtns->st_1, k+j);
 V					terk[j] *= st_1;	teik[j] *= st_1;	tork[j] *= st_1;	toik[j] *= st_1;
 V					perk[j] *= st_1;	peik[j] *= st_1;	pork[j] *= st_1;	poik[j] *= st_1;
