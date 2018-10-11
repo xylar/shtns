@@ -1427,7 +1427,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->d_alm = NULL;		// this marks the gpu as disabled.
 		#endif
 		#ifdef SHTNS4MAGIC
-		shtns->robert_form = 1;		// Robert form by default for MagIC (mutliply spatial vector fields by sin(theta))
+		shtns->robert_form = 1;		// Robert form by default for MagIC (multiply spatial vector fields by sin(theta))
 		#else
 		shtns->robert_form = 0;		// no Robert form by default.
 		#endif
@@ -1885,7 +1885,7 @@ void shtns_robert_form(shtns_cfg shtns, int robert)
 }
 
 /** Enables OpenMP parallel transforms, if available (see \ref compil).
- Call before any initialization of shtns to use mutliple threads. Returns the actual number of threads.
+ Call before any initialization of shtns to use multiple threads. Returns the actual number of threads.
  \li If num_threads > 0, specifies the maximum number of threads that should be used.
  \li If num_threads <= 0, maximum number of threads is automatically set to the number of processors.
  \li If num_threads == 1, openmp will be disabled. */

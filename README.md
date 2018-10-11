@@ -20,7 +20,7 @@ FEATURES:
   Gauss-Legendre quadrature).
 - support for **regular grids** (but they require twice the number of nodes than Gauss grid)
 - support for SSE2, SSE3, **AVX, AVX2, AVX-512** vectorization, as well as 
-  Xeon Phi (KNL), Blue Gene/Q and AltiVec VSX.
+  Xeon Phi (KNL) and AltiVec VSX.
 - **parallel transforms with OpenMP**.
 - *Beta*: automatic **GPU off-loading** with nvidia cuda (Kepler & Pascal).
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).
@@ -58,16 +58,21 @@ DOCUMENTATION:
 
         @article {shtns,
           author = {Schaeffer, Nathanael},
-          title = {Efficient spherical harmonic transforms aimed at
-          pseudospectral numerical simulations},
+          title = {Efficient spherical harmonic transforms aimed at pseudospectral numerical simulations},
           journal = {Geochemistry, Geophysics, Geosystems},
-          doi = {10.1002/ggge.20071},
-          volume = {14}, number = {3}, pages = {751--758},
+          doi = {10.1002/ggge.20071}, volume = {14}, number = {3}, pages = {751--758},
           year = {2013},
         }
 
 CHANGE LOG:
 -----------
+* v3.1  (11 Oct 2018)
+	- Removed Robert formulation functions. Use `shtns_robert_form()` instead.
+	- Optimized transforms for complex-valued spatial fields, including efficient parallelization.
+	- Remove support for IBM Blue Gene/Q (QPX instructions).
+	- Bug fixes (thanks to Martin Schreiber).
+	- Buggy legacy 'mem' algorithms are disabled by default.
+
 * v3.0.1  (25 Jun 2018)
 	- fix typo preventing compilation of AVX512 code-path.
 	- improved configure script to avoid some compilation issues.
