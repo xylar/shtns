@@ -88,7 +88,7 @@ int main()
 	gettimeofday(&t1, NULL);
 	rot = shtns_rotation_create(lmax);
 	gettimeofday(&t2, NULL);
-	shtns_rotation_set_angle(rot, beta);
+	shtns_rotation_set_angles_ZYZ(rot, 0.0, beta, 0.0);
 	gettimeofday(&t3, NULL);
 	printf("rotation: creation time=%.3g ms   set_angle time=%.3g ms\n", tdiff(&t1,&t2), tdiff(&t2,&t3));
 

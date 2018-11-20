@@ -197,7 +197,9 @@ void SH_Xrotate90(shtns_cfg, cplx *Qlm, cplx *Rlm);
 
 shtns_rot shtns_rotation_create(const int lmax);
 void shtns_rotation_destroy(shtns_rot r);
-void shtns_rotation_set_angle(shtns_rot r, const double beta);
+void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, double gamma);
+void shtns_rotation_set_angles_ZXZ(shtns_rot r, double alpha, double beta, double gamma);
+void shtns_rotation_set_angle_axis(shtns_rot r, double theta, double Vx, double Vy, double Vz);
 void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx);
 void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm);
 void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm);

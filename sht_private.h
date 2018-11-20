@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2010-2015 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
- * nathanael.schaeffer@ujf-grenoble.fr
+ * nathanael.schaeffer@univ-grenoble-alpes.fr
  * 
  * This software is governed by the CeCILL license under French law and
  * abiding by the rules of distribution of free software. You can use,
@@ -152,7 +152,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
 
-	/* rotation stuff */
+	/* rotation stuff (pseudo-spectral) */
 	unsigned npts_rot;		// number of physical points needed
 	fftw_plan fft_rot;		// Fourier transform for rotations
 	double* ct_rot;			// cos(theta) array
