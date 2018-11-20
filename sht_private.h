@@ -154,7 +154,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
 
-	/* rotation stuff */
+	/* rotation stuff (pseudo-spectral) */
 	unsigned npts_rot;		// number of physical points needed
 	fftw_plan fft_rot;		// Fourier transform for rotations
 	double* ct_rot;			// cos(theta) array

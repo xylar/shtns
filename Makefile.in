@@ -91,6 +91,9 @@ SHT_example : examples/SHT_example.c $(libname) shtns.h
 SHT_fort_ex : examples/SHT_example.f $(libname) shtns.f
 	$(fc) -L$(PREFIX)/lib -I$(PREFIX)/include -I. -fdefault-real-8 examples/SHT_example.f ./$(libname) $(LIBS) -lc -o SHT_fort_ex
 
+wigner : examples/wigner.c $(libname) shtns.h
+	$(cc) examples/wigner.c -I. ./$(libname) $(LIBS) -o wigner
+
 #documentation :
 docs :
 	( cat doc/doxygen.conf ; echo "PROJECT_NUMBER=@PACKAGE_VERSION@" ) | doxygen -
