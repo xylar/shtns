@@ -657,10 +657,14 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 
 	#if SHT_VERBOSE > 2
 	if (verbose>2) {
-		printf(" *** fft plan :\n");
-		fftw_print_plan(fft);
+		printf(" *** fft plan : \n");
+		if (shtns->fft) fftw_print_plan(shtns->fft);
 		printf("\n *** ifft plan :\n");
-		fftw_print_plan(ifft);
+		if (shtns->ifft) fftw_print_plan(shtns->ifft);
+		printf("\n *** fftc plan : \n");
+		if (shtns->fftc) fftw_print_plan(shtns->fftc);
+		printf("\n *** ifftc plan :\n");
+		if (shtns->ifftc) fftw_print_plan(shtns->ifftc);
 		printf("\n");
 	}
 	#endif
@@ -1293,7 +1297,7 @@ int config_save(shtns_cfg shtns, int req_flags)
 
 	if (shtns->nphi > 1) {
 		FILE* f = fopen("shtns_cfg_fftw","w");
-		if (f != NULL) {
+		if (f) {
 			fftw_export_wisdom_to_file(f);
 			fclose(f);
 		} else err -= 2;
