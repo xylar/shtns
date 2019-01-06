@@ -197,7 +197,7 @@ void SH_Yrotate90(shtns_cfg, cplx *Qlm, cplx *Rlm);
 void SH_Xrotate90(shtns_cfg, cplx *Qlm, cplx *Rlm);
 
 
-shtns_rot shtns_rotation_create(const int lmax);
+shtns_rot shtns_rotation_create(const int lmax, const int mmax);
 void shtns_rotation_destroy(shtns_rot r);
 void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, double gamma);
 void shtns_rotation_set_angles_ZXZ(shtns_rot r, double alpha, double beta, double gamma);

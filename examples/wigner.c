@@ -77,7 +77,7 @@ double SHnorm_real(shtns_cfg shtns, cplx* zlm)
 int main()
 {
 	struct timeval t1, t2, t3;
-	const int lmax = 1000;
+	const int lmax = 300;
 	const double beta = M_PI/2;
 	shtns_rot rot;
 	shtns_cfg sht;
@@ -86,7 +86,7 @@ int main()
 	srand( time(NULL) );	// initialize random numbers.
 
 	gettimeofday(&t1, NULL);
-	rot = shtns_rotation_create(lmax);
+	rot = shtns_rotation_create(lmax,lmax);
 	gettimeofday(&t2, NULL);
 	shtns_rotation_set_angles_ZYZ(rot, 0.0, beta, 0.0);
 	gettimeofday(&t3, NULL);

@@ -47,7 +47,7 @@ include a non-optimized FFTW library.
 DOCUMENTATION:
 --------------
 
-- On-line doc is available: <http://users.isterre.fr/nschaeff/SHTns/>
+- On-line doc is available: <https://nschaeff.bitbucket.io/shtns/>
 - You can build it locally: Run `make docs` to generate documentation
   (requires doxygen). 
   Then browse the html documentation starting with `doc/html/index.html`
@@ -66,6 +66,9 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
+* v3.2
+	- New rotation functions, including the generation of Wigner-d matrices (thanks to Alex J. Yuffa).
+
 * v3.1  (11 Oct 2018)
 	- Removed Robert formulation functions. Use `shtns_robert_form()` instead.
 	- Optimized transforms for complex-valued spatial fields, including efficient parallelization.

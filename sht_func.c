@@ -1304,7 +1304,7 @@ void SH_to_spat_grad(shtns_cfg shtns, cplx *alm, double *gt, double *gp)
 
 struct shtns_rot_ {		// describe a rotation matrix
 	shtns_cfg sht;
-	int lmax;
+	int lmax, mmax;
 	int flag_alpha_gamma;
 	double cos_beta, sin_beta;
 	double alpha, beta, gamma; 	// Euler angles, in ZYZ convention
@@ -1314,10 +1314,12 @@ struct shtns_rot_ {		// describe a rotation matrix
 };
 
 /// Allocate memory and precompute some recurrence coefficients for rotation (independent of angle).
-shtns_rot shtns_rotation_create(const int lmax)
+/// Setting mmax < lmax will result in approximate rotations if not aligned with the z-axis, while mmax=lmax leads to exact rotations.
+shtns_rot shtns_rotation_create(const int lmax, const int mmax)
 {
 	shtns_rot r = (shtns_rot) malloc(sizeof(struct shtns_rot_));
 	r->lmax = lmax;
+	r->mmax = mmax;
 	r->plm_beta = (double*) malloc( sizeof(double) * nlm_calc(lmax+1, lmax+1, 1) );
 	r->sht = shtns_create(lmax+1, lmax+1, 1, sht_for_rotations | SHT_NO_CS_PHASE);		// need SH up to lmax+1, with Schmidt semi-normalization.
 	r->alpha = 0.0;
@@ -1591,13 +1593,14 @@ typedef double v2du __attribute__ ((vector_size (16), aligned (8)));		// UNALIGN
 void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 {
 	const int lmax = r->lmax+1;
+	const int mmax = r->mmax;
 
 	if (r->beta == 0.0) {	// only rotation along Z-axis.
 		if (Rlm != Qlm)		for (int l=0; l<lmax; l++) 	Rlm[l] = Qlm[l];		// copy m=0
 		long lm = lmax;
 		cplx ei_alpha = r->eia;
 		cplx eim_alpha = ei_alpha;
-		for (int m=1; m<lmax; m++) {
+		for (int m=1; m<=mmax; m++) {
 			for (int l=m; l<lmax; l++) {
 				Rlm[lm] = Qlm[lm] * eim_alpha;
 				lm++;
@@ -1609,7 +1612,7 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 
 	Rlm[0] = Qlm[0];		// copy l=0 (invariant by rotation)
 
-	#pragma omp parallel firstprivate(lmax)
+	#pragma omp parallel firstprivate(lmax,mmax)
 	{
 		const double cos_beta = r->cos_beta;
 		const double sin_beta = r->sin_beta;
@@ -1628,6 +1631,7 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 		#pragma omp for schedule(dynamic,1)
 		for (int l=lmax-1; l>0; l--) {
 			const int lw = l+1;		// line width of matrix.
+			const int mlim = (l <= mmax) ? l       : mmax;
 			cplx* const ql = rl + (l+1);
 			double* const m0 = (double*) (rl + 2*(l+1));
 			memset(rl, 0, sizeof(cplx)*(2*l+1));		// zero the temp destination array.
@@ -1637,17 +1641,18 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 			ql[0] = creal(Qlm[lm]);			// m=0
 			if (flag_ag & 1) {		// pre-rotate along Z-axis
 				cplx eima = eia;
-				for (int m=1; m<=l; m++) {
+				for (int m=1; m<=mlim; m++) {
 					lm += lmax-m;
 					ql[m] = Qlm[lm] * eima;
 					eima *= eia;
 				}
 			} else {		// copy
-				for (int m=1; m<=l; m++) {
+				for (int m=1; m<=mlim; m++) {
 					lm += lmax-m;
 					((v2d*)ql)[m] = ((v2d*)Qlm)[lm];
 				}
 			}
+			for (int m=mlim+1; m<=l; m++) ql[m] = 0;		// zero out m that are absent.
 
 			m0[0] = plm_beta[l];		// d(m'=0, m=0)
 			m0[lw] = 0.0;				// required, as a boundary condition
@@ -1845,13 +1850,13 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 			Rlm[lm] = creal(rl[0]);			// m=0
 			if (flag_ag & 2) {		// post-rotate along Z-axis
 				cplx eimg = eig;
-				for (int m=1; m<=l; m++) {
+				for (int m=1; m<=mlim; m++) {
 					lm += lmax-m;
 					Rlm[lm] = rl[m] * eimg;
 					eimg *= eig;
 				}
 			} else {		// copy values to dest
-				for (int m=1; m<=l; m++) {
+				for (int m=1; m<=mlim; m++) {
 					lm += lmax-m;
 					((v2d*)Rlm)[lm] = ((v2d*)rl)[m];
 				}
@@ -1866,13 +1871,19 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 {
 	const int lmax = r->lmax+1;
+	const int mmax = r->mmax;
+
+// indexing scheme:
+// if (l<=MMAX) : l*(l+1) + m
+// if (l>=MMAX) : l*(2*mmax+1) - mmax*mmax + m  = mmax*(2*l-mmax) + l+m
+
 	if (r->beta == 0.0) {	// only rotation along Z-axis.
 		long lm = 0;
 		cplx eia = r->eia;
 		for (int l=0; l<lmax; l++) {
-			long ll = l*(l+1);
-			Rlm[ll + 0] = Zlm[ll + 0];	// copy m=0;
+			long ll = (l<=mmax) ? l*(l+1) : mmax*(2*l-mmax) + l;
 			cplx eim_alpha = eia;
+			Rlm[ll + 0] = Zlm[ll + 0];	// copy m=0;
 			for (int m=1; m<=l; m++) {
 				Rlm[ll - m] = Zlm[ll - m] * conj(eim_alpha);
 				Rlm[ll + m] = Zlm[ll + m] * eim_alpha;
@@ -1884,7 +1895,7 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 
 	Rlm[0] = Zlm[0];		// copy l=0 (invariant by rotation)
 
-	#pragma omp parallel firstprivate(lmax)
+	#pragma omp parallel firstprivate(lmax,mmax)
 	{
 		const double cos_beta = r->cos_beta;
 		const double sin_beta = r->sin_beta;
@@ -1904,6 +1915,8 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 		#pragma omp for schedule(dynamic,1)
 		for (int l=lmax-1; l>0; l--) {
 			const int lw = l+1;		// line width of matrix.
+			const int mlim = (l <= mmax) ? l       : mmax;
+			const long ll  = (l <= mmax) ? l*(l+1) : mmax*(2*l-mmax) + l;
 			v2d* rl = buf;
 			double* const m0 = (double*) (buf + ntmp*(2*l+1));
 			memset(rl, 0, sizeof(cplx)*(2*l+1));		// zero the temp dest array.
@@ -1913,11 +1926,18 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 				zl = rl + 2*l+1;
 				((cplx*)zl)[0] = Zlm[l*(l+1) + 0];
 				cplx eim_alpha = eia;
-				for (int m=1; m<=l; m++) {
-					((cplx*)zl)[-m] = Zlm[l*(l+1) - m] * conj(eim_alpha);
-					((cplx*)zl)[m]  = Zlm[l*(l+1) + m] * eim_alpha;
+				for (int m=1; m<=mlim; m++) {
+					((cplx*)zl)[-m] = Zlm[ll - m] * conj(eim_alpha);
+					((cplx*)zl)[m]  = Zlm[ll + m] * eim_alpha;
 					eim_alpha *= eia;
 				}
+			} else if (mmax < l) {		// we must copy the source to pad it with zeros
+				zl = rl + 2*l+1;
+				for (int m=-mmax; m<=mmax; m++) ((cplx*)zl)[m] = Zlm[ll+m];
+			}
+			for (int m=mlim+1; m<=l; m++) {		// pad source with zeros
+				((cplx*)zl)[-m] = 0;
+				((cplx*)zl)[m]  = 0;
 			}
 
 			m0[0] = plm_beta[l];		// d(m'=0, m=0)
@@ -2112,15 +2132,15 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 			}
 
 			if (flag_ag & 2) {		// apply post-rotation along Z-axis.
-				Rlm[l*(l+1) + 0] = ((cplx*)rl)[0];
+				Rlm[ll + 0] = ((cplx*)rl)[0];
 				cplx eim_gamma = eig;
-				for (int m=1; m<=l; m++) {
-					Rlm[l*(l+1) - m] = ((cplx*)rl)[-m] * conj(eim_gamma);
-					Rlm[l*(l+1) + m] = ((cplx*)rl)[m]  * eim_gamma;
+				for (int m=1; m<=mlim; m++) {
+					Rlm[ll - m] = ((cplx*)rl)[-m] * conj(eim_gamma);
+					Rlm[ll + m] = ((cplx*)rl)[m]  * eim_gamma;
 					eim_gamma *= eig;
 				}
 			} else {
-				memcpy(Rlm + l*l, rl-l, sizeof(cplx)*(2*l+1));		// copy to destination (avoid false sharing when doing openmp).
+				memcpy(Rlm + ll-mlim, rl-mlim, sizeof(cplx)*(2*mlim+1));		// copy to destination (avoid false sharing when doing openmp).
 			}
 		}
 

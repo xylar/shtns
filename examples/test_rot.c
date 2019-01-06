@@ -101,10 +101,10 @@ int main(int argc, char *argv[])
 
 	srand( time(NULL) );	// initialise les nombres.
 	
-	MMAX=LMAX=7;
+	MMAX=LMAX=300;
 	MRES=1;
-	NLAT=12;
-	NPHI=16;
+	NLAT=360;
+	NPHI=720;
 	if (argc > 1) {
 		MMAX=LMAX = atoi(argv[1]);
 		NLAT = 0;	NPHI = 0;  // auto
