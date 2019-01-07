@@ -234,17 +234,19 @@ T			BpF[k*k_inc] = pnr[k]   + I*psr[k];
 		l = (im*(2*(LMAX+1)-(m+MRES)))>>1;		// l = LiM(shtns, 0,im);
 		alm = shtns->alm + 2*(l+m);		// shtns->alm + im*(2*(LMAX+1) -m+MRES);
 
-QX		k=m; do {		// copy input coefficients to a local array
-QX			((v2d*)Ql)[k-1] = ((v2d*)Qlm)[l+k];
-QX			++k;
-QX		} while(k<=llim);
+Q		#ifndef ISHIOKA
+Q		k=m; do {		// copy input coefficients to a local array
+Q			((v2d*)Ql)[k-1] = ((v2d*)Qlm)[l+k];
+Q			++k;
+Q		} while(k<=llim);
+3		Ql[llim] = 0.0;			// allow overflow up to llim
+Q		#endif
 
 V		{	// convert from vector SH to scalar SH
 V			// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
 V			// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
 V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Vlm(l);
 V			double* mx = shtns->mx_stdt + 2*l;
-3			cplx* Qll = &Qlm[l];
 S			cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
 T			cplx* Tl = &Tlm[l];
 V			double em = m;
@@ -270,31 +272,29 @@ V				VWl[2*l+1] = wt;
 V				vs = 0.0;		wt = 0.0;
 S				vs = vs1;
 T				wt = wt1;
-3				Ql[l-1] = Qll[l];
 V			}
 V			VWl[2*llim+2] = vs;
 V			VWl[2*llim+3] = wt;
-3			Ql[llim] = 0.0;			// allow overflow up to llim
 V		}
 
 	#ifdef ISHIOKA
+Q		cplx* Qlt = &Qlm[l+1];		// pointer for index by l
 		// pre-processing for recurrence relation of Ishioka
 		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
 		double* restrict clm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
 		{
 		long l=m;	long ll=0;
-Q		cplx qq = Ql[l-1] * xlm[0];
+Q		cplx qq = Qlt[l-1] * xlm[0];
 Q		while (l<llim-1) {
-Q			cplx qq2 = Ql[l+1];
+Q			cplx qq2 = Qlt[l+1];
 Q			Ql[l-1]   = (qq  +  qq2 * xlm[ll+2]);
-Q			Ql[l] *= xlm[ll+1];
+Q			Ql[l] = Qlt[l] * xlm[ll+1];
 Q			ll+=3;	l+=2;
 Q			qq = qq2 * xlm[ll];
 Q		}
 Q		Ql[l-1]   = qq;
-Q		if (l<llim) {
-Q			Ql[l] *= xlm[ll+1];
-Q		} else Ql[l] = 0.0;
+Q		Ql[l] = (l<llim) ? Qlt[l] * xlm[ll+1] : 0.0;
+Q		Ql[llim] = 0.0;		// allow some overflow
 
 V		l=m;	ll=0;
 V		cplx vv = VWl[2*l]   * xlm[0];
@@ -395,12 +395,14 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 				}
 				l+=2;	al+=4;
 				#else
+				rnd a[NWAY];
+				for (int j=0; j<NWAY; j++)	a[j] = vall(al[1])*cost[j] + vall(al[0]);
+				l+=2;	al+=2;
 				for (int j=0; j<NWAY; ++j) {
 					rnd tmp = y1[j];
-					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+					y1[j] = a[j]*y1[j] + y0[j];
 					y0[j] = tmp;
 				}
-				l+=2;	al+=2;
 				#endif
 				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 					++ny;
@@ -454,15 +456,19 @@ V				for (int j=0; j<NWAY; ++j) {	per[j] += y1[j]  * wr(l+2);		pei[j] += y1[j] *
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+3);		poi[j] += y1[j] * wi(l+3);	}				
 V			  }
 			  if (LSPAN == 2) {
-				rnd a[NWAY], yt[NWAY];
-				for (int j=0; j<NWAY; j++) {	a[j] = vall(al[1])*cost[j] + vall(al[0]);	yt[j] = y1[j];	}
+				rnd a[NWAY];
+				for (int j=0; j<NWAY; j++) a[j] = vall(al[1])*cost[j] + vall(al[0]);
 				for (int j=0; j<NWAY; ++j) {
+					rnd yt = y1[j];
 					y1[j] = a[j]*y1[j] + y0[j];
-					y0[j] = yt[j];
+					y0[j] = yt;
 				}
 			  } else {	// LSPAN == 4
-				for (int j=0; j<NWAY; ++j) y0[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
-				for (int j=0; j<NWAY; ++j) y1[j] = (vall(al[3])*cost[j] + vall(al[2]))*y0[j] + y1[j];
+				rnd a[NWAY];
+				for (int j=0; j<NWAY; ++j) a[j] = vall(al[1])*cost[j] + vall(al[0]);
+				for (int j=0; j<NWAY; ++j) y0[j] = a[j]*y1[j] + y0[j];
+				for (int j=0; j<NWAY; ++j) a[j] = vall(al[3])*cost[j] + vall(al[2]);
+				for (int j=0; j<NWAY; ++j) y1[j] = a[j]*y0[j] + y1[j];
 			  }
 				l+=LSPAN;	al+=LSPAN;
 			}

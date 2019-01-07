@@ -442,12 +442,14 @@ V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * v
 V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
+				rnd aa[NWAY];
+				for (int j=0; j<NWAY; ++j) aa[j] = vall(al[1])*cost[j] + vall(al[0]);
+				l+=2;	al+=2;
 				for (int j=0; j<NWAY; ++j) {
 					rnd tmp = y1[j];
-					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+					y1[j] = aa[j]*y1[j] + y0[j];
 					y0[j] = tmp;
 				}
-				l+=2;	al+=2;
 			}
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
