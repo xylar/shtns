@@ -68,6 +68,8 @@ CHANGE LOG:
 -----------
 * v3.2
 	- New rotation functions, including the generation of Wigner-d matrices (thanks to Alex J. Yuffa).
+	- Add recurrence formula of Ishioka (2018) sometimes leading to faster transforms, especially for large sizes.
+	  see https://doi.org/10.2151/jmsj.2018-019
 
 * v3.1  (11 Oct 2018)
 	- Removed Robert formulation functions. Use `shtns_robert_form()` instead.

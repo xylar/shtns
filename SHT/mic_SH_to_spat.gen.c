@@ -61,6 +61,11 @@ S	void GEN3(_sy1s,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *BtF, cplx *BpF,
 T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, cplx *BtF, cplx *BpF, const long int llim, const int imlim)
   #endif
   {
+
+
+	// LSPAN can be 2 or 4
+	#define LSPAN 2
+
   #ifndef SHT_AXISYM
 Q	#define qr(l) vall(creal(Ql[l-1]))
 Q	#define qi(l) vall(cimag(Ql[l-1]))
@@ -272,6 +277,48 @@ V			VWl[2*llim+3] = wt;
 3			Ql[llim] = 0.0;			// allow overflow up to llim
 V		}
 
+	#ifdef ISHIOKA
+		// pre-processing for recurrence relation of Ishioka
+		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+		double* restrict clm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
+		{
+		long l=m;	long ll=0;
+Q		cplx qq = Ql[l-1] * xlm[0];
+Q		while (l<llim-1) {
+Q			cplx qq2 = Ql[l+1];
+Q			Ql[l-1]   = (qq  +  qq2 * xlm[ll+2]);
+Q			Ql[l] *= xlm[ll+1];
+Q			ll+=3;	l+=2;
+Q			qq = qq2 * xlm[ll];
+Q		}
+Q		Ql[l-1]   = qq;
+Q		if (l<llim) {
+Q			Ql[l] *= xlm[ll+1];
+Q		} else Ql[l] = 0.0;
+
+V		l=m;	ll=0;
+V		cplx vv = VWl[2*l]   * xlm[0];
+V		cplx ww = VWl[2*l+1] * xlm[0];
+V		while (l<llim) {
+V			cplx vv2 = VWl[2*(l+2)];
+V			cplx ww2 = VWl[2*(l+2)+1];
+V			VWl[2*l]   = (vv  +  vv2 * xlm[ll+2]);
+V			VWl[2*l+1] = (ww  +  ww2 * xlm[ll+2]);
+V			VWl[2*l+2] *= xlm[ll+1];
+V			VWl[2*l+3] *= xlm[ll+1];
+V			ll+=3;	l+=2;
+V			vv = vv2 * xlm[ll];
+V			ww = ww2 * xlm[ll];
+V		}
+V		VWl[2*l]   = vv;
+V		VWl[2*l+1] = ww;
+V		if (l<=llim) {
+V			VWl[2*l+2] *= xlm[ll+1];
+V			VWl[2*l+3] *= xlm[ll+1];
+V		}
+		}
+	#endif
+
 		k = shtns->tm[im] / VSIZE2;			// stay on vector boundary
 		#if VSIZE2 == 1
 			k -= k&1;		// we operate without vectors, but we still need complex alignement (2 doubles).
@@ -313,14 +360,25 @@ V			if (robert_form == 0) l=m-1;
 				}
 			} while(l >>= 1);
 		}
+			#ifdef ISHIOKA
+			al = clm;
+			#endif
 			for (int j=0; j<NWAY; ++j) {
-				y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, j+k);
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
+				#ifndef ISHIOKA
+				y0[j] *= vall(al[0]);
+				#else
+				cost[j] *= cost[j];
+				#endif
 			}
 			for (int j=0; j<NWAY; ++j) {
+				#ifndef ISHIOKA
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
+				#else
+				y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y0[j];
+				#endif
 V				por[j] = vall(0.0);		tei[j] = vall(0.0);
 V				tor[j] = vall(0.0);		pei[j] = vall(0.0);
 V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
@@ -328,6 +386,7 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
+				#ifndef ISHIOKA
 				for (int j=0; j<NWAY; ++j) {
 					y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
 				}
@@ -335,6 +394,14 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 					y1[j] = (vall(al[3])*cost[j])*y0[j] + vall(al[2])*y1[j];
 				}
 				l+=2;	al+=4;
+				#else
+				for (int j=0; j<NWAY; ++j) {
+					rnd tmp = y1[j];
+					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+					y0[j] = tmp;
+				}
+				l+=2;	al+=2;
+				#endif
 				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 					++ny;
 					for (int j=0; j<NWAY; ++j) {
@@ -345,6 +412,7 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 		  if (ny == 0) {
 QX			const long llim2 = llim;
 V			const long llim2 = llim+1;
+		#ifndef ISHIOKA
 			while (l<llim2) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
@@ -365,6 +433,63 @@ QX				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * 
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
 			}
+		#else
+			while (l<llim2-(LSPAN-2)) {	// compute even and odd parts
+Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+Q			  if (LSPAN == 4) {
+Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y1[j]  * qr(l+2);		rei[j] += y1[j] * qi(l+2);	}
+Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y1[j]  * qr(l+3);		roi[j] += y1[j] * qi(l+3);	}
+Q			  }
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
+V			  if (LSPAN == 4) {
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y1[j]  * vr(l+2);		tei[j] += y1[j] * vi(l+2);	}
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+3);		toi[j] += y1[j] * vi(l+3);	}
+V			  }
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
+V			  if (LSPAN == 4) {
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y1[j]  * wr(l+2);		pei[j] += y1[j] * wi(l+2);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+3);		poi[j] += y1[j] * wi(l+3);	}				
+V			  }
+			  if (LSPAN == 2) {
+				rnd a[NWAY], yt[NWAY];
+				for (int j=0; j<NWAY; j++) {	a[j] = vall(al[1])*cost[j] + vall(al[0]);	yt[j] = y1[j];	}
+				for (int j=0; j<NWAY; ++j) {
+					y1[j] = a[j]*y1[j] + y0[j];
+					y0[j] = yt[j];
+				}
+			  } else {	// LSPAN == 4
+				for (int j=0; j<NWAY; ++j) y0[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+				for (int j=0; j<NWAY; ++j) y1[j] = (vall(al[3])*cost[j] + vall(al[2]))*y0[j] + y1[j];
+			  }
+				l+=LSPAN;	al+=LSPAN;
+			}
+			if (l<=llim2) {
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
+QX				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+			  if (LSPAN == 4) {
+				if (l<llim2) {
+3				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
+QX				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+				if (l<llim2-1) {
+3				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y1[j]  * vr(l+2);		tei[j] += y1[j] * vi(l+2);	}
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y1[j]  * wr(l+2);		pei[j] += y1[j] * wi(l+2);	}
+QX				for (int j=0; j<NWAY; ++j) {	rer[j] += y1[j]  * qr(l+2);		rei[j] += y1[j] * qi(l+2);	}
+				}}
+			  }
+			}
+			// correct the odd part:
+			for (int j=0; j<NWAY; ++j) cost[j] = vread(ct, k+j);
+V			for (int j=0; j<NWAY; ++j) {  tor[j] *= cost[j];	toi[j] *= cost[j]; }
+V			for (int j=0; j<NWAY; ++j) {  por[j] *= cost[j];	poi[j] *= cost[j]; }
+Q			for (int j=0; j<NWAY; ++j) {  ror[j] *= cost[j];	roi[j] *= cost[j]; }
+		#endif
 3			if (robert_form == 0) {
 3				for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
 3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
@@ -469,3 +594,5 @@ VX			VFREE(BtF);		// this frees also BpF.
   #endif
 
   }
+
+	#undef LSPAN

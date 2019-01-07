@@ -29,7 +29,11 @@ QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const lo
 VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
 3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
   {
+	// TODO: NW should be larger for ISHIOKA ?, or take a different approach.
 	#define NW (NWAY*2)
+	// LSPAN can be 2 or 4
+QX	#define LSPAN 4
+V	#define LSPAN 2
 
 	double *alm, *al;
 	double *wg, *ct, *st;
@@ -204,10 +208,18 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 		l = shtns->tm[im] / VSIZE2;
 		alm = shtns->blm + im*(2*(LMAX+1) -m+MRES);
 		// compute symmetric and anti-symmetric parts:
+	#ifndef ISHIOKA
 QX		SYM_ASYM_Q(BrF, rer, ror, rei, roi, l)
 3		SYM_ASYM_Q3(BrF, rer, ror, rei, roi, l)
 V		SYM_ASYM_V(BtF, ter, tor, tei, toi, l)
 V		SYM_ASYM_V(BpF, per, por, pei, poi, l)
+	#else
+QX		SYM_ASYM_Q_ISH(BrF, rer, ror, rei, roi, l)
+3		SYM_ASYM_Q3_ISH(BrF, rer, ror, rei, roi, l)
+V		SYM_ASYM_V_ISH(BtF, ter, tor, tei, toi, l)
+V		SYM_ASYM_V_ISH(BpF, per, por, pei, poi, l)
+	#endif
+	
 		k=l;
 		for (l=0; l<=llim-m+1; l++) {
 Q			qq[l] = vdup(0.0);
@@ -252,13 +264,22 @@ V			l=m-1;
 				}
 			} while(l >>= 1);
 		}
+			#ifdef ISHIOKA
+			al = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
+			#endif
 			for (int j=0; j<NW; ++j) {
-				y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, k+j);
+				#ifndef ISHIOKA
+				y0[j] *= vall(al[0]);
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];
+				#else
+				cost[j] *= cost[j];		// cos(theta)^2
+				y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y0[j];
+				#endif
 			}
 			l=m;	al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
+				#ifndef ISHIOKA
 				for (int j=0; j<NW; ++j) {
 					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 				}
@@ -266,6 +287,14 @@ V			l=m-1;
 					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
 				}
 				l+=2;	al+=4;
+				#else
+				for (int j=0; j<NW; ++j) {
+					rnd tmp = y1[j];
+					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+					y0[j] = tmp;
+				}
+				l+=2;	al+=2;
+				#endif
 				if (fabs(vlo(y0[NW-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 					++ny;
 					for (int j=0; j<NW; ++j) {
@@ -274,6 +303,7 @@ V			l=m-1;
 				}
 			}
 		  if (ny == 0) {
+		#ifndef ISHIOKA
 Q			q+=(l-m);
 V			v+=2*(l-m);
 			for (int j=0; j<NW; ++j) {	// prefetch
@@ -348,6 +378,89 @@ Q				q[0] += v2d_reduce(qq0, qq1);
 V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
 			}
+		#else
+			struct {
+				rnd y[2];
+				rnd ct2;
+Q				rnd rer, rei,  ror, roi;
+V				rnd ter, tei,  tor, toi;
+V				rnd per, pei,  por, poi;
+			} x[NW];
+Q			q+=(l-m);
+V			v+=2*(l-m);
+			for (int j=0; j<NW; ++j) {	// prefetch
+Q				x[j].rer = vread( rer, k+j);	x[j].rei = vread( rei, k+j);	x[j].ror = vread( ror, k+j);	x[j].roi = vread( roi, k+j);
+V				x[j].ter = vread( ter, k+j);	x[j].tei = vread( tei, k+j);	x[j].tor = vread( tor, k+j);	x[j].toi = vread( toi, k+j);
+V				x[j].per = vread( per, k+j);	x[j].pei = vread( pei, k+j);	x[j].por = vread( por, k+j);	x[j].poi = vread( poi, k+j);
+				x[j].y[0] = y0[j];		x[j].y[1] = y1[j];		x[j].ct2 = cost[j];
+			}
+QX			while (l<=llim) {	// compute even and odd parts
+V			while (l<=llim+1) {	// compute even and odd parts
+Q				rnd ql[2*LSPAN];
+V				rnd vl[2*LSPAN];		rnd wl[2*LSPAN];
+				for (int ll=0; ll<2*LSPAN; ll++) {
+Q					ql[ll] = vall(0.0);
+V					vl[ll] = vall(0.0);		wl[ll] = vall(0.0);
+				}
+				for (int j=0; j<NW; ++j) {
+					for (int ll=0; ll<LSPAN/2; ll++) {
+Q						ql[4*ll+0] += x[j].y[ll] * x[j].rer;		ql[4*ll+1] += x[j].y[ll] * x[j].rei;
+Q						ql[4*ll+2] += x[j].y[ll] * x[j].ror;		ql[4*ll+3] += x[j].y[ll] * x[j].roi;
+V						vl[4*ll+0] += x[j].y[ll] * x[j].ter;		vl[4*ll+1] += x[j].y[ll] * x[j].tei;
+V						vl[4*ll+2] += x[j].y[ll] * x[j].tor;		vl[4*ll+3] += x[j].y[ll] * x[j].toi;
+V						wl[4*ll+0] += x[j].y[ll] * x[j].per;		wl[4*ll+1] += x[j].y[ll] * x[j].pei;
+V						wl[4*ll+2] += x[j].y[ll] * x[j].por;		wl[4*ll+3] += x[j].y[ll] * x[j].poi;
+					}
+					if (LSPAN==2) {
+						rnd tmp = x[j].y[1];
+						x[j].y[1] = (vall(al[1])*x[j].ct2 + vall(al[0]))*x[j].y[1] + x[j].y[0];
+						x[j].y[0] = tmp;
+					} else {	// LSPAN == 4
+						x[j].y[0] = (vall(al[1])*x[j].ct2 + vall(al[0]))*x[j].y[1] + x[j].y[0];
+						x[j].y[1] = (vall(al[3])*x[j].ct2 + vall(al[2]))*x[j].y[0] + x[j].y[1];						
+					}
+				}
+Q				q[0] += v2d_reduce(ql[0], ql[1]);
+V				v[0] += v2d_reduce(vl[0], vl[1]);
+V				v[1] += v2d_reduce(wl[0], wl[1]);
+				for (int ll=1; ll<LSPAN; ll++) {
+					if (l+ll<=llim) {
+Q						q[ll]     += v2d_reduce(ql[2*ll], ql[2*ll+1]);
+					}
+					if (l+ll<=llim+1) {
+V						v[2*ll]   += v2d_reduce(vl[2*ll], vl[2*ll+1]);
+V						v[2*ll+1] += v2d_reduce(wl[2*ll], wl[2*ll+1]);
+					}
+				}
+Q				q+=LSPAN;
+V				v+=2*LSPAN;
+				l+=LSPAN;	al+=LSPAN;
+			}
+	/*		{
+V				rnd vv0 = y0[0] * terk[0];
+V				rnd vv1 = y0[0] * teik[0];
+V				rnd ww0 = y0[0] * perk[0];
+V				rnd ww1 = y0[0] * peik[0];
+V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * terk[j];		vv1 += y0[j] * teik[j];	}	// real even, imag even
+V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * perk[j];		ww1 += y0[j] * peik[j];	}	// real even, imag even
+V				v[0] += v2d_reduce(vv0, vv1);
+V				v[1] += v2d_reduce(ww0, ww1);
+			}
+			if (l==llim) {
+Q		//		rnd qq0 = y0[0] * rerk[0];
+Q		//		rnd qq1 = y0[0] * reik[0];
+V				rnd vv0 = y0[0] * tork[0];
+V				rnd vv1 = y0[0] * toik[0];
+V				rnd ww0 = y0[0] * pork[0];
+V				rnd ww1 = y0[0] * poik[0];
+Q		//		for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rerk[j];		qq1 += y0[j] * reik[j];	}	// real even, imag even
+V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * tork[j];		vv1 += y0[j] * toik[j]; }	// real odd, imag odd
+V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * pork[j];		ww1 += y0[j] * poik[j]; }	// real odd, imag odd
+Q		//		q[0] += v2d_reduce(qq0, qq1);
+V				v[2] += v2d_reduce(vv0, vv1);
+V				v[3] += v2d_reduce(ww0, ww1);
+			}	*/
+		#endif
 		  }
 			k+=NW;
 		} while (k < nk);
@@ -356,7 +469,47 @@ Q		v2d *Ql = (v2d*) &Qlm[l];
 V		v2d *Sl = (v2d*) &Slm[l];
 V		v2d *Tl = (v2d*) &Tlm[l];
 
+	#ifndef ISHIOKA
 Q		for (l=0; l<=llim-m; ++l)	Ql[l] = qq[l];
+	#else
+		{	// post-processing for recurrence relation of Ishioka
+		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+		long l=0;	long ll=0;
+Q		v2d u0 = vdup(0.0);
+Q		while (l<llim-m) {
+Q			v2d uu = qq[l];
+Q			Ql[l] = uu * vdup(xlm[ll]) + u0;
+Q			Ql[l+1] = qq[l+1] * vdup(xlm[ll+1]);
+Q			u0 = uu * vdup(xlm[ll+2]);
+Q			l+=2;	ll+=3;
+Q		}
+Q		if (l==llim-m) {
+Q			v2d uu = qq[l];
+Q			Ql[l] = uu * vdup(xlm[ll]) + u0;
+Q		}
+
+		l=0;	ll=0;
+V		v2d v0 = vdup(0.0);
+V		v2d w0 = vdup(0.0);
+V		while (l<=llim-m) {
+V			v2d vv = vw[2*l];
+V			v2d ww = vw[2*l+1];
+V			vw[2*l]   = vv * vdup(xlm[ll]) + v0;
+V			vw[2*l+1] = ww * vdup(xlm[ll]) + w0;
+V			vw[2*l+2] = vdup(xlm[ll+1]) * vw[2*l+2];
+V			vw[2*l+3] = vdup(xlm[ll+1]) * vw[2*l+3];
+V			v0 = vv * vdup(xlm[ll+2]);
+V			w0 = ww * vdup(xlm[ll+2]);
+V			l+=2;	ll+=3;
+V		}
+V		if (l==llim-m+1) {
+V			v2d vv = vw[2*l];
+V			v2d ww = vw[2*l+1];
+V			vw[2*l]   = vv * vdup(xlm[ll]) + v0;
+V			vw[2*l+1] = ww * vdup(xlm[ll]) + w0;
+V		}
+		}
+	#endif
 
 V		SH_2scal_to_vect(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, m, vw, Sl, Tl);
 
@@ -423,3 +576,5 @@ VX	    VFREE(BtF);	// this frees also BpF.
   #endif
 
   }
+
+	#undef LSPAN

@@ -38,8 +38,13 @@ T	void GEN3(_sy1t,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, c
   #endif
 
   #ifndef SHT_AXISYM
+   #ifndef ISHIOKA
 Q	#define qr(l) vall(creal(Ql[l]))
 Q	#define qi(l) vall(cimag(Ql[l]))
+   #else
+Q	#define qr(l) vall( ((double*) QQl)[2*(l)]   )
+Q	#define qi(l) vall( ((double*) QQl)[2*(l)+1] )
+   #endif
 V	#define vr(l) vall( ((double*) VWl)[4*(l)]   )
 V	#define vi(l) vall( ((double*) VWl)[4*(l)+1] )
 V	#define wr(l) vall( ((double*) VWl)[4*(l)+2] )
@@ -53,6 +58,9 @@ V	#define wi(l) vall( ((double*) VWl)[4*(l)+3] )
 V	int robert_form;
 QX	double Ql0[llim+2];
 V	v2d VWl[llim*2+4];
+  #ifdef ISHIOKA
+	v2d QQl[llim+2];
+  #endif
 
 	ct = shtns->ct;		st = shtns->st;
 	nk = NLAT_2;
@@ -200,11 +208,10 @@ V		BtF += m0*NLAT;		BpF += m0*NLAT;
 		//alm = shtns->alm[im];
 		alm = shtns->alm + 2*(l+m);		// shtns->alm + im*(2*(LMAX+1) -m+MRES);
 
-Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 V		{	// convert from vector SH to scalar SH
 V			// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
 V			// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
-V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Vlm(l);
+V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Wlm(l);
 V			double* mx = shtns->mx_stdt + 2*l;
 S			v2d* Sl = (v2d*) &Slm[l];	// virtual pointer for l=0 and im
 T			v2d* Tl = (v2d*) &Tlm[l];
@@ -232,9 +239,54 @@ V				vs = vdup( 0.0 );		wt = vdup( 0.0 );
 S				vs = vs1;
 T				wt = wt1;
 V			}
-V			VWl[2*llim+2]   = vs;
+V			VWl[2*llim+2] = vs;
 V			VWl[2*llim+3] = wt;
 V		}
+
+	#ifndef ISHIOKA
+Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
+	#else
+Q		v2d* Ql = (v2d*) &Qlm[l];	// virtual pointer for l=0 and im
+		// pre-processing for recurrence relation of Ishioka
+		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+		const double* restrict clm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;	// shift pointer to address by l
+		{
+		long l=m;	long ll=0;
+Q		v2d qq = Ql[l] * vdup(xlm[0]);
+Q		while (l<llim-1) {
+Q			v2d qq2 = Ql[l+2];
+Q			QQl[l]   = (qq  +  qq2 * vdup(xlm[ll+2]));
+Q			QQl[l+1] = Ql[l+1] * vdup(xlm[ll+1]);
+Q			ll+=3;	l+=2;
+Q			qq = qq2 * vdup(xlm[ll]);
+Q		}
+Q		QQl[l]   = qq;
+Q		if (l<llim) {
+Q			QQl[l+1] = Ql[l+1] * vdup(xlm[ll+1]);
+Q		} else QQl[l+1] = vdup(0.0);
+
+V		l=m;	ll=0;
+V		v2d vv = VWl[2*l]   * vdup(xlm[0]);
+V		v2d ww = VWl[2*l+1] * vdup(xlm[0]);
+V		while (l<llim) {
+V			v2d vv2 = VWl[2*(l+2)];
+V			v2d ww2 = VWl[2*(l+2)+1];
+V			VWl[2*l]   = (vv  +  vv2 * vdup(xlm[ll+2]));
+V			VWl[2*l+1] = (ww  +  ww2 * vdup(xlm[ll+2]));
+V			VWl[2*l+2] *= vdup(xlm[ll+1]);
+V			VWl[2*l+3] *= vdup(xlm[ll+1]);
+V			ll+=3;	l+=2;
+V			vv = vv2 * vdup(xlm[ll]);
+V			ww = ww2 * vdup(xlm[ll]);
+V		}
+V		VWl[2*l]   = vv;
+V		VWl[2*l+1] = ww;
+V		if (l<=llim) {
+V			VWl[2*l+2] *= vdup(xlm[ll+1]);
+V			VWl[2*l+3] *= vdup(xlm[ll+1]);
+V		}
+		}
+	#endif
 
 		k=0;	l=shtns->tm[im];
 	#if _GCC_VEC_
@@ -309,14 +361,25 @@ V			if (robert_form == 0) l=m-1;
 				}
 			} while(l >>= 1);
 		}
+		#ifdef ISHIOKA
+			al = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
+		#endif
 			for (int j=0; j<NWAY; ++j) {
-				y0[j] *= vall(al[0]);
 				cost[j] = vread(ct, j+k);
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
+				#ifndef ISHIOKA
+				y0[j] *= vall(al[0]);
+				#else
+				cost[j] *= cost[j];		// cos(theta)^2
+				#endif
 			}
 			for (int j=0; j<NWAY; ++j) {
+				#ifndef ISHIOKA
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
+				#else
+				y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y0[j];
+				#endif
 V				por[j] = vall(0.0);		tei[j] = vall(0.0);
 V				tor[j] = vall(0.0);		pei[j] = vall(0.0);
 V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
@@ -324,6 +387,7 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
+				#ifndef ISHIOKA
 				for (int j=0; j<NWAY; ++j) {
 					y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
 				}
@@ -331,6 +395,14 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 					y1[j] = (vall(al[3])*cost[j])*y0[j] + vall(al[2])*y1[j];
 				}
 				l+=2;	al+=4;
+				#else
+				for (int j=0; j<NWAY; ++j) {
+					rnd tmp = y1[j];
+					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+					y0[j] = tmp;
+				}
+				l+=2;	al+=2;
+				#endif
 				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 					++ny;
 					for (int j=0; j<NWAY; ++j) {
@@ -339,6 +411,7 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 				}
 			}
 		  if (ny == 0) {
+		#ifndef ISHIOKA
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
@@ -361,6 +434,34 @@ Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * q
 V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] * vi(l+1);	}
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 			}
+		#else
+			while (l<llim) {	// compute even and odd parts
+Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
+				for (int j=0; j<NWAY; ++j) {
+					rnd tmp = y1[j];
+					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+					y0[j] = tmp;
+				}
+				l+=2;	al+=2;
+			}
+V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
+V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
+			if (l==llim) {
+V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
+V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
+Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+			}
+			// correct the odd part:
+			for (int j=0; j<NWAY; ++j) cost[j] = vread(ct, k+j);
+V			for (int j=0; j<NWAY; ++j) {  tor[j] *= cost[j];	toi[j] *= cost[j]; }
+V			for (int j=0; j<NWAY; ++j) {  por[j] *= cost[j];	poi[j] *= cost[j]; }
+Q			for (int j=0; j<NWAY; ++j) {  ror[j] *= cost[j];	roi[j] *= cost[j]; }
+		#endif
 3			if (robert_form == 0) {
 3				for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
 3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
