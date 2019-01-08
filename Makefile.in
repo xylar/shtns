@@ -9,7 +9,7 @@ PYTHON=@PYTHON@
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(CFLAGS) -D_GNU_SOURCE
+go= $(CFLAGS) -D_GNU_SOURCE -DISHIOKA
 
 
 # compiler command with options for the sht codelets
