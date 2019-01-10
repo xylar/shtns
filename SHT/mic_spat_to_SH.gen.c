@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2019 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -30,7 +30,9 @@ VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *
 3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
   {
 	// TODO: NW should be larger for ISHIOKA ?, or take a different approach.
-	#define NW (NWAY*2)
+	#define NW (NWAY*16)
+	// another blocking level in theta (64 or 128 should be good)
+	#define NBLK (NWAY*16) //24 //(NWAY*3) //24 //96 // (NWAY*3)  //24
 	// LSPAN can be 2 or 4
 QX	#define LSPAN 4
 V	#define LSPAN 2
@@ -40,7 +42,6 @@ V	#define LSPAN 2
 V	double *l_2;
 	long int nk, k, l,m;
 	unsigned m0, mstep;
-	int k_inc, m_inc;
   #ifndef SHT_AXISYM
 	unsigned im;
   #endif
@@ -48,6 +49,7 @@ V	int robert_form;
 Q	v2d qq[llim+2];
 V	v2d vw[2*llim+4];
 
+	// the SSE macro should align these arrays on vector length.
 Q	double rer[NLAT_2 + NW*VSIZE2] SSE;
 Q	double ror[NLAT_2 + NW*VSIZE2] SSE;
 V	double ter[NLAT_2 + NW*VSIZE2] SSE;
@@ -82,7 +84,8 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 	}
 
 	// ACCESS PATTERN
-	k_inc = shtns->k_stride_a;		m_inc = shtns->m_stride_a;
+	const int k_inc = shtns->k_stride_a;
+	const int m_inc = shtns->m_stride_a;
 
 	#ifndef _OPENMP
 		m0 = 0;		mstep = 1;
@@ -205,194 +208,254 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
   #ifndef SHT_AXISYM
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
-		l = shtns->tm[im] / VSIZE2;
+		int k0 = shtns->tm[im] / VSIZE2;
+		#ifndef ISHIOKA
 		alm = shtns->blm + im*(2*(LMAX+1) -m+MRES);
+		#else
+		alm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
+		#endif
 		// compute symmetric and anti-symmetric parts:
 	#ifndef ISHIOKA
-QX		SYM_ASYM_Q(BrF, rer, ror, rei, roi, l)
-3		SYM_ASYM_Q3(BrF, rer, ror, rei, roi, l)
-V		SYM_ASYM_V(BtF, ter, tor, tei, toi, l)
-V		SYM_ASYM_V(BpF, per, por, pei, poi, l)
+QX		SYM_ASYM_Q(BrF, rer, ror, rei, roi, k0)
+3		SYM_ASYM_Q3(BrF, rer, ror, rei, roi, k0)
+V		SYM_ASYM_V(BtF, ter, tor, tei, toi, k0)
+V		SYM_ASYM_V(BpF, per, por, pei, poi, k0)
 	#else
-QX		SYM_ASYM_Q_ISH(BrF, rer, ror, rei, roi, l)
-3		SYM_ASYM_Q3_ISH(BrF, rer, ror, rei, roi, l)
-V		SYM_ASYM_V_ISH(BtF, ter, tor, tei, toi, l)
-V		SYM_ASYM_V_ISH(BpF, per, por, pei, poi, l)
+QX		SYM_ASYM_Q_ISH(BrF, rer, ror, rei, roi, k0)
+3		SYM_ASYM_Q3_ISH(BrF, rer, ror, rei, roi, k0)
+V		SYM_ASYM_V_ISH(BtF, ter, tor, tei, toi, k0)
+V		SYM_ASYM_V_ISH(BpF, per, por, pei, poi, k0)
 	#endif
 	
-		k=l;
-		for (l=0; l<=llim-m+1; l++) {
+		for (int l=0; l<=llim-m+1; l++) {
 Q			qq[l] = vdup(0.0);
 V			vw[2*l] = vdup(0.0);		vw[2*l+1] = vdup(0.0);
 		}
-		do {
+		int k = nk; do {
+			k -= NBLK;
 Q			v2d* q = qq;
 V			v2d* v = vw;
-			al = alm;
-			rnd cost[NW], y0[NW], y1[NW];
-Q			rnd rerk[NW], reik[NW], rork[NW], roik[NW];		// help the compiler to cache into registers.
-V			rnd terk[NW], teik[NW], tork[NW], toik[NW];
-V			rnd perk[NW], peik[NW], pork[NW], poik[NW];
-			for (int j=0; j<NW; ++j) {
-				cost[j] = vread(st, k+j);
-				y0[j] = vall(0.5);
-			}
-Q			l=m;
-V			l=m-1;
-			long int ny = 0;	// exponent to extend double precision range.
-		if ((int)llim <= SHT_L_RESCALE_FLY) {
-			do {		// sin(theta)^m
-				if (l&1) for (int j=0; j<NW; ++j) y0[j] *= cost[j];
-				for (int j=0; j<NW; ++j) cost[j] *= cost[j];
-			} while(l >>= 1);
-		} else {
-			long int nsint = 0;
-			do {		// sin(theta)^m		(use rescaling to avoid underflow)
-				if (l&1) {
-					for (int j=NW-1; j>=0; --j) y0[j] *= cost[j];
-					ny += nsint;
-					if (vlo(y0[NW-1]) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
-						ny--;
-						for (int j=NW-1; j>=0; --j) y0[j] *= vall(SHT_SCALE_FACTOR);
-					}
+			rnd y01ct[NBLK][3];		// [0] = y0,  [1] =  y1,  [2] = cos(theta)^2
+		#ifndef LOW_LLIM
+			int ny[NBLK/NWAY];		// exponent to extend double precision range.
+		#endif
+			int lnz = llim;			// apriori, we go up to llim.
+			int imin = (k<k0) ? imin = k0-k-(NWAY-1) : 0;	// the last block may be smaller.
+			for (int i=NBLK-NWAY; i>=imin; i-=NWAY) {		// iterate over blocks, start from the right-most (IMPORTANT!)
+				rnd y0[NWAY], cost[NWAY];		// should fit in registers
+				for (int j=0; j<NWAY; j++) {
+					int idx = k+i+j;	if (idx < 0) idx=0;		// don't read below data.
+					y0[j] = vall(0.5);
+					cost[j] = vread(st, idx);		// sin(theta)
 				}
-				for (int j=NW-1; j>=0; --j) cost[j] *= cost[j];
-				nsint += nsint;
-				if (vlo(cost[NW-1]) < 1.0/SHT_SCALE_FACTOR) {
-					nsint--;
-					for (int j=NW-1; j>=0; --j) cost[j] *= vall(SHT_SCALE_FACTOR);
-				}
-			} while(l >>= 1);
-		}
-			#ifdef ISHIOKA
-			al = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
+Q				l=m;
+V				l=m-1;
+				int ny0 = 0;
+			#ifndef LOW_LLIM
+				if ((int)llim <= SHT_L_RESCALE_FLY) {
 			#endif
-			for (int j=0; j<NW; ++j) {
-				cost[j] = vread(ct, k+j);
-				#ifndef ISHIOKA
-				y0[j] *= vall(al[0]);
-				y1[j]  = (vall(al[1])*y0[j]) *cost[j];
-				#else
-				cost[j] *= cost[j];		// cos(theta)^2
-				y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y0[j];
-				#endif
-			}
-			l=m;	al+=2;
-			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
-				#ifndef ISHIOKA
-				for (int j=0; j<NW; ++j) {
-					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
+					do {		// sin(theta)^m
+						if (l&1) for (int j=0; j<NWAY; ++j) y0[j] *= cost[j];
+						for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
+					} while(l >>= 1);
+			#ifndef LOW_LLIM
+				} else {
+					int nsint = 0;
+					do {		// sin(theta)^m		(use rescaling to avoid underflow)
+						if (l&1) {
+							for (int j=NWAY-1; j>=0; --j) y0[j] *= cost[j];
+							ny0 += nsint;
+							if (vlo(y0[NWAY-1]) < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
+								ny0--;
+								for (int j=NWAY-1; j>=0; --j) y0[j] *= vall(SHT_SCALE_FACTOR);
+							}
+						}
+						for (int j=NWAY-1; j>=0; --j) cost[j] *= cost[j];
+						nsint += nsint;
+						if (vlo(cost[NWAY-1]) < 1.0/SHT_SCALE_FACTOR) {
+							nsint--;
+							for (int j=NWAY-1; j>=0; --j) cost[j] *= vall(SHT_SCALE_FACTOR);
+						}
+					} while(l >>= 1);
 				}
-				for (int j=0; j<NW; ++j) {
-					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
+			#endif
+				rnd y1[NWAY];
+				al = alm;
+				for (int j=0; j<NWAY; ++j) {
+					int idx = k+i+j;	if (idx < 0) idx=0;		// don't read below data.
+					cost[j] = vread(ct, idx);		// cos(theta)
+					#ifndef ISHIOKA
+					y0[j] *= vall(al[0]);
+					y1[j]  = (vall(al[1])*y0[j]) * cost[j];
+					#else
+					cost[j] *= cost[j];		// cos(theta)^2
+					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y0[j];
+					#endif
 				}
-				l+=2;	al+=4;
-				#else
-				for (int j=0; j<NW; ++j) {
-					rnd tmp = y1[j];
-					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
-					y0[j] = tmp;
-				}
-				l+=2;	al+=2;
-				#endif
-				if (fabs(vlo(y0[NW-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
-					++ny;
-					for (int j=0; j<NW; ++j) {
-						y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
+
+				l=m;	al+=2;
+				while ((ny0<0) && (l<lnz)) {		// ylm's are too small and are treated as zero
+					#ifndef ISHIOKA
+					for (int j=0; j<NWAY; ++j) {
+						y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
+					}
+					for (int j=0; j<NWAY; ++j) {
+						y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
+					}
+					l+=2;	al+=4;
+					#else
+					for (int j=0; j<NWAY; ++j) {
+						rnd tmp = y1[j];
+						y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+						y0[j] = tmp;
+					}
+					l+=2;	al+=2;
+					#endif
+					if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
+						++ny0;
+						for (int j=0; j<NWAY; ++j) {
+							y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
+						}
 					}
 				}
+				ny[i/NWAY] = ny0;		// store extended exponents
+				if ((l > llim) && (ny0<0)) break;	// nothing more to do in this block.
+				lnz = l;				// record the minimum l for significant values, over this block, do not go above that afterwards
+				for (int j=0; j<NWAY; ++j) {	// store other stuff for recurrence.
+					y01ct[i+j][0] = y0[j];
+					y01ct[i+j][1] = y1[j];
+					y01ct[i+j][2] = cost[j];
+				}
 			}
-		  if (ny == 0) {
+			if (ny[NBLK/NWAY-1] < 0) break;		// no ylm has a significant value in this block, the block is done.
+
+			l = lnz;	// starting point in l for this block
 		#ifndef ISHIOKA
+			al = alm + 2 + 2*(l-m);
+			struct {
+				rnd ct;
+				rnd y[2];
+Q				rnd rer, rei,  ror, roi;
+V				rnd ter, tei,  tor, toi;
+V				rnd per, pei,  por, poi;
+			} x[NBLK];
 Q			q+=(l-m);
 V			v+=2*(l-m);
-			for (int j=0; j<NW; ++j) {	// prefetch
-				y0[j] *= vread(wg, k+j);		y1[j] *= vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
-Q				rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( ror, k+j);		roik[j] = vread( roi, k+j);
-V				terk[j] = vread( ter, k+j);		teik[j] = vread( tei, k+j);		tork[j] = vread( tor, k+j);		toik[j] = vread( toi, k+j);
-V				perk[j] = vread( per, k+j);		peik[j] = vread( pei, k+j);		pork[j] = vread( por, k+j);		poik[j] = vread( poi, k+j);
+			imin = (k0-k > 0) ? k0-k : 0;	// 0 <= imin < NBLK
+			for (int i=imin; i<NBLK; ++i) {
+				rnd w = vread(wg, k+i);		x[i].ct = y01ct[i][2];
+				x[i].y[0] = y01ct[i][0] * w;	x[i].y[1] = y01ct[i][1] * w;		// weight appears here (must be after the previous accuracy loop).
+Q				x[i].rer = vread( rer, k+i);	x[i].rei = vread( rei, k+i);	x[i].ror = vread( ror, k+i);	x[i].roi = vread( roi, k+i);
+V				x[i].ter = vread( ter, k+i);	x[i].tei = vread( tei, k+i);	x[i].tor = vread( tor, k+i);	x[i].toi = vread( toi, k+i);
+V				x[i].per = vread( per, k+i);	x[i].pei = vread( pei, k+i);	x[i].por = vread( por, k+i);	x[i].poi = vread( poi, k+i);
 			}
 V			if (robert_form) {
-V				for (int j=0; j<NW; ++j) {
-V					rnd st_1 = vread(shtns->st_1, k+j);
-V					terk[j] *= st_1;	teik[j] *= st_1;	tork[j] *= st_1;	toik[j] *= st_1;
-V					perk[j] *= st_1;	peik[j] *= st_1;	pork[j] *= st_1;	poik[j] *= st_1;
+V				for (int i=imin; i<NBLK; ++i) {
+V					rnd st_1 = vread(shtns->st_1, k+i);
+V					x[i].ter *= st_1;	x[i].tei *= st_1;	x[i].tor *= st_1;	x[i].toi *= st_1;
+V					x[i].per *= st_1;	x[i].pei *= st_1;	x[i].por *= st_1;	x[i].poi *= st_1;
 V				}
 V			}
 			while (l<llim) {	// compute even and odd parts
-Q				rnd qq0 = y0[0] * rerk[0];
-Q				rnd qq1 = y0[0] * reik[0];
-Q				for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rerk[j];		qq1 += y0[j] * reik[j];	}	// real even, imag even
-V				rnd vv0 = y0[0] * terk[0];
-V				rnd vv1 = y0[0] * teik[0];
-V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * terk[j];		vv1 += y0[j] * teik[j];	}	// real even, imag even
-V				rnd ww0 = y0[0] * perk[0];
-V				rnd ww1 = y0[0] * peik[0];
-V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * perk[j];		ww1 += y0[j] * peik[j];	}	// real even, imag even
+Q				rnd qq0 = vall(0.0);	// real
+Q				rnd qq1 = vall(0.0);	// imag
+Q				rnd qq2 = vall(0.0);	// real
+Q				rnd qq3 = vall(0.0);	// real
+V				rnd vv0 = vall(0.0);	rnd vv1 = vall(0.0);
+V				rnd ww0 = vall(0.0);	rnd ww1 = vall(0.0);
+V				rnd vv2 = vall(0.0);	rnd vv3 = vall(0.0);
+V				rnd ww2 = vall(0.0);	rnd ww3 = vall(0.0);
+				for (unsigned j=imin; j<NBLK; ++j) {
+					register rnd y0 = x[j].y[0];
+					register rnd y1 = x[j].y[1];
+					if (ny[j/NWAY] == 0) {
+Q					qq0 += y0 * x[j].rer;		qq1 += y0 * x[j].rei;	// real even, imag even
+V					vv0 += y0 * x[j].ter;		vv1 += y0 * x[j].tei;	// real even, imag even
+V					ww0 += y0 * x[j].per;		ww1 += y0 * x[j].pei;	// real even, imag even
+Q					qq2 += y1 * x[j].ror;		qq3 += y1 * x[j].roi;	// real even, imag even
+V					vv2 += y1 * x[j].tor;		vv3 += y1 * x[j].toi;	// real odd, imag odd
+V					ww2 += y1 * x[j].por;		ww3 += y1 * x[j].poi;	// real odd, imag odd
+					}
+					y0 = vall(al[1])*(x[j].ct*y1) + vall(al[0])*y0;
+					x[j].y[0] = y0;
+					x[j].y[1] = vall(al[3])*(x[j].ct*y0) + vall(al[2])*y1;
+				}
 Q				q[0] += v2d_reduce(qq0, qq1);
+Q				q[1] += v2d_reduce(qq2, qq3);
 V				v[0] += v2d_reduce(vv0, vv1);
 V				v[1] += v2d_reduce(ww0, ww1);
-				for (int j=0; j<NW; ++j) {
-					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
-				}
-Q				qq0 = y1[0] * rork[0];
-Q				qq1 = y1[0] * roik[0];
-Q				for (int j=1; j<NW; ++j) {	qq0 += y1[j] * rork[j];		qq1 += y1[j] * roik[j]; }	// real odd, imag odd
-V				vv0 = y1[0] * tork[0];
-V				vv1 = y1[0] * toik[0];
-V				for (int j=1; j<NW; ++j) {	vv0 += y1[j] * tork[j];		vv1 += y1[j] * toik[j]; }	// real odd, imag odd
-V				ww0 = y1[0] * pork[0];
-V				ww1 = y1[0] * poik[0];
-V				for (int j=1; j<NW; ++j) {	ww0 += y1[j] * pork[j];		ww1 += y1[j] * poik[j]; }	// real odd, imag odd
-Q				q[1] += v2d_reduce(qq0, qq1);
-V				v[2] += v2d_reduce(vv0, vv1);
-V				v[3] += v2d_reduce(ww0, ww1);
+V				v[2] += v2d_reduce(vv2, vv3);
+V				v[3] += v2d_reduce(ww2, ww3);
 Q				q+=2;
 V				v+=4;
-				for (int j=0; j<NW; ++j) {
-					y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
-				}
 				l+=2;	al+=4;
+				if (ny[imin/NWAY] < 0) {
+					for (int i=imin/NWAY; i<NBLK/NWAY; i++) {	// accuracy checking
+						if ((ny[i] < 0) && (fabs(vlo(x[i*NWAY+NWAY-1].y[0])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)) {		// rescale when value is significant
+							++ny[i];
+							for (int j=0; j<NWAY; ++j) {
+								x[i*NWAY+j].y[0] *= vall(1.0/SHT_SCALE_FACTOR);		x[i*NWAY+j].y[1] *= vall(1.0/SHT_SCALE_FACTOR);
+							}
+						}
+					}
+				}
 			}
 			{
-V				rnd vv0 = y0[0] * terk[0];
-V				rnd vv1 = y0[0] * teik[0];
-V				rnd ww0 = y0[0] * perk[0];
-V				rnd ww1 = y0[0] * peik[0];
-V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * terk[j];		vv1 += y0[j] * teik[j];	}	// real even, imag even
-V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * perk[j];		ww1 += y0[j] * peik[j];	}	// real even, imag even
+V				rnd vv0 = vall(0.0);
+V				rnd vv1 = vall(0.0);
+V				rnd ww0 = vall(0.0);
+V				rnd ww1 = vall(0.0);
+				for (unsigned j=imin; j<NBLK; ++j) {
+					if (ny[j/NWAY] == 0) {
+					register rnd y0 = x[j].y[0];
+V					vv0 += y0 * x[j].ter;		vv1 += y0 * x[j].tei;	// real even, imag even
+V					ww0 += y0 * x[j].per;		ww1 += y0 * x[j].pei;	// real even, imag even
+					}
+				}
 V				v[0] += v2d_reduce(vv0, vv1);
 V				v[1] += v2d_reduce(ww0, ww1);
 			}
 			if (l==llim) {
-Q				rnd qq0 = y0[0] * rerk[0];
-Q				rnd qq1 = y0[0] * reik[0];
-V				rnd vv0 = y1[0] * tork[0];
-V				rnd vv1 = y1[0] * toik[0];
-V				rnd ww0 = y1[0] * pork[0];
-V				rnd ww1 = y1[0] * poik[0];
-Q				for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rerk[j];		qq1 += y0[j] * reik[j];	}	// real even, imag even
-V				for (int j=1; j<NW; ++j) {	vv0 += y1[j] * tork[j];		vv1 += y1[j] * toik[j]; }	// real odd, imag odd
-V				for (int j=1; j<NW; ++j) {	ww0 += y1[j] * pork[j];		ww1 += y1[j] * poik[j]; }	// real odd, imag odd
+Q				rnd qq0 = vall(0.0);	// real
+Q				rnd qq1 = vall(0.0);	// imag
+V				rnd vv0 = vall(0.0);
+V				rnd vv1 = vall(0.0);
+V				rnd ww0 = vall(0.0);
+V				rnd ww1 = vall(0.0);
+				for (unsigned j=imin; j<NBLK; ++j) {
+					if (ny[j/NWAY] == 0) {
+					register rnd y0 = x[j].y[0];
+Q					qq0 += y0 * x[j].rer;		qq1 += y0 * x[j].rei;	// real even, imag even
+					}
+				}
+				for (unsigned j=imin; j<NBLK; ++j) {
+					if (ny[j/NWAY] == 0) {
+					register rnd y1 = x[j].y[1];
+V					vv0 += y1 * x[j].tor;		vv1 += y1 * x[j].toi;	// real odd, imag odd
+V					ww0 += y1 * x[j].por;		ww1 += y1 * x[j].poi;	// real odd, imag odd
+					}
+				}
 Q				q[0] += v2d_reduce(qq0, qq1);
 V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
 			}
 		#else
+			al = alm + 2 + (l-m);
 			struct {
 				rnd y[2];
 				rnd ct2;
 Q				rnd rer, rei,  ror, roi;
 V				rnd ter, tei,  tor, toi;
 V				rnd per, pei,  por, poi;
-			} x[NW];
+			} x[NBLK];
 Q			q+=(l-m);
 V			v+=2*(l-m);
-			for (int j=0; j<NW; ++j) {	// prefetch
-Q				x[j].rer = vread( rer, k+j);	x[j].rei = vread( rei, k+j);	x[j].ror = vread( ror, k+j);	x[j].roi = vread( roi, k+j);
-V				x[j].ter = vread( ter, k+j);	x[j].tei = vread( tei, k+j);	x[j].tor = vread( tor, k+j);	x[j].toi = vread( toi, k+j);
-V				x[j].per = vread( per, k+j);	x[j].pei = vread( pei, k+j);	x[j].por = vread( por, k+j);	x[j].poi = vread( poi, k+j);
-				x[j].y[0] = y0[j];		x[j].y[1] = y1[j];		x[j].ct2 = cost[j];
+			imin = (k0-k > 0) ? k0-k : 0;	// 0 <= imin < NBLK
+			for (int i=imin; i<NBLK; ++i) {
+Q				x[i].rer = vread( rer, k+i);	x[i].rei = vread( rei, k+i);	x[i].ror = vread( ror, k+i);	x[i].roi = vread( roi, k+i);
+V				x[i].ter = vread( ter, k+i);	x[i].tei = vread( tei, k+i);	x[i].tor = vread( tor, k+i);	x[i].toi = vread( toi, k+i);
+V				x[i].per = vread( per, k+i);	x[i].pei = vread( pei, k+i);	x[i].por = vread( por, k+i);	x[i].poi = vread( poi, k+i);
+				x[i].y[0] = y01ct[i][0];		x[i].y[1] = y01ct[i][1];		x[i].ct2 = y01ct[i][2];
 			}
 QX			while (l<=llim) {	// compute even and odd parts
 V			while (l<=llim+1) {	// compute even and odd parts
@@ -402,22 +465,25 @@ V				rnd vl[2*LSPAN];		rnd wl[2*LSPAN];
 Q					ql[ll] = vall(0.0);
 V					vl[ll] = vall(0.0);		wl[ll] = vall(0.0);
 				}
-				for (int j=0; j<NW; ++j) {
+				for (unsigned i=imin; i<NBLK; ++i) {
+					if (ny[i/NWAY] == 0) {
 					for (int ll=0; ll<LSPAN/2; ll++) {
-Q						ql[4*ll+0] += x[j].y[ll] * x[j].rer;		ql[4*ll+1] += x[j].y[ll] * x[j].rei;
-Q						ql[4*ll+2] += x[j].y[ll] * x[j].ror;		ql[4*ll+3] += x[j].y[ll] * x[j].roi;
-V						vl[4*ll+0] += x[j].y[ll] * x[j].ter;		vl[4*ll+1] += x[j].y[ll] * x[j].tei;
-V						vl[4*ll+2] += x[j].y[ll] * x[j].tor;		vl[4*ll+3] += x[j].y[ll] * x[j].toi;
-V						wl[4*ll+0] += x[j].y[ll] * x[j].per;		wl[4*ll+1] += x[j].y[ll] * x[j].pei;
-V						wl[4*ll+2] += x[j].y[ll] * x[j].por;		wl[4*ll+3] += x[j].y[ll] * x[j].poi;
+						register rnd y = x[i].y[ll];
+Q						ql[4*ll+0] += y * x[i].rer;		ql[4*ll+1] += y * x[i].rei;
+Q						ql[4*ll+2] += y * x[i].ror;		ql[4*ll+3] += y * x[i].roi;
+V						vl[4*ll+0] += y * x[i].ter;		vl[4*ll+1] += y * x[i].tei;
+V						vl[4*ll+2] += y * x[i].tor;		vl[4*ll+3] += y * x[i].toi;
+V						wl[4*ll+0] += y * x[i].per;		wl[4*ll+1] += y * x[i].pei;
+V						wl[4*ll+2] += y * x[i].por;		wl[4*ll+3] += y * x[i].poi;
+					}
 					}
 					if (LSPAN==2) {
-						rnd tmp = x[j].y[1];
-						x[j].y[1] = (vall(al[1])*x[j].ct2 + vall(al[0]))*x[j].y[1] + x[j].y[0];
-						x[j].y[0] = tmp;
+						register rnd tmp = x[i].y[1];
+						x[i].y[1] = (vall(al[1])*x[i].ct2 + vall(al[0]))*tmp + x[i].y[0];
+						x[i].y[0] = tmp;
 					} else {	// LSPAN == 4
-						x[j].y[0] = (vall(al[1])*x[j].ct2 + vall(al[0]))*x[j].y[1] + x[j].y[0];
-						x[j].y[1] = (vall(al[3])*x[j].ct2 + vall(al[2]))*x[j].y[0] + x[j].y[1];						
+						x[i].y[0] = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
+						x[i].y[1] = (vall(al[3])*x[i].ct2 + vall(al[2]))*x[i].y[0] + x[i].y[1];						
 					}
 				}
 Q				q[0] += v2d_reduce(ql[0], ql[1]);
@@ -435,6 +501,16 @@ V						v[2*ll+1] += v2d_reduce(wl[2*ll], wl[2*ll+1]);
 Q				q+=LSPAN;
 V				v+=2*LSPAN;
 				l+=LSPAN;	al+=LSPAN;
+				if (ny[imin/NWAY] < 0) {
+					for (int i=imin/NWAY; i<NBLK/NWAY; i++) {	// accuracy checking
+						if ((ny[i] < 0) && (fabs(vlo(x[i*NWAY+NWAY-1].y[0])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)) {		// rescale when value is significant
+							++ny[i];
+							for (int j=0; j<NWAY; ++j) {
+								x[i*NWAY+j].y[0] *= vall(1.0/SHT_SCALE_FACTOR);		x[i*NWAY+j].y[1] *= vall(1.0/SHT_SCALE_FACTOR);
+							}
+						}
+					}
+				}
 			}
 	/*		{
 V				rnd vv0 = y0[0] * terk[0];
@@ -461,9 +537,8 @@ V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
 			}	*/
 		#endif
-		  }
-			k+=NW;
-		} while (k < nk);
+		} while (k > k0);
+		
 		l = LiM(shtns, m, im);
 Q		v2d *Ql = (v2d*) &Qlm[l];
 V		v2d *Sl = (v2d*) &Slm[l];
