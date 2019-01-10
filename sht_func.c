@@ -1587,7 +1587,7 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 */
 
 
-typedef double rndu __attribute__ ((vector_size (32), aligned (8)));		// UNALIGNED vector that contains a complex number
+typedef double rndu __attribute__ ((vector_size (VSIZE2), aligned (8)));	// UNALIGNED vector
 typedef double v2du __attribute__ ((vector_size (16), aligned (8)));		// UNALIGNED vector that contains a complex number
 
 void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
