@@ -251,14 +251,11 @@ V			v2d* v = vw;
 Q				l=m;
 V				l=m-1;
 				int ny0 = 0;
-			#ifndef LOW_LLIM
 				if ((int)llim <= SHT_L_RESCALE_FLY) {
-			#endif
 					do {		// sin(theta)^m
 						if (l&1) for (int j=0; j<NWAY; ++j) y0[j] *= cost[j];
 						for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
 					} while(l >>= 1);
-			#ifndef LOW_LLIM
 				} else {
 					int nsint = 0;
 					do {		// sin(theta)^m		(use rescaling to avoid underflow)
@@ -278,7 +275,6 @@ V				l=m-1;
 						}
 					} while(l >>= 1);
 				}
-			#endif
 				rnd y1[NWAY];
 				al = alm;
 				for (int j=0; j<NWAY; ++j) {
@@ -319,7 +315,8 @@ V				l=m-1;
 					}
 				}
 				ny[i/NWAY] = ny0;		// store extended exponents
-				if ((l > llim) && (ny0<0)) break;	// nothing more to do in this block.
+QX				if ((l > llim) && (ny0<0)) break;	// nothing more to do in this block.
+V				if ((l > llim+1) && (ny0<0)) break;	// nothing more to do in this block.
 				lnz = l;				// record the minimum l for significant values, over this block, do not go above that afterwards
 				for (int j=0; j<NWAY; ++j) {	// store other stuff for recurrence.
 					y01ct[i+j][0] = y0[j];
@@ -547,43 +544,10 @@ V		v2d *Tl = (v2d*) &Tlm[l];
 	#ifndef ISHIOKA
 Q		for (l=0; l<=llim-m; ++l)	Ql[l] = qq[l];
 	#else
-		{	// post-processing for recurrence relation of Ishioka
+		// post-processing for recurrence relation of Ishioka
 		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
-		long l=0;	long ll=0;
-Q		v2d u0 = vdup(0.0);
-Q		while (l<llim-m) {
-Q			v2d uu = qq[l];
-Q			Ql[l] = uu * vdup(xlm[ll]) + u0;
-Q			Ql[l+1] = qq[l+1] * vdup(xlm[ll+1]);
-Q			u0 = uu * vdup(xlm[ll+2]);
-Q			l+=2;	ll+=3;
-Q		}
-Q		if (l==llim-m) {
-Q			v2d uu = qq[l];
-Q			Ql[l] = uu * vdup(xlm[ll]) + u0;
-Q		}
-
-		l=0;	ll=0;
-V		v2d v0 = vdup(0.0);
-V		v2d w0 = vdup(0.0);
-V		while (l<=llim-m) {
-V			v2d vv = vw[2*l];
-V			v2d ww = vw[2*l+1];
-V			vw[2*l]   = vv * vdup(xlm[ll]) + v0;
-V			vw[2*l+1] = ww * vdup(xlm[ll]) + w0;
-V			vw[2*l+2] = vdup(xlm[ll+1]) * vw[2*l+2];
-V			vw[2*l+3] = vdup(xlm[ll+1]) * vw[2*l+3];
-V			v0 = vv * vdup(xlm[ll+2]);
-V			w0 = ww * vdup(xlm[ll+2]);
-V			l+=2;	ll+=3;
-V		}
-V		if (l==llim-m+1) {
-V			v2d vv = vw[2*l];
-V			v2d ww = vw[2*l+1];
-V			vw[2*l]   = vv * vdup(xlm[ll]) + v0;
-V			vw[2*l+1] = ww * vdup(xlm[ll]) + w0;
-V		}
-		}
+Q		ishioka_to_SH(xlm, qq, llim-m, Ql);
+V		ishioka_to_SH2(xlm, vw, llim-m+1, vw);
 	#endif
 
 V		SH_2scal_to_vect(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, m, vw, Sl, Tl);

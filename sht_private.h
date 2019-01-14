@@ -827,3 +827,263 @@ static void SH_2scal_to_vect(const double *mx, const double* l_2, int llim, int 
 		Tl[l] = -tl * vdup(l_2[l+m]);
 	}
 }
+
+/// post-processing for recurrence relation of Ishioka
+/// xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+/// llim_m = llim-m
+/// qq[l-m]: input data obtained with ishioka's relation
+/// Ql[l-m]: output data, spherical harmonic coefficients of degree l (for fixed m).
+/// can operate in-place (Ql = qq)
+static void ishioka_to_SH(const double* xlm, const v2d* qq, const int llim_m, v2d* Ql)
+{
+	int l=0;	int ll=0;
+	v2d u0 = vdup(0.0);
+	while (l<llim_m) {
+		v2d uu = qq[l];
+		Ql[l] = uu * vdup(xlm[ll]) + u0;
+		Ql[l+1] = qq[l+1] * vdup(xlm[ll+1]);
+		u0 = uu * vdup(xlm[ll+2]);
+		l+=2;	ll+=3;
+	}
+	if (l==llim_m) {
+		v2d uu = qq[l];
+		Ql[l] = uu * vdup(xlm[ll]) + u0;
+	}
+}
+
+/// Same as \ref ishioka_to_SH, but for two interlaced coefficient lists
+/// set llim_m = llim-m+1 for vector transforms that include llim+1 (before post-processing)
+/// can operate in-place (vw = VWl)
+static void ishioka_to_SH2(const double* xlm, const v2d* vw, const int llim_m, v2d* VWl)
+{
+	int l=0;	int ll=0;
+	v2d v0 = vdup(0.0);
+	v2d w0 = vdup(0.0);
+	while (l<llim_m) {
+		v2d vv = vw[2*l];
+		v2d ww = vw[2*l+1];
+		VWl[2*l]   = vv * vdup(xlm[ll]) + v0;
+		VWl[2*l+1] = ww * vdup(xlm[ll]) + w0;
+		VWl[2*l+2] = vdup(xlm[ll+1]) * vw[2*l+2];
+		VWl[2*l+3] = vdup(xlm[ll+1]) * vw[2*l+3];
+		v0 = vv * vdup(xlm[ll+2]);
+		w0 = ww * vdup(xlm[ll+2]);
+		l+=2;	ll+=3;
+	}
+	if (l==llim_m) {
+		v2d vv = vw[2*l];
+		v2d ww = vw[2*l+1];
+		VWl[2*l]   = vv * vdup(xlm[ll]) + v0;
+		VWl[2*l+1] = ww * vdup(xlm[ll]) + w0;
+	}
+}
+
+/// post-processing for recurrence relation of Ishioka
+/// xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+/// llim_m = llim-m
+/// qq[l-m]: input data obtained with ishioka's relation
+/// Ql[l-m]: output data, spherical harmonic coefficients of degree l (for fixed m).
+/// can operate in-place (Ql = qq)
+static void ishioka_to_SH_reduce(const double* xlm, const rnd* qq, const int llim_m, v2d* Ql)
+{
+	int l=0;	int ll=0;
+	v2d u0 = vdup(0.0);
+	while (l<llim_m) {
+		v2d uu = v2d_reduce(qq[2*l], qq[2*l+1]);
+		Ql[l] = uu * vdup(xlm[ll]) + u0;
+		Ql[l+1] = vdup(xlm[ll+1]) * v2d_reduce(qq[2*l+2], qq[2*l+3]);
+		u0 = uu * vdup(xlm[ll+2]);
+		l+=2;	ll+=3;
+	}
+	if (l==llim_m) {
+		v2d uu = v2d_reduce(qq[2*l], qq[2*l+1]);
+		Ql[l] = uu * vdup(xlm[ll]) + u0;
+	}
+}
+
+/// Same as \ref ishioka_to_SH, but for two interlaced coefficient lists
+/// set llim_m = llim-m+1 for vector transforms that include llim+1 (before post-processing)
+/// can operate in-place (vw = VWl)
+static void ishioka_to_SH2_reduce(const double* xlm, const rnd* vw, const int llim_m, v2d* VWl)
+{
+		int l=0;	int ll=0;
+		v2d v0 = vdup(0.0);
+		v2d w0 = vdup(0.0);
+		while (l<llim_m) {
+			v2d vv = v2d_reduce(vw[4*l], vw[4*l+1]);
+			v2d ww = v2d_reduce(vw[4*l+2], vw[4*l+3]);
+			VWl[2*l]   = vv * vdup(xlm[ll]) + v0;
+			VWl[2*l+1] = ww * vdup(xlm[ll]) + w0;
+			VWl[2*l+2] = vdup(xlm[ll+1]) * v2d_reduce(vw[4*l+4], vw[4*l+5]);
+			VWl[2*l+3] = vdup(xlm[ll+1]) * v2d_reduce(vw[4*l+6], vw[4*l+7]);
+			v0 = vv * vdup(xlm[ll+2]);
+			w0 = ww * vdup(xlm[ll+2]);
+			l+=2;	ll+=3;
+		}
+		if (l==llim_m) {
+			v2d vv = v2d_reduce(vw[4*l], vw[4*l+1]);
+			v2d ww = v2d_reduce(vw[4*l+2], vw[4*l+3]);
+			VWl[2*l]   = vv * vdup(xlm[ll]) + v0;
+			VWl[2*l+1] = ww * vdup(xlm[ll]) + w0;
+		}
+}
+
+
+/// pre-processing for recurrence relation of Ishioka
+/// xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+/// llim_m = llim-m
+/// Ql[l-m]: intput data, spherical harmonic coefficients of degree l (for fixed m).
+/// qq[l-m]: output data, ready for ishioka's recurrence
+/// can operate in-place (Ql = qq)
+static void SH_to_ishioka(const double* xlm, const v2d* Ql, const int llim_m, v2d* ql)
+{
+	int l=0;	int ll=0;
+	v2d qq = Ql[l] * vdup(xlm[0]);
+	while (l<llim_m-1) {
+		v2d qq2 = Ql[l+2];
+		ql[l]   = (qq  +  qq2 * vdup(xlm[ll+2]));
+		ql[l+1] = Ql[l+1] * vdup(xlm[ll+1]);
+		ll+=3;	l+=2;
+		qq = qq2 * vdup(xlm[ll]);
+	}
+	ql[l]   = qq;
+	ql[l+1] = (l<llim_m) ? Ql[l+1] * vdup(xlm[ll+1]) : vdup(0.0);
+}
+
+/// same as \ref SH_to_ishioka, but handles two interfleaved arrays + operates in-place.
+/// use llim_m = llim-m+1 for vector datat that goes up to llim+1
+static void SH2_to_ishioka(const double* xlm, v2d* VWl, const int llim_m)
+{
+	int l=0;	int ll=0;
+	v2d vv = VWl[2*l]   * xlm[0];
+	v2d ww = VWl[2*l+1] * xlm[0];
+	while (l<llim_m-1) {
+		v2d vv2 = VWl[2*(l+2)];
+		v2d ww2 = VWl[2*(l+2)+1];
+		VWl[2*l]   = (vv  +  vv2 * xlm[ll+2]);
+		VWl[2*l+1] = (ww  +  ww2 * xlm[ll+2]);
+		VWl[2*l+2] *= xlm[ll+1];
+		VWl[2*l+3] *= xlm[ll+1];
+		ll+=3;	l+=2;
+		vv = vv2 * xlm[ll];
+		ww = ww2 * xlm[ll];
+	}
+	VWl[2*l]   = vv;
+	VWl[2*l+1] = ww;
+	if (l<=llim_m-1) {
+		VWl[2*l+2] *= xlm[ll+1];
+		VWl[2*l+3] *= xlm[ll+1];
+	}
+}
+
+/// Convert from vector SH to 2 scalar SH
+/// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
+/// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
+/// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Wlm(l);
+/// m = signed m (for complex SH transform).
+static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* Tl, cplx* VWl)
+{
+	double em = m;
+	cplx sl = Sl[m];
+	cplx tl = Tl[m];
+	cplx vs = 0.0;
+	cplx wt = 0.0;
+	for (int l=m; l<=llim; l++) {
+		double mxu = mx[2*l];
+		double mxl = mx[2*l+1];		// mxl for next iteration
+		vs = vs + I*em*tl;
+		wt = wt + I*em*sl;
+		cplx vs1 = mxl*sl;			// vs for next iter
+		cplx wt1 = -mxl*tl;			// wt for next iter
+		if (l<llim) {
+			sl = Sl[l+1];		// kept for next iteration
+			tl = Tl[l+1];
+			vs += mxu*sl;
+			wt -= mxu*tl;
+		}
+		VWl[2*l]   = vs;
+		VWl[2*l+1] = wt;
+		vs = vs1;
+		wt = wt1;
+	}
+	VWl[2*llim+2] = vs;
+	VWl[2*llim+3] = wt;
+}
+
+static void SH_vect_to_2scal_unif(const double *mx, int llim, int m, cplx* Sl, cplx* Tl, cplx* VWl)
+{
+	double em = m;
+	cplx sl = Sl[m];
+	cplx tl = Tl[m];
+	cplx vs = 0.0;
+	cplx wt = 0.0;
+	int l;
+	for (l=m; l<llim; l++) {
+		double mxu = mx[2*l];
+		double mxl = mx[2*l+1];		// mxl for next iteration
+		vs = vs + I*em*tl;
+		wt = wt + I*em*sl;
+		cplx vs1 = mxl*sl;			// vs for next iter
+		cplx wt1 = -mxl*tl;			// wt for next iter
+		sl = Sl[l+1];		// kept for next iteration
+		tl = Tl[l+1];
+		vs += mxu*sl;
+		wt -= mxu*tl;
+		VWl[2*l]   = vs;
+		VWl[2*l+1] = wt;
+		vs = vs1;
+		wt = wt1;
+	}
+	if (l==llim) {
+		double mxl = mx[2*l+1];		// mxl for next iteration
+		VWl[2*l]   = vs + I*em*tl;
+		VWl[2*l+1] = wt + I*em*sl;
+		VWl[2*llim+2] = mxl*sl;
+		VWl[2*llim+3] = -mxl*tl;
+	}
+}
+
+
+static void SHsph_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* VWl)
+{
+	double em = m;
+	cplx sl = Sl[m];
+	cplx vs = 0.0;
+	for (int l=m; l<=llim; l++) {
+		double mxu = mx[2*l];
+		double mxl = mx[2*l+1];		// mxl for next iteration
+		cplx wt = I*em*sl;
+		cplx vs1 = mxl*sl;			// vs for next iter
+		if (l<llim) {
+			sl = Sl[l+1];		// kept for next iteration
+			vs += mxu*sl;
+		}
+		VWl[2*l]   = vs;
+		VWl[2*l+1] = wt;
+		vs = vs1;
+	}
+	VWl[2*llim+2] = vs;
+	VWl[2*llim+3] = 0.0;
+}
+
+static void SHtor_to_2scal(const double *mx, int llim, int m, cplx* Tl, cplx* VWl)
+{
+	double em = m;
+	cplx tl = Tl[m];
+	cplx wt = 0.0;
+	for (int l=m; l<=llim; l++) {
+		double mxu = mx[2*l];
+		double mxl = mx[2*l+1];		// mxl for next iteration
+		cplx vs = I*em*tl;
+		cplx wt1 = -mxl*tl;			// wt for next iter
+		if (l<llim) {
+			tl = Tl[l+1];		// kept for next iteration
+			wt -= mxu*tl;
+		}
+		VWl[2*l]   = vs;
+		VWl[2*l+1] = wt;
+		wt = wt1;
+	}
+	VWl[2*llim+2] = 0.0;
+	VWl[2*llim+3] = wt;
+}

@@ -208,84 +208,21 @@ V		BtF += m0*NLAT;		BpF += m0*NLAT;
 		//alm = shtns->alm[im];
 		alm = shtns->alm + 2*(l+m);		// shtns->alm + im*(2*(LMAX+1) -m+MRES);
 
-V		{	// convert from vector SH to scalar SH
-V			// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
-V			// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
-V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Wlm(l);
-V			double* mx = shtns->mx_stdt + 2*l;
-S			v2d* Sl = (v2d*) &Slm[l];	// virtual pointer for l=0 and im
-T			v2d* Tl = (v2d*) &Tlm[l];
-V			s2d em = vdup(m);
-S			v2d sl = Sl[m];
-T			v2d tl = Tl[m];
-V			v2d vs = vdup( 0.0 );
-V			v2d wt = vdup( 0.0 );
-V			for (int l=m; l<=llim; l++) {
-V				s2d mxu = vdup( mx[2*l] );
-V				s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
-T				vs = addi( vs ,  em*tl );
-S				wt = addi( wt ,  em*sl );
-S				v2d vs1 = mxl*sl;			// vs for next iter
-T				v2d wt1 = -mxl*tl;			// wt for next iter
-V				if (l<llim) {
-S					sl = Sl[l+1];		// kept for next iteration
-T					tl = Tl[l+1];
-S					vs += mxu*sl;
-T					wt -= mxu*tl;
-V				}
-V				VWl[2*l]   = vs;
-V				VWl[2*l+1] = wt;
-V				vs = vdup( 0.0 );		wt = vdup( 0.0 );
-S				vs = vs1;
-T				wt = wt1;
-V			}
-V			VWl[2*llim+2] = vs;
-V			VWl[2*llim+3] = wt;
-V		}
+  #ifndef SHT_GRAD
+V		SH_vect_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Slm[l], &Tlm[l], (cplx*) VWl);
+  #else
+S		SHsph_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Slm[l], (cplx*) VWl);
+T		SHtor_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Tlm[l], (cplx*) VWl);
+  #endif
 
 	#ifndef ISHIOKA
 Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 	#else
-Q		v2d* Ql = (v2d*) &Qlm[l];	// virtual pointer for l=0 and im
 		// pre-processing for recurrence relation of Ishioka
 		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
-		const double* restrict clm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;	// shift pointer to address by l
-		{
-		long l=m;	long ll=0;
-Q		v2d qq = Ql[l] * vdup(xlm[0]);
-Q		while (l<llim-1) {
-Q			v2d qq2 = Ql[l+2];
-Q			QQl[l]   = (qq  +  qq2 * vdup(xlm[ll+2]));
-Q			QQl[l+1] = Ql[l+1] * vdup(xlm[ll+1]);
-Q			ll+=3;	l+=2;
-Q			qq = qq2 * vdup(xlm[ll]);
-Q		}
-Q		QQl[l]   = qq;
-Q		if (l<llim) {
-Q			QQl[l+1] = Ql[l+1] * vdup(xlm[ll+1]);
-Q		} else QQl[l+1] = vdup(0.0);
-
-V		l=m;	ll=0;
-V		v2d vv = VWl[2*l]   * vdup(xlm[0]);
-V		v2d ww = VWl[2*l+1] * vdup(xlm[0]);
-V		while (l<llim) {
-V			v2d vv2 = VWl[2*(l+2)];
-V			v2d ww2 = VWl[2*(l+2)+1];
-V			VWl[2*l]   = (vv  +  vv2 * vdup(xlm[ll+2]));
-V			VWl[2*l+1] = (ww  +  ww2 * vdup(xlm[ll+2]));
-V			VWl[2*l+2] *= vdup(xlm[ll+1]);
-V			VWl[2*l+3] *= vdup(xlm[ll+1]);
-V			ll+=3;	l+=2;
-V			vv = vv2 * vdup(xlm[ll]);
-V			ww = ww2 * vdup(xlm[ll]);
-V		}
-V		VWl[2*l]   = vv;
-V		VWl[2*l+1] = ww;
-V		if (l<=llim) {
-V			VWl[2*l+2] *= vdup(xlm[ll+1]);
-V			VWl[2*l+3] *= vdup(xlm[ll+1]);
-V		}
-		}
+Q		v2d* Ql = (v2d*) &Qlm[l];	// virtual pointer for l=0 and im
+Q		SH_to_ishioka(xlm, Ql+m, llim-m, QQl+m);
+V		SH2_to_ishioka(xlm, VWl+2*m, llim-m+1);
 	#endif
 
 		k=0;	l=shtns->tm[im];
@@ -536,7 +473,6 @@ S	static void GEN3(SHsph_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, do
 T	static void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
-	int k;
 	unsigned imlim = 0;
 Q	v2d* BrF = (v2d*) Vr;
 V	v2d* BtF = (v2d*) Vt;	v2d* BpF = (v2d*) Vp;

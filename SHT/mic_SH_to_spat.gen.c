@@ -242,81 +242,20 @@ Q		} while(k<=llim);
 3		Ql[llim] = 0.0;			// allow overflow up to llim
 Q		#endif
 
-V		{	// convert from vector SH to scalar SH
-V			// Vlm =  st*d(Slm)/dtheta + I*m*Tlm
-V			// Wlm = -st*d(Tlm)/dtheta + I*m*Slm
-V			// store interleaved: VWlm(2*l) = Vlm(l);	VWlm(2*l+1) = Vlm(l);
-V			double* mx = shtns->mx_stdt + 2*l;
-S			cplx* Sl = &Slm[l];	// virtual pointer for l=0 and im
-T			cplx* Tl = &Tlm[l];
-V			double em = m;
-S			cplx sl = Sl[m];
-T			cplx tl = Tl[m];
-V			cplx vs = 0.0;
-V			cplx wt = 0.0;
-V			for (int l=m; l<=llim; l++) {
-V				double mxu = mx[2*l];
-V				double mxl = mx[2*l+1];		// mxl for next iteration
-T				vs = vs + I*em*tl;
-S				wt = wt + I*em*sl;
-S				cplx vs1 = mxl*sl;			// vs for next iter
-T				cplx wt1 = -mxl*tl;			// wt for next iter
-V				if (l<llim) {
-S					sl = Sl[l+1];		// kept for next iteration
-T					tl = Tl[l+1];
-S					vs += mxu*sl;
-T					wt -= mxu*tl;
-V				}
-V				VWl[2*l]   = vs;
-V				VWl[2*l+1] = wt;
-V				vs = 0.0;		wt = 0.0;
-S				vs = vs1;
-T				wt = wt1;
-V			}
-V			VWl[2*llim+2] = vs;
-V			VWl[2*llim+3] = wt;
-V		}
+	#ifndef SHT_GRAD
+V		SH_vect_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Slm[l], &Tlm[l], VWl);
+	#else
+S		SHsph_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Slm[l], VWl);
+T		SHtor_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Tlm[l], VWl);
+	#endif
 
 	#ifdef ISHIOKA
-Q		cplx* Qlt = &Qlm[l+1];		// pointer for index by l
 		// pre-processing for recurrence relation of Ishioka
 		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
 		double* restrict clm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
-		{
-		long l=m;	long ll=0;
-Q		cplx qq = Qlt[l-1] * xlm[0];
-Q		while (l<llim-1) {
-Q			cplx qq2 = Qlt[l+1];
-Q			Ql[l-1]   = (qq  +  qq2 * xlm[ll+2]);
-Q			Ql[l] = Qlt[l] * xlm[ll+1];
-Q			ll+=3;	l+=2;
-Q			qq = qq2 * xlm[ll];
-Q		}
-Q		Ql[l-1]   = qq;
-Q		Ql[l] = (l<llim) ? Qlt[l] * xlm[ll+1] : 0.0;
+Q		SH_to_ishioka(xlm, (v2d*)(Qlm+l+m), llim-m, (v2d*) Ql+m-1);
 Q		Ql[llim] = 0.0;		// allow some overflow
-
-V		l=m;	ll=0;
-V		cplx vv = VWl[2*l]   * xlm[0];
-V		cplx ww = VWl[2*l+1] * xlm[0];
-V		while (l<llim) {
-V			cplx vv2 = VWl[2*(l+2)];
-V			cplx ww2 = VWl[2*(l+2)+1];
-V			VWl[2*l]   = (vv  +  vv2 * xlm[ll+2]);
-V			VWl[2*l+1] = (ww  +  ww2 * xlm[ll+2]);
-V			VWl[2*l+2] *= xlm[ll+1];
-V			VWl[2*l+3] *= xlm[ll+1];
-V			ll+=3;	l+=2;
-V			vv = vv2 * xlm[ll];
-V			ww = ww2 * xlm[ll];
-V		}
-V		VWl[2*l]   = vv;
-V		VWl[2*l+1] = ww;
-V		if (l<=llim) {
-V			VWl[2*l+2] *= xlm[ll+1];
-V			VWl[2*l+3] *= xlm[ll+1];
-V		}
-		}
+V		SH2_to_ishioka(xlm, (v2d*)(VWl+2*m), llim-m+1);
 	#endif
 
 		k = shtns->tm[im] / VSIZE2;			// stay on vector boundary
