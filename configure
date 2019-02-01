@@ -4192,6 +4192,8 @@ fi
 
 else
 
+	# assume 64 bit mode, add default directory to find the MKL
+	LDFLAGS="$LDFLAGS -L$MKLROOT/lib/intel64"
 	if test "x$enable_openmp" = "xyes"; then :
 
 		# multi-threaded MKL libs
@@ -4243,7 +4245,7 @@ $as_echo "$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&6; }
 if test "x$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" = xyes; then :
   LIBS="$mkl_libs $LIBS"
 else
-  as_fn_error $? "\"FFTW interface not found in MKL libraries ($mkl_libs).\"" "$LINENO" 5
+  as_fn_error $? "\"FFTW interface not found in MKL libraries ($mkl_libs). Please add 'LDFLAGS=-L/path/to/mkl' to ./configure command line.\"" "$LINENO" 5
 fi
 
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: \"FFTW interface found in MKL, link with $mkl_libs\"" >&5

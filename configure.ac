@@ -166,6 +166,8 @@ AS_IF([test "x$enable_mkl" = "xyes"], [
 	AC_CHECK_FUNC(fftw_plan_many_dft, [AC_MSG_NOTICE(["FFTW interface found in MKL, link with -mkl"])],
 		[AC_MSG_ERROR(["FFTW interface not found in MKL libraries (-mkl)."])])
   ],[
+	# assume 64 bit mode, add default directory to find the MKL
+	LDFLAGS="$LDFLAGS -L$MKLROOT/lib/intel64"
 	AS_IF([test "x$enable_openmp" = "xyes"], [
 		# multi-threaded MKL libs
 		#mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -Wl,--end-group -liomp5 -lpthread"
@@ -175,7 +177,7 @@ AS_IF([test "x$enable_mkl" = "xyes"], [
 		mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
 	])
 	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [LIBS="$mkl_libs $LIBS"],
-		AC_MSG_ERROR(["FFTW interface not found in MKL libraries ($mkl_libs)."]),
+		AC_MSG_ERROR(["FFTW interface not found in MKL libraries ($mkl_libs). Please add 'LDFLAGS=-L/path/to/mkl' to ./configure command line."]),
 	["$mkl_libs"])
 	AC_MSG_NOTICE(["FFTW interface found in MKL, link with $mkl_libs"])
   ])
