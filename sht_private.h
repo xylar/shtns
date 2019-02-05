@@ -947,7 +947,9 @@ static void SH_to_ishioka(const double* xlm, const v2d* Ql, const int llim_m, v2
 		qq = qq2 * vdup(xlm[ll]);
 	}
 	ql[l]   = qq;
-	ql[l+1] = (l<llim_m) ? Ql[l+1] * vdup(xlm[ll+1]) : vdup(0.0);
+    qq = vdup(0.0);
+    if (l<llim_m)  qq = Ql[l+1] * vdup(xlm[ll+1]);
+    ql[l+1] = qq;
 }
 
 /// same as \ref SH_to_ishioka, but handles two interfleaved arrays + operates in-place.
@@ -955,24 +957,24 @@ static void SH_to_ishioka(const double* xlm, const v2d* Ql, const int llim_m, v2
 static void SH2_to_ishioka(const double* xlm, v2d* VWl, const int llim_m)
 {
 	int l=0;	int ll=0;
-	v2d vv = VWl[2*l]   * xlm[0];
-	v2d ww = VWl[2*l+1] * xlm[0];
+	v2d vv = VWl[2*l]   * vdup(xlm[0]);
+	v2d ww = VWl[2*l+1] * vdup(xlm[0]);
 	while (l<llim_m-1) {
 		v2d vv2 = VWl[2*(l+2)];
 		v2d ww2 = VWl[2*(l+2)+1];
-		VWl[2*l]   = (vv  +  vv2 * xlm[ll+2]);
-		VWl[2*l+1] = (ww  +  ww2 * xlm[ll+2]);
-		VWl[2*l+2] *= xlm[ll+1];
-		VWl[2*l+3] *= xlm[ll+1];
+		VWl[2*l]   = (vv  +  vv2 * vdup(xlm[ll+2]));
+		VWl[2*l+1] = (ww  +  ww2 * vdup(xlm[ll+2]));
+		VWl[2*l+2] *= vdup(xlm[ll+1]);
+		VWl[2*l+3] *= vdup(xlm[ll+1]);
 		ll+=3;	l+=2;
-		vv = vv2 * xlm[ll];
-		ww = ww2 * xlm[ll];
+		vv = vv2 * vdup(xlm[ll]);
+		ww = ww2 * vdup(xlm[ll]);
 	}
 	VWl[2*l]   = vv;
 	VWl[2*l+1] = ww;
 	if (l<=llim_m-1) {
-		VWl[2*l+2] *= xlm[ll+1];
-		VWl[2*l+3] *= xlm[ll+1];
+		VWl[2*l+2] *= vdup(xlm[ll+1]);
+		VWl[2*l+3] *= vdup(xlm[ll+1]);
 	}
 }
 

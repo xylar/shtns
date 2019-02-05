@@ -74,6 +74,8 @@ AS_IF([test "x$enable_knl" != "xyes"], [
 	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"], [
 		AX_CHECK_COMPILE_FLAG([-mtune=native],[CC="$CC -mtune=native"])
 	])
+	# this is an icc compile option, try if it is supported:
+	AX_CHECK_COMPILE_FLAG([-qopt-zmm-usage=high],[CC="$CC -qopt-zmm-usage=high"])
   ],[
 	enable_many_core=yes		# optimize for many-core architecture
 	# KNL native cross-compiling

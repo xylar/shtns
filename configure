@@ -3259,6 +3259,42 @@ fi
 
 fi
 
+	# this is an icc compile option, try if it is supported:
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -qopt-zmm-usage=high" >&5
+$as_echo_n "checking whether C compiler accepts -qopt-zmm-usage=high... " >&6; }
+if ${ax_cv_check_cflags___qopt_zmm_usage_high+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -qopt-zmm-usage=high"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___qopt_zmm_usage_high=yes
+else
+  ax_cv_check_cflags___qopt_zmm_usage_high=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___qopt_zmm_usage_high" >&5
+$as_echo "$ax_cv_check_cflags___qopt_zmm_usage_high" >&6; }
+if test x"$ax_cv_check_cflags___qopt_zmm_usage_high" = xyes; then :
+  CC="$CC -qopt-zmm-usage=high"
+else
+  :
+fi
+
 
 else
 
