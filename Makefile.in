@@ -61,6 +61,7 @@ SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 SHT/SH_to_spat_mic.c : SHT/mic_SH_to_spat.gen.c
 	$(MAKE) SH_to_spat_mic.c -C SHT SFX=mic SED=$(SED)
 SHT/spat_to_SH_mic.c : SHT/mic_spat_to_SH.gen.c
+	$(MAKE) spat_to_SH_kernel.c -C SHT SFX=kernel SED=$(SED)
 	$(MAKE) spat_to_SH_mic.c -C SHT SFX=mic SED=$(SED)
 
 # objects :
