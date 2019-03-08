@@ -431,7 +431,8 @@ can choose to do so using the adequate \ref shtns_type when calling \ref shtns_i
 \section Speed
 
 SHTns does not implement any "fast" algorithm. However, timings with other Spherical Harmonic Transform tools (including a fast algorithm)
-show that <b>SHTns performs much faster than any other</b>. Furthermore, even at large sizes, the fast algorithm we tested does not seem to be willing to take the lead.
+show that <b>SHTns performs much faster than any other</b>. Furthermore, even at large sizes, the fast algorithm we tested does not seem to be willing to take the lead. <br />
+Since v3.2, SHTns implements the new recurrence relation of <a href="https://doi.org/10.2151/jmsj.2018-019">Ishioka (2018)</a>, leading to faster transforms, especially for large transforms.
 
 <div>
 <table><tr>

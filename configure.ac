@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[3.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[3.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -185,7 +185,7 @@ AS_IF([test "x$enable_mkl" = "xyes"], [
   ])
 ],[
 	# fftw3
-	AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required.]))
+	AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required. Or try using the intel MKL library with --enable-mkl]))
 	AS_IF([test "x$enable_openmp" = "xyes"], [
 		AC_CHECK_LIB([fftw3_omp], [fftw_init_threads],,AC_MSG_ERROR([FFTW3 does not support OpenMP. Did you compile it with --enable-openmp ?.]))
 	])
