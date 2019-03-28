@@ -82,6 +82,7 @@ void shtns_free(void* p) {
 
 void memzero_omp(double* mem, const size_t sze)
 {
+	#ifdef _OPENMP
 	#pragma omp parallel
 	{
 		int i = omp_get_thread_num();
@@ -89,10 +90,14 @@ void memzero_omp(double* mem, const size_t sze)
 		int ofs = (i*sze)/n;
 		memset(mem + ofs, 0, ((i+1)*sze/n - ofs)*sizeof(double));
 	}
+	#else
+		memset(mem, 0, sze*sizeof(double));
+	#endif
 }
 
 void memzero_omp(double* mem, double* mem2, const size_t sze)
 {
+	#ifdef _OPENMP
 	#pragma omp parallel
 	{
 		int i = omp_get_thread_num();
@@ -101,10 +106,15 @@ void memzero_omp(double* mem, double* mem2, const size_t sze)
 		memset(mem + ofs, 0, ((i+1)*sze/n - ofs)*sizeof(double));
 		memset(mem2 + ofs, 0, ((i+1)*sze/n - ofs)*sizeof(double));
 	}
+	#else
+		memset(mem,  0, sze*sizeof(double));
+		memset(mem2, 0, sze*sizeof(double));
+	#endif
 }
 
 void memzero_omp(double* mem, double* mem2, double* mem3, const size_t sze)
 {
+	#ifdef _OPENMP
 	#pragma omp parallel
 	{
 		int i = omp_get_thread_num();
@@ -114,6 +124,11 @@ void memzero_omp(double* mem, double* mem2, double* mem3, const size_t sze)
 		memset(mem2 + ofs, 0, ((i+1)*sze/n - ofs)*sizeof(double));
 		memset(mem3 + ofs, 0, ((i+1)*sze/n - ofs)*sizeof(double));
 	}
+	#else
+		memset(mem,  0, sze*sizeof(double));
+		memset(mem2, 0, sze*sizeof(double));
+		memset(mem3, 0, sze*sizeof(double));
+	#endif
 }
 
 
