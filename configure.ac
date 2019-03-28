@@ -137,25 +137,37 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 
 # Check for CUDA
 AS_IF([test "x$enable_cuda" = "xyes"], [
+	CFLAGS="$CFLAGS -I$CUDA_PATH/include"
+	# assume 64 bit mode, add default directory to find CUDA
+	LDFLAGS="$LDFLAGS -L$CUDA_PATH/lib64"
+	echo $LDFLAGS
 	AC_CHECK_LIB([cudart],[cudaMalloc],,AC_MSG_ERROR([cudart library not found. Try adding LDFLAGS="-L/usr/local/cuda/lib64"]))
 	AC_CHECK_LIB([cufft],[cufftPlanMany],,AC_MSG_ERROR([cufft library not found.]))
 	objs="$objs sht_gpu.o"
 	target="libshtns_cuda.a"
 
+	cuda_arch=''
 	AC_MSG_CHECKING([whether nvcc supports Kepler gpu])
 	AS_IF([nvcc sht_gpu.cu -c -arch=sm_30 --dryrun > /dev/null 2>&1], [
-	    nvcc_flags="$nvcc_flags -gencode=arch=compute_30,code=sm_30"
+	    cuda_arch=30
 	    AC_MSG_RESULT(yes)
 	],[ AC_MSG_RESULT(no) ])
 	AC_MSG_CHECKING([whether nvcc supports Pascal gpu])
 	AS_IF([nvcc sht_gpu.cu -c -arch=sm_60 --dryrun > /dev/null 2>&1], [
-	    nvcc_flags="$nvcc_flags -gencode=arch=compute_60,code=sm_60"
+	    cuda_arch=60
+	    AC_MSG_RESULT(yes)
+	],[ AC_MSG_RESULT(no) ])
+	AC_MSG_CHECKING([whether nvcc supports Volta gpu])
+	AS_IF([nvcc sht_gpu.cu -c -arch=sm_70 --dryrun > /dev/null 2>&1], [
+	    cuda_arch=70
 	    AC_MSG_RESULT(yes)
 	],[ AC_MSG_RESULT(no) ])
 
-	AS_IF([test "x$nvcc_flags" == "x"], [
+	AS_IF([test "x$cuda_arch" == "x"], [
 	    AC_MSG_ERROR([nvcc does not support any compatible gpu. Is nvcc available ?])
 	])
+	nvcc_flags="$nvcc_flags -gencode=arch=compute_$cuda_arch,code=sm_$cuda_arch"
+	LIBS="$LIBS -lstdc++"	# cuda uses the c++ standard library. This is needed to link with gcc
 ])
 libname=$target		# set the libname befor checking for python.
 
