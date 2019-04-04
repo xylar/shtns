@@ -1587,8 +1587,13 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 */
 
 
+#ifdef _GCC_VEC_
 typedef double rndu __attribute__ ((vector_size (VSIZE2*8), aligned (8)));		// UNALIGNED vector that contains a complex number
 typedef double v2du __attribute__ ((vector_size (16), aligned (8)));		// UNALIGNED vector that contains a complex number
+#else
+typedef rnd rndu;
+typedef v2d v2du;
+#endif
 
 void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 {
@@ -1736,11 +1741,11 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 				}
 				#if _GCC_VEC_
 				((v2d*)rl)[-mp] += rmp * conj_parity;
+				conj_parity = - conj_parity;	// switch parity
 				#else
 				rl[-mp] += conj(rmp)*(1-2*(mp&1));		// -mp > 0
 				#endif
 				double* t = mx0_;		mx0_ = mx1_;	mx1_ = t;	// cycle the buffers for lines.
-				conj_parity = - conj_parity;	// switch parity
 			}
 
 			// step 4 + 5 merged:	recursively compute and apply d(m',m),  m'=2..l; m=m'..l  AND  m'=-2..-l; m=-m'..l
@@ -1837,10 +1842,10 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 				}
 				#if _GCC_VEC_
 				((v2d*)rl)[mp] += rmp + rmp_ * conj_parity;
+				conj_parity = - conj_parity;	// switch parity
 				#else
 				rl[mp] += rmp + conj(rmp_)*(1-2*(mp&1));		// -mp > 0
 				#endif
-				conj_parity = - conj_parity;	// switch parity
 				double* t = mx0;		mx0 = mx1;		mx1 = t;	// cycle the buffers for lines.
 				double* t_ = mx0_;		mx0_ = mx1_;	mx1_ = t_;	// cycle the buffers for lines.
 			}
