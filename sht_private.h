@@ -760,18 +760,36 @@ struct DtDp {		// theta and phi derivatives stored together.
 		od[k] = nr-sr;		oi[k] = ni-si; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_V(F, er, od, ei, oi, k0v) { \
+  #define SYM_ASYM_V SYM_ASYM_Q
+  #define SYM_ASYM_Q_ISH(F, er, od, ei, oi, k0v) { \
 	k = ((k0v*VSIZE2)>>1)*2; \
 	do { \
 		double ar,ai,br,bi, sr,si,nr,ni; \
+		double w = wg[k]; \
 		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
 		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
 		nr = ar + br;		ni = ai - bi; \
 		sr = ai + bi;		si = br - ar; \
-		er[k] = nr+sr;		ei[k] = ni+si; \
-		od[k] = nr-sr;		oi[k] = ni-si; \
+		er[k] = (nr+sr)*w;		ei[k] = (ni+si)*w; \
+		w *= ct[k]; \
+		od[k] = (nr-sr)*w;		oi[k] = (ni-si)*w; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
+  #define SYM_ASYM_Q3_ISH(F, er, od, ei, oi, k0v) { \
+	k = ((k0v*VSIZE2)>>1)*2; \
+	do { \
+		double ar,ai,br,bi, sr,si,nr,ni; \
+		double sina = st[k]*wg[k]; \
+		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
+		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
+		nr = ar + br;		ni = ai - bi; \
+		sr = ai + bi;		si = br - ar; \
+		er[k] = (nr+sr)*sina;		ei[k] = (ni+si)*sina; \
+		sina *= ct[k]; \
+		od[k] = (nr-sr)*sina;		oi[k] = (ni-si)*sina; \
+		k+=1; \
+	} while(k < nk*VSIZE2); }
+  #define SYM_ASYM_V_ISH SYM_ASYM_Q_ISH
 #endif
 
 
@@ -933,7 +951,7 @@ static void ishioka_to_SH2_reduce(const double* xlm, const rnd* vw, const int ll
 /// xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
 /// llim_m = llim-m
 /// Ql[l-m]: intput data, spherical harmonic coefficients of degree l (for fixed m).
-/// qq[l-m]: output data, ready for ishioka's recurrence
+/// ql[l-m]: output data, ready for ishioka's recurrence
 /// can operate in-place (Ql = qq)
 static void SH_to_ishioka(const double* xlm, const v2d* Ql, const int llim_m, v2d* ql)
 {
