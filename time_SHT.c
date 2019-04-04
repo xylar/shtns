@@ -87,10 +87,40 @@ double tdiff(struct timeval *start, struct timeval *end)
 	return sec * (1.e3/SHT_ITER);	// time in ms.
 }
 
-// isNaN testing that works with -ffast-math
-double isNaN_0=0, isNaN_1=1;
-inline int isNaN(double x) {
-        return ((x == isNaN_0)&&(x == isNaN_1));
+/// check if an IEEE754 double precision number is finite (works also with -ffinite-math).
+int isNotFinite(double x) {
+	union {
+		volatile double d;
+		volatile long i;
+	} mem;
+
+	mem.d = x;
+	return (mem.i & 0x7FF0000000000000) == 0x7FF0000000000000;		// nan or inf
+}
+
+int allFinite(double* x, int n) {
+	for (int i=0; i<n; i++) {
+		long a = ((long*) x)[i];
+		if ((a & 0x7FF0000000000000) == 0x7FF0000000000000) return 0;		// nan or inf found
+	}
+	return 1;	// all finite !
+}
+
+/// check if an IEEE754 double precision number is finite and normalized.
+int isNotNormal(double x) {
+
+	union {
+		volatile double d;
+		volatile long i;
+	} mem;
+
+	mem.d = x;
+	long ii = mem.i;
+	long exp  = ii & 0x7FF0000000000000;
+	long mant = ii & 0x000FFFFFFFFFFFFF;
+	if (exp == 0x7FF0000000000000) return 1;		// nan or inf
+	if ((exp == 0) && (mant != 0)) return 1;		// denormal
+	return 0;
 }
 
 double scal_error(complex double *Slm, complex double *Slm0, int ltr)
@@ -101,6 +131,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 	nlm_cplx = (MMAX*2 == NPHI) ? LiM(shtns, MRES*MMAX,MMAX) : NLM;
 // compute error :
 	tmax = 0;	n2 = 0;		jj=0;
+//	if (!allFinite((double*)Slm, 2*NLM)) printf("NaN, Inf or Denormal detected\n");
 	for (i=0;i<NLM;i++) {
 		//if ((isNaN(creal(Slm[i]))) || (isNaN(cimag(Slm[i])))) printf("NaN @ lm=%ld (l=%d)\n",i,shtns->li[i]);
 		if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
@@ -111,8 +142,10 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 			t = cabs(Slm[i]);
 		}
 		n2 += t*t;
+//		if (isNotFinite(t)) printf("NaN or Inf @ lm=%ld (l=%d)  Slm=%g,%g  Slm0=%g,%g\n",i,shtns->li[i], creal(Slm[i]), cimag(Slm[i]), creal(Slm0[i]), cimag(Slm0[i]));
 		if (t>tmax) { tmax = t; jj = i; }
 	}
+	if (isNotFinite(sqrt(n2/NLM))) printf("!!! ERROR: nan or inf !!!\n");
 	printf("   => max error = %g (l=%d,lm=%ld)   rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
 	if (tmax > 1e-3) {
 		if (NLM < 15) {
@@ -654,7 +687,7 @@ int main(int argc, char *argv[])
 	int point = 0;
 	int vector = 0;
 	int loadsave = 0;
-	int robert_form = 0;
+	int robert_form = -1;
 	char name[20];
 	FILE* fw;
 
@@ -692,7 +725,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"vector") == 0) vector = 1;
 		if (strcmp(name,"point") == 0) point = 1;
 		if (strcmp(name,"loadsave") == 0) loadsave = 1;
-		if (strcmp(name,"robert") == 0) robert_form = 1;
+		if (strcmp(name,"robert") == 0) robert_form = t;
 	}
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
@@ -702,7 +735,7 @@ int main(int argc, char *argv[])
 	if (MMAX == -1) MMAX=LMAX/MRES;
 	shtns_use_threads(nthreads);		// 0 : means automatically chooses the number of threads.
 	shtns = shtns_create(LMAX, MMAX, MRES, shtnorm);
-	shtns_robert_form(shtns, robert_form);
+	if (robert_form >= 0) shtns_robert_form(shtns, robert_form);		// keep the default robert_form, unless specified on command line (usefull when built4magic)
 	NLM = shtns->nlm;
 	shtns_set_grid_auto(shtns, shtmode | layout, polaropt, nlorder, &NLAT, &NPHI);
 
