@@ -580,10 +580,14 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 		alm_im(shtns, im)[0] = t2;
 	}
 
-	double *clm, *xlm;
-	const long nlm0 = nlm_calc(LMAX+4, MMAX, MRES);
-	clm = (double *) malloc( 5*nlm0/2 * sizeof(double) );	// a_lm, b_lm
-	xlm = clm + nlm0;
+	#ifdef SHTNS_ISHIOKA
+		double *clm, *xlm;
+		const long nlm0 = nlm_calc(LMAX+4, MMAX, MRES);
+		clm = (double *) malloc( 5*nlm0/2 * sizeof(double) );	// a_lm, b_lm
+		xlm = clm + nlm0;
+		shtns->clm = clm;
+		shtns->xlm = xlm;
+	#endif
 
 /// - Precompute the factors alm and blm of the recurrence relation :
 	#pragma omp parallel for private(t1, t2) schedule(dynamic)
@@ -640,6 +644,7 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 			}
 		}
 
+	#ifdef SHTNS_ISHIOKA
 		/// PRE-COMPUTE VALUES FOR NEW RECURRENCE OF ISHIOKA (2018)
 		/// see https://doi.org/10.2151/jmsj.2018-019
 		const long lm0 = im*(2*lmax - (im-1)*MRES);
@@ -679,9 +684,8 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 			//if (lm3 + 3*i+2 >= lm2) printf("error at m=%d, i=%d (%ld >= %ld)\n",m,i, lm3 + 3*i+2, lm2);
 		}
 		free(elm);
+	#endif
 	}
-	shtns->clm = clm;
-	shtns->xlm = xlm;
 }
 
 /// \internal returns the value of the Legendre Polynomial of degree l.

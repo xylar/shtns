@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2019 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -39,7 +39,7 @@ T	static void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, do
   #ifndef SHT_AXISYM
 Q	v2d *BrF;
 V	v2d *BtF, *BpF;
-  #ifndef ISHIOKA
+  #ifndef SHTNS_ISHIOKA
 Q	#define qr(l) vall(creal(Ql[l]))
 Q	#define qi(l) vall(cimag(Ql[l]))
   #else
@@ -62,7 +62,7 @@ T	double* const BpF = Vp;
 V	int robert_form;
 QX	double Ql0[llim+2];
 V	v2d VWl[llim*2+4];
-  #ifdef ISHIOKA
+  #ifdef SHTNS_ISHIOKA
 Q	v2d QQl[llim+2];
   #endif
 
@@ -227,7 +227,7 @@ S		SHsph_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Slm[l], (cplx*) VWl);
 T		SHtor_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Tlm[l], (cplx*) VWl);
   #endif
 
-	#ifndef ISHIOKA
+	#ifndef SHTNS_ISHIOKA
 Q		cplx* Ql = &Qlm[l];	// virtual pointer for l=0 and im
 	#else
 		// pre-processing for recurrence relation of Ishioka
@@ -310,21 +310,21 @@ V			if (robert_form == 0) l=m-1;
 				}
 			} while(l >>= 1);
 		  }
-			#ifdef ISHIOKA
+			#ifdef SHTNS_ISHIOKA
 			al = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;		// for ishioka recurrence
 			#endif
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(ct, j+k);
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				y0[j] *= vall(al[0]);
 				#else
 				cost[j] *= cost[j];		// cos(theta)^2
 				#endif
 			}
 			for (int j=0; j<NWAY; ++j) {
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
 				#else
 				y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y0[j];
@@ -336,7 +336,7 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				for (int j=0; j<NWAY; ++j) {
 					y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
 				}
@@ -361,7 +361,7 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 				}
 			}
 		  if (ny == 0) {
-		#ifndef ISHIOKA
+		#ifndef SHTNS_ISHIOKA
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}

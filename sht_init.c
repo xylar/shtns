@@ -1715,6 +1715,10 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#ifdef SHTNS4MAGIC
 		if (flags == sht_reg_poles) shtns_runerr("Grid cannot include poles with MagIC layout.");
 	#endif
+	#ifdef SHTNS_ISHIOKA
+		if (SHT_NORM == sht_schmidt) shtns_runerr("Schmidt semi-normalization is currently not compatible with Ishioka's recurrence.");
+		if (shtns->norm & SHT_REAL_NORM) shtns_runerr("'Real-norm is currently not compatible with Ishioka's recurrence.");
+	#endif
 
 	if (vector) {
 		// initialize sin(theta).d/dtheta matrix (for vector transforms)

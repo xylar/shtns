@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[3.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[3.2.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -36,6 +36,8 @@ AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX or MIC)]))
+AC_ARG_ENABLE([ishioka],
+	AS_HELP_STRING([--enable-ishioka], [Use the new recursion (faster but experimental)]), [], [enable_ishioka=no])
 
 dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
 dnl generated configure script that the expansion does not occur until
@@ -113,6 +115,7 @@ AS_IF([test "x$enable_many_core" != "xno"], [
 # for MagIC code, also disable matrix transforms and switch to many-core code (possibly without openmp).
 AS_IF([test "x$enable_magic_layout" != "xno"], [
   	enable_mem=no
+	#enable_ishioka=no       # workaround unexplained bug
 	enable_many_core=yes		# optimize for many-core architecture
 	AC_DEFINE([SHTNS4MAGIC],[1],[I need the transforms compatible with the MagIC code, to speed it up!])
 ])
@@ -247,6 +250,11 @@ AS_IF([test "x$enable_f77" != "xno"], [
 # Disable SIMD ?
 AS_IF([test "x$enable_simd" != "xno"], [
 	AC_DEFINE([_GCC_VEC_],[1],[I compile with GCC 4 or ICC 14 or later, and I would like fast vectorized code (if SSE2, AVX or MIC is supported) !])
+])
+
+
+AS_IF([test "x$enable_ishioka" == "xyes"], [
+       AC_DEFINE([SHTNS_ISHIOKA],[1],[Enable the new recurrence proposed by Ishioka (2018) see https://doi.org/10.2151/jmsj.2018-019 (faster, but experimental)])
 ])
 
 # Disable MEM ?

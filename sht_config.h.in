@@ -112,6 +112,10 @@
 /* I need the transforms compatible with the MagIC code, to speed it up! */
 #undef SHTNS4MAGIC
 
+/* Enable the new recurrence proposed by Ishioka (2018) see
+   https://doi.org/10.2151/jmsj.2018-019 (faster, but experimental) */
+#undef SHTNS_ISHIOKA
+
 /* Include algorithms using precomputed matrix stored in memory) */
 #undef SHTNS_MEM
 

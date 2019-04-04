@@ -143,9 +143,11 @@ struct shtns_info {		// MUST start with "int nlm;"
 	/* matrices for vector transform (to convert to scalar transforms) */
 	double *mx_stdt;	// sparse matrix for  sin(theta).d/dtheta,  couples l-1 and l+1
 	double *mx_van;		// sparse matrix for  sin(theta).d/dtheta + 2*cos(theta),  couples l-1 and l+1
+	#ifdef SHTNS_ISHIOKA
 	/* for the new recurrence of Ishioka */
 	double *clm;	// a_lm, b_lm
 	double *xlm;	// epsilon_lm * alpha_lm
+	#endif
 
 	void* ftable[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 

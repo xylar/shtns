@@ -29,7 +29,7 @@ QX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const lo
 VX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
 3	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
   {
-	// TODO: NW should be larger for ISHIOKA ?, or take a different approach.
+	// TODO: NW should be larger for SHTNS_ISHIOKA ?, or take a different approach.
 	#define NW (NWAY*16)
 	// another blocking level in theta (64 or 128 should be good)
 	#define NBLK (NWAY*16) //24 //(NWAY*3) //24 //96 // (NWAY*3)  //24
@@ -210,13 +210,13 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 		int k0 = shtns->tm[im] / VSIZE2;
-		#ifndef ISHIOKA
+		#ifndef SHTNS_ISHIOKA
 		alm = shtns->blm + im*(2*(LMAX+1) -m+MRES);
 		#else
 		alm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
 		#endif
 		// compute symmetric and anti-symmetric parts:
-	#ifndef ISHIOKA
+	#ifndef SHTNS_ISHIOKA
 QX		SYM_ASYM_Q(BrF, rer, ror, rei, roi, k0)
 3		SYM_ASYM_Q3(BrF, rer, ror, rei, roi, k0)
 V		SYM_ASYM_V(BtF, ter, tor, tei, toi, k0)
@@ -282,7 +282,7 @@ V				l=m-1;
 				for (int j=0; j<NWAY; ++j) {
 					int idx = k+i+j;	if (idx < 0) idx=0;		// don't read below data.
 					cost[j] = vread(ct, idx);		// cos(theta)
-					#ifndef ISHIOKA
+					#ifndef SHTNS_ISHIOKA
 					y0[j] *= vall(al[0]);
 					y1[j]  = (vall(al[1])*y0[j]) * cost[j];
 					#else
@@ -294,7 +294,7 @@ V				l=m-1;
 				l=m;	al+=2;
 		#ifdef HI_LLIM
 				while ((ny0<0) && (l<lnz)) {		// ylm's are too small and are treated as zero
-					#ifndef ISHIOKA
+					#ifndef SHTNS_ISHIOKA
 					for (int j=0; j<NWAY; ++j) {
 						y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 					}
@@ -333,7 +333,7 @@ V				if ((l > llim+1) && (ny0<0)) break;	// nothing more to do in this block.
 			l = lnz;	// starting point in l for this block
 		#endif
 
-		#ifndef ISHIOKA
+		#ifndef SHTNS_ISHIOKA
 			al = alm + 2 + 2*(l-m);
 			struct {
 				rnd ct;
@@ -456,7 +456,7 @@ Q				q[0] += v2d_reduce(qq0, qq1);
 V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
 			}
-		#else    /* ISHIOKA */
+		#else    /* SHTNS_ISHIOKA */
 			al = alm + 2 + (l-m);
 			struct {
 				rnd y[2];
@@ -571,7 +571,7 @@ Q		v2d *Ql = (v2d*) &Qlm[l];
 V		v2d *Sl = (v2d*) &Slm[l];
 V		v2d *Tl = (v2d*) &Tlm[l];
 
-	#ifndef ISHIOKA
+	#ifndef SHTNS_ISHIOKA
 Q		for (l=0; l<=llim-m; ++l)	Ql[l] = qq[l];
 	#else
 		// post-processing for recurrence relation of Ishioka

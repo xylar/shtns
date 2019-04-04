@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2019 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -234,7 +234,7 @@ T			BpF[k*k_inc] = pnr[k]   + I*psr[k];
 		l = (im*(2*(LMAX+1)-(m+MRES)))>>1;		// l = LiM(shtns, 0,im);
 		alm = shtns->alm + 2*(l+m);		// shtns->alm + im*(2*(LMAX+1) -m+MRES);
 
-Q		#ifndef ISHIOKA
+Q		#ifndef SHTNS_ISHIOKA
 Q		k=m; do {		// copy input coefficients to a local array
 Q			((v2d*)Ql)[k-1] = ((v2d*)Qlm)[l+k];
 Q			++k;
@@ -249,7 +249,7 @@ S		SHsph_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Slm[l], VWl);
 T		SHtor_to_2scal(shtns->mx_stdt + 2*l, llim, m, &Tlm[l], VWl);
 	#endif
 
-	#ifdef ISHIOKA
+	#ifdef SHTNS_ISHIOKA
 		// pre-processing for recurrence relation of Ishioka
 		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
 		double* restrict clm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
@@ -299,21 +299,21 @@ V			if (robert_form == 0) l=m-1;
 				}
 			} while(l >>= 1);
 		}
-			#ifdef ISHIOKA
+			#ifdef SHTNS_ISHIOKA
 			al = clm;
 			#endif
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(ct, j+k);
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				y0[j] *= vall(al[0]);
 				#else
 				cost[j] *= cost[j];
 				#endif
 			}
 			for (int j=0; j<NWAY; ++j) {
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
 				#else
 				y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y0[j];
@@ -325,7 +325,7 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				for (int j=0; j<NWAY; ++j) {
 					y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
 				}
@@ -353,7 +353,7 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 		  if (ny == 0) {
 QX			const long llim2 = llim;
 V			const long llim2 = llim+1;
-		#ifndef ISHIOKA
+		#ifndef SHTNS_ISHIOKA
 			while (l<llim2) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}

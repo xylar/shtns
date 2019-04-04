@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2019 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -201,7 +201,7 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 		//alm = shtns->blm[im];
 		alm += 2*(LMAX+1-m+MRES);
 		// compute symmetric and anti-symmetric parts:
-	#ifndef ISHIOKA
+	#ifndef SHTNS_ISHIOKA
 QX		SYM_ASYM_Q(BrF, rer, ror, rei, roi, l)
 3		SYM_ASYM_Q3(BrF, rer, ror, rei, roi, l)
 V		SYM_ASYM_V(BtF, ter, tor, tei, toi, l)
@@ -270,12 +270,12 @@ V			l=m-1;
 				}
 			} while(l >>= 1);
 		}
-			#ifdef ISHIOKA
+			#ifdef SHTNS_ISHIOKA
 			al = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
 			#endif
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(ct, k+j);
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				y0[j] *= vall(al[0]);
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];
 				#else
@@ -285,7 +285,7 @@ V			l=m-1;
 			}
 			l=m;	al+=2;
 			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				for (int j=0; j<NWAY; ++j) {
 					y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 				}
@@ -312,7 +312,7 @@ V			l=m-1;
 Q			q+=2*(l-m);
 V			v+=4*(l-m);
 			for (int j=0; j<NWAY; ++j) {	// prefetch
-				#ifndef ISHIOKA
+				#ifndef SHTNS_ISHIOKA
 				y0[j] *= vread(wg, k+j);		y1[j] *= vread(wg, k+j);		// weight appears here (must be after the previous accuracy loop).
 				#endif
 Q				rerk[j] = vread( rer, k+j);		reik[j] = vread( rei, k+j);		rork[j] = vread( ror, k+j);		roik[j] = vread( roi, k+j);
@@ -326,7 +326,7 @@ V					terk[j] *= st_1;	teik[j] *= st_1;	tork[j] *= st_1;	toik[j] *= st_1;
 V					perk[j] *= st_1;	peik[j] *= st_1;	pork[j] *= st_1;	poik[j] *= st_1;
 V				}
 V			}
-		#ifndef ISHIOKA
+		#ifndef SHTNS_ISHIOKA
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j)	{	q[0] += y0[j] * rerk[j];	q[1] += y0[j] * reik[j];	}
 V				for (int j=0; j<NWAY; ++j)	{	v[0] += y0[j] * terk[j];	v[1] += y0[j] * teik[j];	}
@@ -384,7 +384,7 @@ Q		v2d * const Ql = (v2d*) &Qlm[l];
 V		v2d * const Sl = (v2d*) &Slm[l];
 V		v2d * const Tl = (v2d*) &Tlm[l];
 
-	#ifndef ISHIOKA
+	#ifndef SHTNS_ISHIOKA
 Q		#if _GCC_VEC_
 Q			for (l=0; l<=llim-m; ++l)	Ql[l] = v2d_reduce(qq[2*l], qq[2*l+1]);
 Q		#else
