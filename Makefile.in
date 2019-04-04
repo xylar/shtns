@@ -9,7 +9,7 @@ PYTHON=@PYTHON@
 
 ## global options for gcc
 ## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(CFLAGS) -D_GNU_SOURCE -DISHIOKA
+go= $(CFLAGS) -D_GNU_SOURCE
 
 
 # compiler command with options for the sht codelets
@@ -61,8 +61,9 @@ SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 SHT/SH_to_spat_mic.c : SHT/mic_SH_to_spat.gen.c
 	$(MAKE) SH_to_spat_mic.c -C SHT SFX=mic SED=$(SED)
 SHT/spat_to_SH_mic.c : SHT/mic_spat_to_SH.gen.c
-	$(MAKE) spat_to_SH_kernel.c -C SHT SFX=kernel SED=$(SED)
 	$(MAKE) spat_to_SH_mic.c -C SHT SFX=mic SED=$(SED)
+SHT/spat_to_SH_kernel.c : SHT/kernel_spat_to_SH.gen.c
+	$(MAKE) spat_to_SH_kernel.c -C SHT SFX=kernel SED=$(SED)
 
 # objects :
 sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c sht_com.c $(hfiles)
@@ -74,7 +75,7 @@ sht_fly.o : sht_fly.c Makefile $(hfiles) SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly
 	$(shtcc) -c $< -o $@
 sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
 	$(shtcc) -c $< -o $@
-sht_mic.o : sht_mic.c Makefile $(hfiles) SHT/SH_to_spat_mic.c SHT/spat_to_SH_mic.c
+sht_mic.o : sht_mic.c Makefile $(hfiles) SHT/SH_to_spat_mic.c SHT/spat_to_SH_mic.c SHT/spat_to_SH_kernel.c
 	$(shtcc) -c $< -o $@
 sht_gpu.o : sht_gpu.cu sht_gpu_kernels.cu Makefile $(hfiles)
 	nvcc -c sht_gpu.cu -lineinfo -Xptxas=-v @nvcc_flags@
