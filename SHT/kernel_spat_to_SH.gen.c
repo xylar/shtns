@@ -456,7 +456,7 @@ Q				q[0] += v2d_reduce(qq0, qq1);
 V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
 			}
-		#else
+		#else    /* ISHIOKA */
 			al = alm + 2 + (l-m);
 			struct {
 				rnd y[2];
@@ -474,6 +474,13 @@ V				x[i].ter = vread( ter, k+i);	x[i].tei = vread( tei, k+i);	x[i].tor = vread(
 V				x[i].per = vread( per, k+i);	x[i].pei = vread( pei, k+i);	x[i].por = vread( por, k+i);	x[i].poi = vread( poi, k+i);
 				x[i].y[0] = y01ct[i][0];		x[i].y[1] = y01ct[i][1];		x[i].ct2 = y01ct[i][2];
 			}
+V			if (robert_form) {
+V				for (int i=imin; i<NBLK; ++i) {
+V					rnd st_1 = vread(shtns->st_1, k+i);
+V					x[i].ter *= st_1;	x[i].tei *= st_1;	x[i].tor *= st_1;	x[i].toi *= st_1;
+V					x[i].per *= st_1;	x[i].pei *= st_1;	x[i].por *= st_1;	x[i].poi *= st_1;
+V				}
+V			}
 QX			while (l<=llim) {	// compute even and odd parts
 V			while (l<=llim+1) {	// compute even and odd parts
 Q				rnd ql[2*LSPAN];
