@@ -25,7 +25,6 @@
 //////////////////////////////////////////////////
 
 	static
-
 QX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int imlim)
 VX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
 3	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
@@ -117,7 +116,8 @@ V			v_[2*l] = 0.0;		v_[2*l+1] = 0.0;
 V			rnd sint[NW], dy0[NW], dy1[NW];
 Q			rnd rerk[NW], rork[NW];		// help the compiler to cache into registers.
 V			rnd terk[NW], tork[NW], perk[NW], pork[NW];
-			for (int j=0; j<NW; ++j) {
+			const int blk_sze = (k+NW <= nk) ? NW : nk-k;		// limit block size to avoid reading garbage as arrays overflow
+			for (int j=0; j<blk_sze; ++j) {
 				cost[j] = vread(ct, k+j);
 				y0[j] = vall(al[0]) * vread(wg, k+j);		// weight of Gauss quadrature appears here
 V				dy0[j] = vall(0.0);
@@ -129,7 +129,7 @@ V				terk[j] = vread(ter, k+j);		tork[j] = vread(tor, k+j);
 V				perk[j] = vread(per, k+j);		pork[j] = vread(por, k+j);
 			}
 V			if (robert_form) {
-V				for (int j=0; j<NW; ++j) {
+V				for (int j=0; j<blk_sze; ++j) {
 V					rnd st_1 = vread(shtns->st_1, k+j);
 V					terk[j] *= st_1;	tork[j] *= st_1;
 V					perk[j] *= st_1;	pork[j] *= st_1;
@@ -137,14 +137,14 @@ V				}
 V			}
 			al+=2;	l=1;
 			while(l<llim) {
-				for (int j=0; j<NW; ++j) {
+				for (int j=0; j<blk_sze; ++j) {
 V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*sint[j]) + vall(al[0])*dy0[j];
 					y0[j]  = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 				}
 Q				rnd q = y1[0] * rork[0];
 V				rnd s = dy1[0] * terk[0];
 V				rnd t = dy1[0] * perk[0];
-				for (int j=1; j<NW; ++j) {
+				for (int j=1; j<blk_sze; ++j) {
 Q					q += y1[j] * rork[j];
 V					s += dy1[j] * terk[j];
 V					t += dy1[j] * perk[j];
@@ -152,14 +152,14 @@ V					t += dy1[j] * perk[j];
 Q				q_[l-1]   += reduce_add(q);
 V				v_[2*l-2] += reduce_add(s);
 V				v_[2*l-1] -= reduce_add(t);
-				for (int j=0; j<NW; ++j) {
+				for (int j=0; j<blk_sze; ++j) {
 V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*sint[j]) + vall(al[2])*dy1[j];
 					y1[j]  = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
 				}
 Q				q = y0[0] * rerk[0];
 V				s = dy0[0] * tork[0];
 V				t = dy0[0] * pork[0];
-				for (int j=1; j<NW; ++j) {
+				for (int j=1; j<blk_sze; ++j) {
 Q					q += y0[j] * rerk[j];
 V					s += dy0[j] * tork[j];
 V					t += dy0[j] * pork[j];
@@ -173,7 +173,7 @@ V				v_[2*l+1] -= reduce_add(t);
 Q				rnd q = y1[0] * rork[0];
 V				rnd s = dy1[0] * terk[0];
 V				rnd t = dy1[0] * perk[0];
-				for (int j=1; j<NW; ++j) {
+				for (int j=1; j<blk_sze; ++j) {
 Q					q += y1[j] * rork[j];
 V					s += dy1[j] * terk[j];
 V					t += dy1[j] * perk[j];
