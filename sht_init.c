@@ -991,6 +991,17 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 
 /* TEST AND TIMING FUNCTIONS */
 
+/// check if an IEEE754 double precision number is finite (works also with -ffinite-math).
+static int isNotFinite(double x) {
+	union {
+		volatile double d;
+		volatile long i;
+	} mem;
+
+	mem.d = x;
+	return (mem.i & 0x7FF0000000000000) == 0x7FF0000000000000;		// nan or inf
+}
+
 /// \internal return the max error for a back-and-forth SHT transform.
 /// this function is used to internally measure the accuracy.
 double SHT_error(shtns_cfg shtns, int vector)
@@ -1010,7 +1021,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 		Tlm0 = (cplx *) VMALLOC(sizeof(cplx)* NLM);
 		Tlm = (cplx *) VMALLOC(sizeof(cplx)* NLM);
 		Th = (double *) VMALLOC( NSPAT_ALLOC(shtns) * sizeof(double) );
-		if ((Th==0) || (Tlm==0) || (Tlm0==0)) vector=0;
+		if ((Th==0) || (Tlm==0) || (Tlm0==0)) shtns_runerr("not enough memory.");
 	}
 
 // m = nphi/2 is also real if nphi is even.
@@ -1060,6 +1071,10 @@ double SHT_error(shtns_cfg shtns, int vector)
 	#if SHT_VERBOSE > 1
 		if (verbose>1) printf("                  - toroidal   rms error = %.3g  max error = %.3g for l=%hu,lm=%ld\n",sqrt(n2/NLM),tmax,shtns->li[jj],jj);
 	#endif
+	
+		//for (int i=0; i<NLM; i++) {
+		//	printf("l=%d err=%.3g %.3g \t %g,%g (%g,%g) \t %g,%g (%g,%g)\n",shtns->li[i], cabs(Slm[i] - Slm0[i]), cabs(Tlm[i] - Tlm0[i]), creal(Slm[i]),cimag(Slm[i]), creal(Slm0[i]),cimag(Slm0[i]), creal(Tlm[i]),cimag(Tlm[i]), creal(Tlm0[i]),cimag(Tlm0[i]));
+		//}
 	}
 
 	if (Th) VFREE(Th);    if (Tlm) VFREE(Tlm);    if (Tlm0) VFREE(Tlm0);
@@ -1830,7 +1845,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		if (verbose) printf("        + SHT accuracy = %.3g\n",t);
   #endif
   #if SHT_VERBOSE < 2
-		if (t > 1.e-3) {
+		if ((t > 1.e-3) || isNotFinite(t)) {
 			shtns_print_cfg(shtns);
 			shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
 		}
