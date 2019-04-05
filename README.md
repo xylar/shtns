@@ -22,7 +22,7 @@ FEATURES:
 - support for SSE2, SSE3, **AVX, AVX2, AVX-512** vectorization, as well as 
   Xeon Phi (KNL) and AltiVec VSX.
 - **parallel transforms with OpenMP**.
-- *Beta*: automatic **GPU off-loading** with nvidia cuda (Kepler & Pascal).
+- *Beta*: automatic **GPU off-loading** with nvidia cuda (Kepler, Pascal & Volta).
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).
 - **on-the-fly transforms** : saving memory and bandwidth, they are even faster
   on modern architectures.
@@ -66,6 +66,11 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
+* v3.2.1  (5 Apr 2019)
+	- Fix important bugs introduced in v3.2.
+	- Use of Ishioka recurrence is no more the default, but can be activated with `--enable-ishioka`.
+	- Support for Volta GPU, with better detection of CUDA libraries.
+
 * v3.2  (8 Mar 2019)
 	- New rotation functions, including the generation of Wigner-d matrices (thanks to Alex J. Yuffa).
 	- New recurrence formula of Ishioka (2018) leading to faster transforms, especially for large sizes.
