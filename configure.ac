@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[3.2.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[3.2.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -86,7 +86,6 @@ AS_IF([test "x$enable_knl" != "xyes"], [
 	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
 ])
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
-AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],[CFLAGS="$CFLAGS -fomit-frame-pointer"])
 AX_CHECK_COMPILE_FLAG([-std=gnu99],[CFLAGS="$CFLAGS -std=gnu99"])
 
 # with intel compiler, we should not use -O3 (bad performance with icc14 and icc15)
@@ -116,7 +115,7 @@ AS_IF([test "x$enable_many_core" != "xno"], [
 AS_IF([test "x$enable_magic_layout" != "xno"], [
   	enable_mem=no
 	#enable_ishioka=no       # workaround unexplained bug
-	enable_many_core=yes		# optimize for many-core architecture
+	#enable_many_core=yes		# optimize for many-core architecture
 	AC_DEFINE([SHTNS4MAGIC],[1],[I need the transforms compatible with the MagIC code, to speed it up!])
 ])
 
