@@ -207,6 +207,7 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	}
 
   #ifndef SHT_AXISYM
+	const double mpos_scale = shtns->mpos_scale_analys;		// handles real-norm
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 		int k0 = shtns->tm[im] / VSIZE2;
@@ -246,7 +247,7 @@ V			v2d* v = vw;
 				rnd y0[NWAY], cost[NWAY];		// should fit in registers
 				for (int j=0; j<NWAY; j++) {
 					int idx = k+i+j;	if (idx < 0) idx=0;		// don't read below data.
-					y0[j] = vall(0.5);
+					y0[j] = vall(mpos_scale);
 					cost[j] = vread(st, idx);		// sin(theta)
 				}
 Q				l=m;
@@ -575,7 +576,7 @@ V		v2d *Tl = (v2d*) &Tlm[l];
 Q		for (l=0; l<=llim-m; ++l)	Ql[l] = qq[l];
 	#else
 		// post-processing for recurrence relation of Ishioka
-		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+		const double* restrict xlm = shtns->x2lm + 3*im*(2*(LMAX+4) -m+MRES)/4;
 Q		ishioka_to_SH(xlm, qq, llim-m, Ql);
 V		ishioka_to_SH2(xlm, vw, llim-m+1, vw);
 	#endif

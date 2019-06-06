@@ -401,6 +401,7 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 	shtns->ct = (double *) VMALLOC( sizeof(double) * l0*3 );			/// ct[] (including st and st_1)
 	shtns->st = shtns->ct + l0;		shtns->st_1 = shtns->ct + 2*l0;
 
+	#ifdef SHTNS_MEM
 	shtns->ylm = NULL;		shtns->dylm = NULL;			// synthesis
 	shtns->zlm = NULL;		shtns->dzlm = NULL;			// analysis
 
@@ -443,6 +444,7 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 			}
 		}
 	}
+	#endif
 	#if SHT_VERBOSE > 1
 		if (verbose>1) printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
 	#endif
@@ -452,10 +454,12 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 /// \internal free arrays allocated by alloc_SHTarrays.
 static void free_SHTarrays(shtns_cfg shtns)
 {
+	#ifdef SHTNS_MEM
 	free_unused(shtns, &shtns->ylm);
 	free_unused(shtns, &shtns->dylm);
 	free_unused(shtns, &shtns->zlm);
 	free_unused(shtns, &shtns->dzlm);
+	#endif
 
 	if (ref_count(shtns, &shtns->ct) == 1)	VFREE(shtns->ct);
 	shtns->ct = NULL;		shtns->st = NULL;
@@ -991,15 +995,10 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 
 /* TEST AND TIMING FUNCTIONS */
 
-/// check if an IEEE754 double precision number is finite (works also with -ffinite-math).
+/// check if an IEEE754 double precision number is finite (works also when compiled with -ffinite-math).
 static int isNotFinite(double x) {
-	union {
-		volatile double d;
-		volatile long i;
-	} mem;
-
-	mem.d = x;
-	return (mem.i & 0x7FF0000000000000) == 0x7FF0000000000000;		// nan or inf
+	union { double d; unsigned long long i; } mem = { x };
+	return (mem.i & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL;		// nan or inf
 }
 
 /// \internal return the max error for a back-and-forth SHT transform.
@@ -1134,7 +1133,11 @@ static void choose_best_sht(shtns_cfg shtns, int* nlp, int vector)
 	double t0, t, tt, r;
 	double tdct, tnodct;
 	clock_t tcpu;
-	int on_the_fly_only = (shtns->ylm == NULL);		// only on-the-fly.
+	#ifdef SHTNS_MEM
+	const int on_the_fly_only = (shtns->ylm == NULL);		// only on-the-fly.
+	#else
+	const int on_the_fly_only = 1;		// only on-the-fly.
+	#endif
 	int otf_analys = (shtns->wg != NULL);			// on-the-fly analysis supported.
 
 	if (NLAT < VSIZE2*4) return;			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow).
@@ -1480,6 +1483,9 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 				larrays_ok = 1;
 				if (s2->norm == norm) {		// we can reuse the legendre tables.
 					shtns->alm = s2->alm;		shtns->blm = s2->blm;
+					#ifdef SHTNS_ISHIOKA
+					shtns->xlm = s2->xlm;		shtns->x2lm = s2->x2lm;
+					#endif
 					legendre_ok = 1;
 				}
 			}
@@ -1596,6 +1602,9 @@ void shtns_destroy(shtns_cfg shtns)
 	free_unused(shtns, &shtns->alm);
 	free_unused(shtns, &shtns->li);
 	free_unused(shtns, &shtns->ct_rot);
+	#ifdef SHTNS_ISHIOKA
+	free_unused(shtns, &shtns->clm);
+	#endif
 	if (shtns->fft_rot)  fftw_destroy_plan(shtns->fft_rot);
 
 	shtns_unset_grid(shtns);
@@ -1714,10 +1723,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#endif
 	#ifdef SHTNS4MAGIC
 		if (flags == sht_reg_poles) shtns_runerr("Grid cannot include poles with MagIC layout.");
-	#endif
-	#ifdef SHTNS_ISHIOKA
-		if (SHT_NORM == sht_schmidt) shtns_runerr("Schmidt semi-normalization is currently not compatible with Ishioka's recurrence.");
-		if (shtns->norm & SHT_REAL_NORM) shtns_runerr("'Real-norm is currently not compatible with Ishioka's recurrence.");
 	#endif
 
 	if (vector) {
@@ -1995,7 +2000,7 @@ void shtns_print_cfg_()
 	shtns_print_version();
 	if (sht_data) shtns_print_cfg(sht_data);
 }
-	
+
 /// Initializes spherical harmonic transforms of given size using Gauss algorithm with default polar optimization.
 void shtns_init_sh_gauss_(int *layout, int *lmax, int *mmax, int *mres, int *nlat, int *nphi)
 {

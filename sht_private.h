@@ -131,6 +131,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	int m_stride_a;				///< stride in phi direction (m)
 	double *wg;					///< Gauss weights for Gauss-Legendre quadrature.
 	double *st_1;				///< 1/sin(theta);
+	double mpos_scale_analys;	///< scale factor for analysis, handles real-norm (0.5 or 1.0);
 
 	fftw_plan ifft, fft;		// plans for FFTW.
 	fftw_plan ifftc, fftc;
@@ -147,15 +148,18 @@ struct shtns_info {		// MUST start with "int nlm;"
 	/* for the new recurrence of Ishioka */
 	double *clm;	// a_lm, b_lm
 	double *xlm;	// epsilon_lm * alpha_lm
+	double *x2lm;	// epsilon_lm * alpha_lm, scaled for analysis (different from xlm only with Schmidt semi-normalization)
 	#endif
 
 	void* ftable[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 
 	/* MEM matrices */
+	#ifdef SHTNS_MEM
 	double **ylm;		// matrix for inverse transform (synthesis)
 	struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
 	double **zlm;		// matrix for direct transform (analysis)
 	struct DtDp** dzlm;
+	#endif
 
 	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
 

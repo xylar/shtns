@@ -554,11 +554,13 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 
 	alm = (double *) malloc( (2*NLM)*sizeof(double) );		//  fits exactly into an array of 2*NLM doubles.
 	blm = alm;
-	if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
+	if (norm == sht_schmidt) {
 		blm = (double *) malloc( (2*NLM)*sizeof(double) );
 	}
 	if ((alm==0) || (blm==0)) shtns_runerr("not enough memory.");
 	shtns->alm = alm;		shtns->blm = blm;
+
+	shtns->mpos_scale_analys = 0.5/mpos_renorm; 	// (shtns->norm & SHT_REAL_NORM) ? 1.0 : 0.5;		// handles real-norm
 
 /// - Compute and store the prefactor (independant of x) of the starting value for the recurrence :
 /// \f[  Y_m^m(x) = Y_0^0 \ \sqrt{ \prod_{k=1}^{m} \frac{2k+1}{2k} } \ \ (-1)^m \ (1-x^2)^{m/2}  \f]
@@ -581,12 +583,17 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 	}
 
 	#ifdef SHTNS_ISHIOKA
-		double *clm, *xlm;
+		double *clm, *xlm, *ylm;
 		const long nlm0 = nlm_calc(LMAX+4, MMAX, MRES);
-		clm = (double *) malloc( 5*nlm0/2 * sizeof(double) );	// a_lm, b_lm
+		const long n_alloc = (norm == sht_schmidt) ? 8 : 5;
+		clm = (double *) malloc( n_alloc*nlm0/2 * sizeof(double) );	// a_lm, b_lm
+		if (clm==0) shtns_runerr("not enough memory.");
 		xlm = clm + nlm0;
 		shtns->clm = clm;
 		shtns->xlm = xlm;
+		ylm = xlm;
+		if (n_alloc > 5)	ylm = xlm + 3*nlm0/2;
+		shtns->x2lm = ylm;
 	#endif
 
 /// - Precompute the factors alm and blm of the recurrence relation :
@@ -618,28 +625,16 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 			}
 		}
 /// - Compute analysis recurrence coefficients if necessary
-		if ((norm == sht_schmidt) || (mpos_renorm != 1.0)) {
+		if (norm == sht_schmidt) {
 			lm = im*(2*lmax - (im-1)*MRES);
-			t1 = 1.0;
-			t2 = alm[lm+1];
-			if (norm == sht_schmidt) {
-				t1 = 2*m+1;
-				t2 *= (2*m+3)/t1;
-			}
-			if (m>0) t1 /= mpos_renorm;
-			blm[lm] = alm[lm]*t1;
-			blm[lm+1] = t2;
+			real t1 = 2*m+1;
+			blm[lm]   = alm[lm] * t1;
+			blm[lm+1] = alm[lm+1] * (2*m+3)/t1;
 			lm+=2;
 			for (long l=m+2; l<=lmax; ++l) {
-				t1 = alm[lm];
-				t2 = alm[lm+1];
-				if (norm == sht_schmidt) {
-					double t3 = 2*l+1;
-					t1 *= t3/(2*l-3);
-					t2 *= t3/(2*l-1);
-				}
-				blm[lm] = t1;
-				blm[lm+1] = t2;
+				real t3 = 2*l+1;
+				blm[lm]   = alm[lm]   * t3/(2*l-3);
+				blm[lm+1] = alm[lm+1] * t3/(2*l-1);
 				lm+=2;
 			}
 		}
@@ -672,7 +667,9 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 			//if (lm0/2 + 2*i+1 >= lm1/2) printf("error at m=%d, i=%d (%ld >= %ld)\n",m,i, lm0/2 + 2*i+1, lm1/2);
 		//	dlm[i] *= a0m;
 		}
-
+		
+		if (norm == sht_schmidt)  a0m *= SQRT(2*m+1);
+		
 		const long lm3 = 3*im*(2*(LMAX+4) - (im-1)*MRES)/4;
 		long lm2 = 3*(im+1)*(2*(LMAX+4) - (im)*MRES)/4;
 		// change e(l,m), to be e(l,m) * alpha(l/2,m)
@@ -682,6 +679,25 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 			xlm[lm3 + 3*i+1] = a;
 			xlm[lm3 + 3*i+2] = elm[2*i+1] * a;
 			//if (lm3 + 3*i+2 >= lm2) printf("error at m=%d, i=%d (%ld >= %ld)\n",m,i, lm3 + 3*i+2, lm2);
+		}
+		
+		if (norm == sht_schmidt) {		// correct for schmidt semi-normalized:
+			const long lm3 = 3*im*(2*(LMAX+4) - (im-1)*MRES)/4;
+			int l = m;
+			real sq = SQRT(2*l+1);
+			for (long i=0; i<=(LMAX-m+1)/2; i++) {
+				real sq1 = SQRT(2*(l+1)+1);
+				real sq2 = SQRT(2*(l+2)+1);
+				ylm[lm3 + 3*i]   = xlm[lm3 + 3*i]   * sq;
+				ylm[lm3 + 3*i+1] = xlm[lm3 + 3*i+1] * sq1;
+				ylm[lm3 + 3*i+2] = xlm[lm3 + 3*i+2] * sq2;
+								
+				xlm[lm3 + 3*i]   /= sq;
+				xlm[lm3 + 3*i+1] /= sq1;
+				xlm[lm3 + 3*i+2] /= sq2;
+				sq = sq2;
+				l+=2;
+			}
 		}
 		free(elm);
 	#endif

@@ -184,6 +184,7 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	}
 
   #ifndef SHT_AXISYM
+	const double mpos_scale = shtns->mpos_scale_analys;		// handles real-norm
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 		l = shtns->tm[im] / VSIZE2;
@@ -230,7 +231,7 @@ V			rnd terk[NWAY], teik[NWAY], tork[NWAY], toik[NWAY];
 V			rnd perk[NWAY], peik[NWAY], pork[NWAY], poik[NWAY];
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(st, k+j);
-				y0[j] = vall(0.5);
+				y0[j] = vall(mpos_scale);
 			}
 Q			l=m;
 V			l=m-1;
@@ -383,7 +384,7 @@ V		SH_2scal_to_vect_reduce(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, m, vw, Sl
 	#else
 		// post-processing for recurrence relation of Ishioka
 V		v2d* VWl = (v2d*) vw;
-		const double* restrict xlm = shtns->xlm + 3*im*(2*(LMAX+4) -m+MRES)/4;
+		const double* restrict xlm = shtns->x2lm + 3*im*(2*(LMAX+4) -m+MRES)/4;
 Q		ishioka_to_SH_reduce(xlm, qq, llim-m, Ql);
 V		ishioka_to_SH2_reduce(xlm, vw, llim-m+1, VWl);
 V		SH_2scal_to_vect(shtns->mx_van + 2*LM(shtns,m,m), l_2, llim, m, VWl, Sl, Tl);
