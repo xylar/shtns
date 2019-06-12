@@ -53,6 +53,11 @@ void shtns_verbose(int v) {
 	verbose = v;
 }
 
+#ifdef SHTNS_ISHIOKA
+#define _SHTNS_ID_ _SIMD_NAME_ ",ishioka"
+#else
+#define _SHTNS_ID_ _SIMD_NAME_
+#endif
 
 /// \internal Abort program with error message.
 static void shtns_runerr(const char * error_text)
@@ -1255,14 +1260,15 @@ done:
 	if (Slm) VFREE(Slm);	 	if (Sh)  VFREE(Sh);
 }
 
-
 void shtns_print_version() {
   #ifndef SHTNS4MAGIC
-	printf("[" PACKAGE_STRING "] built " __DATE__ ", " __TIME__ ", id: " _SIMD_NAME_ "\n");
+	printf("[" PACKAGE_STRING "] built " __DATE__ ", " __TIME__ ", id: " _SHTNS_ID_ "\n");
   #else
-	printf("[" PACKAGE_STRING "] built for MagIC " __DATE__ ", " __TIME__ ", id: " _SIMD_NAME_ "\n");
+	printf("[" PACKAGE_STRING "] built for MagIC " __DATE__ ", " __TIME__  ", id: " _SHTNS_ID_ "\n");
   #endif
 }
+
+
 
 void fprint_ftable(FILE* fp, void* ftable[SHT_NVAR][SHT_NTYP])
 {
@@ -1323,7 +1329,7 @@ int config_save(shtns_cfg shtns, int req_flags)
 
 	FILE *fcfg = fopen("shtns_cfg","a");
 	if (fcfg != NULL) {
-		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",PACKAGE_VERSION, _SIMD_NAME_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, -1);
+		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",PACKAGE_VERSION, _SHTNS_ID_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, -1);
 		fprint_ftable(fcfg, shtns->ftable);
 		fprintf(fcfg,"\n");
 		fclose(fcfg);
@@ -1341,7 +1347,7 @@ int config_load(shtns_cfg shtns, int req_flags)
 	void* ft2[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 	int lmax2, mmax2, mres2, nphi2, nlat2, grid2, nthreads2, req_flags2, nlorder2, mtr_dct2;
 	int found = 0;
-	char version[32], simd[8], alg[8];
+	char version[32], simd[32], alg[8];
 
 	if (shtns->ct == NULL) return -1;		// no grid set
 
@@ -1351,7 +1357,7 @@ int config_load(shtns_cfg shtns, int req_flags)
 	if (fcfg != NULL) {
 		int i=0;
 		while(1) {
-			fscanf(fcfg, "%30s %7s %d %d %d %d %d %d %d %d %d %d",version, simd, &lmax2, &mmax2, &mres2, &nphi2, &nlat2, &grid2, &nthreads2, &req_flags2, &nlorder2, &mtr_dct2);
+			fscanf(fcfg, "%30s %30s %d %d %d %d %d %d %d %d %d %d",version, simd, &lmax2, &mmax2, &mres2, &nphi2, &nlat2, &grid2, &nthreads2, &req_flags2, &nlorder2, &mtr_dct2);
 			for (int iv=0; iv<SHT_NVAR; iv++) {
 				fscanf(fcfg, "%7s", alg);
 				for (int it=0; it<SHT_NTYP; it++) {
@@ -1368,7 +1374,7 @@ int config_load(shtns_cfg shtns, int req_flags)
 			if (feof(fcfg)) break;
 			if ((shtns->lmax == lmax2) && (shtns->mmax == mmax2) && (shtns->mres == mres2) && (shtns->nthreads == nthreads2) &&
 			  (shtns->nphi == nphi2) && (shtns->nlat == nlat2) && (shtns->grid == grid2) &&  (req_flags == req_flags2) &&
-			  (shtns->nlorder == nlorder2) && (strcmp(simd, _SIMD_NAME_)==0)) {
+			  (shtns->nlorder == nlorder2) && (strcmp(simd, _SHTNS_ID_)==0)) {
 			#if SHT_VERBOSE > 0
 				if (verbose > 0) printf("        + using saved config\n");
 			#endif
@@ -1760,8 +1766,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 
 	if (quick_init == 0) {		// do not waste too much time finding optimal fftw.
-		shtns->fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
-	// fftw_set_timelimit(60.0);		// do not search plans for more than 1 minute (does it work well ???)
+		//shtns->fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
+		shtns->fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
+		//fftw_set_timelimit(60.0);		// do not search plans for more than 1 minute (does it work well ???)
 		if (*nphi > 512) shtns->fftw_plan_mode = FFTW_PATIENT;
 		if (*nphi > 1024) shtns->fftw_plan_mode = FFTW_MEASURE;
 	} else {
