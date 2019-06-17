@@ -127,13 +127,11 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 	dnl AC_CHECK_HEADERS([omp.h])
+	objs="$objs sht_omp.o"
 	AS_IF([test "x$enable_knl" != "xno"], [
 		target="libshtns_mic.a"
-		objs="sht_mic.o"
 	],[
 		target="libshtns_omp.a"
-		objs="$objs sht_omp.o"
-		AS_IF([test "x$enable_many_core" != "xno"], [objs="sht_mic.o"])
 	])
 ])
 

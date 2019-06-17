@@ -46,14 +46,20 @@
 	#define NWAY 4
 	#include "SHT/spat_to_SH_omp.c"
 	#include "SHT/SH_to_spat_omp.c"
+	#include "SHT/spat_to_SHst_omp.c"
+	#include "SHT/SHst_to_spat_omp.c"
 	#undef NWAY
 	#define NWAY 6
 	#include "SHT/spat_to_SH_omp.c"
 	#include "SHT/SH_to_spat_omp.c"
+	#include "SHT/spat_to_SHst_omp.c"
+	#include "SHT/SHst_to_spat_omp.c"
 	#undef NWAY
 	#define NWAY 8
 	#include "SHT/spat_to_SH_omp.c"
 	#include "SHT/SH_to_spat_omp.c"
+	#include "SHT/spat_to_SHst_omp.c"
+	#include "SHT/SHst_to_spat_omp.c"
 	#undef NWAY
 
 #define SHT_GRAD
@@ -88,6 +94,18 @@
 	#include "SHT/spat_to_SHqst_omp.c"
 	#include "SHT/SHqst_to_spat_omp.c"
 	#undef NWAY
+	#define NWAY 4
+	#include "SHT/spat_to_SHqst_omp.c"
+	#include "SHT/SHqst_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 6
+	#include "SHT/spat_to_SHqst_omp.c"
+	#include "SHT/SHqst_to_spat_omp.c"
+	#undef NWAY
+	#define NWAY 8
+	#include "SHT/spat_to_SHqst_omp.c"
+	#include "SHT/SHqst_to_spat_omp.c"
+	#undef NWAY
 #undef SHT_3COMP
 
 
@@ -98,10 +116,10 @@ void* fomp[6][SHT_NTYP] = {
 		SHsph_to_spat_omp2_l, SHtor_to_spat_omp2_l, SHqst_to_spat_omp2_l, spat_to_SHqst_omp2_l },
 	{ SH_to_spat_omp3_l, spat_to_SH_omp3_l, SHsphtor_to_spat_omp3_l, spat_to_SHsphtor_omp3_l,
 		SHsph_to_spat_omp3_l, SHtor_to_spat_omp3_l, SHqst_to_spat_omp3_l, spat_to_SHqst_omp3_l },
-	{ SH_to_spat_omp4_l, spat_to_SH_omp4_l, NULL, NULL,
-		SHsph_to_spat_omp4_l, SHtor_to_spat_omp4_l, NULL, NULL },
-	{ SH_to_spat_omp6_l, spat_to_SH_omp6_l, NULL, NULL,
-		NULL, NULL, NULL, NULL },
-	{ SH_to_spat_omp8_l, spat_to_SH_omp8_l, NULL, NULL,
-		NULL, NULL, NULL, NULL }
+	{ SH_to_spat_omp4_l, spat_to_SH_omp4_l, SHsphtor_to_spat_omp4_l, spat_to_SHsphtor_omp4_l,
+		SHsph_to_spat_omp4_l, SHtor_to_spat_omp4_l, SHqst_to_spat_omp4_l, spat_to_SHqst_omp4_l },
+	{ SH_to_spat_omp6_l, spat_to_SH_omp6_l, SHsphtor_to_spat_omp6_l, spat_to_SHsphtor_omp6_l,
+		NULL, NULL, SHqst_to_spat_omp6_l, spat_to_SHqst_omp6_l },
+	{ SH_to_spat_omp8_l, spat_to_SH_omp8_l, SHsphtor_to_spat_omp8_l, spat_to_SHsphtor_omp8_l,
+		NULL, NULL, SHqst_to_spat_omp8_l, spat_to_SHqst_omp8_l }
 };

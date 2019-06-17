@@ -4002,18 +4002,14 @@ $as_echo "$ac_cv_prog_c_openmp" >&6; }
 
 
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
-		if test "x$enable_knl" != "xno"; then :
+		objs="$objs sht_omp.o"
+	if test "x$enable_knl" != "xno"; then :
 
 		target="libshtns_mic.a"
-		objs="sht_mic.o"
 
 else
 
 		target="libshtns_omp.a"
-		objs="$objs sht_omp.o"
-		if test "x$enable_many_core" != "xno"; then :
-  objs="sht_mic.o"
-fi
 
 fi
 
