@@ -261,8 +261,10 @@ static void init_sht_array_func(shtns_cfg shtns)
 	  #endif
 	} else {
 		for (int j=0; j<=alg_lim; j++) {
-			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
-			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
+			if (shtns->nthreads <= 2) {		// don't consider non-parallel algos for large number of threads.
+				memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
+				memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
+			}
 			memcpy(sht_func[SHT_M][SHT_FLY1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);
 		  #ifdef _OPENMP
 			memcpy(sht_func[SHT_STD][SHT_OMP1 + j], &fomp[j], sizeof(void*)*SHT_NTYP);
@@ -1173,6 +1175,7 @@ static void choose_best_sht(shtns_cfg shtns, int* nlp, int vector)
 	}
 	#endif
 
+	const int ref_alg = (shtns->nthreads == 1) ? SHT_FLY2 : SHT_OMP2;
 	if (*nlp <= 0) {
 		// find good nloop by requiring less than 3% difference between 2 consecutive timings.
 		m=0;	nloop = 1;                     // number of loops to get timings.
@@ -1182,10 +1185,10 @@ static void choose_best_sht(shtns_cfg shtns, int* nlp, int vector)
 				m = 0;		nloop *= 3;
 			} else 	m++;
 			tcpu = clock();
-			t0 = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_FLY2][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+			t0 = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][ref_alg][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			tcpu = clock() - tcpu;		tt = 1.e-6 * tcpu;
 			if (tt >= SHT_TIME_LIMIT) break;			// we should not exceed 1 second
-			t = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][SHT_FLY2][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
+			t = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][ref_alg][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			r = fabs(2.0*(t-t0)/(t+t0));
 			#if SHT_VERBOSE > 1
 				if (verbose>1) printf(", nloop=%d, r=%g, m=%d (real time = %g s)\n",nloop,r,m,tt);
