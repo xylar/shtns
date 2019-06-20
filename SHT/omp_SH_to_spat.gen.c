@@ -183,9 +183,9 @@ T				S2D_STORE(Bp0, j+k, pe[j], po[j])
 		#else
 			for (int j=0; j<NWAY; ++j) {
 				if ((k+j)>=nk) break;
-Q				S2D_STORE_4MAGIC(Br0, j+k, re[j], ro[j])
-S				S2D_STORE_4MAGIC(Bt0, j+k, te[j], to[j])
-T				S2D_STORE_4MAGIC(Bp0, j+k, pe[j], po[j])
+Q				S2D_STORE_4MAGIC((double*)Br0, j+k, re[j], ro[j]);
+S				S2D_STORE_4MAGIC((double*)Bt0, j+k, te[j], to[j]);
+T				S2D_STORE_4MAGIC((double*)Bp0, j+k, pe[j], po[j]);
 			}
 		#endif
 			k+=NWAY;
@@ -415,9 +415,9 @@ V				S2D_CSTORE(BpF, k+j, per[j], por[j], pei[j], poi[j])
 		#else
 			for (int j=0; j<NWAY; ++j) {
 				if ((k+j)>=nk) break;
-Q				S2D_CSTORE_4MAGIC(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
-V				S2D_CSTORE_4MAGIC(BtF, k+j, ter[j], tor[j], tei[j], toi[j])
-V				S2D_CSTORE_4MAGIC(BpF, k+j, per[j], por[j], pei[j], poi[j])
+Q				S2D_CSTORE_4MAGIC((double*)BrF, (double*) (BrF + (NPHI-2*im)*NLAT_2), k+j, rer[j], ror[j], rei[j], roi[j]);
+V				S2D_CSTORE_4MAGIC((double*)BtF, (double*) (BtF + (NPHI-2*im)*NLAT_2), k+j, ter[j], tor[j], tei[j], toi[j]);
+V				S2D_CSTORE_4MAGIC((double*)BpF, (double*) (BpF + (NPHI-2*im)*NLAT_2), k+j, per[j], por[j], pei[j], poi[j]);
 			}
 		#endif
 			k+=NWAY;
