@@ -1612,6 +1612,8 @@ void shtns_destroy(shtns_cfg shtns)
 	free_unused(shtns, &shtns->clm);
 	#endif
 	if (shtns->fft_rot)  fftw_destroy_plan(shtns->fft_rot);
+	free_unused(shtns, &shtns->mx_stdt);
+	free_unused(shtns, &shtns->mx_van);
 
 	shtns_unset_grid(shtns);
 
