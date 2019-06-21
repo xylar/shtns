@@ -19,7 +19,7 @@ cc = $(CC) $(go) -O2
 fc = @FC@ $(go) -O2
 
 hfiles = sht_private.h sht_config.h shtns.h
-objs = sht_init.o @objs@
+objs = sht_init.o sht_kernels_a.o @objs@
 libname = @libname@
 
 default : @target@
@@ -69,7 +69,9 @@ sht_mem.o : sht_mem.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c
 	$(shtcc) -c $< -o $@
 sht_fly.o : sht_fly.c Makefile $(hfiles) SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
 	$(shtcc) -c $< -o $@
-sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c SHT/spat_to_SH_kernel.c
+sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
+	$(shtcc) -c $< -o $@
+sht_kernels_a.o : sht_kernels_a.c Makefile $(hfiles) SHT/spat_to_SH_kernel.c
 	$(shtcc) -c $< -o $@
 sht_gpu.o : sht_gpu.cu sht_gpu_kernels.cu Makefile $(hfiles)
 	nvcc -c sht_gpu.cu -lineinfo -Xptxas=-v @nvcc_flags@

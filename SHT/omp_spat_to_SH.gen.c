@@ -24,23 +24,13 @@
 #
 //////////////////////////////////////////////////
 
-	#define HI_LLIM
-QX	#define BASE _an1_hi
-QX	#include "spat_to_SH_kernel.c"
-VX	#define BASE _an2_hi
-VX	#include "spat_to_SHst_kernel.c"
-3	#define BASE _an3_hi
-3	#include "spat_to_SHqst_kernel.c"
-	#undef BASE
-	
-	#undef HI_LLIM
-QX	#define BASE _an1
-QX	#include "spat_to_SH_kernel.c"
-VX	#define BASE _an2
-VX	#include "spat_to_SHst_kernel.c"
-3	#define BASE _an3
-3	#include "spat_to_SHqst_kernel.c"
-	#undef BASE
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int imlim);
+VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim);
+3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim);
+QX	void GEN3(_an1_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int imlim);
+VX	void GEN3(_an2_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim);
+3	void GEN3(_an3_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim);
+
 
 
 	static

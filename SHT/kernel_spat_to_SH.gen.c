@@ -24,7 +24,16 @@
 #
 //////////////////////////////////////////////////
 
-	static
+	#ifdef HI_LLIM
+QX	#define BASE _an1_hi
+VX	#define BASE _an2_hi
+3	#define BASE _an3_hi
+	#else
+QX	#define BASE _an1
+VX	#define BASE _an2
+3	#define BASE _an3
+	#endif
+
 QX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int imlim)
 VX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
 3	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
@@ -603,3 +612,5 @@ V				Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
   #endif
   }
 
+	#undef BASE
+	#undef LSPAN
