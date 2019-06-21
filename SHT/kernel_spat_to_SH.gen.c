@@ -484,16 +484,37 @@ V				}
 V			}
 QX			while (l<=llim) {	// compute even and odd parts
 V			while (l<=llim+1) {	// compute even and odd parts
+				unsigned i = imin;
+			#ifdef HI_LLIM
+				unsigned ii = imin/NWAY;
+				while ((ny[ii] < 0) && (ii<NBLK/NWAY)) {		// these are zeros
+					const unsigned imax = (ii+1)*NWAY;
+					do {
+						if (LSPAN==2) {
+							rnd tmp = x[i].y[1];
+							x[i].y[1] = (vall(al[1])*x[i].ct2 + vall(al[0]))*tmp + x[i].y[0];
+							x[i].y[0] = tmp;
+						} else {	// LSPAN == 4
+							x[i].y[0] = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
+							x[i].y[1] = (vall(al[3])*x[i].ct2 + vall(al[2]))*x[i].y[0] + x[i].y[1];						
+						}
+					} while (++i < imax);
+					if (fabs(vlo(x[ii*NWAY+NWAY-1].y[0])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
+						++ny[ii];
+						for (int j=0; j<NWAY; ++j) {
+							x[ii*NWAY+j].y[0] *= vall(1.0/SHT_SCALE_FACTOR);		x[ii*NWAY+j].y[1] *= vall(1.0/SHT_SCALE_FACTOR);
+						}
+					}
+					++ii;
+				}
+			#endif
 Q				rnd ql[2*LSPAN];
 V				rnd vl[2*LSPAN];		rnd wl[2*LSPAN];
 				for (int ll=0; ll<2*LSPAN; ll++) {
 Q					ql[ll] = vall(0.0);
 V					vl[ll] = vall(0.0);		wl[ll] = vall(0.0);
 				}
-				for (unsigned i=imin; i<NBLK; ++i) {
-				#ifdef HI_LLIM
-					if (ny[i/NWAY] == 0)
-				#endif
+				while (i<NBLK) {
 					for (int ll=0; ll<LSPAN/2; ll++) {
 						register rnd y = x[i].y[ll];
 Q						ql[4*ll+0] += y * x[i].rer;		ql[4*ll+1] += y * x[i].rei;
@@ -511,6 +532,7 @@ V						wl[4*ll+2] += y * x[i].por;		wl[4*ll+3] += y * x[i].poi;
 						x[i].y[0] = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
 						x[i].y[1] = (vall(al[3])*x[i].ct2 + vall(al[2]))*x[i].y[0] + x[i].y[1];						
 					}
+					++i;
 				}
 Q				q[0] += v2d_reduce(ql[0], ql[1]);
 V				v[0] += v2d_reduce(vl[0], vl[1]);
@@ -527,18 +549,6 @@ V						v[2*ll+1] += v2d_reduce(wl[2*ll], wl[2*ll+1]);
 Q				q+=LSPAN;
 V				v+=2*LSPAN;
 				l+=LSPAN;	al+=LSPAN;
-		#ifdef HI_LLIM
-				if (ny[imin/NWAY] < 0) {
-					for (int i=imin/NWAY; i<NBLK/NWAY; i++) {	// accuracy checking
-						if ((ny[i] < 0) && (fabs(vlo(x[i*NWAY+NWAY-1].y[0])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)) {		// rescale when value is significant
-							++ny[i];
-							for (int j=0; j<NWAY; ++j) {
-								x[i*NWAY+j].y[0] *= vall(1.0/SHT_SCALE_FACTOR);		x[i*NWAY+j].y[1] *= vall(1.0/SHT_SCALE_FACTOR);
-							}
-						}
-					}
-				}
-		#endif
 			}
 	/*		{
 V				rnd vv0 = y0[0] * terk[0];
