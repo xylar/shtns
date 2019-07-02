@@ -29,7 +29,9 @@
 
 	#define NWAY 1
 	#include "SHT/spat_to_SHst_omp.c"
+	#ifdef _GCC_VEC_
 	#include "SHT/SHst_to_spat_omp.c"
+	#endif
 	#undef NWAY
 	#define NWAY 2
 	#include "SHT/spat_to_SH_omp.c"
@@ -39,9 +41,11 @@
 	#undef NWAY
 	#define NWAY 3
 	#include "SHT/spat_to_SH_omp.c"
-	#include "SHT/SH_to_spat_omp.c"
 	#include "SHT/spat_to_SHst_omp.c"
+	#ifdef _GCC_VEC_
+	#include "SHT/SH_to_spat_omp.c"
 	#include "SHT/SHst_to_spat_omp.c"
+	#endif
 	#undef NWAY
 	#define NWAY 4
 	#include "SHT/spat_to_SH_omp.c"
@@ -63,11 +67,12 @@
 	#undef NWAY
 
 #define SHT_GRAD
-	#define NWAY 1
+	#define NWAY 2
 	#include "SHT/SHs_to_spat_omp.c"
 	#include "SHT/SHt_to_spat_omp.c"
 	#undef NWAY
-	#define NWAY 2
+	#ifdef _GCC_VEC_
+	#define NWAY 1
 	#include "SHT/SHs_to_spat_omp.c"
 	#include "SHT/SHt_to_spat_omp.c"
 	#undef NWAY
@@ -75,6 +80,7 @@
 	#include "SHT/SHs_to_spat_omp.c"
 	#include "SHT/SHt_to_spat_omp.c"
 	#undef NWAY
+	#endif
 	#define NWAY 4
 	#include "SHT/SHs_to_spat_omp.c"
 	#include "SHT/SHt_to_spat_omp.c"
@@ -84,7 +90,9 @@
 #define SHT_3COMP
 	#define NWAY 1
 	#include "SHT/spat_to_SHqst_omp.c"
+	#ifdef _GCC_VEC_
 	#include "SHT/SHqst_to_spat_omp.c"
+	#endif
 	#undef NWAY
 	#define NWAY 2
 	#include "SHT/spat_to_SHqst_omp.c"
@@ -92,7 +100,9 @@
 	#undef NWAY
 	#define NWAY 3
 	#include "SHT/spat_to_SHqst_omp.c"
+	#ifdef _GCC_VEC_
 	#include "SHT/SHqst_to_spat_omp.c"
+	#endif
 	#undef NWAY
 	#define NWAY 4
 	#include "SHT/spat_to_SHqst_omp.c"
@@ -108,6 +118,17 @@
 	#undef NWAY
 #undef SHT_3COMP
 
+#ifndef _GCC_VEC_
+	#define SHsphtor_to_spat_omp1_l NULL
+	#define SHsph_to_spat_omp1_l NULL
+	#define SHtor_to_spat_omp1_l NULL
+	#define SHqst_to_spat_omp1_l NULL
+	#define SH_to_spat_omp3_l NULL
+	#define SHsphtor_to_spat_omp3_l NULL
+	#define SHsph_to_spat_omp3_l NULL
+	#define SHtor_to_spat_omp3_l NULL
+	#define SHqst_to_spat_omp3_l NULL
+#endif
 
 void* fomp[6][SHT_NTYP] = {
 	{ NULL, NULL, SHsphtor_to_spat_omp1_l, spat_to_SHsphtor_omp1_l,

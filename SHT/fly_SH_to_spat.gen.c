@@ -36,6 +36,10 @@ S	static void GEN3(SHsph_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, do
 T	static void GEN3(SHtor_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, const long int llim) {
   #endif
 
+	#if !defined( _GCC_VEC_ ) && (NWAY & 1)
+	#error "NWAY must be even when compiled without explicit vectorization."
+	#endif
+
   #ifndef SHT_AXISYM
 Q	v2d *BrF;
 V	v2d *BtF, *BpF;
@@ -69,7 +73,6 @@ Q	v2d QQl[llim+2];
   #ifndef SHT_AXISYM
 Q	BrF = (v2d*) Vr;
 V	BtF = (v2d*) Vt;	BpF = (v2d*) Vp;
-	#ifdef _GCC_VEC_
 	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
 		unsigned long nv = shtns->nspat;
 QX		BrF = (v2d*) VMALLOC( nv * sizeof(double) );
@@ -82,19 +85,6 @@ VX		BpF = BtF + nv/2;
 S		k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2);
 T		k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2);
 	  #endif
-	#else
-	if (shtns->ncplx_fft > 0) {		// alloc memory for the FFT
-QX		BrF = VMALLOC( shtns->ncplx_fft * sizeof(cplx) );
-VX		BtF = VMALLOC( 2* shtns->ncplx_fft * sizeof(cplx) );
-VX		BpF = BtF + shtns->ncplx_fft;
-3		BrF = VMALLOC( 3* shtns->ncplx_fft * sizeof(cplx) );
-3		BtF = BrF + shtns->ncplx_fft;		BpF = BtF + shtns->ncplx_fft;
-	}
-	  #ifdef SHT_GRAD
-S		k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT);
-T		k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT);
-	  #endif
-	#endif
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
@@ -122,9 +112,7 @@ T			Tl0[l-1] = (double) Tlm[l];	//	Tl[l] = (double) Tlm[l+1];
 			++l;
 		} while(l<=llim);
 		k=0;	nk = NLAT_2;
-	#if _GCC_VEC_
 		nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
-	#endif
 		do {
 			l=0;	al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
@@ -205,13 +193,8 @@ T				S2D_STORE_4MAGIC((double*)BpF, j+k, pe[j], po[j]);
 	}
 
   #ifndef SHT_AXISYM
-	#if _GCC_VEC_
 Q		BrF += NLAT_2;
 V		BtF += NLAT_2;	BpF += NLAT_2;
-	#else
-Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
-	#endif
 	for(im=1; im<=imlim; ++im) {
 		m = im*MRES;
 		//l = LiM(shtns, 0,im);
@@ -238,7 +221,6 @@ V		SH2_to_ishioka(xlm, VWl+2*m, llim-m+1);
 	#endif
 
 		k=0;	l=shtns->tm[im];
-	#if _GCC_VEC_
 		l>>=1;		// stay on a 16 byte boundary
 		while (k<l) {	// polar optimization
 	#ifndef SHTNS4MAGIC
@@ -258,21 +240,11 @@ V			BpF[2*k+1] = vdup(0.0);			BpF[(NPHI-2*im)*NLAT_2 +2*k+1] = vdup(0.0);
 	#endif
 			++k;
 		}
+		#ifdef _GCC_VEC_
 		k = ((unsigned) k) / (VSIZE2/2);
-	#else
-		while (k<l) {	// polar optimization
-		  #ifndef SHTNS4MAGIC
-Q			BrF[k] = 0.0;		BrF[NLAT-l+k] = 0.0;
-V			BtF[k] = 0.0;		BtF[NLAT-l+k] = 0.0;
-V			BpF[k] = 0.0;		BpF[NLAT-l+k] = 0.0;
-		  #else
-Q			BrF[2*k] = 0.0;		BrF[2*k+1] = 0.0;
-V			BtF[2*k] = 0.0;		BtF[2*k+1] = 0.0;
-V			BpF[2*k] = 0.0;		BpF[2*k+1] = 0.0;
-		  #endif
-			++k;
-		}
-	#endif
+		#else
+		k *= 2;
+		#endif
 		do {
 			al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
@@ -418,11 +390,19 @@ Q			for (int j=0; j<NWAY; ++j) {  ror[j] *= cost[j];	roi[j] *= cost[j]; }
 3			}
 		  }
 		#ifndef SHTNS4MAGIC
+		  #ifdef _GCC_VEC_
 			for (int j=0; j<NWAY; ++j) {
 Q				S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
 V				S2D_CSTORE(BtF, k+j, ter[j], tor[j], tei[j], toi[j])
 V				S2D_CSTORE(BpF, k+j, per[j], por[j], pei[j], poi[j])
 			}
+		  #else
+			for (int j=0; j<NWAY/2; ++j) {		// NWAY is even when _GCC_VEC_ is not defined
+Q				S2D_CSTOREX(BrF, k/2+j, 2*j, rer, ror, rei, roi)
+V				S2D_CSTOREX(BtF, k/2+j, 2*j, ter, tor, tei, toi)
+V				S2D_CSTOREX(BpF, k/2+j, 2*j, per, por, pei, poi)
+			}
+		  #endif
 		#else
 			for (int j=0; j<NWAY; ++j) {
 				if ((k+j)>=nk) break;
@@ -433,32 +413,17 @@ V				S2D_CSTORE_4MAGIC((double*) BpF, (double*) (BpF + (NPHI-2*im)*NLAT_2), k+j,
 		#endif
 			k+=NWAY;
 		} while (k < nk);
-	#if _GCC_VEC_
 Q		BrF += NLAT_2;
 V		BtF += NLAT_2;	BpF += NLAT_2;
-	#else
-Q		BrF += NLAT;
-V		BtF += NLAT;	BpF += NLAT;
-	#endif
 	}
 
-  #if _GCC_VEC_
 	for (k=0; k < NLAT_2*(NPHI-1-2*imlim); ++k) {	// padding for high m's
 Q		BrF[k] = vdup(0.0);
 V		BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
 	}
 Q	BrF -= NLAT_2*(imlim+1);		// restore original pointer
 V	BtF -= NLAT_2*(imlim+1);	BpF -= NLAT_2*(imlim+1);
-  #else
-	for (k=0; k < NLAT*((NPHI>>1) -imlim); ++k) {	// padding for high m's
-Q			BrF[k] = 0.0;
-V			BtF[k] = 0.0;	BpF[k] = 0.0;
-	}
-Q	BrF -= NLAT*(imlim+1);		// restore original pointer
-V	BtF -= NLAT*(imlim+1);	BpF -= NLAT*(imlim+1);	// restore original pointer
-  #endif
     // NPHI > 1 as SHT_AXISYM is not defined.
-	#if _GCC_VEC_
   	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode != 1) {
 Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
@@ -472,17 +437,6 @@ Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.
 		}
 	}
-	#else
-	if (shtns->ncplx_fft >= 0) {
-Q		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BrF, Vr);
-V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BtF, Vt);
-V		fftw_execute_dft_c2r(shtns->ifft, (cplx *) BpF, Vp);
-		if (shtns->ncplx_fft > 0) {		// free memory
-Q			VFREE(BrF);
-VX			VFREE(BtF);		// this frees also BpF.
-		}
-	}
-	#endif
   #endif
 
 Q	#undef qr

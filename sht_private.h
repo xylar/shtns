@@ -133,7 +133,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double *st_1;				///< 1/sin(theta);
 	double mpos_scale_analys;	///< scale factor for analysis, handles real-norm (0.5 or 1.0);
 
-	fftw_plan ifft, fft;		// plans for FFTW.
 	fftw_plan ifftc, fftc;
 	fftw_plan ifft_cplx, fft_cplx;		// for complex-valued spatial fields.
 
@@ -160,8 +159,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 	double **zlm;		// matrix for direct transform (analysis)
 	struct DtDp** dzlm;
 	#endif
-
-	int ncplx_fft;			///< number of complex numbers to allocate for the fft : -1 = no fft; 0 = in-place fft (no allocation).
 
 	/* rotation stuff (pseudo-spectral) */
 	unsigned npts_rot;		// number of physical points needed
@@ -695,21 +692,37 @@ struct shtns_info {		// MUST start with "int nlm;"
 	#define VMALLOC(s)	( (sizeof(void*) >= 8) ? malloc(s) : fftw_malloc(s) )
 	#define VFREE(s)	( (sizeof(void*) >= 8) ? free(s) : fftw_free(s) )
 
-	#define S2D_STORE(mem, idx, ev, od)		(mem)[idx] = ev+od;		(mem)[NLAT-1 - (idx)] = ev-od;
+	#define S2D_STORE(mem, idx, ev, od)		((double*)mem)[idx] = ev+od;		((double*)mem)[NLAT-1 - (idx)] = ev-od;
 	#define S2D_CSTORE(mem, idx, er, od, ei, oi)	mem[idx] = (er+od) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-od) + I*(ei-oi);
 	#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	mem[idx] = (er+od) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-od) + I*(ei-oi);
+	#define S2D_CSTOREX(mem, idx, v, er, od, ei, oi) { \
+		double a0 = (er[(v)]  +od[(v)])   + (ei[(v)+1]+oi[(v)+1]); \
+		double b0 = (er[(v)]  +od[(v)])   - (ei[(v)+1]+oi[(v)+1]); \
+		double a1 = (er[(v)+1]+od[(v)+1]) + (ei[(v)]  +oi[(v)]); \
+		double b1 = (er[(v)+1]+od[(v)+1]) - (ei[(v)]  +oi[(v)]); \
+		((cplx*)mem)[(idx)] = b0 + I*a1; \
+		((cplx*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = a0 + I*b1; \
+		a1 = (er[(v)]  -od[(v)])   + (ei[(v)+1]-oi[(v)+1]); \
+		b1 = (er[(v)]  -od[(v)])   - (ei[(v)+1]-oi[(v)+1]); \
+		a0 = (er[(v)+1]-od[(v)+1]) + (ei[(v)]  -oi[(v)]); \
+		b0 = (er[(v)+1]-od[(v)+1]) - (ei[(v)]  -oi[(v)]); \
+		((cplx*)mem)[NLAT_2-1 -(idx)] = b0 + I*a1; \
+		((cplx*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = a0 + I*b1; }
 
-	inline static void S2D_STORE_4MAGIC(double* mem, long idx, rnd ev, rnd od) {
-		((cplx*)mem)[2*idx] = ev+od;
-		((cplx*)mem)[2*idx+1] = ev-od;
+	inline static void S2D_STORE_4MAGIC(double* mem, long idx, double ev, double od) {
+		((cplx*)mem)[idx] = (ev+od) + I*(ev-od);
 	}
 
-	inline static void S2D_CSTORE_4MAGIC(double* mem, double* mem_m, long idx, rnd er, rnd od, rnd ei, rnd oi) {
-		((cplx*)mem)[2*idx]   = (er+od) + I*(ei+oi);
-		((cplx*)mem)[2*idx+1] = (er-od) + I*(ei-oi);
+	inline static void S2D_CSTORE_4MAGIC(double* mem, double* mem_m, long idx, double er, double od, double ei, double oi) {
+		double nr = er + od;		double ni = ei + oi;
+		double sr = er - od;		double si = ei - oi;
+		er = nr - si;		od = sr+ni;
+		ei = nr + si;		oi = sr-ni;		
+		((cplx*)mem)[idx]   = er + I*od;
+		((cplx*)mem_m)[idx] = ei + I*oi;
 	}
 
-	inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, rnd er, rnd od, rnd ei, rnd oi) {
+	inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, double er, double od, double ei, double oi) {
 		((cplx*)mem)[2*idx]   = (er+od) + I*(ei+oi);
 		((cplx*)mem)[2*idx+1] = (er-od) + I*(ei-oi);
 	}
@@ -720,7 +733,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 /// align pointer on MIN_ALIGNMENT (must be a power of 2)
 #define PTR_ALIGN(p) ((((size_t)(p)) + (MIN_ALIGNMENT-1)) & (~((size_t)(MIN_ALIGNMENT-1))))
-
 
 struct DtDp {		// theta and phi derivatives stored together.
 	double t, p;

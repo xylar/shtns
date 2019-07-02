@@ -470,10 +470,6 @@ static void free_SHTarrays(shtns_cfg shtns)
 
 	if (ref_count(shtns, &shtns->ct) == 1)	VFREE(shtns->ct);
 	shtns->ct = NULL;		shtns->st = NULL;
-
-	if (ref_count(shtns, &shtns->fft) == 1)  fftw_destroy_plan(shtns->fft);
-	if (ref_count(shtns, &shtns->ifft) == 1) fftw_destroy_plan(shtns->ifft);
-	shtns->fft = NULL;		shtns->ifft = NULL;		shtns->ncplx_fft = -1;	// no fft
 }
 
 #ifndef HAVE_FFTW_COST
@@ -490,7 +486,6 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	double cost_fft_ip, cost_fft_oop, cost_ifft_ip, cost_ifft_oop;
 	cplx *ShF;
 	double *Sh;
-	fftw_plan fft2, ifft2, fft, ifft;
 	int nfft, ncplx, nreal;
 	int theta_inc, phi_inc, phi_embed;
   #ifdef HAVE_FFTW_COST
@@ -510,8 +505,6 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 
 	shtns->k_stride_a = 1;		shtns->m_stride_a = NLAT;		// default strides
 
-	shtns->fft = NULL;		shtns->ifft = NULL;
-
 	shtns->nspat = NPHI * NLAT;		// default spatial size
 
 	if (NPHI==1) 	// no FFT needed.
@@ -520,7 +513,6 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		#if SHT_VERBOSE > 0
 			if (verbose) printf("        => no fft : Mmax=0, Nphi=1, Nlat=%d\n",NLAT);
 		#endif
-		shtns->ncplx_fft = -1;	// no fft.
 		return;
 	}
 
@@ -545,7 +537,6 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 // Allocate dummy Spatial Fields.
 	ShF = (cplx *) VMALLOC(ncplx * NLAT*2 * sizeof(cplx));		// *2 for complex-valued fields
 	Sh = (double *) VMALLOC(ncplx * NLAT*2 * sizeof(cplx));
-	fft = NULL;		ifft = NULL;	fft2 = NULL;	ifft2 = NULL;
 
 // complex fft for fly transform is a bit different.
 	if (layout & SHT_PHI_CONTIGUOUS) {		// out-of-place split dft
@@ -601,77 +592,10 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		}
 		#endif
 	}
-
-#if _GCC_VEC_
-  if (on_the_fly == 0)
-#endif
-  {		// the real ffts are required if _GCC_VEC_ == 0 or if on_the_fly is zero.
-// IFFT : unnormalized.  FFT : must be normalized.
-	cost_fft_ip = 0.0;	cost_ifft_ip = 0.0;		cost_fft_oop = 0.0;		cost_ifft_oop = 0.0;
-	if (in_place) {		// in-place FFT (if allowed)
-		ifft2 = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, (double*) ShF, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
-		#if SHT_VERBOSE > 1
-		if (verbose>1) {
-			printf("          in-place cost : ifft=%lg  ",fftw_cost(ifft2));	fflush(stdout);
-		}
-		#endif
-		if (ifft2 != NULL) {
-			fft2 = fftw_plan_many_dft_r2c(1, &nfft, NLAT, (double*) ShF, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
-			#if SHT_VERBOSE > 1
-			if (verbose>1) {
-				printf("fft=%lg\n",fftw_cost(fft2));	fflush(stdout);
-			}
-			#endif
-			if (fft2 != NULL) {
-				cost_fft_ip = fftw_cost(fft2);		cost_ifft_ip = fftw_cost(ifft2);
-			}
-		}
-	}
-	if ( (in_place == 0) || (cost_fft_ip * cost_ifft_ip > 0.0) )
-	{		// out-of-place FFT
-		ifft = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nreal, phi_inc, theta_inc, shtns->fftw_plan_mode);
-		#if SHT_VERBOSE > 1
-			if (verbose>1) {  printf("          oop cost : ifft=%lg  ",fftw_cost(ifft));	fflush(stdout);  }
-		#endif
-		if (ifft == NULL) shtns_runerr("[FFTW] ifft planning failed !");
-		fft = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nreal, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, shtns->fftw_plan_mode);
-		#if SHT_VERBOSE > 1
-			if (verbose>1) {  printf("fft=%lg\n",fftw_cost(fft));	fflush(stdout);  }
-		#endif
-		if (fft == NULL) shtns_runerr("[FFTW] fft planning failed !");
-		cost_fft_oop = fftw_cost(fft);		cost_ifft_oop = fftw_cost(ifft);
-	}
-	if ( (cost_fft_ip * cost_ifft_ip > 0.0) && (cost_fft_oop * cost_ifft_oop > 0.0) ) {		// both have been succesfully timed.
-		if ( cost_fft_oop + SHT_NL_ORDER*cost_ifft_oop < cost_fft_ip + SHT_NL_ORDER*cost_ifft_ip )
-			in_place = 0;		// disable in-place, because out-of-place is faster.
-	}
-
-	if (in_place) {
-		/* IN-PLACE FFT */
-		if (fft != NULL)  fftw_destroy_plan(fft);
-		if (ifft != NULL) fftw_destroy_plan(ifft);
-		fft = fft2;		ifft = ifft2;
-		shtns->ncplx_fft = 0;		// fft is done in-place, no allocation needed.
-		shtns->nspat = phi_embed * NLAT;	// more space must be reserved for inplace ffts.
-	} else {
-		/* OUT-OF-PLACE FFT */
-		if (fft2 != NULL)  fftw_destroy_plan(fft2);		// use OUT-OF-PLACE FFT
-		if (ifft2 != NULL) fftw_destroy_plan(ifft2);
-		shtns->ncplx_fft = ncplx * NLAT;		// fft is done out-of-place, store allocation size.
-		#if SHT_VERBOSE > 1
-			if (verbose>1) printf("        ** out-of-place fft **\n");
-		#endif
-	}
-	shtns->fft = fft;		shtns->ifft = ifft;
-  }
 	VFREE(Sh);		VFREE(ShF);
 
 	#if SHT_VERBOSE > 2
 	if (verbose>2) {
-		printf(" *** fft plan : \n");
-		if (shtns->fft) fftw_print_plan(shtns->fft);
-		printf("\n *** ifft plan :\n");
-		if (shtns->ifft) fftw_print_plan(shtns->ifft);
 		printf("\n *** fftc plan : \n");
 		if (shtns->fftc) fftw_print_plan(shtns->fftc);
 		printf("\n *** ifftc plan :\n");
@@ -1580,7 +1504,7 @@ shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 		}
 	}
 	if (nofft != 0) {
-		shtns->ncplx_fft = -1;		// fft disabled.
+		shtns->fftc_mode = -1;		// fft disabled.
 	}
 
 // save a pointer to this setup and return.
@@ -1700,13 +1624,10 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#if HAVE_LIBCUFFT
 		if (*nlat % 64) shtns_runerr("Nlat must be a multiple of 64 for GPUs\n");
 	#endif
+	if (*nlat & 1) shtns_runerr("Nlat must be even\n");
 	#if _GCC_VEC_
-		if (*nlat & 1) shtns_runerr("Nlat must be even\n");
 		#ifdef SHTNS4MAGIC
 			if (*nlat % (VSIZE2*2)) shtns_runerr("Nlat must be an even multiple of vector size\n");
-		#endif
-		#ifdef __MIC__
-			if (*nlat % VSIZE2) shtns_runerr("Nlat must be a multiple of 8 for the MIC\n");
 		#endif
 	#endif
 	shtns_unset_grid(shtns);		// release grid if previously allocated.

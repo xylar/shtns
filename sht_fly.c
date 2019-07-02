@@ -29,9 +29,11 @@
 
 	#define NWAY 1
 	#include "SHT/spat_to_SH_fly.c"
-	#include "SHT/SH_to_spat_fly.c"
 	#include "SHT/spat_to_SHst_fly.c"
+	#ifdef _GCC_VEC_
+	#include "SHT/SH_to_spat_fly.c"
 	#include "SHT/SHst_to_spat_fly.c"
+	#endif
 	#undef NWAY
 	#define NWAY 2
 	#include "SHT/spat_to_SH_fly.c"
@@ -41,9 +43,11 @@
 	#undef NWAY
 	#define NWAY 3
 	#include "SHT/spat_to_SH_fly.c"
-	#include "SHT/SH_to_spat_fly.c"
 	#include "SHT/spat_to_SHst_fly.c"
+	#ifdef _GCC_VEC_
+	#include "SHT/SH_to_spat_fly.c"
 	#include "SHT/SHst_to_spat_fly.c"
+	#endif
 	#undef NWAY
 	#define NWAY 4
 	#include "SHT/spat_to_SH_fly.c"
@@ -65,11 +69,12 @@
 	#undef NWAY
 
 #define SHT_GRAD
-	#define NWAY 1
+	#define NWAY 2
 	#include "SHT/SHs_to_spat_fly.c"
 	#include "SHT/SHt_to_spat_fly.c"
 	#undef NWAY
-	#define NWAY 2
+	#ifdef _GCC_VEC_
+	#define NWAY 1
 	#include "SHT/SHs_to_spat_fly.c"
 	#include "SHT/SHt_to_spat_fly.c"
 	#undef NWAY
@@ -77,6 +82,7 @@
 	#include "SHT/SHs_to_spat_fly.c"
 	#include "SHT/SHt_to_spat_fly.c"
 	#undef NWAY
+	#endif
 	#define NWAY 4
 	#include "SHT/SHs_to_spat_fly.c"
 	#include "SHT/SHt_to_spat_fly.c"
@@ -86,7 +92,9 @@
 #define SHT_3COMP
 	#define NWAY 1
 	#include "SHT/spat_to_SHqst_fly.c"
+	#ifdef _GCC_VEC_
 	#include "SHT/SHqst_to_spat_fly.c"
+	#endif
 	#undef NWAY
 	#define NWAY 2
 	#include "SHT/spat_to_SHqst_fly.c"
@@ -94,7 +102,9 @@
 	#undef NWAY
 	#define NWAY 3
 	#include "SHT/spat_to_SHqst_fly.c"
+	#ifdef _GCC_VEC_
 	#include "SHT/SHqst_to_spat_fly.c"
+	#endif
 	#undef NWAY
 	#define NWAY 4
 	#include "SHT/spat_to_SHqst_fly.c"
@@ -117,7 +127,9 @@
 
 	#define NWAY 1
 	#include "SHT/spat_to_SHst_fly.c"
+	#ifdef _GCC_VEC_
 	#include "SHT/SHst_to_spat_fly.c"
+	#endif
 	#undef NWAY
 	#define NWAY 2
 	#include "SHT/spat_to_SH_fly.c"
@@ -127,9 +139,11 @@
 	#undef NWAY
 	#define NWAY 3
 	#include "SHT/spat_to_SH_fly.c"
-	#include "SHT/SH_to_spat_fly.c"
 	#include "SHT/spat_to_SHst_fly.c"
+	#ifdef _GCC_VEC_
+	#include "SHT/SH_to_spat_fly.c"
 	#include "SHT/SHst_to_spat_fly.c"
+	#endif
 	#undef NWAY
 	#define NWAY 4
 	#include "SHT/spat_to_SH_fly.c"
@@ -145,11 +159,12 @@
 	#undef NWAY
 
 #define SHT_GRAD
-	#define NWAY 1
+	#define NWAY 2
 	#include "SHT/SHs_to_spat_fly.c"
 	#include "SHT/SHt_to_spat_fly.c"
 	#undef NWAY
-	#define NWAY 2
+	#ifdef _GCC_VEC_
+	#define NWAY 1
 	#include "SHT/SHs_to_spat_fly.c"
 	#include "SHT/SHt_to_spat_fly.c"
 	#undef NWAY
@@ -157,6 +172,7 @@
 	#include "SHT/SHs_to_spat_fly.c"
 	#include "SHT/SHt_to_spat_fly.c"
 	#undef NWAY
+	#endif
 	#define NWAY 4
 	#include "SHT/SHs_to_spat_fly.c"
 	#include "SHT/SHt_to_spat_fly.c"
@@ -166,7 +182,9 @@
 #define SHT_3COMP
 	#define NWAY 1
 	#include "SHT/spat_to_SHqst_fly.c"
+	#ifdef _GCC_VEC_
 	#include "SHT/SHqst_to_spat_fly.c"
+	#endif
 	#undef NWAY
 	#define NWAY 2
 	#include "SHT/spat_to_SHqst_fly.c"
@@ -174,11 +192,54 @@
 	#undef NWAY
 	#define NWAY 3
 	#include "SHT/spat_to_SHqst_fly.c"
+	#ifdef _GCC_VEC_
 	#include "SHT/SHqst_to_spat_fly.c"
+	#endif
 	#undef NWAY
 #undef SHT_3COMP
 
+#ifndef _GCC_VEC_
+	#define SH_to_spat_fly1_l NULL
+	#define SHsphtor_to_spat_fly1_l NULL
+	#define SHsph_to_spat_fly1_l NULL
+	#define SHtor_to_spat_fly1_l NULL
+	#define SHqst_to_spat_fly1_l NULL
+	#define SH_to_spat_fly3_l NULL
+	#define SHsphtor_to_spat_fly3_l NULL
+	#define SHsph_to_spat_fly3_l NULL
+	#define SHtor_to_spat_fly3_l NULL
+	#define SHqst_to_spat_fly3_l NULL
 
+	#define SHsphtor_to_spat_fly1_m0l NULL
+	#define SHsph_to_spat_fly1_m0l NULL
+	#define SHtor_to_spat_fly1_m0l NULL
+	#define SHqst_to_spat_fly1_m0l NULL
+	#define SH_to_spat_fly3_m0l NULL
+	#define SHsphtor_to_spat_fly3_m0l NULL
+	#define SHsph_to_spat_fly3_m0l NULL
+	#define SHtor_to_spat_fly3_m0l NULL
+	#define SHqst_to_spat_fly3_m0l NULL
+
+	#define SHsphtor_to_spat_fly1_m0l NULL
+	#define SHsph_to_spat_fly1_m0l NULL
+	#define SHtor_to_spat_fly1_m0l NULL
+	#define SHqst_to_spat_fly1_m0l NULL
+	#define SH_to_spat_fly3_m0l NULL
+	#define SHsphtor_to_spat_fly3_m0l NULL
+	#define SHsph_to_spat_fly3_m0l NULL
+	#define SHtor_to_spat_fly3_m0l NULL
+	#define SHqst_to_spat_fly3_m0l NULL
+
+	#define SHsphtor_m_to_spat_fly1_l NULL
+	#define SHsph_m_to_spat_fly1_l NULL
+	#define SHtor_m_to_spat_fly1_l NULL
+	#define SHqst_m_to_spat_fly1_l NULL
+	#define SH_m_to_spat_fly3_l NULL
+	#define SHsphtor_m_to_spat_fly3_l NULL
+	#define SHsph_m_to_spat_fly3_l NULL
+	#define SHtor_m_to_spat_fly3_l NULL
+	#define SHqst_m_to_spat_fly3_l NULL
+#endif
 
 void* ffly[6][SHT_NTYP] = {
 	{ SH_to_spat_fly1_l, spat_to_SH_fly1_l, SHsphtor_to_spat_fly1_l, spat_to_SHsphtor_fly1_l,
