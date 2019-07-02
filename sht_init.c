@@ -2108,18 +2108,34 @@ void shtns_calc_nlm_(int *nlm, const int *const lmax, const int *const mmax, con
     *nlm = nlm_calc(*lmax, *mmax, *mres);
 }
 
-/// returns lm, the index in an SH array of mode (l,m).
-/// call from fortran using \code call shtns_lmidx(lm, l, m) \endcode
-void shtns_lmidx_(int *lm, const int *const l, const int *const m)
+
+int shtns_lmidx_fortran(shtns_cfg shtns, const int *const l, const int *const m)
 {
 	unsigned im = *m;
-	unsigned mres = sht_data->mres;
+	unsigned mres = shtns->mres;
 	if (mres > 1) {
 		unsigned k = im % mres;
 		im = im / mres;
 		if (k) printf("wrong m");
 	}
-    *lm = LiM(sht_data, *l, im) + 1;	// convert to fortran convention index.
+    return LiM(shtns, *l, im) + 1;	// convert to fortran convention index.
+}
+
+/// returns lm, the index in an SH array of mode (l,m).
+/// call from fortran using \code call shtns_lmidx(lm, l, m) \endcode
+void shtns_lmidx_(int *lm, const int *const l, const int *const m)
+{
+    *lm = shtns_lmidx_fortran(sht_data, l, m);
+}
+
+int shtns_lm2l_fortran(shtns_cfg shtns, const int *lm)
+{
+	return shtns->li[*lm -1];	// convert from fortran convention index.
+}
+
+int shtns_lm2m_fortran(shtns_cfg shtns, const int *lm)
+{
+	return shtns->mi[*lm -1];	// convert from fortran convention index.
 }
 
 /// returns l and m, degree and order of an index in SH array lm.
