@@ -552,10 +552,10 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 
 	if (with_cs_phase != 0) with_cs_phase = 1;		// force to 1 if !=0
 
-	alm = (double *) malloc( (2*NLM)*sizeof(double) );		//  fits exactly into an array of 2*NLM doubles.
+	alm = (double *) malloc( (2*NLM + 2)*sizeof(double) );		//  fits exactly into an array of 2*NLM doubles, + 2 values to allow overflow read.
 	blm = alm;
 	if (norm == sht_schmidt) {
-		blm = (double *) malloc( (2*NLM)*sizeof(double) );
+		blm = (double *) malloc( (2*NLM + 2)*sizeof(double) );
 	}
 	if ((alm==0) || (blm==0)) shtns_runerr("not enough memory.");
 	shtns->alm = alm;		shtns->blm = blm;
