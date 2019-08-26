@@ -66,9 +66,15 @@ DOCUMENTATION:
 
 CHANGE LOG:
 -----------
+
+* v3.3  (26 Aug 2019)
+	- Faster (especially for analysis or for small sizes).
+	- New Fortran 2003 interface (thanks to T. Gastine).
+	- Small fixes and code cleanup.
+
 * v3.2.2  (6 Jun 2019)
 	- Ishioka's reccurence can now be used with all normalizations. Will likely become the default soon.
-	- Fix: allow single-m Legendre transforms with --enable-magic-layout.
+	- Fix: allow single-m Legendre transforms with `--enable-magic-layout`.
 
 * v3.2.1  (5 Apr 2019)
 	- Fix important bugs introduced in v3.2.
