@@ -1,3 +1,5 @@
+! Fortran 2003 interface to the SHTns library.
+
   integer(C_INT), parameter :: SHT_NATIVE_LAYOUT=0
   integer(C_INT), parameter :: SHT_THETA_CONTIGUOUS=256
   integer(C_INT), parameter :: SHT_PHI_CONTIGUOUS=512

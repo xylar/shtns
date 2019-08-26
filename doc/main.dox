@@ -526,9 +526,11 @@ When your program is ready, compile it adding these options to the compiler (gcc
 */
 
 
-/** \page f77 Using SHTns with Fortran 77
+/** \page fortran Using SHTns with Fortran
 
-SHTns provides an interface to Fortran language (compatible with gfortran).
+SHTns provides two interfaces to Fortran language (compatible with gfortran).
+
+\section f77 Basic Fortran 77 interface
 
 First of all you need to initialize SHTns. There are two ways to do this :
 \li calling one of the \c shtns_init_* subroutines,
@@ -549,12 +551,27 @@ When your program is ready, compile it adding these options to the compiler (gfo
 -L/path/to/lib/ -I/path/to/include/ -lshtns -lfftw3 -lm -lc
 \endcode
 
+\section f03 Fortran 2003 iso_c_binding
+
+An iso_c_binding is provided in file \c shtns.f03 for a direct call to the C interface.
+
+\see See the \link SHT_example.f90 Fortran 2003 example \endlink that uses these bindings.
+
+
 \example SHT_example.f
   \brief A Fortran example program that performs backward and forward Spherical Harmonic Transforms using SHTns.
 
   Compile using : \code make SHT_fort_ex \endcode
   \see fortapi
   \see \ref f77
+
+\example SHT_example.f90
+  \brief A Fortran 2003 example using iso_c_binding program that performs backward and forward Spherical Harmonic Transforms using SHTns.
+
+  Compile using : \code make SHT_f90_ex \endcode
+  \see fortran
+  \see \ref f03
+  
 
 */
 
