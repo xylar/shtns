@@ -3308,6 +3308,7 @@ fi
 else
 
 	enable_many_core=yes		# optimize for many-core architecture
+	target="libshtns_mic.a"
 	# KNL native cross-compiling
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -xMIC-AVX512" >&5
 $as_echo_n "checking whether C compiler accepts -xMIC-AVX512... " >&6; }
@@ -3341,7 +3342,7 @@ $as_echo "$ax_cv_check_cflags___xMIC_AVX512" >&6; }
 if test x"$ax_cv_check_cflags___xMIC_AVX512" = xyes; then :
   CC="$CC -xMIC-AVX512"
 else
-  as_fn_error $? "\"Xeon Phi (KNL) not supported.\"" "$LINENO" 5
+  as_fn_error $? "\"Xeon Phi (KNL) not supported. Did you use the Intel Compiler?\"" "$LINENO" 5
 fi
 
 	# With KNL, enable mkl by default.
@@ -3917,7 +3918,7 @@ if test "x$enable_many_core" != "xno"; then :
 fi
 
 fi
-# for MagIC code, also disable matrix transforms and switch to many-core code (possibly without openmp).
+# for MagIC code, also disable matrix transforms.
 if test "x$enable_magic_layout" != "xno"; then :
 
   	enable_mem=no
@@ -4005,7 +4006,7 @@ $as_echo "$ac_cv_prog_c_openmp" >&6; }
 		objs="$objs sht_omp.o"
 	if test "x$enable_knl" != "xno"; then :
 
-		target="libshtns_mic.a"
+		target="libshtns_mic_omp.a"
 
 else
 

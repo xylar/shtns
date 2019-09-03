@@ -80,8 +80,9 @@ AS_IF([test "x$enable_knl" != "xyes"], [
 	AX_CHECK_COMPILE_FLAG([-qopt-zmm-usage=high],[CC="$CC -qopt-zmm-usage=high"])
   ],[
 	enable_many_core=yes		# optimize for many-core architecture
+	target="libshtns_mic.a"
 	# KNL native cross-compiling
-	AX_CHECK_COMPILE_FLAG([-xMIC-AVX512],[CC="$CC -xMIC-AVX512"], [AC_MSG_ERROR(["Xeon Phi (KNL) not supported."])])
+	AX_CHECK_COMPILE_FLAG([-xMIC-AVX512],[CC="$CC -xMIC-AVX512"], [AC_MSG_ERROR(["Xeon Phi (KNL) not supported. Did you use the Intel Compiler?"])])
 	# With KNL, enable mkl by default.
 	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
 ])
@@ -111,7 +112,7 @@ AS_IF([test "x$enable_many_core" != "xno"], [
   	enable_mem=no
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
-# for MagIC code, also disable matrix transforms and switch to many-core code (possibly without openmp).
+# for MagIC code, also disable matrix transforms.
 AS_IF([test "x$enable_magic_layout" != "xno"], [
   	enable_mem=no
 	#enable_ishioka=no       # workaround unexplained bug
@@ -129,7 +130,7 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 	dnl AC_CHECK_HEADERS([omp.h])
 	objs="$objs sht_omp.o"
 	AS_IF([test "x$enable_knl" != "xno"], [
-		target="libshtns_mic.a"
+		target="libshtns_mic_omp.a"
 	],[
 		target="libshtns_omp.a"
 	])
