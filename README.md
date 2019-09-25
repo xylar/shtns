@@ -67,6 +67,9 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v3.3.1  (25 Sep 2019)
+	- Different name for openmp and non-openmp version of shtns library for KNL.
+
 * v3.3  (26 Aug 2019)
 	- Faster (especially for analysis or for small sizes).
 	- New Fortran 2003 interface (thanks to T. Gastine).
