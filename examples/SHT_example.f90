@@ -68,6 +68,7 @@ program SHT_example
    l = 1 
    m = 0
    lm = shtns_lmidx(shtns_c,l,m)
+   !-- Set the l=1, m=0 mode to 1.0
    Slm(lm)=(1.0_dp,0.0_dp)
 
    !-- Get (l,m) from lm
@@ -84,6 +85,7 @@ program SHT_example
    !-- Spat -> Spec
    call spat_to_SH(shtns_c, Sh, Slm)
 
+   !-- print S(1,0) to check it 1.0 is recovered.
    print*, 'S(1,0)', Slm(lm)
 
    !-- Legendre only for m=0

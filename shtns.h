@@ -288,10 +288,10 @@ void SHsphtor_to_spat_cplx(shtns_cfg, cplx *Slm, cplx *Tlm, cplx *Vt, cplx *Vp);
 /// \name 3D transforms (combine scalar and vector)
 //@{
 /// 3D vector transform from spherical coordinates to radial-spheroidal-toroidal spectral components (see \ref vsh_def).
-/// They should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
+/// They should be prefered over separate calls to scalar and 2D vector transforms as they can be significantly faster.
 void spat_to_SHqst(shtns_cfg, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm);
-/// 3D vector transform from spherical coordinates to radial-spheroidal-toroidal spectral components (see \ref vsh_def).
-/// They should be prefered over separate calls to scalar and 2D vector transforms as they are often significantly faster.
+/// 3D vector transform from radial-spheroidal-toroidal spectral components (see \ref vsh_def) to spherical coordinates.
+/// They should be prefered over separate calls to scalar and 2D vector transforms as they can be significantly faster.
 void SHqst_to_spat(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp);
 
 void spat_cplx_to_SHqst(shtns_cfg, cplx *Vr, cplx *Vt, cplx *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm);

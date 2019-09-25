@@ -1813,8 +1813,8 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
  * \param shtns is the config created by shtns_create for which the grid will be set.
  * \param flags allows to choose the type of transform (see \ref shtns_type) and the spatial data layout (see \ref spat)
  * \param eps polar optimization threshold : polar values of Legendre Polynomials below that threshold are neglected (for high m), leading to increased performance (a few percents)
- * \param nlat,nphi respectively the number of latitudinal and longitudinal grid points.
  *  0 = no polar optimization;  1.e-14 = VERY safe;  1.e-10 = safe;  1.e-6 = aggresive, but still good accuracy.
+ * \param nlat,nphi respectively the number of latitudinal and longitudinal grid points.
 */
 int shtns_set_grid(shtns_cfg shtns, enum shtns_type flags, double eps, int nlat, int nphi)
 {
