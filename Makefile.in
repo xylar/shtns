@@ -18,7 +18,7 @@ shtcc = $(CC) $(go) @shtcc_flags@
 cc = $(CC) $(go) -O2
 fc = @FC@ $(go) -O2
 
-hfiles = sht_private.h sht_config.h shtns.h
+hfiles = sht_private.h sht_config.h shtns.h shtns_simd.h
 objs = sht_init.o sht_kernels_a.o @objs@
 libname = @libname@
 
