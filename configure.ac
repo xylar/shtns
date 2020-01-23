@@ -96,6 +96,11 @@ AC_EGREP_CPP(icc,
    #endif
   ], [shtcc_flags="-O2"], [shtcc_flags="-O3"])
 
+# the following prevents gcc from inserting memset in tight loops for zeroing stuff. Must appear after -O3
+AX_CHECK_COMPILE_FLAG([-fno-tree-loop-distribute-patterns],[shtcc_flags="$shtcc_flags -fno-tree-loop-distribute-patterns"])
+# avoid insering VZEROUPPER instructions everywhere.
+AX_CHECK_COMPILE_FLAG([-mno-vzeroupper],[shtcc_flags="$shtcc_flags -mno-vzeroupper"])
+
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h])
 
@@ -134,6 +139,9 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 	],[
 		target="libshtns_omp.a"
 	])
+],[
+	# without openmp, we still want vectorization of some decorated loops, if possible.
+	AX_CHECK_COMPILE_FLAG([-fopenmp-simd],[CFLAGS="$CFLAGS -fopenmp-simd"])
 ])
 
 # Check for CUDA

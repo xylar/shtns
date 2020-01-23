@@ -220,31 +220,29 @@ Q		SH_to_ishioka(xlm, Ql+m, llim-m, QQl+m);
 V		SH2_to_ishioka(xlm, VWl+2*m, llim-m+1);
 	#endif
 
-		k=0;	l=shtns->tm[im];
-		l>>=1;		// stay on a 16 byte boundary
-		while (k<l) {	// polar optimization
-	#ifndef SHTNS4MAGIC
-Q			BrF[k] = vdup(0.0);				BrF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
-Q			BrF[NLAT_2-l+k] = vdup(0.0);	BrF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
-V			BtF[k] = vdup(0.0);				BtF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
-V			BtF[NLAT_2-l+k] = vdup(0.0);	BtF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
-V			BpF[k] = vdup(0.0);				BpF[(NPHI-2*im)*NLAT_2 + k] = vdup(0.0);
-V			BpF[NLAT_2-l+k] = vdup(0.0);	BpF[(NPHI+1-2*im)*NLAT_2 -l+k] = vdup(0.0);
-	#else
-Q			BrF[2*k] = vdup(0.0);			BrF[(NPHI-2*im)*NLAT_2 + 2*k] = vdup(0.0);
-Q			BrF[2*k+1] = vdup(0.0);			BrF[(NPHI-2*im)*NLAT_2 +2*k+1] = vdup(0.0);
-V			BtF[2*k] = vdup(0.0);			BtF[(NPHI-2*im)*NLAT_2 + 2*k] = vdup(0.0);
-V			BtF[2*k+1] = vdup(0.0);			BtF[(NPHI-2*im)*NLAT_2 +2*k+1] = vdup(0.0);
-V			BpF[2*k] = vdup(0.0);			BpF[(NPHI-2*im)*NLAT_2 + 2*k] = vdup(0.0);
-V			BpF[2*k+1] = vdup(0.0);			BpF[(NPHI-2*im)*NLAT_2 +2*k+1] = vdup(0.0);
-	#endif
-			++k;
-		}
-		#ifdef _GCC_VEC_
-		k = ((unsigned) k) / (VSIZE2/2);
+		// polar optimization
+		k = shtns->tm[im];		// start index in theta (=0 if no polar optimization)
+		#if _GCC_VEC_
+		k = ((unsigned) k) / VSIZE2;	// in vector size units.
 		#else
-		k *= 2;
+		k = (k>>1)*2;		// k must be even.
 		#endif
+			const long ofsm = (NPHI-2*im)*NLAT_2;
+		#ifndef SHTNS4MAGIC
+			#if _GCC_VEC_
+			const long ofs1 = NLAT_2 - k*(VSIZE2/2);
+			#else
+			const long ofs1 = NLAT_2 - k/2;
+			#endif
+Q			zero_poles4_vect(BrF, ofsm, ofs1, k);
+V			zero_poles4_vect(BtF, ofsm, ofs1, k);
+V			zero_poles4_vect(BpF, ofsm, ofs1, k);
+		#else
+Q			zero_poles2_vect(BrF, ofsm, 2*k);
+V			zero_poles2_vect(BtF, ofsm, 2*k);
+V			zero_poles2_vect(BpF, ofsm, 2*k);
+		#endif
+
 		do {
 			al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
@@ -413,6 +411,7 @@ V				S2D_CSTORE_4MAGIC((double*) BpF, (double*) (BpF + (NPHI-2*im)*NLAT_2), k+j,
 		#endif
 			k+=NWAY;
 		} while (k < nk);
+
 Q		BrF += NLAT_2;
 V		BtF += NLAT_2;	BpF += NLAT_2;
 	}
@@ -620,21 +619,18 @@ V			VWl[2*llim+2] = vs;
 V			VWl[2*llim+3] = wt;
 V		}
 
-		k=0;	l=shtns->tm[im];
-		while (k<l) {	// polar optimization
-		  #ifndef SHTNS4MAGIC
-Q			BrF[k] = vdup(0.0);		BrF[NLAT-l+k] = vdup(0.0);
-V			BtF[k] = vdup(0.0);		BtF[NLAT-l+k] = vdup(0.0);
-V			BpF[k] = vdup(0.0);		BpF[NLAT-l+k] = vdup(0.0);
-		  #else
-Q			BrF[2*k] = vdup(0.0);		BrF[2*k+1] = vdup(0.0);
-V			BtF[2*k] = vdup(0.0);		BtF[2*k+1] = vdup(0.0);
-V			BpF[2*k] = vdup(0.0);		BpF[2*k+1] = vdup(0.0);
-		  #endif
-			++k;
-		}
+		l = shtns->tm[im];
+		l = ((unsigned) l) / VSIZE2;
+		#ifndef SHTNS4MAGIC
+Q		 	zero_poles2_vect(BrF, NLAT-l, 2*l);
+V		 	zero_poles4_vect(BtF, NLAT-l, BpF-BtF, 2*l);
+		#else
+			#pragma omp simd
+Q			for (k=0; k<l*4*VSIZE2; k++)	((double*)BrF)[k] = 0.0;
+V			zero_poles2_vect(BtF, BpF-BtF, 4*l);
+		#endif
 
-		k = ((unsigned) l) / VSIZE2;
+		k = l;
 		do {
 			al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];

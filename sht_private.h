@@ -938,6 +938,24 @@ static void SHtor_to_2scal(const double *mx, int llim, int m, cplx* Tl, cplx* VW
   #endif
 }
 
+static void zero_poles4_vect(v2d* F0, long ofsm, long ofs1, long n) {
+	#pragma omp simd
+	for (long i=0; i<n*VSIZE2; i++) {
+		((double*)F0)[i] = 0.0;
+		((double*)(F0+ofs1))[i] = 0.0;
+		((double*)(F0+ofsm))[i] = 0.0;
+		((double*)(F0+ofsm+ofs1))[i] = 0.0;
+	}
+}
+
+static void zero_poles2_vect(v2d* F0, long ofsm, long n) {
+	#pragma omp simd
+	for (long i=0; i<n*VSIZE2; i++) {
+		((double*)F0)[i] = 0.0;
+		((double*)(F0+ofsm))[i] = 0.0;
+	}
+}
+
 /*
 // Fm = F + im*m_inc
 // Fm2 = F + (NPHI-im)*m_inc
