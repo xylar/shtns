@@ -399,11 +399,17 @@
 		typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 2 doubles.
 		// Allocate memory aligned on 16 bytes for SSE2 (fftw_malloc works only if fftw was compiled with --enable-sse2)
 		// in 64 bit systems, malloc should be 16 bytes aligned anyway.
+		#define vall(x) ((rnd) _mm_set1_pd(x))
+		#define vread(mem, idx) ((s2d*)(mem))[idx]
+		#define vstor(mem, idx, v) ((s2d*)(mem))[idx] = v
 		#ifdef __SSE3__
 			#include <pmmintrin.h>
 			#define _SIMD_NAME_ "sse3"
 			inline static v2d v2d_reduce(v2d a, v2d b) {
 				return _mm_hadd_pd(a,b);
+			}
+			inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
+				return _mm_addsub_pd(vall(0.0), v);
 			}
 		#else
 			#include <emmintrin.h>
@@ -412,22 +418,20 @@
 				v2d c = _mm_unpacklo_pd(a, b);		b = _mm_unpackhi_pd(a, b);
 				return b + c;
 			}
+			inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
+				rnd nv = vall(0.0) - v;
+				return _mm_shuffle_pd(nv, v, 2);
+			}
 		#endif
 		inline static rnd vreverse(rnd a) {	return (rnd)_mm_shuffle_pd(a,a,1);	}
 		#define vdup_even(v) ((rnd)_mm_unpacklo_pd(v,v))
 		#define vdup_odd(v)  ((rnd)_mm_unpackhi_pd(v,v))
 		#define vxchg_even_odd(v) ((rnd)_mm_shuffle_pd(v,v,0x1))
-		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
-			return _mm_addsub_pd(vall(0.0), v);
-		}
 		inline static rnd vneg_even_inloop(rnd v) {		// this needs to load a constant and may cause a cache miss, except in a loop where the constant is kept in register.
 			static const unsigned long long neg0[2] = {0x8000000000000000ULL, 0};
-			return _mm_xor_pd(v, (v2d*)neg0);
+			return _mm_xor_pd(v, *(v2d*)neg0);
 		}
 		#define reduce_add(a) ( _mm_cvtsd_f64(a) + _mm_cvtsd_f64(_mm_unpackhi_pd(a,a)) )
-		#define vall(x) ((rnd) _mm_set1_pd(x))
-		#define vread(mem, idx) ((s2d*)(mem))[idx]
-		#define vstor(mem, idx, v) ((s2d*)(mem))[idx] = v
 		#define S2D_STORE(mem, idx, ev, od)		((s2d*)mem)[idx] = ev+od;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(ev-od);
 
 		void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd er, rnd od, rnd ei, rnd oi) {
