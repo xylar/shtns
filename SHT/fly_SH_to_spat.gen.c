@@ -591,7 +591,7 @@ T		Tlm -= m;
 
 V		{	// convert from vector SH to scalar SH
 V			double* mx = shtns->mx_stdt + l-m;
-V			s2d em = vdup(ms);
+V			double em = ms;
 S			v2d sl = ((v2d*)Slm)[m];
 T			v2d tl = ((v2d*)Tlm)[m];
 V			v2d vs = vdup( 0.0 );
@@ -599,8 +599,8 @@ V			v2d wt = vdup( 0.0 );
 V			for (int l=m; l<=llim; l++) {
 V				s2d mxu = vdup( mx[2*l] );
 V				s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
-T				vs = addi( vs ,  em*tl );
-S				wt = addi( wt ,  em*sl );
+T				vs += IxKxZ(em, tl);	// vs = addi( vs ,  em*tl );
+S				wt += IxKxZ(em, sl);	// wt = addi( wt ,  em*sl );
 S				v2d vs1 = mxl*sl;			// vs for next iter
 T				v2d wt1 = -mxl*tl;			// wt for next iter
 V				if (l<llim) {

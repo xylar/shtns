@@ -72,7 +72,7 @@
 		v2d c = vec_mergel(a, b);		b = vec_mergeh(a, b);
 		return b + c;
 	}
-	inline static v2d addi(v2d a, v2d b) {
+/*	inline static v2d addi(v2d a, v2d b) {
 		const s2d mp = {-1.0, 1.0};
 		return a + vxchg(b)*mp;
 	}
@@ -80,7 +80,7 @@
 		const s2d mp = {-1.0, 1.0};
 		return a + b*mp;
 	}
-
+*/
 	#define vdup(x) vec_splats((double)x)
 	#define vlo(a) vec_extract(a, 0)
 	#define vhi(a) vec_extract(a, 1)
@@ -89,6 +89,10 @@
 	inline static s2d vec_mix_lohi(s2d a, s2d b) {	// same as _mm_shuffle_pd(a,b,2)
 		const vector unsigned char perm = {0,1,2,3,4,5,6,7, 24,25,26,27,28,29,30,31};
 		return vec_perm(a,b,perm);
+	}
+	inline static v2d IxKxZ(double k, v2d z) {		// I*k*z,  allowing to use FMA.
+		const s2d vk = {-k, k};
+		return vk*vxchg(z);
 	}
 
 		#define S2D_STORE(mem, idx, ev, od)		((s2d*)(mem))[idx] = ev+od;		((s2d*)(mem))[NLAT_2-1 - (idx)] = vxchg(ev-od);
@@ -131,28 +135,24 @@
 	#define VSIZE 2
 	typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
 	typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
+	#define vxchg(a) ((v2d)_mm_shuffle_pd(a,a,1))					// swap the two elements of a vector of 2 doubles.
 	#ifdef __AVX__
 		#include <immintrin.h>
 		typedef double v4d __attribute__ ((vector_size (8*4)));		// vector that contains 2 complex numbers
 		#define vall4(x) ((v4d) _mm256_set1_pd(x))
 		#define vread4(mem, idx) ((v4d)_mm256_loadu_pd( ((double*)(mem)) + (idx)*4 ))
 		#define vstor4(mem, idx, v) _mm256_storeu_pd( ((double*)(mem)) + (idx)*4 , v)
-		#define vxchg(a) ((v2d)_mm_permute_pd(a,1))
 		inline static v4d v2d_x2_to_v4d(v2d a, v2d b) {
 			return (v4d) _mm256_insertf128_pd( _mm256_castpd128_pd256( a ), b, 1);
 		}
-		#ifdef __AVX2__
-			inline static v4d vreverse4(v4d a) {		// reverse vector: [0,1,2,3] => [3,2,1,0]
-				return (v4d) _mm256_permute4x64_pd(a, 0x1B);
-			}
-		#else
-			inline static v4d vreverse4(v4d a) {		// reverse vector: [0,1,2,3] => [3,2,1,0]
-				a = (v4d)_mm256_shuffle_pd(a, a, 5);		// [0,1,2,3] => [1,0,3,2]
-				return (v4d)_mm256_permute2f128_pd(a,a, 1);	// => [3,2,1,0]
-			}
-		#endif
-	#else
-		#define vxchg(a) ((v2d)_mm_shuffle_pd(a,a,1))
+		inline static v4d vreverse4(v4d a) {		// reverse vector: [0,1,2,3] => [3,2,1,0]
+			#ifdef __AVX2__
+			return (v4d) _mm256_permute4x64_pd(a, 0x1B);
+			#else
+			a = (v4d)_mm256_shuffle_pd(a, a, 5);		// [0,1,2,3] => [1,0,3,2]
+			return (v4d)_mm256_permute2f128_pd(a,a, 1);	// => [3,2,1,0]
+			#endif
+		}
 	#endif
 	#ifdef __AVX512F__
 		#define MIN_ALIGNMENT 64
@@ -426,7 +426,7 @@
 		inline static rnd vreverse(rnd a) {	return (rnd)_mm_shuffle_pd(a,a,1);	}
 		#define vdup_even(v) ((rnd)_mm_unpacklo_pd(v,v))
 		#define vdup_odd(v)  ((rnd)_mm_unpackhi_pd(v,v))
-		#define vxchg_even_odd(v) ((rnd)_mm_shuffle_pd(v,v,0x1))
+		#define vxchg_even_odd(v) vxchg(v)
 		inline static rnd vneg_even_inloop(rnd v) {		// this needs to load a constant and may cause a cache miss, except in a loop where the constant is kept in register.
 			static const unsigned long long neg0[2] = {0x8000000000000000ULL, 0};
 			return _mm_xor_pd(v, *(v2d*)neg0);
@@ -486,12 +486,15 @@
 	#endif
 	#ifdef __SSE3__
 		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd((b),(b),1))		// a + I*b
-		#define subadd(a,b) _mm_addsub_pd(a, b)		// [al-bl, ah+bh]
+		//#define subadd(a,b) _mm_addsub_pd(a, b)		// [al-bl, ah+bh]
 		//#define CMUL(a,b) _mm_addsub_pd(_mm_shuffle_pd(a,a,0)*b, _mm_shuffle_pd(a,a,3)*_mm_shuffle_pd(b,b,1))
 	#else
 		#define addi(a,b) ( (a) + (_mm_shuffle_pd((b),(b),1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
-		#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
+		//#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
 	#endif
+	inline static v2d IxKxZ(double k, v2d z) {		// I*k*z,  allowing to use FMA.
+		return (v2d) _mm_setr_pd(-k,k) * vxchg(z);
+	}
 
 	// build mask (-0, -0) to change sign of both hi and lo values using xorpd
 	#define SIGN_MASK_2  _mm_castsi128_pd(_mm_slli_epi64(_mm_set1_epi64x(0), _mm_set1_epi64x(0)), 63))
@@ -549,18 +552,21 @@
 	#define vall(x) (x)
 	#define vdup(x) (x)
 	#define vxchg(x) (x)
-	#define addi(a,b) ((a) + I*(b))
+	//#define addi(a,b) ((a) + I*(b))
 	#define vlo_to_dbl(a) (a)
 	#define vhi_to_dbl(a) (a)
 	#define vcplx_real(a) creal(a)
 	#define vcplx_imag(a) cimag(a)
+	inline static v2d IxKxZ(double k, v2d z) {		// I*k*z
+		return I*k*z;
+	}
 
 	#define S2D_STORE(mem, idx, ev, od)		((double*)mem)[idx] = ev+od;		((double*)mem)[NLAT-1 - (idx)] = ev-od;
 	#define S2D_CSTORE(mem, idx, er, od, ei, oi)	mem[idx] = (er+od) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-od) + I*(ei-oi);
 	#define S2D_CSTORE2(mem, idx, er, od, ei, oi)	mem[idx] = (er+od) + I*(ei+oi); 	mem[NLAT-1-(idx)] = (er-od) + I*(ei-oi);
 	void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, double er, double od, double ei, double oi) {
-		((cplx*)mem)[idx] = (er+od) + I*(ei+oi);
-		((cplx*)mem)[nlat-1-idx] = (er-od) + I*(ei-oi);
+		((v2d*)mem)[idx] = (er+od) + I*(ei+oi);
+		((v2d*)mem)[nlat-1-idx] = (er-od) + I*(ei-oi);
 	}
 
 	#define S2D_CSTOREX(mem, idx, v, er, od, ei, oi) { \
@@ -568,17 +574,17 @@
 		double b0 = (er[(v)]  +od[(v)])   - (ei[(v)+1]+oi[(v)+1]); \
 		double a1 = (er[(v)+1]+od[(v)+1]) + (ei[(v)]  +oi[(v)]); \
 		double b1 = (er[(v)+1]+od[(v)+1]) - (ei[(v)]  +oi[(v)]); \
-		((cplx*)mem)[(idx)] = b0 + I*a1; \
-		((cplx*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = a0 + I*b1; \
+		((v2d*)mem)[(idx)] = b0 + I*a1; \
+		((v2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = a0 + I*b1; \
 		a1 = (er[(v)]  -od[(v)])   + (ei[(v)+1]-oi[(v)+1]); \
 		b1 = (er[(v)]  -od[(v)])   - (ei[(v)+1]-oi[(v)+1]); \
 		a0 = (er[(v)+1]-od[(v)+1]) + (ei[(v)]  -oi[(v)]); \
 		b0 = (er[(v)+1]-od[(v)+1]) - (ei[(v)]  -oi[(v)]); \
-		((cplx*)mem)[NLAT_2-1 -(idx)] = b0 + I*a1; \
-		((cplx*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = a0 + I*b1; }
+		((v2d*)mem)[NLAT_2-1 -(idx)] = b0 + I*a1; \
+		((v2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = a0 + I*b1; }
 
 	inline static void S2D_STORE_4MAGIC(double* mem, long idx, double ev, double od) {
-		((cplx*)mem)[idx] = (ev+od) + I*(ev-od);
+		((v2d*)mem)[idx] = (ev+od) + I*(ev-od);
 	}
 
 	inline static void S2D_CSTORE_4MAGIC(double* mem, double* mem_m, long idx, double er, double od, double ei, double oi) {
@@ -586,13 +592,13 @@
 		double sr = er - od;		double si = ei - oi;
 		er = nr - si;		od = sr+ni;
 		ei = nr + si;		oi = sr-ni;		
-		((cplx*)mem)[idx]   = er + I*od;
-		((cplx*)mem_m)[idx] = ei + I*oi;
+		((v2d*)mem)[idx]   = er + I*od;
+		((v2d*)mem_m)[idx] = ei + I*oi;
 	}
 
 	inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, double er, double od, double ei, double oi) {
-		((cplx*)mem)[2*idx]   = (er+od) + I*(ei+oi);
-		((cplx*)mem)[2*idx+1] = (er-od) + I*(ei-oi);
+		((v2d*)mem)[2*idx]   = (er+od) + I*(ei+oi);
+		((v2d*)mem)[2*idx+1] = (er-od) + I*(ei-oi);
 	}
 #endif
 

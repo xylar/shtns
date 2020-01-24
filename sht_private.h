@@ -420,7 +420,7 @@ static void SH_2scal_to_vect_reduce(const double *mx, const double* l_2, int lli
 	// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
 	// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
 	// double* mx = shtns->mx_van + 2*LM(shtns,m,m);	//(im*(2*(LMAX+1)-(m+MRES))) + 2*m;
-	s2d em = vdup(m);
+	double em = m;
 	m = abs(m);
 	v2d vl = v2d_reduce(vw[0], vw[1]);
 	v2d wl = v2d_reduce(vw[2], vw[3]);
@@ -429,8 +429,8 @@ static void SH_2scal_to_vect_reduce(const double *mx, const double* l_2, int lli
 	for (int l=0; l<=llim-m; l++) {
 		s2d mxu = vdup( mx[2*l] );
 		s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
-		v2d sl = addi( sl1 ,  em*wl );
-		v2d tl = addi( tl1 ,  em*vl );
+		v2d sl = sl1 + IxKxZ(em, wl);		// sl1 + I*em*wl
+		v2d tl = tl1 + IxKxZ(em, vl);		// tl1 + I*em*vl
 		sl1 =  mxl*vl;			// vs for next iter
 		tl1 = -mxl*wl;			// wt for next iter
 		vl = v2d_reduce(vw[4*l+4], vw[4*l+5]);		// kept for next iteration
@@ -447,7 +447,7 @@ static void SH_2scal_to_vect(const double *mx, const double* l_2, int llim, int 
 	// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
 	// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
 #if !defined( _GCC_VEC_) || !defined( __AVX__ )
-	s2d em = vdup(m);
+	double em = m;
 	m = abs(m);
 	v2d vl = vw[0];
 	v2d wl = vw[1];
@@ -456,8 +456,8 @@ static void SH_2scal_to_vect(const double *mx, const double* l_2, int llim, int 
 	for (int l=0; l<=llim-m; l++) {
 		s2d mxu = vdup( mx[2*l] );
 		s2d mxl = vdup( mx[2*l+1] );		// mxl for next iteration
-		v2d sl = addi( sl1 ,  em*wl );
-		v2d tl = addi( tl1 , -em*vl );
+		v2d sl = sl1 + IxKxZ(em, wl);	// sl1 + I*em*wl;
+		v2d tl = tl1 - IxKxZ(em, vl);	// sl1 - I*em*vl;
 		sl1 =  mxl*vl;			// vs for next iter
 		tl1 =  mxl*wl;			// wt for next iter
 		vl = vw[2*l+2];		// kept for next iteration
@@ -644,40 +644,8 @@ static void SH2_to_ishioka(const double* xlm, v2d* VWl, const int llim_m)
 /// m = signed m (for complex SH transform).
 static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* Tl, cplx* VWl)
 {
-  #ifndef _GCC_VEC_
+  #if !defined(_GCC_VEC_) || !defined( __AVX__ )
 	double em = m;
-	cplx sl = Sl[m];
-	cplx tl = Tl[m];
-	cplx vs = 0.0;
-	cplx wt = 0.0;
-	int l;
-	for (l=m; l<llim; l++) {
-		double mxu = mx[2*l];
-		double mxl = mx[2*l+1];		// mxl for next iteration
-		vs = vs + I*em*tl;
-		wt = wt + I*em*sl;
-		cplx vs1 = mxl*sl;			// vs for next iter
-		cplx wt1 = -mxl*tl;			// wt for next iter
-		sl = Sl[l+1];		// kept for next iteration
-		tl = Tl[l+1];
-		vs += mxu*sl;
-		wt -= mxu*tl;
-		VWl[2*l]   = vs;
-		VWl[2*l+1] = wt;
-		vs = vs1;
-		wt = wt1;
-	}
-	if (l==llim) {
-		double mxl = mx[2*l+1];		// mxl for next iteration
-		VWl[2*l]   = vs + I*em*tl;
-		VWl[2*l+1] = wt + I*em*sl;
-		VWl[2*llim+2] = mxl*sl;
-		VWl[2*llim+3] = -mxl*tl;
-	}
-  #else
-	#ifndef __AVX__
-	v2d em = (v2d) _mm_setr_pd(-m, m);
-//	v2d em = vneg_even_precalc(vall(m));
 	v2d sl = ((v2d*)Sl)[m];
 	v2d tl = ((v2d*)Tl)[m];
 	v2d vs = vdup(0.0);
@@ -686,8 +654,8 @@ static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* 
 	for (l=m; l<llim; l++) {
 		s2d mxu = vdup(mx[2*l]);
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
-		vs += em * vxchg(tl);
-		wt += em * vxchg(sl);
+		vs += IxKxZ(em, tl);		// vs += I*em*tl;
+		wt += IxKxZ(em, sl);		// wt += I*em*sl;
 		v2d vs1 =  mxl*sl;			// vs for next iter
 		v2d wt1 = -mxl*tl;			// wt for next iter
 		sl = ((v2d*)Sl)[l+1];		// kept for next iteration
@@ -701,12 +669,12 @@ static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* 
 	}
 	if (l==llim) {
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
-		((v2d*)VWl)[2*l]   = vs + em * vxchg(tl);
-		((v2d*)VWl)[2*l+1] = wt + em * vxchg(sl);
+		((v2d*)VWl)[2*l]   = vs + IxKxZ(em, tl);	// vs + I*em*tl;
+		((v2d*)VWl)[2*l+1] = wt + IxKxZ(em, sl);	// wt + I*em*sl;
 		((v2d*)VWl)[2*llim+2] =  mxl*sl;
 		((v2d*)VWl)[2*llim+3] = -mxl*tl;
 	}
-	#else
+  #else
 	v4d em = (v4d) _mm256_setr_pd(-m,m, m,-m);
 	v4d stl = v2d_x2_to_v4d( -((v2d*)Sl)[m], ((v2d*)Tl)[m]);
 	v4d mxl = vall4(0.0);
@@ -727,7 +695,6 @@ static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* 
 		vstor4(VWl +2*l, 0, vswt);
 		vstor4(VWl + 2*l+2, 0, -mxl*stl);
 	}
-	#endif
   #endif
 }
 
