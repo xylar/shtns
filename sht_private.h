@@ -471,19 +471,18 @@ static void SH_2scal_to_vect(const double *mx, const double* l_2, int llim, int 
 	v4d em = _mm256_setr_pd(-m,m, m,-m);
 	m = abs(m);
 	v4d vwl = vread4(vw, 0);
-	v4d vwll = vall4(0.0);
-	v4d mxl = vall4( 0.0 );
+	v4d stl = em * vreverse4(vwl);
 	for (int l=0; l<=llim-m; l++) {
 			// SH_vect_to_2scal :: 2 full permutes, 1 mul, 2 fma, 2 128bit-loads, 2 64-bit broadcasts, 1 256-bit store
 			// here :: 1 full permutes, 2 mul, 2 fma, 2 128bit-stores, 3 64-bit broadcasts, 1 256-bit load
 		v4d vwu = vread4(vw+2*l+2, 0);		// kept for next iteration
 		v4d mxu = vall4( mx[2*l] );
-		v4d stl = em * vreverse4(vwl) + mxl * vwll + mxu * vwu;
+		stl += mxu * vwu;
 		stl *= vall4(l_2[l+m]);
 		Sl[l] = - (v2d) _mm256_castpd256_pd128(stl);
 		Tl[l] = _mm256_extractf128_pd(stl, 1);
-		mxl = vall4( mx[2*l+1] );		// mxl for next iteration
-		vwll = vwl;		vwl = vwu;
+		stl = em * vreverse4(vwu) + vwl * vall4( mx[2*l+1] );
+		vwl = vwu;
 	}
   #endif
 }
@@ -648,50 +647,45 @@ static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* 
 	double em = m;
 	v2d sl = ((v2d*)Sl)[m];
 	v2d tl = ((v2d*)Tl)[m];
-	v2d vs = vdup(0.0);
-	v2d wt = vdup(0.0);
+	v2d vs = IxKxZ(em, tl);
+	v2d wt = IxKxZ(em, sl);
 	long l;
 	for (l=m; l<llim; l++) {
+		v2d sl1 = ((v2d*)Sl)[l+1];		// kept for next iteration
+		v2d tl1 = ((v2d*)Tl)[l+1];
 		s2d mxu = vdup(mx[2*l]);
-		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
-		vs += IxKxZ(em, tl);		// vs += I*em*tl;
-		wt += IxKxZ(em, sl);		// wt += I*em*sl;
-		v2d vs1 =  mxl*sl;			// vs for next iter
-		v2d wt1 = -mxl*tl;			// wt for next iter
-		sl = ((v2d*)Sl)[l+1];		// kept for next iteration
-		tl = ((v2d*)Tl)[l+1];
-		vs += mxu*sl;
-		wt -= mxu*tl;
-		((v2d*)VWl)[2*l]   = vs;
-		((v2d*)VWl)[2*l+1] = wt;
-		vs = vs1;
-		wt = wt1;
+		s2d mxl = vdup(mx[2*l+1]);	// mxl for next iteration
+		((v2d*)VWl)[2*l]   = vs + mxu*sl1;
+		((v2d*)VWl)[2*l+1] = wt - mxu*tl1;
+		vs = IxKxZ(em, tl1) + mxl*sl;		// vs += I*em*tl;
+		wt = IxKxZ(em, sl1) - mxl*tl;		// wt += I*em*sl;
+		sl = sl1;
+		tl = tl1;
 	}
 	if (l==llim) {
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
-		((v2d*)VWl)[2*l]   = vs + IxKxZ(em, tl);	// vs + I*em*tl;
-		((v2d*)VWl)[2*l+1] = wt + IxKxZ(em, sl);	// wt + I*em*sl;
+		((v2d*)VWl)[2*l]   = vs;
+		((v2d*)VWl)[2*l+1] = wt;
 		((v2d*)VWl)[2*llim+2] =  mxl*sl;
 		((v2d*)VWl)[2*llim+3] = -mxl*tl;
 	}
   #else
 	v4d em = (v4d) _mm256_setr_pd(-m,m, m,-m);
 	v4d stl = v2d_x2_to_v4d( -((v2d*)Sl)[m], ((v2d*)Tl)[m]);
-	v4d mxl = vall4(0.0);
-	v4d stll = vall4(0.0);
+	v4d vswt = em*vreverse4(stl);
 	long l;
 	for (l=m; l<llim; l++) {
 		// 2 full permutes, 1 mul, 2 fma, 2 128bit-loads, 2 64-bit broadcasts, 1 256-bit store
 		v4d stlu = v2d_x2_to_v4d( -((v2d*)Sl)[l+1], ((v2d*)Tl)[l+1]);
 		v4d mxu = vall4(mx[2*l]);
-		v4d vswt = em*vreverse4(stl) - mxl*stll - mxu*stlu;
+		v4d mxl = vall4(mx[2*l+1]);		// mxl for next iteration
+		vswt -= mxu*stlu;
 		vstor4(VWl +2*l, 0, vswt);
-		mxl = vall4(mx[2*l+1]);		// mxl for next iteration
-		stll = stl;		stl = stlu;			// kept for next iter
+		vswt = em*vreverse4(stlu) - mxl*stl;
+		stl = stlu;			// kept for next iter
 	}
 	if (l==llim) {
-		v4d vswt = em*vreverse4(stl) - mxl*stll;
-		mxl = vall4(mx[2*l+1]);		// mxl for next iteration
+		v4d mxl = vall4(mx[2*l+1]);		// mxl for next iteration
 		vstor4(VWl +2*l, 0, vswt);
 		vstor4(VWl + 2*l+2, 0, -mxl*stl);
 	}
@@ -794,115 +788,54 @@ static void SH_vect_to_2scal_new(const double *mx, int llim, int m, const cplx* 
 
 static void SHsph_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* VWl)
 {
-  #ifndef _GCC_VEC_
 	double em = m;
-	cplx sl = Sl[m];
-	cplx vs = 0.0;
-	int l;
-	for (l=m; l<llim; l++) {
-		cplx sl1 = Sl[l+1];
-		double mxu = mx[2*l];
-		double mxl = mx[2*l+1];		// mxl for next iteration
-		VWl[2*l]   = vs + mxu*sl1;
-		VWl[2*l+1] = I*em*sl;
-		vs = mxl*sl;			// vs for next iter
-		sl = sl1;
-	}
-	if (l==llim) {
-		double mxl = mx[2*l+1];		// mxl for next iteration
-		VWl[2*l]   = vs;
-		VWl[2*l+1] = I*em*sl;
-		VWl[2*llim+2] = mxl*sl;
-		VWl[2*llim+3] = 0.0;
-	}
-  #else
-/*	#if VSIZE2 >= 4
-	for (; l<=llim-VSIZE2/2; l+=VSIZE2/2) {		// general case 		V[2*l] = mx[2*l-1]*S[l-1]
-		// 3 in-lane permutes, 2 full permutes, 2 mul, 1 fma, 4 256bit-loads, 2 256bit stores
-		rnd mxx = vread(mx+2*l-1, 0);
-		rnd mxl = vdup_even(mxx);
-		rnd mxu = vdup_odd(mxx);
-		rnd s = mxl * vread(Sl+l-1, 0) + mxu * vread(Sl+l+1, 0);
-		rnd t = emx * vxchg_even_odd( vread(Sl+l,0) );
-		#ifdef __AVX512F__
-			vstor(VWl+2*l, 0, _mm512_permutex2var_pd(s,_mm512_setr_epi64(0,1,8,9,2,3,10,11), t) );
-			vstor(VWl+2*l, 1, _mm512_permutex2var_pd(s,_mm512_setr_epi64(4,5,12,13,6,7,14,15), t) );
-		#elif defined( __AVX__ )
-			vstor(VWl+2*l, 0, _mm256_permute2f128_pd(s,t, 0x20) );
-			vstor(VWl+2*l, 1, _mm256_permute2f128_pd(s,t, 0x31) );
-		#else
-			#error "unsupported simd vectors"
-		#endif
-	}
-	#endif	*/
-	v2d em = (v2d) _mm_setr_pd(-m, m);
 	v2d sl = ((v2d*)Sl)[m];
 	v2d vs = vdup(0.0);
+	v2d wt = IxKxZ(em, sl);
 	long l;
 	for (l=m; l<llim; l++) {
 		v2d sl1 = ((v2d*)Sl)[l+1];
 		s2d mxu = vdup(mx[2*l]);
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
 		((v2d*)VWl)[2*l]   = vs + mxu*sl1;
-		((v2d*)VWl)[2*l+1] = em * vxchg(sl);
+		((v2d*)VWl)[2*l+1] = wt;	// IxKxZ(em, sl);
 		vs = mxl*sl;			// vs for next iter
+		wt = IxKxZ(em, sl1);
 		sl = sl1;		// kept for next iteration
 	}
 	if (l==llim) {
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
 		((v2d*)VWl)[2*l]   = vs;
-		((v2d*)VWl)[2*l+1] = em * vxchg(sl);
-		((v2d*)VWl)[2*llim+2] =  mxl*sl;
-		((v2d*)VWl)[2*llim+3] = vdup(0.0);
+		((v2d*)VWl)[2*l+1] = wt;
+		((v2d*)VWl)[2*l+2] = mxl*sl;
+		((v2d*)VWl)[2*l+3] = vdup(0.0);
 	}
-  #endif
 }
 
 static void SHtor_to_2scal(const double *mx, int llim, int m, cplx* Tl, cplx* VWl)
 {
-  #ifndef _GCC_VEC_
-	double em = m;
-	cplx tl = Tl[m];
-	cplx wt = 0.0;
-	int l;
-	for (l=m; l<llim; l++) {
-		cplx tl1 = Tl[l+1];
-		double mxu = mx[2*l];
-		double mxl = mx[2*l+1];		// mxl for next iteration
-		VWl[2*l]   = I*em*tl;
-		VWl[2*l+1] = wt - mxu*tl1;
-		wt = -mxl*tl;			// wt for next iter
-		tl = tl1;
-	}
-	if (l==llim) {
-		double mxl = mx[2*l+1];		// mxl for next iteration
-		VWl[2*l]   = I*em*tl;
-		VWl[2*l+1] = wt;
-		VWl[2*llim+2] = 0.0;
-		VWl[2*llim+3] = -mxl*tl;
-	}
-  #else
-	v2d em = (v2d) _mm_setr_pd(m, -m);
+	double em = -m;
 	v2d tl = - ((v2d*)Tl)[m];
+	v2d vs = IxKxZ(em, tl);
 	v2d wt = vdup(0.0);
 	long l;
 	for (l=m; l<llim; l++) {
 		v2d tl1 = - ((v2d*)Tl)[l+1];
 		s2d mxu = vdup(mx[2*l]);
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
-		((v2d*)VWl)[2*l]   = em * vxchg(tl);
+		((v2d*)VWl)[2*l]   = vs;
 		((v2d*)VWl)[2*l+1] = wt + mxu*tl1;
 		wt = mxl*tl;			// wt for next iter
+		vs = IxKxZ(em, tl1);
 		tl = tl1;
 	}
 	if (l==llim) {
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
-		((v2d*)VWl)[2*l]   = em * vxchg(tl);
+		((v2d*)VWl)[2*l]   = vs;
 		((v2d*)VWl)[2*l+1] = wt;
-		((v2d*)VWl)[2*llim+2] = vdup(0.0);
-		((v2d*)VWl)[2*llim+3] = mxl*tl;
+		((v2d*)VWl)[2*l+2] = vdup(0.0);
+		((v2d*)VWl)[2*l+3] = mxl*tl;
 	}
-  #endif
 }
 
 static void zero_poles4_vect(v2d* F0, long ofsm, long ofs1, long n) {
