@@ -676,8 +676,8 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 		for (long i=0; i<=(LMAX-m+1)/2; i++) {
 			real a = dlm[i] * a0m;		// multiply by coefficient of ymm
 			xlm[lm3 + 3*i]   = elm[2*i] * a;
-			xlm[lm3 + 3*i+1] = a;
-			xlm[lm3 + 3*i+2] = elm[2*i+1] * a;
+			xlm[lm3 + 3*i+1] = elm[2*i+1] * a;
+			xlm[lm3 + 3*i+2] = a;
 			//if (lm3 + 3*i+2 >= lm2) printf("error at m=%d, i=%d (%ld >= %ld)\n",m,i, lm3 + 3*i+2, lm2);
 		}
 		
@@ -689,12 +689,12 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 				real sq1 = SQRT(2*(l+1)+1);
 				real sq2 = SQRT(2*(l+2)+1);
 				ylm[lm3 + 3*i]   = xlm[lm3 + 3*i]   * sq;
-				ylm[lm3 + 3*i+1] = xlm[lm3 + 3*i+1] * sq1;
-				ylm[lm3 + 3*i+2] = xlm[lm3 + 3*i+2] * sq2;
+				ylm[lm3 + 3*i+1] = xlm[lm3 + 3*i+1] * sq2;
+				ylm[lm3 + 3*i+2] = xlm[lm3 + 3*i+2] * sq1;
 								
 				xlm[lm3 + 3*i]   /= sq;
-				xlm[lm3 + 3*i+1] /= sq1;
-				xlm[lm3 + 3*i+2] /= sq2;
+				xlm[lm3 + 3*i+1] /= sq2;
+				xlm[lm3 + 3*i+2] /= sq1;
 				sq = sq2;
 				l+=2;
 			}

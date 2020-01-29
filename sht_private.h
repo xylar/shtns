@@ -495,19 +495,33 @@ static void SH_2scal_to_vect(const double *mx, const double* l_2, int llim, int 
 /// can operate in-place (Ql = qq)
 static void ishioka_to_SH(const double* xlm, const v2d* qq, const int llim_m, v2d* Ql)
 {
-	int l=0;	int ll=0;
+	long l=0;	long ll=0;
+  #if !defined( _GCC_VEC_) || !defined( __AVX__ )
 	v2d u0 = vdup(0.0);
 	while (l<llim_m) {
 		v2d uu = qq[l];
 		Ql[l] = uu * vdup(xlm[ll]) + u0;
-		Ql[l+1] = qq[l+1] * vdup(xlm[ll+1]);
-		u0 = uu * vdup(xlm[ll+2]);
+		Ql[l+1] = qq[l+1] * vdup(xlm[ll+2]);
+		u0 = uu * vdup(xlm[ll+1]);
 		l+=2;	ll+=3;
 	}
 	if (l==llim_m) {
-		v2d uu = qq[l];
-		Ql[l] = uu * vdup(xlm[ll]) + u0;
+		Ql[l] = qq[l] * vdup(xlm[ll]) + u0;
 	}
+  #else
+	v4d z = vall4(0.0);
+//	#pragma GCC unroll 2
+	while (l<llim_m) {
+		v4d x = vread4(xlm+ll, 0);	x = vdup_even4(x);
+		v4d uu = vread4(qq+l, 0);	// [qq[l], qq[l+1]]
+		vstor4(Ql+l, 0, uu*x + z);
+		z = _mm256_castpd128_pd256( _mm256_castpd256_pd128(uu) * vdup(xlm[ll+1]) );		// upper part of z is zeroed.
+		l+=2;	ll+=3;
+	}
+	if (l==llim_m) {
+		Ql[l] = qq[l] * vdup(xlm[ll]) + _mm256_castpd256_pd128(z);
+	}
+  #endif
 }
 
 /*
@@ -521,7 +535,8 @@ qnew = q1*[a,a,c,c] + q0*[b,b,0,0]   [1x, 1fma, 2 shuffles] => not worth it
 AVX512: q1 = q[l, l+1, l+2, l+3]
 		q0 = q[l-2, l-1, l, l+1]  => [additional read!]
 		read: [a,b,c,a',b'c',x,x] => 2 shuffles (7 cycles)
-qnw = q1*[a,a,c,c,a',a',c',c'] + q0*[b,b,0,0,b',b',0,0]   => [1x,1fma,2shuffle+1read] for 4 cplx.
+qnew = q1*[a,a,c,c,a',a',c',c'] + q0*[b,b,0,0,b',b',0,0]   => [1x,1fma,2shuffle+1read] for 4 cplx.
+		use _mm512_maskz_permutexvar_pd() to produce second coeff including zeros.
 */
 
 /// Same as \ref ishioka_to_SH, but for two interlaced coefficient lists
@@ -538,10 +553,10 @@ static void ishioka_to_SH2(const double* xlm, const v2d* vw, const int llim_m, v
 		v2d ww = vw[2*l+1];
 		VWl[2*l]   = vv * vdup(xlm[ll]) + v0;
 		VWl[2*l+1] = ww * vdup(xlm[ll]) + w0;
-		VWl[2*l+2] = vdup(xlm[ll+1]) * vw[2*l+2];
-		VWl[2*l+3] = vdup(xlm[ll+1]) * vw[2*l+3];
-		v0 = vv * vdup(xlm[ll+2]);
-		w0 = ww * vdup(xlm[ll+2]);
+		VWl[2*l+2] = vdup(xlm[ll+2]) * vw[2*l+2];
+		VWl[2*l+3] = vdup(xlm[ll+2]) * vw[2*l+3];
+		v0 = vv * vdup(xlm[ll+1]);
+		w0 = ww * vdup(xlm[ll+1]);
 		l+=2;	ll+=3;
 	}
 	if (l==llim_m) {
@@ -556,9 +571,9 @@ static void ishioka_to_SH2(const double* xlm, const v2d* vw, const int llim_m, v
 		v4d vwl = vread4( vw + 2*l, 0);
 		vw0 += vwl * vall4(xlm[ll]);
 		vstor4(VWl + 2*l, 0, vw0);
-		v4d y = vread4(vw + 2*l, 1) * vall4(xlm[ll+1]);
+		v4d y = vread4(vw + 2*l, 1) * vall4(xlm[ll+2]);
 		vstor4(VWl + 2*l, 1, y);
-		vw0 = vwl * vall4(xlm[ll+2]);
+		vw0 = vwl * vall4(xlm[ll+1]);
 		l+=2;	ll+=3;
 	}
 	if (l==llim_m) {
@@ -577,22 +592,48 @@ static void ishioka_to_SH2(const double* xlm, const v2d* vw, const int llim_m, v
 /// can operate in-place (Ql = qq)
 static void SH_to_ishioka(const double* xlm, const v2d* Ql, const int llim_m, v2d* ql)
 {
-	int l=0;	int ll=0;
+	long l=0;	long ll=0;
+  #if !defined( _GCC_VEC_) || !defined( __AVX__ )
 	v2d qq = Ql[l] * vdup(xlm[0]);
 	while (l<llim_m-1) {
 		v2d qq2 = Ql[l+2];
-		ql[l]   = (qq  +  qq2 * vdup(xlm[ll+2]));
-		ql[l+1] = Ql[l+1] * vdup(xlm[ll+1]);
+		ql[l]   = (qq  +  qq2 * vdup(xlm[ll+1]));
+		ql[l+1] = Ql[l+1] * vdup(xlm[ll+2]);
 		ll+=3;	l+=2;
 		qq = qq2 * vdup(xlm[ll]);
 	}
 	ql[l]   = qq;
     qq = vdup(0.0);
-    if (l<llim_m)  qq = Ql[l+1] * vdup(xlm[ll+1]);
+    if (l<llim_m)  qq = Ql[l+1] * vdup(xlm[ll+2]);
     ql[l+1] = qq;
+  #else
+	v4d y = vread4(Ql+l, 0);
+/*	while (l<llim_m-4) {
+		v4d x = vread4(xlm+ll, 0);	x = vdup_even4(x);
+		v4d y2 = vread4(Ql+l+2, 0);
+		v4d z =_mm256_castpd128_pd256( vdup(xlm[ll+1]) * _mm256_castpd256_pd128( y2 ) );		// upper part of z is zeroed.
+		vstor4(ql+l, 0, x*y + z);
+		x = vread4(xlm+ll+3, 0);	x = vdup_even4(x);
+		y = vread4(Ql+l+4, 0);
+		z =_mm256_castpd128_pd256( vdup(xlm[ll+4]) * _mm256_castpd256_pd128( y ) );		// upper part of z is zeroed.
+		vstor4(ql+l+2, 0, x*y2 + z);
+		ll+=6;	l+=4;
+	}	*/
+	while (l<llim_m-1) {
+		v4d x = vread4(xlm+ll, 0);	x = vdup_even4(x);
+		v4d y = vread4(Ql+l, 0);
+		v4d z =_mm256_castpd128_pd256( vdup(xlm[ll+1]) * Ql[l+2] );		// upper part of z is zeroed with AVX
+		vstor4(ql+l, 0, x*y + z);
+		ll+=3;	l+=2;
+	}
+	ql[l]   = Ql[l] * vdup(xlm[ll]);
+    v2d qq = vdup(0.0);
+    if (l<llim_m)  qq = Ql[l+1] * vdup(xlm[ll+2]);
+    ql[l+1] = qq;
+  #endif
 }
 
-/// same as \ref SH_to_ishioka, but handles two interfleaved arrays + operates in-place.
+/// same as \ref SH_to_ishioka, but handles two interleaved arrays + operates in-place.
 /// use llim_m = llim-m+1 for vector datat that goes up to llim+1
 static void SH2_to_ishioka(const double* xlm, v2d* VWl, const int llim_m)
 {
@@ -603,10 +644,10 @@ static void SH2_to_ishioka(const double* xlm, v2d* VWl, const int llim_m)
 	while (l<llim_m-1) {
 		v2d vv2 = VWl[2*(l+2)];
 		v2d ww2 = VWl[2*(l+2)+1];
-		VWl[2*l]   = (vv  +  vv2 * vdup(xlm[ll+2]));
-		VWl[2*l+1] = (ww  +  ww2 * vdup(xlm[ll+2]));
-		VWl[2*l+2] *= vdup(xlm[ll+1]);
-		VWl[2*l+3] *= vdup(xlm[ll+1]);
+		VWl[2*l]   = (vv  +  vv2 * vdup(xlm[ll+1]));
+		VWl[2*l+1] = (ww  +  ww2 * vdup(xlm[ll+1]));
+		VWl[2*l+2] *= vdup(xlm[ll+2]);
+		VWl[2*l+3] *= vdup(xlm[ll+2]);
 		ll+=3;	l+=2;
 		vv = vv2 * vdup(xlm[ll]);
 		ww = ww2 * vdup(xlm[ll]);
@@ -614,23 +655,23 @@ static void SH2_to_ishioka(const double* xlm, v2d* VWl, const int llim_m)
 	VWl[2*l]   = vv;
 	VWl[2*l+1] = ww;
 	if (l<=llim_m-1) {
-		VWl[2*l+2] *= vdup(xlm[ll+1]);
-		VWl[2*l+3] *= vdup(xlm[ll+1]);
+		VWl[2*l+2] *= vdup(xlm[ll+2]);
+		VWl[2*l+3] *= vdup(xlm[ll+2]);
 	}
   #else
 	v4d vwl = vread4(VWl +2*l, 0) * vall4(xlm[0]);
 	while (l<llim_m-1) {
 		v4d vw2 = vread4(VWl +2*l, 2);
-		vwl += vw2 * vall4(xlm[ll+2]);
+		vwl += vw2 * vall4(xlm[ll+1]);
 		vstor4(VWl +2*l, 0, vwl);
-		v4d y = vread4(VWl + 2*l, 1) * vall4(xlm[ll+1]);
+		v4d y = vread4(VWl + 2*l, 1) * vall4(xlm[ll+2]);
 		vstor4(VWl + 2*l, 1, y);
 		ll+=3;	l+=2;
 		vwl = vw2 * vall4(xlm[ll]);
 	}
 	vstor4(VWl + 2*l, 0, vwl);
 	if (l<=llim_m-1) {
-		v4d y = vread4(VWl + 2*l, 1) * vall4(xlm[ll+1]);
+		v4d y = vread4(VWl + 2*l, 1) * vall4(xlm[ll+2]);
 		vstor4(VWl + 2*l, 1, y);
 	}
   #endif
