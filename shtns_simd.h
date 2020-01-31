@@ -146,11 +146,11 @@
 			return (v4d) _mm256_insertf128_pd( _mm256_castpd128_pd256( a ), b, 1);
 		}
 		inline static v4d vreverse4(v4d a) {		// reverse vector: [0,1,2,3] => [3,2,1,0]
-			#ifdef __AVX2__
-			return (v4d) _mm256_permute4x64_pd(a, 0x1B);
+			#if defined( __AVX2__ ) && !defined( __znver2 )
+			return (v4d) _mm256_permute4x64_pd(a, 0x1B);		// 3 cycles on intel; 6 cycles on Zen2
 			#else
-			a = (v4d)_mm256_shuffle_pd(a, a, 5);		// [0,1,2,3] => [1,0,3,2]
-			return (v4d)_mm256_permute2f128_pd(a,a, 1);	// => [3,2,1,0]
+			a = (v4d)_mm256_shuffle_pd(a, a, 5);		// [0,1,2,3] => [1,0,3,2]	// 1 cycle on intel; 1 cycle on Zen2
+			return (v4d)_mm256_permute2f128_pd(a,a, 1);	// => [3,2,1,0]				// 2 cycles on SandyBridge, 3 cycles on Haswell+, 3 cycles on Zen2
 			#endif
 		}
 		#define vdup_even4(v) ((rnd)_mm256_movedup_pd(v))
@@ -496,13 +496,6 @@
 	inline static v2d IxKxZ(double k, v2d z) {		// I*k*z,  allowing to use FMA.
 		return (v2d) _mm_setr_pd(-k,k) * vxchg(z);
 	}
-
-	// build mask (-0, -0) to change sign of both hi and lo values using xorpd
-	#define SIGN_MASK_2  _mm_castsi128_pd(_mm_slli_epi64(_mm_set1_epi64x(0), _mm_set1_epi64x(0)), 63))
-	// build mask (0, -0) to change sign of hi value using xorpd (used in CFFT_TO_2REAL)
-	#define SIGN_MASK_HI  _mm_unpackhi_pd(vdup(0.0), SIGN_MASK_2 )
-	// build mask (-0, 0) to change sign of lo value using xorpd
-	#define SIGN_MASK_LO  _mm_unpackhi_pd(SIGN_MASK_2, vdup(0.0) )
 
 	// vset(lo, hi) takes two doubles and pack them in a vector
 	#define vset(lo, hi) _mm_set_pd(hi, lo)
