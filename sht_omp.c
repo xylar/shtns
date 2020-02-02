@@ -130,17 +130,33 @@
 	#define SHqst_to_spat_omp3_l NULL
 #endif
 
-void* fomp[6][SHT_NTYP] = {
-	{ NULL, NULL, SHsphtor_to_spat_omp1_l, spat_to_SHsphtor_omp1_l,
-		SHsph_to_spat_omp1_l, SHtor_to_spat_omp1_l, SHqst_to_spat_omp1_l, spat_to_SHqst_omp1_l },
-	{ SH_to_spat_omp2_l, spat_to_SH_omp2_l, SHsphtor_to_spat_omp2_l, spat_to_SHsphtor_omp2_l,
-		SHsph_to_spat_omp2_l, SHtor_to_spat_omp2_l, SHqst_to_spat_omp2_l, spat_to_SHqst_omp2_l },
-	{ SH_to_spat_omp3_l, spat_to_SH_omp3_l, SHsphtor_to_spat_omp3_l, spat_to_SHsphtor_omp3_l,
-		SHsph_to_spat_omp3_l, SHtor_to_spat_omp3_l, SHqst_to_spat_omp3_l, spat_to_SHqst_omp3_l },
-	{ SH_to_spat_omp4_l, spat_to_SH_omp4_l, SHsphtor_to_spat_omp4_l, spat_to_SHsphtor_omp4_l,
-		SHsph_to_spat_omp4_l, SHtor_to_spat_omp4_l, SHqst_to_spat_omp4_l, spat_to_SHqst_omp4_l },
-	{ SH_to_spat_omp6_l, spat_to_SH_omp6_l, SHsphtor_to_spat_omp6_l, spat_to_SHsphtor_omp6_l,
-		NULL, NULL, SHqst_to_spat_omp6_l, spat_to_SHqst_omp6_l },
-	{ SH_to_spat_omp8_l, spat_to_SH_omp8_l, SHsphtor_to_spat_omp8_l, spat_to_SHsphtor_omp8_l,
-		NULL, NULL, SHqst_to_spat_omp8_l, spat_to_SHqst_omp8_l }
+void* fomp_a[6][SHT_NTYP] = {
+	{ NULL, NULL, SHsphtor_to_spat_omp_a1_l, spat_to_SHsphtor_omp_a1_l,
+		SHsph_to_spat_omp_a1_l, SHtor_to_spat_omp_a1_l, SHqst_to_spat_omp_a1_l, spat_to_SHqst_omp_a1_l },
+	{ SH_to_spat_omp_a2_l, spat_to_SH_omp_a2_l, SHsphtor_to_spat_omp_a2_l, spat_to_SHsphtor_omp_a2_l,
+		SHsph_to_spat_omp_a2_l, SHtor_to_spat_omp_a2_l, SHqst_to_spat_omp_a2_l, spat_to_SHqst_omp_a2_l },
+	{ SH_to_spat_omp_a3_l, spat_to_SH_omp_a3_l, SHsphtor_to_spat_omp_a3_l, spat_to_SHsphtor_omp_a3_l,
+		SHsph_to_spat_omp_a3_l, SHtor_to_spat_omp_a3_l, SHqst_to_spat_omp_a3_l, spat_to_SHqst_omp_a3_l },
+	{ SH_to_spat_omp_a4_l, spat_to_SH_omp_a4_l, SHsphtor_to_spat_omp_a4_l, spat_to_SHsphtor_omp_a4_l,
+		SHsph_to_spat_omp_a4_l, SHtor_to_spat_omp_a4_l, SHqst_to_spat_omp_a4_l, spat_to_SHqst_omp_a4_l },
+	{ SH_to_spat_omp_a6_l, spat_to_SH_omp_a6_l, SHsphtor_to_spat_omp_a6_l, spat_to_SHsphtor_omp_a6_l,
+		NULL, NULL, SHqst_to_spat_omp_a6_l, spat_to_SHqst_omp_a6_l },
+	{ SH_to_spat_omp_a8_l, spat_to_SH_omp_a8_l, SHsphtor_to_spat_omp_a8_l, spat_to_SHsphtor_omp_a8_l,
+		NULL, NULL, SHqst_to_spat_omp_a8_l, spat_to_SHqst_omp_a8_l }
 };
+
+void* fomp_b[6][SHT_NTYP] = {
+	{ NULL, NULL, SHsphtor_to_spat_omp_b1_l, spat_to_SHsphtor_omp_b1_l,
+		SHsph_to_spat_omp_b1_l, SHtor_to_spat_omp_b1_l, SHqst_to_spat_omp_b1_l, spat_to_SHqst_omp_b1_l },
+	{ SH_to_spat_omp_b2_l, spat_to_SH_omp_b2_l, SHsphtor_to_spat_omp_b2_l, spat_to_SHsphtor_omp_b2_l,
+		SHsph_to_spat_omp_b2_l, SHtor_to_spat_omp_b2_l, SHqst_to_spat_omp_b2_l, spat_to_SHqst_omp_b2_l },
+	{ SH_to_spat_omp_b3_l, spat_to_SH_omp_b3_l, SHsphtor_to_spat_omp_b3_l, spat_to_SHsphtor_omp_b3_l,
+		SHsph_to_spat_omp_b3_l, SHtor_to_spat_omp_b3_l, SHqst_to_spat_omp_b3_l, spat_to_SHqst_omp_b3_l },
+	{ SH_to_spat_omp_b4_l, spat_to_SH_omp_b4_l, SHsphtor_to_spat_omp_b4_l, spat_to_SHsphtor_omp_b4_l,
+		SHsph_to_spat_omp_b4_l, SHtor_to_spat_omp_b4_l, SHqst_to_spat_omp_b4_l, spat_to_SHqst_omp_b4_l },
+	{ SH_to_spat_omp_b6_l, spat_to_SH_omp_b6_l, SHsphtor_to_spat_omp_b6_l, spat_to_SHsphtor_omp_b6_l,
+		NULL, NULL, SHqst_to_spat_omp_b6_l, spat_to_SHqst_omp_b6_l },
+	{ SH_to_spat_omp_b8_l, spat_to_SH_omp_b8_l, SHsphtor_to_spat_omp_b8_l, spat_to_SHsphtor_omp_b8_l,
+		NULL, NULL, SHqst_to_spat_omp_b8_l, spat_to_SHqst_omp_b8_l }
+};
+

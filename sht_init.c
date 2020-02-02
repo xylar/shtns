@@ -161,9 +161,11 @@ enum sht_algos { SHT_MEM, SHT_SV,
 	SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8,
 	SHT_GPU1, SHT_GPU2, SHT_GPU3, SHT_GPU4,
 	SHT_OMP1, SHT_OMP2, SHT_OMP3, SHT_OMP4, SHT_OMP6, SHT_OMP8,
+	SHT_OMP1A, SHT_OMP2A, SHT_OMP3A, SHT_OMP4A, SHT_OMP6A, SHT_OMP8A,
 	SHT_NALG };
 
-char* sht_name[SHT_NALG] = {"mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu1", "gpu2", "gpu3", "gpu4", "omp1", "omp2", "omp3", "omp4", "omp6", "omp8" };
+char* sht_name[SHT_NALG] = {"mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu1", "gpu2", "gpu3", "gpu4",
+	"omp1", "omp2", "omp3", "omp4", "omp6", "omp8",  "omp1a", "omp2a", "omp3a", "omp4a", "omp6a", "omp8a",   };
 char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 char* sht_var[SHT_NVAR] = {"std", "ltr", "m" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
@@ -178,7 +180,8 @@ extern void* ffly[6][SHT_NTYP];
 extern void* ffly_m[6][SHT_NTYP];
 extern void* ffly_m0[6][SHT_NTYP];
 #ifdef _OPENMP
-extern void* fomp[6][SHT_NTYP];
+extern void* fomp_a[6][SHT_NTYP];
+extern void* fomp_b[6][SHT_NTYP];
 #endif
 #ifdef HAVE_LIBCUFFT
 extern void* fgpu[4][SHT_NTYP];
@@ -267,8 +270,10 @@ static void init_sht_array_func(shtns_cfg shtns)
 			}
 			memcpy(sht_func[SHT_M][SHT_FLY1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);
 		  #ifdef _OPENMP
-			memcpy(sht_func[SHT_STD][SHT_OMP1 + j], &fomp[j], sizeof(void*)*SHT_NTYP);
-			memcpy(sht_func[SHT_LTR][SHT_OMP1 + j], &fomp[j], sizeof(void*)*SHT_NTYP);
+			memcpy(sht_func[SHT_STD][SHT_OMP1 + j], &fomp_a[j], sizeof(void*)*SHT_NTYP);
+			memcpy(sht_func[SHT_LTR][SHT_OMP1 + j], &fomp_a[j], sizeof(void*)*SHT_NTYP);
+			memcpy(sht_func[SHT_STD][SHT_OMP1A + j], &fomp_b[j], sizeof(void*)*SHT_NTYP);
+			memcpy(sht_func[SHT_LTR][SHT_OMP1A + j], &fomp_b[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_M][SHT_OMP1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);		// no omp algo for SHT_M, use fly instead
 		  #endif
 		}
@@ -582,6 +587,18 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		shtns->fftc_mode = 0;
 		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 		shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
+		
+		if (shtns->nthreads > 1) {
+			fftw_plan_with_nthreads(1);
+			// FOR MKL only:
+			//fftw3_mkl.number_of_user_threads = shtns->nthreads;        // required to call the fft of mkl from multiple threads.
+			// try to divide NLAT/2 into threads.
+			int nblk = (NLAT/2) / shtns->nthreads;
+			printf("omp block size = %d\n", nblk);
+			if (nblk * shtns->nthreads != NLAT/2) shtns_runerr("not divisible");
+			shtns->ifftc_block = fftw_plan_many_dft(1, &nfft, nblk, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+			shtns->fftc_block = shtns->ifftc_block;		// same thing, with m>0 and m<0 exchanged.
+		}
 
 		// complex-values spatial fields (in-place):
 		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, NLAT, 1, ShF, &nfft, NLAT, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);

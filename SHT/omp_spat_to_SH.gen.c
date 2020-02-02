@@ -34,9 +34,9 @@ VX	void GEN3(_an2_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cpl
 
 
 	static
-QX	void GEN3(spat_to_SH_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, cplx *Qlm, long int llim) {
-VX	void GEN3(spat_to_SHsphtor_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, long int llim) {
-3	void GEN3(spat_to_SHqst_omp,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, long int llim) {
+QX	void GEN3(spat_to_SH_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, cplx *Qlm, long int llim) {
+VX	void GEN3(spat_to_SHsphtor_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, long int llim) {
+3	void GEN3(spat_to_SHqst_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, long int llim) {
 
 Q	double *BrF;		// contains the Fourier transformed data
 V	double *BtF, *BpF;	// contains the Fourier transformed data
@@ -49,6 +49,7 @@ V	BtF = Vt;	BpF = Vp;
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
+
 	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode > 0) {		// alloc memory for out-of-place FFT
 			unsigned long nv = shtns->nspat;
@@ -94,6 +95,50 @@ VX	    VFREE(BtF);	// this frees also BpF.
 	}
   #endif
 
+  }
+  
+	static
+QX	void GEN3(spat_to_SH_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, cplx *Qlm, long int llim) {
+VX	void GEN3(spat_to_SHsphtor_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, long int llim) {
+3	void GEN3(spat_to_SHqst_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, long int llim) {
+
+Q	double *BrF;		// contains the Fourier transformed data
+V	double *BtF, *BpF;	// contains the Fourier transformed data
+	unsigned imlim=0;
+
+Q	BrF = Vr;
+V	BtF = Vt;	BpF = Vp;
+  #ifndef SHT_AXISYM
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
+	imlim += 1;
+
+	#pragma omp parallel num_threads(shtns->nthreads)
+	{
+		const int nblk = (NLAT/2) / shtns->nthreads;
+		#pragma omp for schedule(static)
+		for (int k=0; k<shtns->nthreads; k++) {
+Q			fftw_execute_dft(shtns->fftc_block, ((cplx *) Vr) + k*nblk, ((cplx *) BrF) + k*nblk);
+V			fftw_execute_dft(shtns->fftc_block, ((cplx *) Vt) + k*nblk, ((cplx *) BtF) + k*nblk);
+V			fftw_execute_dft(shtns->fftc_block, ((cplx *) Vp) + k*nblk, ((cplx *) BpF) + k*nblk);
+		}
+  #else
+	#pragma omp parallel num_threads(shtns->nthreads)
+	{
+  #endif
+
+		if (llim < SHT_L_RESCALE_FLY) {
+QX			GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
+VX			GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
+3			GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
+		} else {
+QX			GEN3(_an1_hi,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
+VX			GEN3(_an2_hi,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
+3			GEN3(_an3_hi,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
+		}
+	}
   }
 
 	#undef LSPAN

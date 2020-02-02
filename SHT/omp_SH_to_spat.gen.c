@@ -428,13 +428,74 @@ S	#undef si
 T	#undef tr
 T	#undef ti
 
-3	static void GEN3(SHqst_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	static void GEN3(SH_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
+3	static void GEN3(SHqst_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	static void GEN3(SH_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
-VX	static void GEN3(SHsphtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
+VX	static void GEN3(SHsphtor_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #else
-S	static void GEN3(SHsph_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
-T	static void GEN3(SHtor_to_spat_omp,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
+S	static void GEN3(SHsph_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
+T	static void GEN3(SHtor_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
+  #endif
+
+	unsigned imlim = 0;
+Q	v2d* BrF = (v2d*) Vr;
+V	v2d* BtF = (v2d*) Vt;	v2d* BpF = (v2d*) Vp;
+
+  #ifndef SHT_AXISYM
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
+	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
+		unsigned long nv = shtns->nspat;
+QX		BrF = (v2d*) VMALLOC( nv * sizeof(double) );
+VX		BtF = (v2d*) VMALLOC( 2*nv * sizeof(double) );
+VX		BpF = BtF + nv/2;
+3		BrF = (v2d*) VMALLOC( 3*nv * sizeof(double) );
+3		BtF = BrF + nv/2;		BpF = BrF + nv;
+	}
+  #endif
+	imlim += 1;
+  
+  #pragma omp parallel num_threads(shtns->nthreads)
+  {
+3	GEN3(_sy3o,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim);
+QX	GEN3(_sy1o,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim);
+	#ifndef SHT_GRAD
+VX		GEN3(_sy2o,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
+	#else
+S		GEN3(_sy1os,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
+T		GEN3(_sy1ot,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
+	#endif
+  }
+
+  #ifndef SHT_AXISYM
+    // NPHI > 1 as SHT_AXISYM is not defined.
+  	if (shtns->fftc_mode >= 0) {
+		if (shtns->fftc_mode != 1) {
+Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
+V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
+V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
+		} else {		// split dft
+Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
+V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
+V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
+Q			VFREE(BrF);
+VX			VFREE(BtF);		// this frees also BpF.
+		}
+	}
+  #endif
+
+  }
+
+
+3	static void GEN3(SHqst_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	static void GEN3(SH_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
+  #ifndef SHT_GRAD
+VX	static void GEN3(SHsphtor_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
+  #else
+S	static void GEN3(SHsph_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
+T	static void GEN3(SHtor_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 	unsigned imlim = 0;
@@ -468,51 +529,15 @@ S		GEN3(_sy1os,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
 T		GEN3(_sy1ot,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
 	#endif
 
-
-  #ifndef SHT_AXISYM
-V	#ifndef HAVE_LIBFFTW3_OMP
-V	  #pragma omp barrier
-V		if (shtns->fftc_mode >= 0) {
-V		if (shtns->fftc_mode != 1) {
-3			#pragma omp single nowait
-3			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
-V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
-V			#pragma omp single nowait
-V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
-V		} else {		// split dft
-3			#pragma omp single nowait
-3			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
-V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
-V			#pragma omp single nowait
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-V		}
-V		}
-V	#endif
-  #endif
-
-  }
-
-  #ifndef SHT_AXISYM
-    // NPHI > 1 as SHT_AXISYM is not defined.
-  	if (shtns->fftc_mode >= 0) {
-		if (shtns->fftc_mode != 1) {
-V		  #ifdef HAVE_LIBFFTW3_OMP
-Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
-V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
-V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
-V		  #endif
-		} else {		// split dft
-V		  #ifdef HAVE_LIBFFTW3_OMP
-Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-V		  #endif
-Q			VFREE(BrF);
-VX			VFREE(BtF);		// this frees also BpF.
+	if (shtns->fftc_mode >= 0) {
+		const int nblk = (NLAT/2) / shtns->nthreads;
+		#pragma omp barrier
+		#pragma omp for schedule(static)
+		for (int k=0; k<shtns->nthreads; k++) {
+Q			fftw_execute_dft(shtns->ifftc_block, ((cplx *) BrF) + k*nblk, ((cplx *) Vr) + k*nblk);
+V			fftw_execute_dft(shtns->ifftc_block, ((cplx *) BtF) + k*nblk, ((cplx *) Vt) + k*nblk);
+V			fftw_execute_dft(shtns->ifftc_block, ((cplx *) BpF) + k*nblk, ((cplx *) Vp) + k*nblk);
 		}
 	}
-  #endif
-
+  }
   }
