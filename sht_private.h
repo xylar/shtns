@@ -516,11 +516,11 @@ static void ishioka_to_SH(const double* xlm, const v2d* qq, const int llim_m, v2
 		v4d x = vread4(xlm+ll, 0);	x = vdup_even4(x);
 		v4d uu = vread4(qq+l, 0);	// [qq[l], qq[l+1]]
 		vstor4(Ql+l, 0, uu*x + z);
-		z = _mm256_castpd128_pd256( _mm256_castpd256_pd128(uu) * vdup(xlm[ll+1]) );		// upper part of z is zeroed.
+		z = _mm256_castpd128_pd256( (v2d)_mm256_castpd256_pd128(uu) * vdup(xlm[ll+1]) );		// upper part of z is zeroed.
 		l+=2;	ll+=3;
 	}
 	if (l==llim_m) {
-		Ql[l] = qq[l] * vdup(xlm[ll]) + _mm256_castpd256_pd128(z);
+		Ql[l] = qq[l] * vdup(xlm[ll]) + (v2d)_mm256_castpd256_pd128(z);
 	}
   #endif
 }

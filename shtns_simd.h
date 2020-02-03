@@ -153,7 +153,7 @@
 			return (v4d)_mm256_permute2f128_pd(a,a, 1);	// => [3,2,1,0]				// 2 cycles on SandyBridge, 3 cycles on Haswell+, 3 cycles on Zen2
 			#endif
 		}
-		#define vdup_even4(v) ((rnd)_mm256_movedup_pd(v))
+		#define vdup_even4(v) ((v4d)_mm256_movedup_pd(v))
 	#endif
 	#ifdef __AVX512F__
 		#define MIN_ALIGNMENT 64
@@ -524,9 +524,9 @@
 		#define vhi_to_dbl(a) _mm_cvtsd_f64(_mm_unpackhi_pd(a,a))
 	#endif
 	#ifdef __AVX512F__
-		#define v2d_lo(a) _mm512_castpd512_pd128(a)
+		#define v2d_lo(a) (v2d)_mm512_castpd512_pd128(a)
 	#elif defined __AVX__
-		#define v2d_lo(a) _mm256_castpd256_pd128(a)
+		#define v2d_lo(a) (v2d)_mm256_castpd256_pd128(a)
 	#else
 		#define v2d_lo(a) (a)
 	#endif
