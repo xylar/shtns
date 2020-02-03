@@ -96,7 +96,7 @@ VX	    VFREE(BtF);	// this frees also BpF.
   #endif
 
   }
-  
+
 	static
 QX	void GEN3(spat_to_SH_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, double *Vr, cplx *Qlm, long int llim) {
 VX	void GEN3(spat_to_SHsphtor_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, long int llim) {
@@ -115,14 +115,32 @@ V	BtF = Vt;	BpF = Vp;
 	#endif
 	imlim += 1;
 
+	if (shtns->fftc_mode > 0) {		// alloc memory for out-of-place FFT
+		unsigned long nv = shtns->nspat;
+QX		BrF = (double*) VMALLOC( nv * sizeof(double) );
+VX		BtF = (double*) VMALLOC( 2*nv * sizeof(double) );
+VX		BpF = BtF + nv;
+3		BrF = (double*) VMALLOC( 3*nv * sizeof(double) );
+3		BtF = BrF + nv;		BpF = BtF + nv;
+	}
+
 	#pragma omp parallel num_threads(shtns->nthreads)
 	{
 		const int nblk = (NLAT/2) / shtns->nthreads;
-		#pragma omp for schedule(static)
-		for (int k=0; k<shtns->nthreads; k++) {
-Q			fftw_execute_dft(shtns->fftc_block, ((cplx *) Vr) + k*nblk, ((cplx *) BrF) + k*nblk);
-V			fftw_execute_dft(shtns->fftc_block, ((cplx *) Vt) + k*nblk, ((cplx *) BtF) + k*nblk);
-V			fftw_execute_dft(shtns->fftc_block, ((cplx *) Vp) + k*nblk, ((cplx *) BpF) + k*nblk);
+		if (shtns->fftc_mode != 1) {
+			#pragma omp for schedule(static)
+			for (int k=0; k<shtns->nthreads; k++) {
+Q				fftw_execute_dft(shtns->fftc_block, ((cplx *) Vr) + k*nblk, ((cplx *) BrF) + k*nblk);
+V				fftw_execute_dft(shtns->fftc_block, ((cplx *) Vt) + k*nblk, ((cplx *) BtF) + k*nblk);
+V				fftw_execute_dft(shtns->fftc_block, ((cplx *) Vp) + k*nblk, ((cplx *) BpF) + k*nblk);
+			}
+		} else {
+			#pragma omp for schedule(static)
+			for (int k=0; k<shtns->nthreads; k++) {
+Q				fftw_execute_split_dft(shtns->fftc_block, Vr+NPHI*(1+2*k*nblk), Vr+NPHI*2*k*nblk, BrF+1+NPHI*2*k*nblk, BrF+NPHI*2*k*nblk);
+V				fftw_execute_split_dft(shtns->fftc_block, Vt+NPHI*(1+2*k*nblk), Vt+NPHI*2*k*nblk, BtF+1+NPHI*2*k*nblk, BtF+NPHI*2*k*nblk);
+V				fftw_execute_split_dft(shtns->fftc_block, Vp+NPHI*(1+2*k*nblk), Vp+NPHI*2*k*nblk, BpF+1+NPHI*2*k*nblk, BpF+NPHI*2*k*nblk);
+			}
 		}
   #else
 	#pragma omp parallel num_threads(shtns->nthreads)
@@ -139,6 +157,13 @@ VX			GEN3(_an2_hi,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
 3			GEN3(_an3_hi,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
 		}
 	}
+
+  #ifndef SHT_AXISYM
+  	if (shtns->fftc_mode > 0) {		// free memory
+Q	    VFREE(BrF);
+VX	    VFREE(BtF);	// this frees also BpF.
+	}
+  #endif
   }
 
 	#undef LSPAN

@@ -561,6 +561,25 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
 		shtns->k_stride_a = NPHI;		shtns->m_stride_a = 2;
 		
+		if (shtns->nthreads > 1) {
+			fftw_plan_with_nthreads(1);
+			// FOR MKL only:
+			//fftw3_mkl.number_of_user_threads = shtns->nthreads;        // required to call the fft of mkl from multiple threads.
+			// try to divide NLAT/2 into threads.
+			int nblk = (NLAT/2) / shtns->nthreads;
+			printf("omp block size (split) = %d\n", nblk);
+			if (nblk * shtns->nthreads != NLAT/2) shtns_runerr("not divisible");
+
+			dim.n = NPHI;    	dim.os = 1;			dim.is = NLAT;		// complex transpose
+			many.n = nblk;		many.os = 2*NPHI;	many.is = 2;
+			shtns->ifftc_block = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
+
+			dim.n = NPHI;    	dim.is = 1;			dim.os = 2;		// split complex, but without global transpose (faster).
+			many.n = nblk;		many.is = 2*NPHI;	many.os = 2*NPHI;
+			shtns->fftc_block = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
+			fftw_plan_with_nthreads(shtns->nthreads);
+		}
+
 		// for complex transform it is much simpler (out-of-place):
 		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, NLAT, 1, (cplx*)Sh, &nfft, 1, NPHI, FFTW_BACKWARD, shtns->fftw_plan_mode);
 		shtns->fft_cplx =  fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, 1, NPHI, (cplx*)Sh, &nfft, NLAT, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
@@ -598,6 +617,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			if (nblk * shtns->nthreads != NLAT/2) shtns_runerr("not divisible");
 			shtns->ifftc_block = fftw_plan_many_dft(1, &nfft, nblk, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 			shtns->fftc_block = shtns->ifftc_block;		// same thing, with m>0 and m<0 exchanged.
+			fftw_plan_with_nthreads(shtns->nthreads);
 		}
 
 		// complex-values spatial fields (in-place):
