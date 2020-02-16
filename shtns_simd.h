@@ -146,11 +146,11 @@
 			return (v4d) _mm256_insertf128_pd( _mm256_castpd128_pd256( a ), b, 1);
 		}
 		inline static v4d vreverse4(v4d a) {		// reverse vector: [0,1,2,3] => [3,2,1,0]
-			#if defined( __AVX2__ ) && !defined( __znver2 )
-			return (v4d) _mm256_permute4x64_pd(a, 0x1B);		// 3 cycles on intel; 6 cycles on Zen2
+			#if defined( __AVX2__ )
+			return (v4d) _mm256_permute4x64_pd(a, 0x1B);	// 3 cycles on intel; 6 cycles on Zen2
 			#else
-			a = (v4d)_mm256_shuffle_pd(a, a, 5);		// [0,1,2,3] => [1,0,3,2]	// 1 cycle on intel; 1 cycle on Zen2
-			return (v4d)_mm256_permute2f128_pd(a,a, 1);	// => [3,2,1,0]				// 2 cycles on SandyBridge, 3 cycles on Haswell+, 3 cycles on Zen2
+			a = (v4d)_mm256_permute2f128_pd(a,a, 1);	// => [2,3,0,1]			// 2 cycles on SandyBridge, 3 cycles on Haswell+, 3 cycles on Zen2
+			return (v4d)_mm256_shuffle_pd(a, a, 5);		// [2,3,0,1] => [3,2,1,0]	// 1 cycle on intel; 3 cycles on Zen2 (1 cycle in certain conditions)
 			#endif
 		}
 		#define vdup_even4(v) ((v4d)_mm256_movedup_pd(v))
@@ -170,6 +170,7 @@
 			return _mm512_shuffle_f64x2(a,a,0x1B);	// [7,6,5,4,3,2,1,0]
 			//return (rnd) _mm512_permutexvar_pd(_mm512_set_epi64(0,1,2,3,4,5,6,7), a);		// same speed on KNL, but requires a constant to be loaded...
 		}
+		#define vreverse_pairs(v) ((rnd)_mm512_shuffle_f64x2(v,v, 0x1B))
 		#define vdup_even(v) ((rnd)_mm512_movedup_pd(v))
 		#define vdup_odd(v)	 ((rnd)_mm512_permute_pd(v,0xFF))
 		#define vxchg_even_odd(v) ((rnd)_mm512_permute_pd(v,0x55))
@@ -201,7 +202,7 @@
 
 		void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd er, rnd od, rnd ei, rnd oi) {
 			rnd ni = ei+oi;		rnd sr = er-od;		rnd nr = er+od;		rnd si = ei-oi;
-			ni = (rnd)_mm512_permute_pd(ni, 0x55);		sr = (rnd)_mm512_permute_pd(sr, 0x55);		// 
+			ni = (rnd)_mm512_permute_pd(ni, 0x55);		sr = (rnd)_mm512_permute_pd(sr, 0x55);		// pair-wise exchange: [1,0,3,2,5,4,7,6]
 			const long ridx = nlat - (idx+1)*8;
 			rnd aa = ni + nr;	rnd bb = nr - ni;		rnd cc = sr + si;	rnd dd = sr - si;
 			nr = _mm512_mask_blend_pd((__mmask8) 0xAA, bb, aa );		ni = _mm512_mask_blend_pd((__mmask8) 0xAA, aa, bb );
@@ -297,8 +298,10 @@
 		#define vread(mem, idx) ((rnd)_mm256_loadu_pd( ((double*)(mem)) + (idx)*4 ))
 		#define vstor(mem, idx, v) _mm256_storeu_pd( ((double*)(mem)) + (idx)*4 , v)
 		#define vreverse vreverse4
+		#define vreverse_pairs(v) ((rnd)_mm256_permute2f128_pd(v,v,1))
 		#define vdup_even(v) ((rnd)_mm256_movedup_pd(v))
 		#define vdup_odd(v)  ((rnd)_mm256_unpackhi_pd(v,v))
+		// intra-lane exchange, same as _mm256_permute_pd(xm, 0x5), but faster with gcc<10
 		#define vxchg_even_odd(v) ((rnd)_mm256_shuffle_pd(v,v,0x5))
 		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
 			return _mm256_addsub_pd(vall(0.0), v);
@@ -316,13 +319,13 @@
 			a = _mm256_hadd_pd(a, b);
 			return (v2d)_mm256_castpd256_pd128(a) + (v2d)_mm256_extractf128_pd(a,1);
 		}
-		/*inline static v4d v4d_reduce(rnd a, rnd b, rnd c, rnd d) {
-			a = _mm256_hadd_pd(a, b);
-			c = _mm256_hadd_pd(c, d);
-			v4d x = _mm256_blend_pd(a,c,0xc);			// _mm256_setr_pd(a[0],a[1],c[2],c[3]);
+		inline static v4d v4d_reduce(rnd a, rnd b, rnd c, rnd d) {
+			a = _mm256_hadd_pd(a, b);	// a0+a1, b0+b1, a2+a3, b2+b3
+			c = _mm256_hadd_pd(c, d);	// c0+c1, d0+d1, c2+c3, d2+d3
 			v4d y = _mm256_permute2f128_pd(a,c,0x21);	// _mm256_setr_pd(a[2],a[3],c[0],c[1]);
+			v4d x = _mm256_blend_pd(a,c,0xc);			// _mm256_setr_pd(a[0],a[1],c[2],c[3]);
 			return x+y;
-		}*/
+		}
 		#define S2D_STORE(mem, idx, ev, od) \
 			_mm256_storeu_pd(((double*)mem) + (idx)*4,   ev+od); \
 			_mm256_storeu_pd(((double*)mem) + NLAT-4-(idx)*4,   vreverse(ev-od));
@@ -425,6 +428,7 @@
 			}
 		#endif
 		inline static rnd vreverse(rnd a) {	return (rnd)_mm_shuffle_pd(a,a,1);	}
+		#define vreverse_pairs(v) (v)
 		#define vdup_even(v) ((rnd)_mm_unpacklo_pd(v,v))
 		#define vdup_odd(v)  ((rnd)_mm_unpackhi_pd(v,v))
 		#define vxchg_even_odd(v) vxchg(v)

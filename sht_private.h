@@ -23,6 +23,7 @@
 /// \internal \file sht_private.h private data and options.
 
 #include <stdlib.h>
+#include <string.h>
 #include <complex.h>
 #include <math.h>
 // FFTW la derivee d/dx = ik	(pas de moins !)
@@ -794,7 +795,7 @@ static void SH_vect_to_2scal_new(const double *mx, int llim, int m, const cplx* 
 		#endif
 	}
 	#endif
-	for (; l<llim; l++) {		// general case, reminder 		V[2*l] = mx[2*l-1]*S[l-1]
+	for (; l<=llim; l++) {		// general case, reminder 		V[2*l] = mx[2*l-1]*S[l-1]
 		s2d mxl = vdup(mx[2*l-1]);
 		s2d mxu = vdup(mx[2*l]);
 		#ifndef _GCC_VEC_
@@ -804,21 +805,12 @@ static void SH_vect_to_2scal_new(const double *mx, int llim, int m, const cplx* 
 		v2d imt = v2d_lo(emx) * vxchg(((v2d*)Tl)[l]);
 		v2d ims = v2d_lo(emx) * vxchg(((v2d*)Sl)[l]);
 		#endif
-		((v2d*)VWl)[2*l]   = imt + mxu*((v2d*)Sl)[l+1] + mxl*((v2d*)Sl)[l-1];
-		((v2d*)VWl)[2*l+1] = ims - mxu*((v2d*)Tl)[l+1] - mxl*((v2d*)Tl)[l-1];
-	}
-	if (l==llim) {
-		s2d mxl = vdup(mx[2*l-1]);
-		#ifndef _GCC_VEC_
-		v2d imt = I*em*Tl[l];
-		v2d ims = I*em*Sl[l];
-		#else
-		v2d imt = v2d_lo(emx) * vxchg(((v2d*)Tl)[l]);
-		v2d ims = v2d_lo(emx) * vxchg(((v2d*)Sl)[l]);
-		#endif
+		if (l<llim) {
+			imt += mxu*((v2d*)Sl)[l+1];
+			ims -= mxu*((v2d*)Tl)[l+1];
+		}
 		((v2d*)VWl)[2*l]   = imt + mxl*((v2d*)Sl)[l-1];
 		((v2d*)VWl)[2*l+1] = ims - mxl*((v2d*)Tl)[l-1];
-		l++;
 	}
 	{	//l=llim+1
 		s2d mxl = vdup(mx[2*l-1]);
@@ -928,12 +920,8 @@ static void sym_asym_q1(double* Fm, double* Fm2, double* eori, int k0v, unsigned
     for (; k<4*(nk+nway*VSIZE2); k++) eori[k] = 0.0;		// allow overflow
 }
 
-static
-const long negeven[VSIZE2] = {0x8000000000000000, 0, 0x8000000000000000, 0};
-
 static void sym_asym_q1vec(double* Fm, double* Fm2, double* eori, int k0v, unsigned nlat, int nway)
 {
-    rnd vn = vread(negeven, 0);		// idea: we can use _mm256_broadcast_pd() to read only 128 bits and copy to upper-half.
     unsigned nk = ((((nlat+1)/2) +VSIZE2-1)/VSIZE2)*VSIZE2;
     k0v *= VSIZE2;
     int k;
@@ -941,19 +929,15 @@ static void sym_asym_q1vec(double* Fm, double* Fm2, double* eori, int k0v, unsig
 		rnd a = vread(Fm+k, 0);
 		rnd b = vread(Fm2+k, 0);
 		rnd xm = a-b;		rnd xp = a+b;
-		xm = _mm256_shuffle_pd(xm, xm, 5);		// intra-lane exchange, same as _mm256_permute_pd(xm, 0x5), but faster with gcc.
-		xm = _mm256_xor_pd(xm,vn);
+		xm = vxchg_even_odd(xm);
+		xm = vneg_even_inloop(xm);
 
 		rnd c = vread(Fm+(nlat-VSIZE2-k), 0);
 		rnd d = vread(Fm2+(nlat-VSIZE2-k), 0);
 		rnd yp = vreverse(c+d);
 		rnd ym = d-c;
-
-		//ym = vreverse(ym);  ym = _mm256_permute_pd(ym, 0x5);		// basic version: 2-3 permutes: don't use
-		ym =  _mm256_permute2f128_pd(ym,ym, 1);		// AVX version
-		//ym = _mm256_permute4x64_pd(ym, 0x4E);		// AVX2 version
-
-		ym = _mm256_xor_pd(ym,vn);
+		ym = vneg_even_inloop(ym);
+		ym = vreverse_pairs(ym);
 
 		vstor(eori+4*k, 0, xp+yp);
 		vstor(eori+4*k, 1, xm+ym);
