@@ -119,15 +119,25 @@
 #undef SHT_3COMP
 
 #ifndef _GCC_VEC_
-	#define SHsphtor_to_spat_omp1_l NULL
-	#define SHsph_to_spat_omp1_l NULL
-	#define SHtor_to_spat_omp1_l NULL
-	#define SHqst_to_spat_omp1_l NULL
-	#define SH_to_spat_omp3_l NULL
-	#define SHsphtor_to_spat_omp3_l NULL
-	#define SHsph_to_spat_omp3_l NULL
-	#define SHtor_to_spat_omp3_l NULL
-	#define SHqst_to_spat_omp3_l NULL
+	#define SHsphtor_to_spat_omp_a1_l NULL
+	#define SHsph_to_spat_omp_a1_l NULL
+	#define SHtor_to_spat_omp_a1_l NULL
+	#define SHqst_to_spat_omp_a1_l NULL
+	#define SH_to_spat_omp_a3_l NULL
+	#define SHsphtor_to_spat_omp_a3_l NULL
+	#define SHsph_to_spat_omp_a3_l NULL
+	#define SHtor_to_spat_omp_a3_l NULL
+	#define SHqst_to_spat_omp_a3_l NULL
+	
+	#define SHsphtor_to_spat_omp_b1_l NULL
+	#define SHsph_to_spat_omp_b1_l NULL
+	#define SHtor_to_spat_omp_b1_l NULL
+	#define SHqst_to_spat_omp_b1_l NULL
+	#define SH_to_spat_omp_b3_l NULL
+	#define SHsphtor_to_spat_omp_b3_l NULL
+	#define SHsph_to_spat_omp_b3_l NULL
+	#define SHtor_to_spat_omp_b3_l NULL
+	#define SHqst_to_spat_omp_b3_l NULL
 #endif
 
 void* fomp_a[6][SHT_NTYP] = {

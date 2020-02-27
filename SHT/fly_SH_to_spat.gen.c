@@ -82,8 +82,8 @@ VX		BpF = BtF + nv/2;
 3		BtF = BrF + nv/2;		BpF = BrF + nv;
 	}
 	  #ifdef SHT_GRAD
-S		k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2);
-T		k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2);
+S		memset(BpF, 0, NLAT_2 * sizeof(cplx));
+T		memset(BtF, 0, NLAT_2 * sizeof(cplx));
 	  #endif
 	imlim = MTR;
 	#ifdef SHT_VAR_LTR
@@ -174,6 +174,17 @@ S					to[j] += dy0[j] * vall(Sl0[l-1]);
 T					po[j] -= dy0[j] * vall(Tl0[l-1]);
 				}
 			}
+			// combine even/odd into north/south
+Q			for (int j=0; j<NWAY; ++j) {
+Q				rnd s = re[j] - ro[j];		re[j] = re[j] + ro[j];
+Q				ro[j] = s;
+Q			}
+V			for (int j=0; j<NWAY; ++j) {			
+S				rnd ts = te[j] - to[j];	te[j] = te[j] + to[j];
+T				rnd ps = pe[j] - po[j];	pe[j] = pe[j] + po[j];
+S				to[j] = ts;
+T				po[j] = ps;
+V			}
 		#ifndef SHTNS4MAGIC
 			for (int j=0; j<NWAY; ++j) {
 Q				S2D_STORE(BrF, j+k, re[j], ro[j])
@@ -227,7 +238,7 @@ V		SH2_to_ishioka(xlm, VWl+2*m, llim-m+1);
 		#else
 		k = (k>>1)*2;		// k must be even.
 		#endif
-			const long ofsm = (NPHI-2*im)*NLAT_2;
+		const long ofsm = (NPHI-2*im)*NLAT_2;
 		#ifndef SHTNS4MAGIC
 			#if _GCC_VEC_
 			const long ofs1 = NLAT_2 - k*(VSIZE2/2);
@@ -305,7 +316,9 @@ V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
 V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
-			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
+
+		  if (ny < 0) {		// ylm treated as zero and ignored if ny < 0
+			while (l<llim) {
 				#ifndef SHTNS_ISHIOKA
 				for (int j=0; j<NWAY; ++j) {
 					y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
@@ -315,22 +328,24 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 				}
 				al+=4;
 				#else
-				for (int j=0; j<NWAY; ++j) {
-					rnd tmp = y1[j];
-					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
-					y0[j] = tmp;
-				}
+				rnd a[NWAY];
+				for (int j=0; j<NWAY; ++j)	a[j] = vall(al[1])*cost[j] + vall(al[0]);
 				al+=2;
+				for (int j=0; j<NWAY; ++j) {
+					a[j] = a[j]*y1[j] + y0[j];
+					y0[j] = y1[j];		y1[j] = a[j];
+				}
 				#endif
-				l+=2;
+				l+=2;		// must happen before we may break the loop below:
 				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
-					++ny;
 					for (int j=0; j<NWAY; ++j) {
 						y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
 					}
+					if (++ny == 0) break;
 				}
 			}
-		  if (ny == 0) {
+		  }
+		  if LIKELY(ny == 0) {
 		#ifndef SHTNS_ISHIOKA
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
@@ -354,52 +369,91 @@ Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * q
 V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] * vi(l+1);	}
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 			}
+			// combine even/odd into north/south
+Q			for (int j=0; j<NWAY; ++j) {
+Q				rnd sr = rer[j] - ror[j];	rer[j] = rer[j] + ror[j];
+Q			  	rnd si = rei[j] - roi[j];	rei[j] = rei[j] + roi[j];
+Q				ror[j] = sr;		roi[j] = si;
+Q			}
+V			for (int j=0; j<NWAY; ++j) {			
+V				rnd sr = ter[j] - tor[j];	ter[j] = ter[j] + tor[j];
+V			  	rnd si = tei[j] - toi[j];	tei[j] = tei[j] + toi[j];
+V				tor[j] = sr;		toi[j] = si;
+V				sr = per[j] - por[j];	per[j] = per[j] + por[j];
+V			  	si = pei[j] - poi[j];	pei[j] = pei[j] + poi[j];
+V				por[j] = sr;		poi[j] = si;
+V			}
 		#else
 			while (l<llim) {	// compute even and odd parts
-Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
-Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
-V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
-V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
-V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
-V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
+QX				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+QX				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
+3				for (int j=0; j<NWAY; ++j)	rer[j] += y0[j] * qr(l);
+3				for (int j=0; j<NWAY; ++j)	rei[j] += y0[j] * qi(l);
+3				for (int j=0; j<NWAY; ++j)	ror[j] += y0[j] * qr(l+1);
+3				for (int j=0; j<NWAY; ++j)	roi[j] += y0[j] * qi(l+1);
+V				for (int j=0; j<NWAY; ++j)	ter[j] += y0[j] * vr(l);
+V				for (int j=0; j<NWAY; ++j)	tei[j] += y0[j] * vi(l);
+V				for (int j=0; j<NWAY; ++j)	per[j] += y0[j] * wr(l);
+V				for (int j=0; j<NWAY; ++j)	pei[j] += y0[j] * wi(l);
+V				for (int j=0; j<NWAY; ++j)	tor[j] += y0[j] * vr(l+1);
+V				for (int j=0; j<NWAY; ++j)	toi[j] += y0[j] * vi(l+1);
+V				for (int j=0; j<NWAY; ++j)	por[j] += y0[j] * wr(l+1);
+V				for (int j=0; j<NWAY; ++j)	poi[j] += y0[j] * wi(l+1);
 				for (int j=0; j<NWAY; ++j) {
-					rnd tmp = y1[j];
-					y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
-					y0[j] = tmp;
+					rnd tmp = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+					y0[j] = y1[j];
+					y1[j] = tmp;
 				}
 				l+=2;	al+=2;
 			}
-V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
-V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
-			if (l==llim) {
-V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
-V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
-Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+			for (int j=0; j<NWAY; ++j) cost[j] = vread(ct, k+j);		// read ahead to correct the odd part below
+V			for (int j=0; j<NWAY; ++j)	ter[j] += y0[j] * vr(l);
+V			for (int j=0; j<NWAY; ++j)	tei[j] += y0[j] * vi(l);
+V			for (int j=0; j<NWAY; ++j)	per[j] += y0[j] * wr(l);
+V			for (int j=0; j<NWAY; ++j)	pei[j] += y0[j] * wi(l);
+			if LIKELY(l==llim) {
+V				for (int j=0; j<NWAY; ++j)	tor[j] += y0[j] * vr(l+1);
+V				for (int j=0; j<NWAY; ++j)	toi[j] += y0[j] * vi(l+1);
+V				for (int j=0; j<NWAY; ++j)	por[j] += y0[j] * wr(l+1);
+V				for (int j=0; j<NWAY; ++j)	poi[j] += y0[j] * wi(l+1);
+Q				for (int j=0; j<NWAY; ++j)	rer[j] += y0[j] * qr(l);
+Q				for (int j=0; j<NWAY; ++j)	rei[j] += y0[j] * qi(l);
 			}
 			// correct the odd part:
-			for (int j=0; j<NWAY; ++j) cost[j] = vread(ct, k+j);
-V			for (int j=0; j<NWAY; ++j) {  tor[j] *= cost[j];	toi[j] *= cost[j]; }
-V			for (int j=0; j<NWAY; ++j) {  por[j] *= cost[j];	poi[j] *= cost[j]; }
-Q			for (int j=0; j<NWAY; ++j) {  ror[j] *= cost[j];	roi[j] *= cost[j]; }
+Q		//	for (int j=0; j<NWAY; ++j) {  ror[j] *= cost[j];	roi[j] *= cost[j]; }
+V		//	for (int j=0; j<NWAY; ++j) {  tor[j] *= cost[j];	toi[j] *= cost[j]; }
+V		//	for (int j=0; j<NWAY; ++j) {  por[j] *= cost[j];	poi[j] *= cost[j]; }
+
+			// combine even/odd into north/south, and correct the odd part for free with FMA
+Q			for (int j=0; j<NWAY; ++j) {
+Q				rnd sr = rer[j] - ror[j]*cost[j];	rer[j] = rer[j] + ror[j]*cost[j];
+Q			  	rnd si = rei[j] - roi[j]*cost[j];	rei[j] = rei[j] + roi[j]*cost[j];
+Q				ror[j] = sr;		roi[j] = si;
+Q			}
+V			for (int j=0; j<NWAY; ++j) {
+V				rnd sr = ter[j] - tor[j]*cost[j];	ter[j] = ter[j] + tor[j]*cost[j];
+V			  	rnd si = tei[j] - toi[j]*cost[j];	tei[j] = tei[j] + toi[j]*cost[j];
+V				tor[j] = sr;		toi[j] = si;
+V				sr = per[j] - por[j]*cost[j];	per[j] = per[j] + por[j]*cost[j];
+V			  	si = pei[j] - poi[j]*cost[j];	pei[j] = pei[j] + poi[j]*cost[j];
+V				por[j] = sr;		poi[j] = si;
+V			}
 		#endif
-3			if (robert_form == 0) {
+3			if LIKELY(robert_form == 0) {
 3				for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
 3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
 3			}
 		  }
 		#ifndef SHTNS4MAGIC
 		  #ifdef _GCC_VEC_
-			for (int j=0; j<NWAY; ++j) {
-Q				S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
-V				S2D_CSTORE(BtF, k+j, ter[j], tor[j], tei[j], toi[j])
-V				S2D_CSTORE(BpF, k+j, per[j], por[j], pei[j], poi[j])
-			}
+Q			for (int j=0; j<NWAY; ++j) { S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j]) }
+V			for (int j=0; j<NWAY; ++j) { S2D_CSTORE(BtF, k+j, ter[j], tor[j], tei[j], toi[j]) }
+V			for (int j=0; j<NWAY; ++j) { S2D_CSTORE(BpF, k+j, per[j], por[j], pei[j], poi[j]) }
 		  #else
-			for (int j=0; j<NWAY/2; ++j) {		// NWAY is even when _GCC_VEC_ is not defined
-Q				S2D_CSTOREX(BrF, k/2+j, 2*j, rer, ror, rei, roi)
-V				S2D_CSTOREX(BtF, k/2+j, 2*j, ter, tor, tei, toi)
-V				S2D_CSTOREX(BpF, k/2+j, 2*j, per, por, pei, poi)
-			}
+		  	// NWAY is even when _GCC_VEC_ is not defined
+Q			for (int j=0; j<NWAY/2; ++j) {	S2D_CSTOREX(BrF, k/2+j, 2*j, rer, ror, rei, roi)  }
+V			for (int j=0; j<NWAY/2; ++j) {	S2D_CSTOREX(BtF, k/2+j, 2*j, ter, tor, tei, toi)  }
+V			for (int j=0; j<NWAY/2; ++j) {	S2D_CSTOREX(BpF, k/2+j, 2*j, per, por, pei, poi)  }
 		  #endif
 		#else
 			for (int j=0; j<NWAY; ++j) {
@@ -416,10 +470,16 @@ Q		BrF += NLAT_2;
 V		BtF += NLAT_2;	BpF += NLAT_2;
 	}
 
-	for (k=0; k < NLAT_2*(NPHI-1-2*imlim); ++k) {	// padding for high m's
+	// padding for high m's
+	if (NPHI-1 > 2*imlim) {
+Q		memset(BrF, 0, sizeof(cplx)*( NLAT_2*(NPHI-1-2*imlim) ));
+V		memset(BtF, 0, sizeof(cplx)*( NLAT_2*(NPHI-1-2*imlim) ));
+V		memset(BpF, 0, sizeof(cplx)*( NLAT_2*(NPHI-1-2*imlim) ));
+	}
+	/*for (k=0; k < NLAT_2*(NPHI-1-2*imlim); ++k) {
 Q		BrF[k] = vdup(0.0);
 V		BtF[k] = vdup(0.0);	BpF[k] = vdup(0.0);
-	}
+	}*/
 Q	BrF -= NLAT_2*(imlim+1);		// restore original pointer
 V	BtF -= NLAT_2*(imlim+1);	BpF -= NLAT_2*(imlim+1);
     // NPHI > 1 as SHT_AXISYM is not defined.
@@ -561,6 +621,17 @@ S					to[j] += dy0[j] * vall(Sl0[l-1]);
 T					po[j] -= dy0[j] * vall(Tl0[l-1]);
 				}
 			}
+			// combine even/odd into north/south
+Q			for (int j=0; j<NWAY; ++j) {
+Q				rnd s = re[j] - ro[j];		re[j] = re[j] + ro[j];
+Q				ro[j] = s;
+Q			}
+V			for (int j=0; j<NWAY; ++j) {			
+S				rnd ts = te[j] - to[j];	te[j] = te[j] + to[j];
+T				rnd ps = pe[j] - po[j];	pe[j] = pe[j] + po[j];
+S				to[j] = ts;
+T				po[j] = ps;
+V			}
 		#ifndef SHTNS4MAGIC
 			for (int j=0; j<NWAY; ++j) {
 Q				S2D_CSTORE2(BrF, k+j, re[j], ro[j], vall(0), vall(0))
@@ -625,7 +696,7 @@ V		}
 Q		 	zero_poles2_vect(BrF, NLAT-l, 2*l);
 V		 	zero_poles4_vect(BtF, NLAT-l, BpF-BtF, 2*l);
 		#else
-			#pragma omp simd
+Q			#pragma omp simd
 Q			for (k=0; k<l*4*VSIZE2; k++)	((double*)BrF)[k] = 0.0;
 V			zero_poles2_vect(BtF, BpF-BtF, 4*l);
 		#endif
@@ -720,6 +791,20 @@ Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * q
 V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] * vi(l+1);	}
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 			}
+			// combine even/odd into north/south
+Q			for (int j=0; j<NWAY; ++j) {
+Q				rnd sr = rer[j] - ror[j];	rer[j] = rer[j] + ror[j];
+Q			  	rnd si = rei[j] - roi[j];	rei[j] = rei[j] + roi[j];
+Q				ror[j] = sr;		roi[j] = si;
+Q			}
+V			for (int j=0; j<NWAY; ++j) {			
+V				rnd sr = ter[j] - tor[j];	ter[j] = ter[j] + tor[j];
+V			  	rnd si = tei[j] - toi[j];	tei[j] = tei[j] + toi[j];
+V				tor[j] = sr;		toi[j] = si;
+V				sr = per[j] - por[j];	per[j] = per[j] + por[j];
+V			  	si = pei[j] - poi[j];	pei[j] = pei[j] + poi[j];
+V				por[j] = sr;		poi[j] = si;
+V			}
 3			if (robert_form == 0) {
 3				for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
 3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }

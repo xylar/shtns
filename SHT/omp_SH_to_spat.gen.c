@@ -28,13 +28,13 @@
 # T : line for vector transform, toroidal component.
 
 	static
-3	void GEN3(_sy3o,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
-QX	void GEN3(_sy1o,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, v2d *BrF, long int llim, const int imlim) {
+3	void GEN3(_sy3o,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, const unsigned im, int it0, int it1) {
+QX	void GEN3(_sy1o,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, v2d *BrF, long int llim, const unsigned im, int it0, int it1) {
   #ifndef SHT_GRAD
-VX	void GEN3(_sy2o,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+VX	void GEN3(_sy2o,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const unsigned im, int it0, int it1) {
   #else
-S	void GEN3(_sy1os,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
-T	void GEN3(_sy1ot,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const int imlim) {
+S	void GEN3(_sy1os,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, v2d *BtF, v2d *BpF, const long int llim, const unsigned im, int it0, int it1) {
+T	void GEN3(_sy1ot,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const unsigned im, int it0, int it1) {
   #endif
 
 	#if !defined( _GCC_VEC_ ) && (NWAY & 1)
@@ -53,9 +53,7 @@ V	#define vr(l) vall( ((double*) VWl)[4*(l)]   )
 V	#define vi(l) vall( ((double*) VWl)[4*(l)+1] )
 V	#define wr(l) vall( ((double*) VWl)[4*(l)+2] )
 V	#define wi(l) vall( ((double*) VWl)[4*(l)+3] )
-	unsigned im;
   #endif
-	unsigned m0, mstep;
 	long int nk,k,l,m;
 	double *alm, *al;
 	double *ct, *st;
@@ -67,24 +65,20 @@ V	v2d VWl[llim*2+4];
   #endif
 
 	ct = shtns->ct;		st = shtns->st;
-	nk = NLAT_2;
+	nk = it1;	//NLAT_2;
 	#if _GCC_VEC_
 		nk = ((unsigned)(nk+VSIZE2-1)) / VSIZE2;
+		it0 = ((unsigned)(it0+VSIZE2-1)) / VSIZE2;
 	#endif
 V	robert_form = shtns->robert_form;
 
-	#ifndef _OPENMP
-		m0 = 0;		mstep = 1;
-	#else
-		m0 = omp_get_thread_num();
-		mstep = omp_get_num_threads();
-		if (m0 == 0)
-	#endif
+	if (im == 0)
 	{	//	im=0;
 S		double* const Sl0 = (double*) VWl;
 T		double* const Tl0 = (double*) VWl + llim+2;
 3		double* const Ql0 = (double*) (VWl + llim+2);
 		#ifdef SHT_GRAD
+			// TODO: fix k,nk bounds
 		  #ifndef SHT_AXISYM
 S				k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2);
 T				k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2);
@@ -102,7 +96,7 @@ S			Sl0[l-1] = creal( Slm[l] );	//	Sl[l] = (double) Slm[l+1];
 T			Tl0[l-1] = creal( Tlm[l] );	//	Tl[l] = (double) Tlm[l+1];
 			++l;
 		} while(l<=llim);
-		k=0;
+		k=it0;
 		do {
 			l=0;	al = alm;
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
@@ -164,6 +158,17 @@ S					to[j] += dy0[j] * vall(Sl0[l-1]);
 T					po[j] -= dy0[j] * vall(Tl0[l-1]);
 				}
 			}
+			// combine even/odd into north/south
+Q			for (int j=0; j<NWAY; ++j) {
+Q				rnd s = re[j] - ro[j];		re[j] = re[j] + ro[j];
+Q				ro[j] = s;
+Q			}
+V			for (int j=0; j<NWAY; ++j) {			
+S				rnd ts = te[j] - to[j];	te[j] = te[j] + to[j];
+T				rnd ps = pe[j] - po[j];	pe[j] = pe[j] + po[j];
+S				to[j] = ts;
+T				po[j] = ps;
+V			}
 		#ifndef SHTNS4MAGIC
 			for (int j=0; j<NWAY; ++j) {
 Q				S2D_STORE(BrF, j+k, re[j], ro[j])
@@ -180,13 +185,12 @@ T				S2D_STORE_4MAGIC((double*)BpF, j+k, pe[j], po[j]);
 		#endif
 			k+=NWAY;
 		} while (k < nk);
-		m0=mstep;
 	}
-
   #ifndef SHT_AXISYM
-Q		BrF += m0*NLAT_2;
-V		BtF += m0*NLAT_2;	BpF += m0*NLAT_2;
-	for (im=m0; im<imlim; im+=mstep) {
+	else
+	{		// im > 0
+Q		BrF += im*NLAT_2;
+V		BtF += im*NLAT_2;	BpF += im*NLAT_2;
 		m = im*MRES;
 		l = (im*(2*(LMAX+1)-(m+MRES)))>>1;		//l = LiM(shtns, 0,im);
 		#ifndef SHTNS_ISHIOKA
@@ -219,6 +223,7 @@ V		SH2_to_ishioka(xlm, VWl+2*m, llim-m+1);
 		#else
 		k = (k>>1)*2;		// k must be even.
 		#endif
+		if (it0 < k) {
 			const long ofsm = (NPHI-2*im)*NLAT_2;
 		#ifndef SHTNS4MAGIC
 			#if _GCC_VEC_
@@ -226,14 +231,15 @@ V		SH2_to_ishioka(xlm, VWl+2*m, llim-m+1);
 			#else
 			const long ofs1 = NLAT_2 - k/2;
 			#endif
-Q			zero_poles4_vect(BrF, ofsm, ofs1, k);
-V			zero_poles4_vect(BtF, ofsm, ofs1, k);
-V			zero_poles4_vect(BpF, ofsm, ofs1, k);
+Q			zero_poles4_vect(BrF+it0*(VSIZE2/2), ofsm, ofs1, k-it0);
+V			zero_poles4_vect(BtF+it0*(VSIZE2/2), ofsm, ofs1, k-it0);
+V			zero_poles4_vect(BpF+it0*(VSIZE2/2), ofsm, ofs1, k-it0);
 		#else
-Q			zero_poles2_vect(BrF, ofsm, 2*k);
-V			zero_poles2_vect(BtF, ofsm, 2*k);
-V			zero_poles2_vect(BpF, ofsm, 2*k);
+Q			zero_poles2_vect(BrF+it0*VSIZE2, ofsm, 2*(k-it0));
+V			zero_poles2_vect(BtF+it0*VSIZE2, ofsm, 2*(k-it0));
+V			zero_poles2_vect(BpF+it0*VSIZE2, ofsm, 2*(k-it0));
 		#endif
+		} else k=it0;
 
 		do {
 			rnd cost[NWAY], y0[NWAY], y1[NWAY];
@@ -294,32 +300,31 @@ V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
 V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
-			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
+		  if (ny != 0) {		// ylm treated as zero and ignored if ny < 0
+			const rnd scale = vall(1.0/SHT_SCALE_FACTOR);
+			while (l<llim) {
 				#ifndef SHTNS_ISHIOKA
-				for (int j=0; j<NWAY; ++j) {
-					y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
-				}
-				for (int j=0; j<NWAY; ++j) {
-					y1[j] = (vall(al[3])*cost[j])*y0[j] + vall(al[2])*y1[j];
-				}
-				l+=2;	al+=4;
+				for (int j=0; j<NWAY; ++j)	y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
+				for (int j=0; j<NWAY; ++j)	y1[j] = (vall(al[3])*cost[j])*y0[j] + vall(al[2])*y1[j];
+				al+=4;
 				#else
 				rnd a[NWAY];
 				for (int j=0; j<NWAY; ++j)	a[j] = vall(al[1])*cost[j] + vall(al[0]);
-				l+=2;	al+=2;
+				al+=2;
 				for (int j=0; j<NWAY; ++j) {
-					rnd tmp = y1[j];
-					y1[j] = a[j]*y1[j] + y0[j];
-					y0[j] = tmp;
+					a[j] = a[j]*y1[j] + y0[j];
+					y0[j] = y1[j];		y1[j] = a[j];
 				}
 				#endif
+				l+=2;
 				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
-					++ny;
 					for (int j=0; j<NWAY; ++j) {
-						y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
+						y0[j] *= scale;		y1[j] *= scale;
 					}
+					if (++ny == 0) break;
 				}
 			}
+		  }
 		  if (ny == 0) {
 		#ifndef SHTNS_ISHIOKA
 			while (l<llim) {	// compute even and odd parts
@@ -344,79 +349,103 @@ Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * q
 V				for (int j=0; j<NWAY; ++j) {	tor[j] += y1[j]  * vr(l+1);		toi[j] += y1[j] * vi(l+1);	}
 V				for (int j=0; j<NWAY; ++j) {	por[j] += y1[j]  * wr(l+1);		poi[j] += y1[j] * wi(l+1);	}
 			}
+			// combine even/odd into north/south
+Q			for (int j=0; j<NWAY; ++j) {
+Q				rnd sr = rer[j] - ror[j];	rer[j] = rer[j] + ror[j];
+Q			  	rnd si = rei[j] - roi[j];	rei[j] = rei[j] + roi[j];
+Q				ror[j] = sr;		roi[j] = si;
+Q			}
+V			for (int j=0; j<NWAY; ++j) {			
+V				rnd sr = ter[j] - tor[j];	ter[j] = ter[j] + tor[j];
+V			  	rnd si = tei[j] - toi[j];	tei[j] = tei[j] + toi[j];
+V				tor[j] = sr;		toi[j] = si;
+V				sr = per[j] - por[j];	per[j] = per[j] + por[j];
+V			  	si = pei[j] - poi[j];	pei[j] = pei[j] + poi[j];
+V				por[j] = sr;		poi[j] = si;
+V			}
 		#else
 			while (l<llim) {	// compute even and odd parts
-Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
-Q				for (int j=0; j<NWAY; ++j) {	ror[j] += y0[j]  * qr(l+1);		roi[j] += y0[j] * qi(l+1);	}
-V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
-V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
-V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
-V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
-				rnd aa[NWAY];
-				for (int j=0; j<NWAY; ++j) aa[j] = vall(al[1])*cost[j] + vall(al[0]);
-				l+=2;	al+=2;
+Q				for (int j=0; j<NWAY; ++j)	rer[j] += y0[j] * qr(l);
+Q				for (int j=0; j<NWAY; ++j)	rei[j] += y0[j] * qi(l);
+Q				for (int j=0; j<NWAY; ++j)	ror[j] += y0[j] * qr(l+1);
+Q				for (int j=0; j<NWAY; ++j)	roi[j] += y0[j] * qi(l+1);
+V				for (int j=0; j<NWAY; ++j)	ter[j] += y0[j] * vr(l);
+V				for (int j=0; j<NWAY; ++j)	tei[j] += y0[j] * vi(l);
+V				for (int j=0; j<NWAY; ++j)	per[j] += y0[j] * wr(l);
+V				for (int j=0; j<NWAY; ++j)	pei[j] += y0[j] * wi(l);
+V				for (int j=0; j<NWAY; ++j)	tor[j] += y0[j] * vr(l+1);
+V				for (int j=0; j<NWAY; ++j)	toi[j] += y0[j] * vi(l+1);
+V				for (int j=0; j<NWAY; ++j)	por[j] += y0[j] * wr(l+1);
+V				for (int j=0; j<NWAY; ++j)	poi[j] += y0[j] * wi(l+1);
 				for (int j=0; j<NWAY; ++j) {
-					rnd tmp = y1[j];
-					y1[j] = aa[j]*y1[j] + y0[j];
-					y0[j] = tmp;
+					rnd tmp = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
+					y0[j] = y1[j];
+					y1[j] = tmp;
 				}
+				l+=2;	al+=2;
 			}
-V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
-V				for (int j=0; j<NWAY; ++j) {	per[j] += y0[j]  * wr(l);		pei[j] += y0[j] * wi(l);	}
+			for (int j=0; j<NWAY; ++j) cost[j] = vread(ct, k+j);		// read ahead to correct the odd part below
+V			for (int j=0; j<NWAY; ++j)	ter[j] += y0[j] * vr(l);
+V			for (int j=0; j<NWAY; ++j)	tei[j] += y0[j] * vi(l);
+V			for (int j=0; j<NWAY; ++j)	per[j] += y0[j] * wr(l);
+V			for (int j=0; j<NWAY; ++j)	pei[j] += y0[j] * wi(l);
 			if (l==llim) {
-V				for (int j=0; j<NWAY; ++j) {	tor[j] += y0[j]  * vr(l+1);		toi[j] += y0[j] * vi(l+1);	}
-V				for (int j=0; j<NWAY; ++j) {	por[j] += y0[j]  * wr(l+1);		poi[j] += y0[j] * wi(l+1);	}
-Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
+V				for (int j=0; j<NWAY; ++j)	tor[j] += y0[j] * vr(l+1);
+V				for (int j=0; j<NWAY; ++j)	toi[j] += y0[j] * vi(l+1);
+V				for (int j=0; j<NWAY; ++j)	por[j] += y0[j] * wr(l+1);
+V				for (int j=0; j<NWAY; ++j)	poi[j] += y0[j] * wi(l+1);
+Q				for (int j=0; j<NWAY; ++j)	rer[j] += y0[j] * qr(l);
+Q				for (int j=0; j<NWAY; ++j)	rei[j] += y0[j] * qi(l);
 			}
 			// correct the odd part:
-			for (int j=0; j<NWAY; ++j) cost[j] = vread(ct, k+j);
-V			for (int j=0; j<NWAY; ++j) {  tor[j] *= cost[j];	toi[j] *= cost[j]; }
-V			for (int j=0; j<NWAY; ++j) {  por[j] *= cost[j];	poi[j] *= cost[j]; }
-Q			for (int j=0; j<NWAY; ++j) {  ror[j] *= cost[j];	roi[j] *= cost[j]; }
+Q		//	for (int j=0; j<NWAY; ++j) {  ror[j] *= cost[j];	roi[j] *= cost[j]; }
+V		//	for (int j=0; j<NWAY; ++j) {  tor[j] *= cost[j];	toi[j] *= cost[j]; }
+V		//	for (int j=0; j<NWAY; ++j) {  por[j] *= cost[j];	poi[j] *= cost[j]; }
+
+			// combine even/odd into north/south, and correct the odd part for free with FMA
+Q			for (int j=0; j<NWAY; ++j) {
+Q				rnd sr = rer[j] - ror[j]*cost[j];	rer[j] = rer[j] + ror[j]*cost[j];
+Q			  	rnd si = rei[j] - roi[j]*cost[j];	rei[j] = rei[j] + roi[j]*cost[j];
+Q				ror[j] = sr;		roi[j] = si;
+Q			}
+V			for (int j=0; j<NWAY; ++j) {
+V				rnd sr = ter[j] - tor[j]*cost[j];	ter[j] = ter[j] + tor[j]*cost[j];
+V			  	rnd si = tei[j] - toi[j]*cost[j];	tei[j] = tei[j] + toi[j]*cost[j];
+V				tor[j] = sr;		toi[j] = si;
+V				sr = per[j] - por[j]*cost[j];	per[j] = per[j] + por[j]*cost[j];
+V			  	si = pei[j] - poi[j]*cost[j];	pei[j] = pei[j] + poi[j]*cost[j];
+V				por[j] = sr;		poi[j] = si;
+V			}
 		#endif
 3			if (robert_form == 0) {
 3				for (int j=0; j<NWAY; ++j) cost[j]  = vread(st, k+j);
-3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  ror[j] *= cost[j];	rei[j] *= cost[j];  roi[j] *= cost[j];  }
+3				for (int j=0; j<NWAY; ++j) {  rer[j] *= cost[j];  rei[j] *= cost[j];  ror[j] *= cost[j];	roi[j] *= cost[j];  }
 3			}
 		  }
 		#ifndef SHTNS4MAGIC
 		  #ifdef _GCC_VEC_
 			for (int j=0; j<NWAY; ++j) {
-Q				S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
 V				S2D_CSTORE(BtF, k+j, ter[j], tor[j], tei[j], toi[j])
 V				S2D_CSTORE(BpF, k+j, per[j], por[j], pei[j], poi[j])
+Q				S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j])
 			}
 		  #else
 			for (int j=0; j<NWAY/2; ++j) {		// NWAY is even when _GCC_VEC_ is not defined
-Q				S2D_CSTOREX(BrF, k/2+j, 2*j, rer, ror, rei, roi)
 V				S2D_CSTOREX(BtF, k/2+j, 2*j, ter, tor, tei, toi)
 V				S2D_CSTOREX(BpF, k/2+j, 2*j, per, por, pei, poi)
+Q				S2D_CSTOREX(BrF, k/2+j, 2*j, rer, ror, rei, roi)
 			}
 		  #endif
 		#else
 			for (int j=0; j<NWAY; ++j) {
 				if ((k+j)>=nk) break;
-Q				S2D_CSTORE_4MAGIC((double*)BrF, (double*) (BrF + (NPHI-2*im)*NLAT_2), k+j, rer[j], ror[j], rei[j], roi[j]);
 V				S2D_CSTORE_4MAGIC((double*)BtF, (double*) (BtF + (NPHI-2*im)*NLAT_2), k+j, ter[j], tor[j], tei[j], toi[j]);
 V				S2D_CSTORE_4MAGIC((double*)BpF, (double*) (BpF + (NPHI-2*im)*NLAT_2), k+j, per[j], por[j], pei[j], poi[j]);
+Q				S2D_CSTORE_4MAGIC((double*)BrF, (double*) (BrF + (NPHI-2*im)*NLAT_2), k+j, rer[j], ror[j], rei[j], roi[j]);
 			}
 		#endif
 			k+=NWAY;
 		} while (k < nk);
-
-Q		BrF += mstep*NLAT_2;
-V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
-	}
-
-	while(im <= NPHI-imlim) {	// padding for high m's
-		k=0;
-		do {
-Q			BrF[k] = vdup(0.0);
-V			BtF[k] = vdup(0.0);		BpF[k] = vdup(0.0);
-		} while (++k < NLAT_2);
-Q		BrF += mstep*NLAT_2;
-V		BtF += mstep*NLAT_2;	BpF += mstep*NLAT_2;
-	  im+=mstep;
 	}
   #endif
 }
@@ -455,18 +484,43 @@ VX		BpF = BtF + nv/2;
 3		BtF = BrF + nv/2;		BpF = BrF + nv;
 	}
   #endif
-	imlim += 1;
   
   #pragma omp parallel num_threads(shtns->nthreads)
   {
-3	GEN3(_sy3o,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim);
-QX	GEN3(_sy1o,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim);
+	  int it0 = 0;
+	  int it1 = NLAT_2;
+	  const int it_step = NLAT_2 / shtns->nthreads;
+	#pragma omp for schedule(dynamic,1) collapse(1) nowait
+	//for (int it0=0; it0<NLAT_2; it0 += it_step)
+	for (int im=0; im <= imlim/2; im++)
+	{
+		//it1 = it0 + it_step;
+3		GEN3(_sy3o,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
+QX		GEN3(_sy1o,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
+		if (imlim-im > im) {
+3			GEN3(_sy3o,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim-im, it0, it1);
+QX			GEN3(_sy1o,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim-im, it0, it1);
+		}
 	#ifndef SHT_GRAD
-VX		GEN3(_sy2o,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
+VX		GEN3(_sy2o,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
+		if (imlim-im > im) {
+VX			GEN3(_sy2o,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim-im, it0, it1);			
+		}
 	#else
-S		GEN3(_sy1os,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
-T		GEN3(_sy1ot,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
+S		GEN3(_sy1os,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
+T		GEN3(_sy1ot,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
 	#endif
+	}
+
+	// padding for high m's
+	if (NPHI-1 > 2*imlim) {
+		#pragma omp for schedule(dynamic) nowait
+		for (int im=imlim+1; im < NPHI-imlim; im++)  {
+Q			memset(BrF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
+V			memset(BtF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
+V			memset(BpF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
+		}
+	}
   }
 
   #ifndef SHT_AXISYM
@@ -516,31 +570,56 @@ VX		BpF = BtF + nv/2;
 3		BtF = BrF + nv/2;		BpF = BrF + nv;
 	}
   #endif
-	imlim += 1;
-  
+
   #pragma omp parallel num_threads(shtns->nthreads)
   {
-3	GEN3(_sy3o,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim);
-QX	GEN3(_sy1o,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim);
+	const int it0=0;
+	const int it1=NLAT_2;
+	#pragma omp for schedule(static,1) nowait
+	for (int im=0; im<=imlim; im++)
+	{
+		#if NWAY < 2
+3		GEN3(_sy3o,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
+QX		GEN3(_sy1o,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
 	#ifndef SHT_GRAD
-VX		GEN3(_sy2o,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim);
+VX		GEN3(_sy2o,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
 	#else
-S		GEN3(_sy1os,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim);
-T		GEN3(_sy1ot,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim);
+S		GEN3(_sy1os,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
+T		GEN3(_sy1ot,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
 	#endif
+		#else
+Q		GEN3(_sy1o,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
+	#ifndef SHT_GRAD
+V		GEN3(_sy2o,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
+	#else
+S		GEN3(_sy1os,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
+T		GEN3(_sy1ot,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
+	#endif
+		#endif
+	}
+
+	// padding for high m's
+	if (NPHI-1 > 2*imlim) {
+		#pragma omp for schedule(static) nowait
+		for (int im=imlim+1; im < NPHI-imlim; im++)  {
+Q			memset(BrF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
+V			memset(BtF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
+V			memset(BpF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
+		}
+	}
 
 	if (shtns->fftc_mode >= 0) {
 		const int nblk = (NLAT/2) / shtns->nthreads;
 		#pragma omp barrier
 		if (shtns->fftc_mode != 1) {
-			#pragma omp for schedule(static)
+			#pragma omp for schedule(static) nowait
 			for (int k=0; k<shtns->nthreads; k++) {
 Q				fftw_execute_dft(shtns->ifftc_block, ((cplx *) BrF) + k*nblk, ((cplx *) Vr) + k*nblk);
 V				fftw_execute_dft(shtns->ifftc_block, ((cplx *) BtF) + k*nblk, ((cplx *) Vt) + k*nblk);
 V				fftw_execute_dft(shtns->ifftc_block, ((cplx *) BpF) + k*nblk, ((cplx *) Vp) + k*nblk);
 			}
 		} else {
-			#pragma omp for schedule(static)
+			#pragma omp for schedule(static) nowait
 			for (int k=0; k<shtns->nthreads; k++) {
 Q				fftw_execute_split_dft(shtns->ifftc_block,((double*)BrF)+1 +2*k*nblk, ((double*)BrF) +2*k*nblk, Vr+NPHI*(1+2*k*nblk), Vr +NPHI*2*k*nblk);
 V				fftw_execute_split_dft(shtns->ifftc_block,((double*)BtF)+1 +2*k*nblk, ((double*)BtF) +2*k*nblk, Vt+NPHI*(1+2*k*nblk), Vt +NPHI*2*k*nblk);
