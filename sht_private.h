@@ -263,157 +263,43 @@ struct DtDp {		// theta and phi derivatives stored together.
 
 // compute symmetric and antisymmetric parts, and reorganize data.
 #ifndef SHTNS4MAGIC
-  #define SYM_ASYM_M0_V(F, er, od) { \
+  #define SYM_ASYM_M0_V(F, eo) { \
 	long int k=0; do { \
 		double an = F[k*k_inc];				double bn = F[k*k_inc +1]; \
 		double bs = F[(NLAT-2-k)*k_inc];	double as = F[(NLAT-2-k)*k_inc +1]; \
-		er[k] = an+as;			od[k] = an-as; \
-		er[k+1] = bn+bs;		od[k+1] = bn-bs; \
+		unsigned long kk = (((unsigned)k) % VSIZE2) + 2*VSIZE2*(((unsigned)k)/VSIZE2); \
+		eo[kk] = an+as;		eo[kk + VSIZE2] = an-as; \
+		eo[kk+1+(VSIZE2==1)] = bn+bs;		eo[kk+1 + VSIZE2 + (VSIZE2==1)] = bn-bs; \
 		k+=2; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_M0_Q(F, er, od, acc0) { \
+  #define SYM_ASYM_M0_Q(F, eo, acc0) { \
 	double r0a = 0.0;	double r0b = 0.0; \
 	long int k=0; do { \
 		double an = F[k*k_inc];				double bn = F[k*k_inc +1]; \
 		double bs = F[(NLAT-2-k)*k_inc];	double as = F[(NLAT-2-k)*k_inc +1]; \
-		er[k] = an+as;			od[k] = an-as; \
-		er[k+1] = bn+bs;		od[k+1] = bn-bs; \
+		unsigned long kk = (((unsigned)k) % VSIZE2) + 2*VSIZE2*(((unsigned)k)/VSIZE2); \
+		eo[kk] = an+as;			eo[kk + VSIZE2] = an-as; \
+		eo[kk+1+(VSIZE2==1)] = bn+bs;		eo[kk+1 + VSIZE2 + (VSIZE2==1)] = bn-bs; \
 		r0a += (an+as)*wg[k];	r0b += (bn+bs)*wg[k+1]; \
 		k+=2; \
 	} while(k < nk*VSIZE2); 	acc0 = r0a+r0b; }
-  #define SYM_ASYM_Q(F, er, od, ei, oi, k0v) { \
-	long int k = ((k0v*VSIZE2)>>1)*2; \
-	do { \
-		double an, bn, ani, bni, bs, as, bsi, asi, t; \
-		ani = F[im*m_inc + k*k_inc];		bni = F[im*m_inc + k*k_inc +1]; \
-		an  = F[(NPHI-im)*m_inc + k*k_inc];	bn = F[(NPHI-im)*m_inc + k*k_inc +1]; \
-		t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t; \
-		bsi = F[im*m_inc + (NLAT-2 -k)*k_inc];		asi = F[im*m_inc + (NLAT-2-k)*k_inc + 1]; \
-		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
-		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
-		er[k] = an+as;		ei[k] = ani+asi;		er[k+1] = bn+bs;		ei[k+1] = bni+bsi; \
-		od[k] = an-as;		oi[k] = ani-asi;		od[k+1] = bn-bs;		oi[k+1] = bni-bsi; \
-		k+=2; \
-		} while (k<nk*VSIZE2); }
-  #define SYM_ASYM_Q3(F, er, od, ei, oi, k0v) { \
-	long int k = ((k0v*VSIZE2)>>1)*2; \
-	do { \
-		double an, bn, ani, bni, bs, as, bsi, asi, t; \
-		double sina = st[k];	double sinb = st[k+1]; \
-		ani = F[im*m_inc + k*k_inc];		bni = F[im*m_inc + k*k_inc +1]; \
-		an  = F[(NPHI-im)*m_inc + k*k_inc];	bn = F[(NPHI-im)*m_inc + k*k_inc +1]; \
-		t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t; \
-		bsi = F[im*m_inc + (NLAT-2 -k)*k_inc];		asi = F[im*m_inc + (NLAT-2-k)*k_inc + 1]; \
-		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
-		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
-		er[k] = (an+as)*sina;	ei[k] = (ani+asi)*sina;		er[k+1] = (bn+bs)*sinb;		ei[k+1] = (bni+bsi)*sinb; \
-		od[k] = (an-as)*sina;	oi[k] = (ani-asi)*sina;		od[k+1] = (bn-bs)*sinb;		oi[k+1] = (bni-bsi)*sinb; \
-		k+=2; \
-		} while (k<nk*VSIZE2); }
-  #define SYM_ASYM_V SYM_ASYM_Q
-  #define SYM_ASYM_Q_ISH(F, er, od, ei, oi, k0v) { \
-	long int k = ((k0v*VSIZE2)>>1)*2; \
-	do { \
-		double an, bn, ani, bni, bs, as, bsi, asi, t; \
-		double wa = wg[k];	double wb = wg[k+1]; \
-		ani = F[im*m_inc + k*k_inc];		bni = F[im*m_inc + k*k_inc +1]; \
-		an  = F[(NPHI-im)*m_inc + k*k_inc];	bn = F[(NPHI-im)*m_inc + k*k_inc +1]; \
-		t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t; \
-		bsi = F[im*m_inc + (NLAT-2 -k)*k_inc];		asi = F[im*m_inc + (NLAT-2-k)*k_inc + 1]; \
-		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
-		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
-		er[k] = (an+as)*wa;		ei[k] = (ani+asi)*wa;		er[k+1] = (bn+bs)*wb;		ei[k+1] = (bni+bsi)*wb; \
-		wa *= ct[k];	wb *= ct[k+1]; \
-		od[k] = (an-as)*wa;		oi[k] = (ani-asi)*wa;		od[k+1] = (bn-bs)*wb;		oi[k+1] = (bni-bsi)*wb; \
-		k+=2; \
-		} while (k<nk*VSIZE2); }
-  #define SYM_ASYM_Q3_ISH(F, er, od, ei, oi, k0v) { \
-	long int k = ((k0v*VSIZE2)>>1)*2; \
-	do { \
-		double an, bn, ani, bni, bs, as, bsi, asi, t; \
-		double sina = st[k]*wg[k];	double sinb = st[k+1]*wg[k+1]; \
-		ani = F[im*m_inc + k*k_inc];		bni = F[im*m_inc + k*k_inc +1]; \
-		an  = F[(NPHI-im)*m_inc + k*k_inc];	bn = F[(NPHI-im)*m_inc + k*k_inc +1]; \
-		t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t; \
-		bsi = F[im*m_inc + (NLAT-2 -k)*k_inc];		asi = F[im*m_inc + (NLAT-2-k)*k_inc + 1]; \
-		bs = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc];	as = F[(NPHI-im)*m_inc +(NLAT-2-k)*k_inc +1]; \
-		t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t; \
-		er[k] = (an+as)*sina;	ei[k] = (ani+asi)*sina;		er[k+1] = (bn+bs)*sinb;		ei[k+1] = (bni+bsi)*sinb; \
-		sina *= ct[k];		sinb *= ct[k+1]; \
-		od[k] = (an-as)*sina;	oi[k] = (ani-asi)*sina;		od[k+1] = (bn-bs)*sinb;		oi[k+1] = (bni-bsi)*sinb; \
-		k+=2; \
-		} while (k<nk*VSIZE2); }
-  #define SYM_ASYM_V_ISH SYM_ASYM_Q_ISH
 #else /* SHTNS4MAGIC */
-  #define SYM_ASYM_M0_V(F, er, od) { \
+  #define SYM_ASYM_M0_V(F, eo) { \
 	long int k=0; do { \
 		double an = F[2*k*k_inc];		double as = F[2*k*k_inc +1]; \
-		er[k] = an+as;			od[k] = an-as; \
+		unsigned long kk = (((unsigned)k) % VSIZE2) + 2*VSIZE2*(((unsigned)k)/VSIZE2); \
+		eo[kk] = an+as;			eo[kk +VSIZE2] = an-as; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_M0_Q(F, er, od, acc0) { \
+  #define SYM_ASYM_M0_Q(F, eo, acc0) { \
 	acc0 = 0.0; \
 	long int k=0; do { \
 		double an = F[2*k*k_inc];	double as = F[2*k*k_inc +1]; \
-		er[k] = (an+as);			od[k] = (an-as); \
+		unsigned long kk = (((unsigned)k) % VSIZE2) + 2*VSIZE2*(((unsigned)k)/VSIZE2); \
+		eo[kk] = (an+as);			eo[kk +VSIZE2] = (an-as); \
 		acc0 += (an+as)*wg[k]; \
 		k+=1; \
 	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_Q(F, er, od, ei, oi, k0v) { \
-	k = ((k0v*VSIZE2)>>1)*2; \
-	do { \
-		double ar,ai,br,bi, sr,si,nr,ni; \
-		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
-		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
-		nr = ar + br;		ni = ai - bi; \
-		sr = ai + bi;		si = br - ar; \
-		er[k] = nr+sr;		ei[k] = ni+si; \
-		od[k] = nr-sr;		oi[k] = ni-si; \
-		k+=1; \
-	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_Q3(F, er, od, ei, oi, k0v) { \
-	k = ((k0v*VSIZE2)>>1)*2; \
-	do { \
-		double ar,ai,br,bi, sr,si,nr,ni; \
-		double sina = st[k]; \
-		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
-		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
-		nr = (ar + br)*sina;		ni = (ai - bi)*sina; \
-		sr = (ai + bi)*sina;		si = (br - ar)*sina; \
-		er[k] = nr+sr;		ei[k] = ni+si; \
-		od[k] = nr-sr;		oi[k] = ni-si; \
-		k+=1; \
-	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_V SYM_ASYM_Q
-  #define SYM_ASYM_Q_ISH(F, er, od, ei, oi, k0v) { \
-	k = ((k0v*VSIZE2)>>1)*2; \
-	do { \
-		double ar,ai,br,bi, sr,si,nr,ni; \
-		double w = wg[k]; \
-		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
-		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
-		nr = ar + br;		ni = ai - bi; \
-		sr = ai + bi;		si = br - ar; \
-		er[k] = (nr+sr)*w;		ei[k] = (ni+si)*w; \
-		w *= ct[k]; \
-		od[k] = (nr-sr)*w;		oi[k] = (ni-si)*w; \
-		k+=1; \
-	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_Q3_ISH(F, er, od, ei, oi, k0v) { \
-	k = ((k0v*VSIZE2)>>1)*2; \
-	do { \
-		double ar,ai,br,bi, sr,si,nr,ni; \
-		double sina = st[k]*wg[k]; \
-		br = F[im*m_inc + 2*k*k_inc];			bi = F[im*m_inc + 2*k*k_inc +1]; \
-		ar = F[(NPHI-im)*m_inc + 2*k*k_inc];	ai = F[(NPHI-im)*m_inc + 2*k*k_inc +1]; \
-		nr = ar + br;		ni = ai - bi; \
-		sr = ai + bi;		si = br - ar; \
-		er[k] = (nr+sr)*sina;		ei[k] = (ni+si)*sina; \
-		sina *= ct[k]; \
-		od[k] = (nr-sr)*sina;		oi[k] = (ni-si)*sina; \
-		k+=1; \
-	} while(k < nk*VSIZE2); }
-  #define SYM_ASYM_V_ISH SYM_ASYM_Q_ISH
 #endif
 
 
@@ -890,66 +776,89 @@ static void zero_poles2_vect(v2d* F0, long ofsm, long n) {
 	}
 }
 
-/*
-// Fm = F + im*m_inc
-// Fm2 = F + (NPHI-im)*m_inc
-static void sym_asym_q1(double* Fm, double* Fm2, double* eori, int k0v, unsigned nlat, int nway)
-{
-    unsigned nk = ((((nlat+1)/2) +VSIZE2-1)/VSIZE2)*VSIZE2;
-    k0v *= VSIZE2;
-    int k;
-    #pragma omp simd
-    for (k=k0v; k<nk; k+=2) {
-        double an, bn, ani, bni, bs, as, bsi, asi, t;
-        ani = Fm[k];	bni = Fm[k+1];
-        an  = Fm2[k];	bn = Fm2[k+1];
-        t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
-        bsi = Fm[nlat-2-k];	asi = Fm[nlat-2-k +1];
-        bs = Fm2[nlat-2-k];	as = Fm2[nlat-2-k +1];
-        t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
-        int k0 = (k&(VSIZE2-1));
-        int k1 = (k/VSIZE2)*4*VSIZE2;
-        eori[k1 + k0] = an+as;			eori[k1 +k0+1] = bn+bs;			// even real
-        eori[k1+VSIZE2 +k0] = ani+asi;	eori[k1+VSIZE2 +k0+1] = bni+bsi;		// even imag
-        eori[k1+2*VSIZE2 +k0] = an-as;		eori[k1+2*VSIZE2 +k0+1] = bn-bs;		// odd real
-        eori[k1+3*VSIZE2 +k0] = ani-asi;	eori[k1+3*VSIZE2 +k0+1] = bni-bsi;		// odd imag
-        //er[k] = an+as;		ei[k] = ani+asi;		er[k+1] = bn+bs;		ei[k+1] = bni+bsi;
-        //od[k] = an-as;		oi[k] = ani-asi;		od[k+1] = bn-bs;		oi[k+1] = bni-bsi;
-    }
-    k*=4;
-    for (; k<4*(nk+nway*VSIZE2); k++) eori[k] = 0.0;		// allow overflow
-}
-
-static void sym_asym_q1vec(double* Fm, double* Fm2, double* eori, int k0v, unsigned nlat, int nway)
-{
-    unsigned nk = ((((nlat+1)/2) +VSIZE2-1)/VSIZE2)*VSIZE2;
-    k0v *= VSIZE2;
-    int k;
-    for (k=k0v; k<nk; k+=VSIZE2) {
-		rnd a = vread(Fm+k, 0);
-		rnd b = vread(Fm2+k, 0);
-		rnd xm = a-b;		rnd xp = a+b;
-		xm = vxchg_even_odd(xm);
-		xm = vneg_even_inloop(xm);
-
-		rnd c = vread(Fm+(nlat-VSIZE2-k), 0);
-		rnd d = vread(Fm2+(nlat-VSIZE2-k), 0);
-		rnd yp = vreverse(c+d);
-		rnd ym = d-c;
-		ym = vneg_even_inloop(ym);
-		ym = vreverse_pairs(ym);
-
-		vstor(eori+4*k, 0, xp+yp);
-		vstor(eori+4*k, 1, xm+ym);
-		vstor(eori+4*k, 2, xp-yp);
-		vstor(eori+4*k, 3, xm-ym);
-    }
-    for ( ; k<nk+nway*VSIZE2; k+=VSIZE2) {		// allow overflow
-		vstor(eori+4*k, 0, vall(0.0));
-		vstor(eori+4*k, 1, vall(0.0));
-		vstor(eori+4*k, 2, vall(0.0));
-		vstor(eori+4*k, 3, vall(0.0));
+static void zero_mem(v2d* F0, long n) {
+	#pragma omp simd
+	for (long i=0; i<n*VSIZE2; i++) {
+		((double*)F0)[i] = 0.0;
 	}
 }
 
-*/
+
+#ifndef SHTNS4MAGIC
+// Fm = F + im*m_inc
+// Fm2 = F + (NPHI-im)*m_inc
+static void split_north_south_real_imag(double* Fm, double* Fm2, double* eori, long k0v, unsigned nlat, int k_inc)
+{
+    unsigned nk = ((((nlat+1)>>1) +VSIZE2-1)/VSIZE2)*VSIZE2;
+    k0v *= VSIZE2;
+  #if VSIZE2 >= 2
+	if LIKELY(k_inc == 1) {		// optimized and vectorized for k_inc==1
+		const rnd neg_even = vneg_even_xor_cte;
+		eori += k0v*4;
+		for (long k=k0v; k<nk; k+=VSIZE2) {
+			rnd a = vread(Fm+k, 0);
+			rnd b = vread(Fm2+k, 0);
+			rnd xm = a-b;		rnd xp = a+b;
+			xm = vxchg_even_odd(xm);
+			xm = vxor(xm, neg_even);	// change sign of even values in vector
+
+			rnd c = vread(Fm+(nlat-VSIZE2-k), 0);
+			rnd d = vread(Fm2+(nlat-VSIZE2-k), 0);
+			rnd yp = vreverse(c+d);
+			rnd ym = d-c;
+			ym = vxor(ym, neg_even);	// change sign of even values in vector
+			ym = vreverse_pairs(ym);
+
+			vstor(eori, 0, xp);		// north real
+			vstor(eori, 1, xm);		// north imag
+			vstor(eori, 2, yp);		// south real
+			vstor(eori, 3, ym);		// south imag
+			eori += 4*VSIZE2;
+		}
+		return;
+	}
+  #endif
+    for (long k=k0v; k<nk; k+=2) {
+        double an, bn, ani, bni, bs, as, bsi, asi, t;
+        ani = Fm[k*k_inc];	bni = Fm[k*k_inc+1];
+        an  = Fm2[k*k_inc];	bn = Fm2[k*k_inc+1];
+        t = ani-an;	an += ani;		ani = bn-bni;		bn += bni;		bni = t;
+        bsi = Fm[(nlat-2-k)*k_inc];	asi = Fm[(nlat-2-k)*k_inc +1];
+        bs = Fm2[(nlat-2-k)*k_inc];	as = Fm2[(nlat-2-k)*k_inc +1];
+        t = bsi-bs;		bs += bsi;		bsi = as-asi;		as += asi;		asi = t;
+		#if VSIZE2 >= 2
+			unsigned long kk = (((unsigned)k) % VSIZE2) + 4*VSIZE2*(((unsigned)k)/VSIZE2);
+			eori[kk] = an;			eori[kk+1] = bn;			// north real
+			eori[kk+VSIZE2] = ani;	eori[kk+VSIZE2 +1] = bni;		// north imag
+			eori[kk+2*VSIZE2] = as;		eori[kk+2*VSIZE2 +1] = bs;		// south real
+			eori[kk+3*VSIZE2] = asi;	eori[kk+3*VSIZE2 +1] = bsi;		// south imag
+		#else
+			unsigned long kk = 4*k;
+			eori[kk] = an;		eori[kk+4] = bn;		// north real
+			eori[kk+1] = ani;	eori[kk+5] = bni;		// north imag
+			eori[kk+2] = as;	eori[kk+6] = bs;		// south real
+			eori[kk+3] = asi;	eori[kk+7] = bsi;		// south imag
+		#endif
+    }
+}
+
+#else /* SHTNS4MAGIC */
+
+// Fm = F + im*m_inc
+// Fm2 = F + (NPHI-im)*m_inc
+static void split_north_south_real_imag(double* Fm, double* Fm2, double* eori, long k0v, unsigned nlat, int k_inc)
+{
+    unsigned nk = ((((nlat+1)>>1) +VSIZE2-1)/VSIZE2)*VSIZE2;
+	for (long k = ((k0v*VSIZE2)>>1)*2; k<nk; k++) {
+		double ar,ai,br,bi, sr,si,nr,ni;
+		br = Fm[2*k*k_inc];		bi = Fm[2*k*k_inc +1];
+		ar = Fm2[2*k*k_inc];	ai = Fm2[2*k*k_inc +1];
+		nr = ar + br;		ni = ai - bi;
+		sr = ai + bi;		si = br - ar;
+		unsigned long kk = (((unsigned)k) % VSIZE2) + 4*VSIZE2*(((unsigned)k)/VSIZE2);
+		eori[kk] = nr;				eori[kk +VSIZE2] = ni;
+		eori[kk +2*VSIZE2] = sr;	eori[kk +3*VSIZE2] = si;
+	}
+}
+
+#endif

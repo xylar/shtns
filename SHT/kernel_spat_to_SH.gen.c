@@ -55,23 +55,18 @@ V	double *l_2;
 	unsigned im;
   #endif
 V	int robert_form;
-Q	v2d qq[llim+2];
-V	v2d vw[2*llim+4];
+Q	v2d qq[llim+LSPAN];
+V	v2d vw[2*llim+2+LSPAN];
 
 	// the SSE macro should align these arrays on vector length.
-Q	double rer[NLAT_2 + NW*VSIZE2] SSE;
-Q	double ror[NLAT_2 + NW*VSIZE2] SSE;
-V	double ter[NLAT_2 + NW*VSIZE2] SSE;
-V	double tor[NLAT_2 + NW*VSIZE2] SSE;
-V	double per[NLAT_2 + NW*VSIZE2] SSE;
-V	double por[NLAT_2 + NW*VSIZE2] SSE;
   #ifndef SHT_AXISYM
-Q	double rei[NLAT_2 + NW*VSIZE2] SSE;
-Q	double roi[NLAT_2 + NW*VSIZE2] SSE;
-V	double tei[NLAT_2 + NW*VSIZE2] SSE;
-V	double toi[NLAT_2 + NW*VSIZE2] SSE;
-V	double pei[NLAT_2 + NW*VSIZE2] SSE;
-V	double poi[NLAT_2 + NW*VSIZE2] SSE;
+Q	double reori[NLAT_2*4 + NW*VSIZE2*4] SSE;
+V	double teori[NLAT_2*4 + NW*VSIZE2*4] SSE;
+V	double peori[NLAT_2*4 + NW*VSIZE2*4] SSE;
+  #else
+Q	double reori[NLAT_2*2 + NW*VSIZE2*2] SSE;
+V	double teori[NLAT_2*2 + NW*VSIZE2*2] SSE;
+V	double peori[NLAT_2*2 + NW*VSIZE2*2] SSE;
   #endif
 
 	nk = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
@@ -81,16 +76,21 @@ V	double poi[NLAT_2 + NW*VSIZE2] SSE;
 	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
 V	robert_form = shtns->robert_form;
 V	l_2 = shtns->l_2;
-	for (k=nk*VSIZE2; k<(nk-1+NW)*VSIZE2; ++k) {		// never written, so this is now done for all m's
-Q		rer[k] = 0.0;		ror[k] = 0.0;
-V		ter[k] = 0.0;		tor[k] = 0.0;
-V		per[k] = 0.0;		por[k] = 0.0;
-	  #ifndef SHT_AXISYM
-Q		rei[k] = 0.0;		roi[k] = 0.0;
-V		tei[k] = 0.0;		toi[k] = 0.0;
-V		pei[k] = 0.0;		poi[k] = 0.0;
-	  #endif
+  #ifndef SHT_AXISYM
+	#pragma omp simd
+	for (k=nk*VSIZE2*4; k<(nk-1+NW)*VSIZE2*4; ++k) {		// never written, so this is now done for all m's
+Q		reori[k] = 0.0;
+V		teori[k] = 0.0;
+V		peori[k] = 0.0;
 	}
+  #else
+	#pragma omp simd
+	for (k=nk*VSIZE2*2; k<(nk-1+NW)*VSIZE2*2; ++k) {		// never written, so this is now done for all m's
+Q		reori[k] = 0.0;
+V		teori[k] = 0.0;
+V		peori[k] = 0.0;
+	}
+  #endif
 
 	// ACCESS PATTERN
 	const int k_inc = shtns->k_stride_a;
@@ -107,9 +107,9 @@ V		pei[k] = 0.0;		poi[k] = 0.0;
 		alm = shtns->blm;
 Q		double r0 = 0.0;
 		// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-Q		SYM_ASYM_M0_Q(BrF, rer, ror, r0)
-V		SYM_ASYM_M0_V(BtF, ter, tor)
-V		SYM_ASYM_M0_V(BpF, per, por)
+Q		SYM_ASYM_M0_Q(BrF, reori, r0)
+V		SYM_ASYM_M0_V(BtF, teori)
+V		SYM_ASYM_M0_V(BpF, peori)
 Q		Qlm[0] = r0 * alm[0];			// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
@@ -133,9 +133,9 @@ V				dy0[j] = vall(0.0);
 V				sint[j] = -vread(st, k+j);
 				y1[j] =  (vall(al[1])*y0[j]) * cost[j];
 V				dy1[j] = (vall(al[1])*y0[j]) * sint[j];
-Q				rerk[j] = vread(rer, k+j);		rork[j] = vread(ror, k+j);		// cache into registers.
-V				terk[j] = vread(ter, k+j);		tork[j] = vread(tor, k+j);
-V				perk[j] = vread(per, k+j);		pork[j] = vread(por, k+j);
+Q				rerk[j] = vread(reori, (k+j)*2);		rork[j] = vread(reori, (k+j)*2+1);		// cache into registers.
+V				terk[j] = vread(teori, (k+j)*2);		tork[j] = vread(teori, (k+j)*2+1);
+V				perk[j] = vread(peori, (k+j)*2);		pork[j] = vread(peori, (k+j)*2+1);
 			}
 V			if (robert_form) {
 V				for (int j=0; j<blk_sze; ++j) {
@@ -220,24 +220,19 @@ V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 	for (im=m0; im<imlim; im+=mstep) {
 		m = im*MRES;
 		int k0 = shtns->tm[im] / VSIZE2;
+		#if VSIZE2 == 1
+		k0 = (k0>>1)*2;		// we need an even value.
+		#endif
 		#ifndef SHTNS_ISHIOKA
 		alm = shtns->blm + im*(2*(LMAX+1) -m+MRES);
 		#else
 		alm = shtns->clm + im*(2*(LMAX+1) - m+MRES)/2;
 		#endif
-		// compute symmetric and anti-symmetric parts:
-	#ifndef SHTNS_ISHIOKA
-QX		SYM_ASYM_Q(BrF, rer, ror, rei, roi, k0)
-3		SYM_ASYM_Q3(BrF, rer, ror, rei, roi, k0)
-V		SYM_ASYM_V(BtF, ter, tor, tei, toi, k0)
-V		SYM_ASYM_V(BpF, per, por, pei, poi, k0)
-	#else
-QX		SYM_ASYM_Q_ISH(BrF, rer, ror, rei, roi, k0)
-3		SYM_ASYM_Q3_ISH(BrF, rer, ror, rei, roi, k0)
-V		SYM_ASYM_V_ISH(BtF, ter, tor, tei, toi, k0)
-V		SYM_ASYM_V_ISH(BpF, per, por, pei, poi, k0)
-	#endif
-	
+		// preprocess spatial data for SIMD processing.
+Q		split_north_south_real_imag(BrF + im*m_inc, BrF + (NPHI-im)*m_inc, reori, k0, NLAT, k_inc);
+V		split_north_south_real_imag(BtF + im*m_inc, BtF + (NPHI-im)*m_inc, teori, k0, NLAT, k_inc);
+V		split_north_south_real_imag(BpF + im*m_inc, BpF + (NPHI-im)*m_inc, peori, k0, NLAT, k_inc);
+
 		for (int l=0; l<=llim-m+1; l++) {
 Q			qq[l] = vdup(0.0);
 V			vw[2*l] = vdup(0.0);		vw[2*l+1] = vdup(0.0);
@@ -358,11 +353,16 @@ V			v+=2*(l-m);
 			for (int i=imin; i<NBLK; ++i) {
 				rnd w = vread(wg, k+i);		x[i].ct = y01ct[i][2];
 				x[i].y[0] = y01ct[i][0] * w;	x[i].y[1] = y01ct[i][1] * w;		// weight appears here (must be after the previous accuracy loop).
-Q				x[i].rer = vread( rer, k+i);	x[i].rei = vread( rei, k+i);	x[i].ror = vread( ror, k+i);	x[i].roi = vread( roi, k+i);
-V				x[i].ter = vread( ter, k+i);	x[i].tei = vread( tei, k+i);	x[i].tor = vread( tor, k+i);	x[i].toi = vread( toi, k+i);
-V				x[i].per = vread( per, k+i);	x[i].pei = vread( pei, k+i);	x[i].por = vread( por, k+i);	x[i].poi = vread( poi, k+i);
+3				rnd s = vread(st, k+i);
+Q				rnd rnr = vread(reori, (k+i)*4);		rnd rsr = vread(reori, (k+i)*4 +2);		rnd rni = vread(reori, (k+i)*4 +1);		rnd rsi = vread(reori, (k+i)*4 +3);
+QX				x[i].rer = (rnr+rsr);		x[i].rei = (rni+rsi);		x[i].ror = (rnr-rsr);		x[i].roi = (rni-rsi);
+3				x[i].rer = (rnr+rsr)*s;		x[i].rei = (rni+rsi)*s;		x[i].ror = (rnr-rsr)*s;		x[i].roi = (rni-rsi)*s;
+V				rnd tnr = vread(teori, (k+i)*4);		rnd tsr = vread(teori, (k+i)*4 +2);		rnd tni = vread(teori, (k+i)*4 +1);		rnd tsi = vread(teori, (k+i)*4 +3);
+V				x[i].ter = (tnr+tsr);		x[i].tei = (tni+tsi);		x[i].tor = (tnr-tsr);		x[i].toi = (tni-tsi);
+V				rnd pnr = vread(peori, (k+i)*4);		rnd psr = vread(peori, (k+i)*4 +2);		rnd pni = vread(peori, (k+i)*4 +1);		rnd psi = vread(peori, (k+i)*4 +3);
+V				x[i].per = (pnr+psr);		x[i].pei = (pni+psi);		x[i].por = (pnr-psr);		x[i].poi = (pni-psi);
 			}
-V			if (robert_form) {
+V			if UNLIKELY(robert_form) {
 V				for (int i=imin; i<NBLK; ++i) {
 V					rnd st_1 = vread(shtns->st_1, k+i);
 V					x[i].ter *= st_1;	x[i].tei *= st_1;	x[i].tor *= st_1;	x[i].toi *= st_1;
@@ -414,34 +414,44 @@ V						ww2 += y1 * x[j].por;		ww3 += y1 * x[j].poi;	// real odd, imag odd
 					x[j].y[1] = vall(al[3])*(x[j].ct*y0) + vall(al[2])*y1;
 					++j;
 				}
+				#if _GCC_VEC_ && __AVX__
+Q				vstor4(q, 0, vread4(q, 0) + v4d_reduce(qq0, qq1, qq2, qq3) );
+V				vstor4(v, 0, vread4(v, 0) + v4d_reduce(vv0, vv1, ww0, ww1) );
+V				vstor4(v, 1, vread4(v, 1) + v4d_reduce(vv2, vv3, ww2, ww3) );
+				#else
 Q				q[0] += v2d_reduce(qq0, qq1);
 Q				q[1] += v2d_reduce(qq2, qq3);
 V				v[0] += v2d_reduce(vv0, vv1);
 V				v[1] += v2d_reduce(ww0, ww1);
 V				v[2] += v2d_reduce(vv2, vv3);
 V				v[3] += v2d_reduce(ww2, ww3);
+				#endif
 Q				q+=2;
 V				v+=4;
 				l+=2;	al+=4;
 			}
-			{
+V			{
 V				rnd vv0 = vall(0.0);
 V				rnd vv1 = vall(0.0);
 V				rnd ww0 = vall(0.0);
 V				rnd ww1 = vall(0.0);
-				for (unsigned j=imin; j<NBLK; ++j) {
-					#ifdef HI_LLIM
-					if (ny[j/NWAY] == 0)
-					#endif
-					{
-						register rnd y0 = x[j].y[0];
+V				for (unsigned j=imin; j<NBLK; ++j) {
+V					#ifdef HI_LLIM
+V					if (ny[j/NWAY] == 0)
+V					#endif
+V					{
+V						register rnd y0 = x[j].y[0];
 V						vv0 += y0 * x[j].ter;		vv1 += y0 * x[j].tei;	// real even, imag even
 V						ww0 += y0 * x[j].per;		ww1 += y0 * x[j].pei;	// real even, imag even
-					}
-				}
+V					}
+V				}
+V				#if _GCC_VEC_ && __AVX__
+V				vstor4(v, 0, vread4(v, 0) + v4d_reduce(vv0, vv1, ww0, ww1) );
+V				#else
 V				v[0] += v2d_reduce(vv0, vv1);
 V				v[1] += v2d_reduce(ww0, ww1);
-			}
+V				#endif
+V			}
 			if (l==llim) {
 Q				rnd qq0 = vall(0.0);	// real
 Q				rnd qq1 = vall(0.0);	// imag
@@ -454,23 +464,20 @@ V				rnd ww1 = vall(0.0);
 					if (ny[j/NWAY] == 0)
 					#endif
 					{
-						register rnd y0 = x[j].y[0];
+Q						register rnd y0 = x[j].y[0];
 Q						qq0 += y0 * x[j].rer;		qq1 += y0 * x[j].rei;	// real even, imag even
-					}
-				}
-				for (unsigned j=imin; j<NBLK; ++j) {
-					#ifdef HI_LLIM
-					if (ny[j/NWAY] == 0)
-					#endif
-					{
-						register rnd y1 = x[j].y[1];
+V						register rnd y1 = x[j].y[1];
 V						vv0 += y1 * x[j].tor;		vv1 += y1 * x[j].toi;	// real odd, imag odd
 V						ww0 += y1 * x[j].por;		ww1 += y1 * x[j].poi;	// real odd, imag odd
 					}
 				}
 Q				q[0] += v2d_reduce(qq0, qq1);
+V				#if _GCC_VEC_ && __AVX__
+V				vstor4(v, 1, vread4(v, 1) + v4d_reduce(vv0, vv1, ww0, ww1) );
+V				#else
 V				v[2] += v2d_reduce(vv0, vv1);
 V				v[3] += v2d_reduce(ww0, ww1);
+V				#endif
 			}
 		#else    /* SHTNS_ISHIOKA */
 			al = alm + 2 + (l-m);
@@ -485,12 +492,18 @@ Q			q+=(l-m);
 V			v+=2*(l-m);
 			imin = (k0-k > 0) ? k0-k : 0;	// 0 <= imin < NBLK
 			for (int i=imin; i<NBLK; ++i) {
-Q				x[i].rer = vread( rer, k+i);	x[i].rei = vread( rei, k+i);	x[i].ror = vread( ror, k+i);	x[i].roi = vread( roi, k+i);
-V				x[i].ter = vread( ter, k+i);	x[i].tei = vread( tei, k+i);	x[i].tor = vread( tor, k+i);	x[i].toi = vread( toi, k+i);
-V				x[i].per = vread( per, k+i);	x[i].pei = vread( pei, k+i);	x[i].por = vread( por, k+i);	x[i].poi = vread( poi, k+i);
+Q				rnd rnr = vread(reori, (k+i)*4);		rnd rsr = vread(reori, (k+i)*4 +2);		rnd rni = vread(reori, (k+i)*4 +1);		rnd rsi = vread(reori, (k+i)*4 +3);
+				rnd w = vread(wg, k+i);		rnd wo = w * vread(ct, k+i);
 				x[i].y[0] = y01ct[i][0];		x[i].y[1] = y01ct[i][1];		x[i].ct2 = y01ct[i][2];
+QX				x[i].rer = (rnr+rsr)*w;		x[i].rei = (rni+rsi)*w;		x[i].ror = (rnr-rsr)*wo;		x[i].roi = (rni-rsi)*wo;
+V				rnd tnr = vread(teori, (k+i)*4);		rnd tsr = vread(teori, (k+i)*4 +2);		rnd tni = vread(teori, (k+i)*4 +1);		rnd tsi = vread(teori, (k+i)*4 +3);
+V				x[i].ter = (tnr+tsr)*w;		x[i].tei = (tni+tsi)*w;		x[i].tor = (tnr-tsr)*wo;		x[i].toi = (tni-tsi)*wo;
+V				rnd pnr = vread(peori, (k+i)*4);		rnd psr = vread(peori, (k+i)*4 +2);		rnd pni = vread(peori, (k+i)*4 +1);		rnd psi = vread(peori, (k+i)*4 +3);
+V				x[i].per = (pnr+psr)*w;		x[i].pei = (pni+psi)*w;		x[i].por = (pnr-psr)*wo;		x[i].poi = (pni-psi)*wo;
+3				w *= vread(st, k+i);		wo *= vread(st, k+i);
+3				x[i].rer = (rnr+rsr)*w;		x[i].rei = (rni+rsi)*w;		x[i].ror = (rnr-rsr)*wo;		x[i].roi = (rni-rsi)*wo;
 			}
-V			if (robert_form) {
+V			if UNLIKELY(robert_form) {
 V				for (int i=imin; i<NBLK; ++i) {
 V					rnd st_1 = vread(shtns->st_1, k+i);
 V					x[i].ter *= st_1;	x[i].tei *= st_1;	x[i].tor *= st_1;	x[i].toi *= st_1;
@@ -549,17 +562,19 @@ V						wl[4*ll+2] += y * x[i].por;		wl[4*ll+3] += y * x[i].poi;
 					}
 					++i;
 				}
-Q				q[0] += v2d_reduce(ql[0], ql[1]);
-V				v[0] += v2d_reduce(vl[0], vl[1]);
-V				v[1] += v2d_reduce(wl[0], wl[1]);
-				for (int ll=1; ll<LSPAN; ll++) {
-					if (l+ll<=llim) {
-Q						q[ll]     += v2d_reduce(ql[2*ll], ql[2*ll+1]);
-					}
-					if (l+ll<=llim+1) {
-V						v[2*ll]   += v2d_reduce(vl[2*ll], vl[2*ll+1]);
-V						v[2*ll+1] += v2d_reduce(wl[2*ll], wl[2*ll+1]);
-					}
+				for (int ll=0; ll<LSPAN/2; ll++) {		// we can overflow, the work arrays are padded.
+				  #if _GCC_VEC_ && __AVX__
+Q					vstor4(q, ll,     vread4(q, ll)     + v4d_reduce(ql[4*ll+0], ql[4*ll+1], ql[4*ll+2], ql[4*ll+3]) );
+V					vstor4(v, 2*ll,   vread4(v, 2*ll)   + v4d_reduce(vl[4*ll+0], vl[4*ll+1], wl[4*ll+0], wl[4*ll+1]) );
+V					vstor4(v, 2*ll+1, vread4(v, 2*ll+1) + v4d_reduce(vl[4*ll+2], vl[4*ll+3], wl[4*ll+2], wl[4*ll+3]) );
+				  #else
+Q					q[2*ll+0] += v2d_reduce(ql[4*ll+0], ql[4*ll+1]);
+Q					q[2*ll+1] += v2d_reduce(ql[4*ll+2], ql[4*ll+3]);
+V					v[4*ll+0] += v2d_reduce(vl[4*ll+0], vl[4*ll+1]);
+V					v[4*ll+1] += v2d_reduce(wl[4*ll+0], wl[4*ll+1]);
+V					v[4*ll+2] += v2d_reduce(vl[4*ll+2], vl[4*ll+3]);
+V					v[4*ll+3] += v2d_reduce(wl[4*ll+2], wl[4*ll+3]);
+				  #endif
 				}
 Q				q+=LSPAN;
 V				v+=2*LSPAN;

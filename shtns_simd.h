@@ -133,6 +133,7 @@
 	typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
 	typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
 	#define vxchg(a) ((v2d)_mm_shuffle_pd(a,a,1))					// swap the two elements of a vector of 2 doubles.
+	static const unsigned long long _neg0[2] __attribute__((aligned (16))) = {0x8000000000000000ULL, 0} ;		// a constant needed to change the sign of vectors
 	#ifdef __AVX__
 		#include <immintrin.h>
 		typedef double v4d __attribute__ ((vector_size (8*4)));		// vector that contains 2 complex numbers
@@ -147,7 +148,7 @@
 			return (v4d) _mm256_permute4x64_pd(a, 0x1B);	// 3 cycles on intel; 6 cycles on Zen2
 			#else
 			a = (v4d)_mm256_permute2f128_pd(a,a, 1);	// => [2,3,0,1]			// 2 cycles on SandyBridge, 3 cycles on Haswell+, 3 cycles on Zen2
-			return (v4d)_mm256_shuffle_pd(a, a, 5);		// [2,3,0,1] => [3,2,1,0]	// 1 cycle on intel; 3 cycles on Zen2 (1 cycle in certain conditions)
+			return (v4d)_mm256_shuffle_pd(a, a, 5);		// [2,3,0,1] => [3,2,1,0]	// 1 cycle on intel; 3 cycles on Zen2
 			#endif
 		}
 		#define vdup_even4(v) ((v4d)_mm256_movedup_pd(v))
@@ -173,11 +174,8 @@
 		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
 			return _mm512_fmaddsub_pd(vall(0.0), vall(0.0), v);
 		}
-		inline static rnd vneg_even_inloop(rnd v) {		// this needs to load a constant and may cause a cache miss, except in a loop where the constant is kept in register.
-			static const unsigned long long neg0[2] = {0x8000000000000000ULL, 0};
-			//return _mm512_xor_pd(v, _mm512_broadcast_f32x4(*(_m128*)neg0));	// requires __AVX512DQ__
-			return (rnd) _mm512_castsi512_pd( _mm512_xor_epi64(_mm512_castpd_si512(v), _mm512_broadcast_i32x4(*(__m128i*)neg0)) );
-		}
+		#define vneg_even_xor_cte ((rnd)_mm512_castsi512_pd(_mm512_broadcast_i32x4(*(__m128i*)_neg0)))
+		#define vxor(v,x) ((rnd)_mm512_castsi512_pd( _mm512_xor_epi64(_mm512_castpd_si512(v), _mm512_castpd_si512(x))))
 		inline static double reduce_add(rnd a) {
 			return _mm512_reduce_add_pd(a);
 		}
@@ -312,11 +310,9 @@
 		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
 			return _mm256_addsub_pd(vall(0.0), v);
 		}
-		inline static rnd vneg_even_inloop(rnd v) {		// this needs to load a constant and may cause a cache miss, except in a loop where the constant is kept in register.
-			static const unsigned long long neg0[2] = {0x8000000000000000ULL, 0};
-			return _mm256_xor_pd(v, _mm256_broadcast_pd((v2d*)neg0));
-		}
-		//#define vneg_even(v) ((rnd)_mm256_xor_pd(v, _mm256_castsi256_pd( _mm256_setr_epi32(0,0x80000000, 0,0, 0,0x80000000, 0,0))))	// BUGGY ON GCC! DON'T USE!
+		#define vneg_even_xor_cte ((rnd)_mm256_broadcast_pd((v2d*)_neg0))
+		//#define vneg_even_xor_cte ((rnd)_mm256_castsi256_pd( _mm256_setr_epi32(0,0x80000000, 0,0, 0,0x80000000, 0,0)))	// BUGGY ON GCC! DON'T USE!
+		#define vxor(v,x) ((rnd)_mm256_xor_pd(v, x))
 		inline static double reduce_add(rnd a) {
 			v2d t = (v2d)_mm256_castpd256_pd128(a) + (v2d)_mm256_extractf128_pd(a,1);
 			return _mm_cvtsd_f64(t) + _mm_cvtsd_f64(_mm_unpackhi_pd(t,t));
@@ -438,10 +434,8 @@
 		#define vdup_even(v) ((rnd)_mm_unpacklo_pd(v,v))
 		#define vdup_odd(v)  ((rnd)_mm_unpackhi_pd(v,v))
 		#define vxchg_even_odd(v) vxchg(v)
-		inline static rnd vneg_even_inloop(rnd v) {		// this needs to load a constant and may cause a cache miss, except in a loop where the constant is kept in register.
-			static const unsigned long long neg0[2] = {0x8000000000000000ULL, 0};
-			return _mm_xor_pd(v, *(v2d*)neg0);
-		}
+		#define vneg_even_xor_cte (*(v2d*)_neg0)
+		#define vxor(v,x) ((rnd)_mm_xor_pd(v, x))
 		#define reduce_add(a) ( _mm_cvtsd_f64(a) + _mm_cvtsd_f64(_mm_unpackhi_pd(a,a)) )
 		#define S2D_STORE(mem, idx, n, s)		((s2d*)mem)[idx] = n;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(s);
 
