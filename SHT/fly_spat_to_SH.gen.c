@@ -70,17 +70,20 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
 	}
   #endif
 
-	if (llim < SHT_L_RESCALE_FLY) {
-		for (int im=0; im<=imlim; im++) {
-QX			GEN3(_an1,NWAY,_l)(shtns, BrF, Qlm, llim, im);
-VX			GEN3(_an2,NWAY,_l)(shtns, BtF, BpF, Slm, Tlm, llim, im);
-3			GEN3(_an3,NWAY,_l)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
-		}
-	} else {
+  #ifndef SHT_AXISYM
+	if (llim >= SHT_L_RESCALE_FLY) {
 		for (int im=0; im<=imlim; im++) {
 QX			GEN3(_an1_hi,NWAY,_l)(shtns, BrF, Qlm, llim, im);
 VX			GEN3(_an2_hi,NWAY,_l)(shtns, BtF, BpF, Slm, Tlm, llim, im);
 3			GEN3(_an3_hi,NWAY,_l)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+		}
+	} else
+  #endif
+	{
+		for (int im=0; im<=imlim; im++) {
+QX			GEN3(_an1,NWAY,_l)(shtns, BrF, Qlm, llim, im);
+VX			GEN3(_an2,NWAY,_l)(shtns, BtF, BpF, Slm, Tlm, llim, im);
+3			GEN3(_an3,NWAY,_l)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
 		}
 	}
 

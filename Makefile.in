@@ -19,7 +19,7 @@ cc = $(CC) $(go) -O2
 fc = @FC@ $(go) -O2
 
 hfiles = sht_private.h sht_config.h shtns.h shtns_simd.h
-objs = sht_init.o sht_kernels_a.o @objs@
+objs = sht_init.o sht_kernels_a.o sht_kernels_s.o @objs@
 libname = @libname@
 
 default : @target@
@@ -60,6 +60,8 @@ SHT/SH_to_spat_omp.c : SHT/omp_SH_to_spat.gen.c
 	$(MAKE) SH_to_spat_omp.c -C SHT SFX=omp SED=$(SED)
 SHT/spat_to_SH_omp.c : SHT/omp_spat_to_SH.gen.c
 	$(MAKE) spat_to_SH_omp.c -C SHT SFX=omp SED=$(SED)
+SHT/SH_to_spat_kernel.c : SHT/kernel_SH_to_spat.gen.c
+	$(MAKE) SH_to_spat_kernel.c -C SHT SFX=kernel SED=$(SED)
 SHT/spat_to_SH_kernel.c : SHT/kernel_spat_to_SH.gen.c
 	$(MAKE) spat_to_SH_kernel.c -C SHT SFX=kernel SED=$(SED)
 
@@ -72,6 +74,8 @@ sht_mem.o : sht_mem.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c
 sht_fly.o : sht_fly.c Makefile $(hfiles) SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
 	$(shtcc) -c $< -o $@
 sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
+	$(shtcc) -c $< -o $@
+sht_kernels_s.o : sht_kernels_s.c Makefile $(hfiles) SHT/SH_to_spat_kernel.c
 	$(shtcc) -c $< -o $@
 sht_kernels_a.o : sht_kernels_a.c Makefile $(hfiles) SHT/spat_to_SH_kernel.c
 	$(shtcc) -c $< -o $@
