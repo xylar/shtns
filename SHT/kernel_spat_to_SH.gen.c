@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2019 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -34,9 +34,9 @@ VX	#define BASE _an2
 3	#define BASE _an3
 	#endif
 
-QX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int imlim)
-VX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
-3	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim)
+QX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const unsigned im)
+VX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const unsigned im)
+3	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const unsigned im)
   {
 	// TODO: NW should be larger for SHTNS_ISHIOKA ?, or take a different approach.
 	#define NW (NWAY*16)
@@ -50,23 +50,19 @@ V	#define LSPAN 2
 	double *wg, *ct, *st;
 V	double *l_2;
 	long int nk, k, l,m;
-	unsigned m0, mstep;
-  #ifndef SHT_AXISYM
-	unsigned im;
-  #endif
 V	int robert_form;
 Q	v2d qq[llim+LSPAN];
 V	v2d vw[2*llim+2+LSPAN];
 
 	// the SSE macro should align these arrays on vector length.
   #ifndef SHT_AXISYM
-Q	double reori[NLAT_2*4 + NW*VSIZE2*4] SSE;
-V	double teori[NLAT_2*4 + NW*VSIZE2*4] SSE;
-V	double peori[NLAT_2*4 + NW*VSIZE2*4] SSE;
+Q	double reori[NLAT_2*4 + (VSIZE2-1)*4] SSE;
+V	double teori[NLAT_2*4 + (VSIZE2-1)*4] SSE;
+V	double peori[NLAT_2*4 + (VSIZE2-1)*4] SSE;
   #else
-Q	double reori[NLAT_2*2 + NW*VSIZE2*2] SSE;
-V	double teori[NLAT_2*2 + NW*VSIZE2*2] SSE;
-V	double peori[NLAT_2*2 + NW*VSIZE2*2] SSE;
+Q	double reori[NLAT_2*2 + (VSIZE2-1)*2] SSE;
+V	double teori[NLAT_2*2 + (VSIZE2-1)*2] SSE;
+V	double peori[NLAT_2*2 + (VSIZE2-1)*2] SSE;
   #endif
 
 	nk = NLAT_2;	// copy NLAT_2 to a local variable for faster access (inner loop limit)
@@ -76,40 +72,24 @@ V	double peori[NLAT_2*2 + NW*VSIZE2*2] SSE;
 	wg = shtns->wg;		ct = shtns->ct;		st = shtns->st;
 V	robert_form = shtns->robert_form;
 V	l_2 = shtns->l_2;
-  #ifndef SHT_AXISYM
-	#pragma omp simd
-	for (k=nk*VSIZE2*4; k<(nk-1+NW)*VSIZE2*4; ++k) {		// never written, so this is now done for all m's
-Q		reori[k] = 0.0;
-V		teori[k] = 0.0;
-V		peori[k] = 0.0;
-	}
-  #else
-	#pragma omp simd
-	for (k=nk*VSIZE2*2; k<(nk-1+NW)*VSIZE2*2; ++k) {		// never written, so this is now done for all m's
-Q		reori[k] = 0.0;
-V		teori[k] = 0.0;
-V		peori[k] = 0.0;
-	}
-  #endif
 
 	// ACCESS PATTERN
 	const int k_inc = shtns->k_stride_a;
 	const int m_inc = shtns->m_stride_a;
 
-	#ifndef _OPENMP
-		m0 = 0;		mstep = 1;
-	#else
-		m0 = omp_get_thread_num();
-		mstep = omp_get_num_threads();
-		if (m0 == 0)
-	#endif
-	{		// im=0 : dzl.p = 0.0 and evrything is REAL
+	if (im == 0)
+	{		// im=0 : evrything is REAL
 		alm = shtns->blm;
-Q		double r0 = 0.0;
+Q	//	double r0 = 0.0;
 		// compute symmetric and antisymmetric parts. (do not weight here, it is cheaper to weight y0)
-Q		SYM_ASYM_M0_Q(BrF, reori, r0)
-V		SYM_ASYM_M0_V(BtF, teori)
-V		SYM_ASYM_M0_V(BpF, peori)
+Q	//	SYM_ASYM_M0_Q(BrF, reori, r0)
+V	//	SYM_ASYM_M0_V(BtF, teori)
+V	//	SYM_ASYM_M0_V(BpF, peori)
+
+Q		double r0 = split_sym_asym_m0_accl0(BrF, reori, NLAT_2, k_inc, wg);
+V		split_sym_asym_m0(BtF, teori, NLAT_2, k_inc);
+V		split_sym_asym_m0(BpF, peori, NLAT_2, k_inc);
+
 Q		Qlm[0] = r0 * alm[0];			// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
 		k = 0;
@@ -202,22 +182,12 @@ V			Slm[l] = v_[2*l-2]*l_2[l];		Tlm[l] = v_[2*l-1]*l_2[l];
 Q				((v2d*)Qlm)[l] = vdup(0.0);
 V				((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
 			}
-			#ifndef SHT_AXISYM
-			if (imlim <= MMAX) {		// zero out m >= imlim
-				l = LiM(shtns, imlim*MRES, imlim);
-				do {
-Q					((v2d*)Qlm)[l] = vdup(0.0);
-V					((v2d*)Slm)[l] = vdup(0.0);		((v2d*)Tlm)[l] = vdup(0.0);
-				} while(++l < shtns->nlm);
-			}
-			#endif
 		#endif
-		m0=mstep;
 	}
-
   #ifndef SHT_AXISYM
-	const double mpos_scale = shtns->mpos_scale_analys;		// handles real-norm
-	for (im=m0; im<imlim; im+=mstep) {
+	else
+	{
+		const double mpos_scale = shtns->mpos_scale_analys;		// handles real-norm
 		m = im*MRES;
 		int k0 = shtns->tm[im] / VSIZE2;
 		#if VSIZE2 == 1

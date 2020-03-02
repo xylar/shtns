@@ -133,6 +133,9 @@
 	typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
 	typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
 	#define vxchg(a) ((v2d)_mm_shuffle_pd(a,a,1))					// swap the two elements of a vector of 2 doubles.
+	#define vxor2(v,x) ((v2d)_mm_xor_pd(v, x))
+	#define vread2(mem, idx) ((v2d)_mm_loadu_pd( ((double*)(mem)) + (idx)*2 ))
+	#define vstor2(mem, idx, v) _mm_storeu_pd( ((double*)(mem)) + (idx)*2 , v)
 	static const unsigned long long _neg0[2] __attribute__((aligned (16))) = {0x8000000000000000ULL, 0} ;		// a constant needed to change the sign of vectors
 	#ifdef __AVX__
 		#include <immintrin.h>
@@ -435,7 +438,7 @@
 		#define vdup_odd(v)  ((rnd)_mm_unpackhi_pd(v,v))
 		#define vxchg_even_odd(v) vxchg(v)
 		#define vneg_even_xor_cte (*(v2d*)_neg0)
-		#define vxor(v,x) ((rnd)_mm_xor_pd(v, x))
+		#define vxor(v,x) vxor2(v,x)
 		#define reduce_add(a) ( _mm_cvtsd_f64(a) + _mm_cvtsd_f64(_mm_unpackhi_pd(a,a)) )
 		#define S2D_STORE(mem, idx, n, s)		((s2d*)mem)[idx] = n;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(s);
 

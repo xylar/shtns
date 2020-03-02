@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2019 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -68,22 +68,29 @@ V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, BtF+1, BtF);
 V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
 	    }
 	}
-  #else
-	imlim = 0;
   #endif
-	imlim += 1;
 
 	if (llim < SHT_L_RESCALE_FLY) {
-QX		GEN3(_an1,NWAY,_l)(shtns, BrF, Qlm, llim, imlim);
-VX		GEN3(_an2,NWAY,_l)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
-3		GEN3(_an3,NWAY,_l)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
+		for (int im=0; im<=imlim; im++) {
+QX			GEN3(_an1,NWAY,_l)(shtns, BrF, Qlm, llim, im);
+VX			GEN3(_an2,NWAY,_l)(shtns, BtF, BpF, Slm, Tlm, llim, im);
+3			GEN3(_an3,NWAY,_l)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+		}
 	} else {
-QX		GEN3(_an1_hi,NWAY,_l)(shtns, BrF, Qlm, llim, imlim);
-VX		GEN3(_an2_hi,NWAY,_l)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
-3		GEN3(_an3_hi,NWAY,_l)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
+		for (int im=0; im<=imlim; im++) {
+QX			GEN3(_an1_hi,NWAY,_l)(shtns, BrF, Qlm, llim, im);
+VX			GEN3(_an2_hi,NWAY,_l)(shtns, BtF, BpF, Slm, Tlm, llim, im);
+3			GEN3(_an3_hi,NWAY,_l)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+		}
 	}
 
   #ifndef SHT_AXISYM
+	if (imlim < MMAX) {		// zero out m > imlim
+		long l = LiM(shtns, (imlim+1)*MRES, imlim+1);
+Q		memset(Qlm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+V		memset(Slm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+V		memset(Tlm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+	}
   	if (shtns->fftc_mode > 0) {		// free memory
 Q	    VFREE(BrF);
 VX	    VFREE(BtF);	// this frees also BpF.

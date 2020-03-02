@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2019 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -24,13 +24,12 @@
 #
 //////////////////////////////////////////////////
 
-QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int imlim);
-VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim);
-3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim);
-QX	void GEN3(_an1_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int imlim);
-VX	void GEN3(_an2_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int imlim);
-3	void GEN3(_an3_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int imlim);
-
+QX	void GEN3(_an1,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int im);
+VX	void GEN3(_an2,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int im);
+3	void GEN3(_an3,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int im);
+QX	void GEN3(_an1_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, cplx *Qlm, const long int llim, const int im);
+VX	void GEN3(_an2_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *Slm, cplx *Tlm, const long int llim, const int im);
+3	void GEN3(_an3_hi,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const int im);
 
 
 	static
@@ -70,25 +69,39 @@ V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
 	    }
 	}
   #endif
-	imlim += 1;
 
-	if (llim < SHT_L_RESCALE_FLY) {
-		#pragma omp parallel num_threads(shtns->nthreads)
-		{
-QX			GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
-VX			GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
-3			GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
+	#pragma omp parallel num_threads(shtns->nthreads)
+	{
+		if (llim < SHT_L_RESCALE_FLY) {
+			#pragma omp for schedule(static,1) nowait
+			for (int im=0; im<=imlim; im++) {
+QX				GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, im);
+VX				GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, im);
+3				GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+			}
+		} else {
+			#pragma omp for schedule(static,1) nowait
+			for (int im=0; im<=imlim; im++) {
+QX				GEN3(_an1_hi,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, im);
+VX				GEN3(_an2_hi,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, im);
+3				GEN3(_an3_hi,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+			}
 		}
-	} else {
-		#pragma omp parallel num_threads(shtns->nthreads)
-		{
-QX			GEN3(_an1_hi,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
-VX			GEN3(_an2_hi,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
-3			GEN3(_an3_hi,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
-		}
+		#ifndef SHT_AXISYM
+			if (imlim < MMAX) {		// zero out m > imlim
+				long l = LiM(shtns, (imlim+1)*MRES, imlim+1);
+Q				#pragma omp single nowait
+Q				memset(Qlm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+V				#pragma omp single nowait
+V				memset(Slm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+V				#pragma omp single nowait
+V				memset(Tlm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+			}
+		#endif
 	}
 
   #ifndef SHT_AXISYM
+
   	if (shtns->fftc_mode > 0) {		// free memory
 Q	    VFREE(BrF);
 VX	    VFREE(BtF);	// this frees also BpF.
@@ -113,7 +126,6 @@ V	BtF = Vt;	BpF = Vp;
 	#ifdef SHT_VAR_LTR
 		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
 	#endif
-	imlim += 1;
 
 	if (shtns->fftc_mode > 0) {		// alloc memory for out-of-place FFT
 		unsigned long nv = shtns->nspat;
@@ -148,14 +160,31 @@ V				fftw_execute_split_dft(shtns->fftc_block, Vp+NPHI*(1+2*k*nblk), Vp+NPHI*2*k
   #endif
 
 		if (llim < SHT_L_RESCALE_FLY) {
-QX			GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
-VX			GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
-3			GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
+			#pragma omp for schedule(static,1) nowait
+			for (int im=0; im<=imlim; im++) {
+QX				GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, im);
+VX				GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, im);
+3				GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+			}
 		} else {
-QX			GEN3(_an1_hi,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim);
-VX			GEN3(_an2_hi,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim);
-3			GEN3(_an3_hi,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim);
+			#pragma omp for schedule(static,1) nowait
+			for (int im=0; im<=imlim; im++) {
+QX				GEN3(_an1_hi,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, im);
+VX				GEN3(_an2_hi,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, im);
+3				GEN3(_an3_hi,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+			}
 		}
+		#ifndef SHT_AXISYM
+			if (imlim < MMAX) {		// zero out m > imlim
+				long l = LiM(shtns, (imlim+1)*MRES, imlim+1);
+Q				#pragma omp single nowait
+Q				memset(Qlm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+V				#pragma omp single nowait
+V				memset(Slm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+V				#pragma omp single nowait
+V				memset(Tlm+l, 0, (shtns->nlm - l)*sizeof(cplx));
+			}
+		#endif
 	}
 
   #ifndef SHT_AXISYM
