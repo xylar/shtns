@@ -3229,15 +3229,18 @@ $as_echo "$ax_cv_check_cflags___march_native" >&6; }
 if test x"$ax_cv_check_cflags___march_native" = xyes; then :
   CC="$CC -march=native"
 else
+  :
+fi
 
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mtune=native" >&5
-$as_echo_n "checking whether C compiler accepts -mtune=native... " >&6; }
-if ${ax_cv_check_cflags___mtune_native+:} false; then :
+	# tune for skylake, it gives significantly better performance on Haswell with gcc 9.2
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mtune=skylake" >&5
+$as_echo_n "checking whether C compiler accepts -mtune=skylake... " >&6; }
+if ${ax_cv_check_cflags___mtune_skylake+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -mtune=native"
+  CFLAGS="$CFLAGS  -mtune=skylake"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3250,22 +3253,19 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___mtune_native=yes
+  ax_cv_check_cflags___mtune_skylake=yes
 else
-  ax_cv_check_cflags___mtune_native=no
+  ax_cv_check_cflags___mtune_skylake=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
   CFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___mtune_native" >&5
-$as_echo "$ax_cv_check_cflags___mtune_native" >&6; }
-if test x"$ax_cv_check_cflags___mtune_native" = xyes; then :
-  CC="$CC -mtune=native"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___mtune_skylake" >&5
+$as_echo "$ax_cv_check_cflags___mtune_skylake" >&6; }
+if test x"$ax_cv_check_cflags___mtune_skylake" = xyes; then :
+  CC="$CC -mtune=skylake"
 else
   :
-fi
-
-
 fi
 
 	# this is an icc compile option, try if it is supported:
@@ -3707,6 +3707,79 @@ fi
 rm -f conftest*
 
 
+# the following prevents gcc from inserting memset in tight loops for zeroing stuff. Must appear after -O3
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-tree-loop-distribute-patterns" >&5
+$as_echo_n "checking whether C compiler accepts -fno-tree-loop-distribute-patterns... " >&6; }
+if ${ax_cv_check_cflags___fno_tree_loop_distribute_patterns+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fno-tree-loop-distribute-patterns"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fno_tree_loop_distribute_patterns=yes
+else
+  ax_cv_check_cflags___fno_tree_loop_distribute_patterns=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_tree_loop_distribute_patterns" >&5
+$as_echo "$ax_cv_check_cflags___fno_tree_loop_distribute_patterns" >&6; }
+if test x"$ax_cv_check_cflags___fno_tree_loop_distribute_patterns" = xyes; then :
+  shtcc_flags="$shtcc_flags -fno-tree-loop-distribute-patterns"
+else
+  :
+fi
+
+# avoid insering VZEROUPPER instructions everywhere.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mno-vzeroupper" >&5
+$as_echo_n "checking whether C compiler accepts -mno-vzeroupper... " >&6; }
+if ${ax_cv_check_cflags___mno_vzeroupper+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -mno-vzeroupper"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___mno_vzeroupper=yes
+else
+  ax_cv_check_cflags___mno_vzeroupper=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___mno_vzeroupper" >&5
+$as_echo "$ax_cv_check_cflags___mno_vzeroupper" >&6; }
+if test x"$ax_cv_check_cflags___mno_vzeroupper" = xyes; then :
+  shtcc_flags="$shtcc_flags -mno-vzeroupper"
+else
+  :
+fi
+
+
 # Checks for header files.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ANSI C header files" >&5
 $as_echo_n "checking for ANSI C header files... " >&6; }
@@ -3912,7 +3985,6 @@ fi
 # On many-core systems, enable openmp by default, and disable precomputed matrix support.
 if test "x$enable_many_core" != "xno"; then :
 
-  	enable_mem=no
 	if test "x$enable_openmp" = "xdefault"; then :
   enable_openmp=yes
 fi
@@ -3921,7 +3993,6 @@ fi
 # for MagIC code, also disable matrix transforms.
 if test "x$enable_magic_layout" != "xno"; then :
 
-  	enable_mem=no
 	#enable_ishioka=no       # workaround unexplained bug
 	#enable_many_core=yes		# optimize for many-core architecture
 
@@ -3934,7 +4005,6 @@ nvcc_flags=""
 # Disable precomputed matrix support with openmp: to avoid bugs arising with icc + openmp.
 if test "x$enable_openmp" = "xyes"; then :
 
-  	enable_mem=no
 	nvcc_flags="-Xcompiler -fopenmp"
 
   OPENMP_CFLAGS=
@@ -4013,6 +4083,45 @@ else
 		target="libshtns_omp.a"
 
 fi
+
+else
+
+	# without openmp, we still want vectorization of some decorated loops, if possible.
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fopenmp-simd" >&5
+$as_echo_n "checking whether C compiler accepts -fopenmp-simd... " >&6; }
+if ${ax_cv_check_cflags___fopenmp_simd+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fopenmp-simd"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fopenmp_simd=yes
+else
+  ax_cv_check_cflags___fopenmp_simd=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fopenmp_simd" >&5
+$as_echo "$ax_cv_check_cflags___fopenmp_simd" >&6; }
+if test x"$ax_cv_check_cflags___fopenmp_simd" = xyes; then :
+  CFLAGS="$CFLAGS -fopenmp-simd"
+else
+  :
+fi
+
 
 fi
 
@@ -4514,16 +4623,6 @@ if test "x$enable_ishioka" == "xyes"; then :
 
 $as_echo "#define SHTNS_ISHIOKA 1" >>confdefs.h
 
-
-fi
-
-# Disable MEM ?
-if test "x$enable_mem" == "xyes"; then :
-
-
-$as_echo "#define SHTNS_MEM 1" >>confdefs.h
-
-	objs="$objs sht_mem.o"		# compile mem transforms
 
 fi
 

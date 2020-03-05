@@ -154,14 +154,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 
 	void* ftable[SHT_NVAR][SHT_NTYP];		// pointers to transform functions.
 
-	/* MEM matrices */
-	#ifdef SHTNS_MEM
-	double **ylm;		// matrix for inverse transform (synthesis)
-	struct DtDp** dylm;	// theta and phi derivative of Ylm matrix
-	double **zlm;		// matrix for direct transform (analysis)
-	struct DtDp** dzlm;
-	#endif
-
 	/* rotation stuff (pseudo-spectral) */
 	unsigned npts_rot;		// number of physical points needed
 	fftw_plan fft_rot;		// Fourier transform for rotations

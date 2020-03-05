@@ -116,9 +116,6 @@
    https://doi.org/10.2151/jmsj.2018-019 (faster, but experimental) */
 #undef SHTNS_ISHIOKA
 
-/* Include algorithms using precomputed matrix stored in memory) */
-#undef SHTNS_MEM
-
 /* Compile the Fortran API */
 #undef SHT_F77_API
 

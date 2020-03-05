@@ -170,12 +170,6 @@ char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3
 char* sht_var[SHT_NVAR] = {"std", "ltr", "m" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
-#ifdef SHTNS_MEM
-extern void* fmem[SHT_NTYP];
-extern void* fmem_l[SHT_NTYP];
-extern void* fmem_m0[SHT_NTYP];
-extern void* fmem_m0l[SHT_NTYP];
-#endif
 extern void* ffly[6][SHT_NTYP];
 extern void* ffly_m[6][SHT_NTYP];
 extern void* ffly_m0[6][SHT_NTYP];
@@ -212,16 +206,6 @@ static void set_sht_gpu(shtns_cfg shtns, int typ_start)
 	}
 }
 
-#ifdef SHTNS_MEM
-/// \internal choose memory algorithm everywhere.
-static void set_sht_mem(shtns_cfg shtns) {
-	for (int it=0; it<SHT_NTYP; it++) {
-		for (int v=0; v<SHT_NVAR; v++)
-			shtns->ftable[v][it] = sht_func[v][SHT_MEM][it];
-		shtns->ftable[SHT_M][it] = sht_func[SHT_M][SHT_FLY2][it];		// there is no "mem" algo for SHT_M
-	}
-}
-#endif
 
 /// \internal copy all algos to sht_func array (should be called by set_grid before choosing variants).
 /// if nphi is 1, axisymmetric algorithms are used.
@@ -258,10 +242,6 @@ static void init_sht_array_func(shtns_cfg shtns)
 			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_M][SHT_FLY1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);
 		}
-	  #ifdef SHTNS_MEM
-		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem_m0, sizeof(void*)*SHT_NTYP);
-		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_m0l, sizeof(void*)*SHT_NTYP);
-	  #endif
 	} else {
 		for (int j=0; j<=alg_lim; j++) {
 			if (shtns->nthreads <= 2) {		// don't consider non-parallel algos for large number of threads.
@@ -277,10 +257,6 @@ static void init_sht_array_func(shtns_cfg shtns)
 			memcpy(sht_func[SHT_M][SHT_OMP1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);		// no omp algo for SHT_M, use fly instead
 		  #endif
 		}
-	  #ifdef SHTNS_MEM
-		memcpy(sht_func[SHT_STD][SHT_MEM], &fmem, sizeof(void*)*SHT_NTYP);
-		memcpy(sht_func[SHT_LTR][SHT_MEM], &fmem_l, sizeof(void*)*SHT_NTYP);
-	  #endif
 	  #ifdef HAVE_LIBCUFFT
 		for (int j=0; j<4; j++) {
 			memcpy(sht_func[SHT_STD][SHT_GPU1+j], &fgpu[j], sizeof(void*)*SHT_NTYP);
@@ -289,11 +265,7 @@ static void init_sht_array_func(shtns_cfg shtns)
 	  #endif
 	}
 
-	#ifdef SHTNS_MEM
-	set_sht_mem(shtns);		// default transform is MEM
-	#else
-	set_sht_fly(shtns, 0);
-	#endif
+	set_sht_fly(shtns, 0);	// default transform is FLY
 }
 
 
@@ -342,66 +314,6 @@ static int free_unused(shtns_cfg shtns, void* pp)
 	return (n-1);
 }
 
-#ifdef SHTNS_MEM
-/// \internal Free matrices if on-the-fly has been selected.
-static void free_unused_matrices(shtns_cfg shtns)
-{
-	long int marray_size = (MMAX+1)*sizeof(double) + (MIN_ALIGNMENT-1);
-	int count[SHT_NTYP];
-	int it, iv, ia, iv2;
-
-	for (it=0; it<SHT_NTYP; it++) {
-		count[it] = 0;
-		for (iv=0; iv<SHT_NVAR; iv++) {
-			void* fptr = shtns->ftable[iv][it];
-			if (fptr != NULL) {
-				for (ia=0; ia<=SHT_MEM; ia++)		// count occurences to mem algo
-					for (iv2=0; iv2<SHT_NVAR; iv2++)
-						if (sht_func[iv2][ia][it] == fptr) count[it]++;
-			}
-		}
-		#if SHT_VERBOSE > 1
-			if (verbose>1) printf(" %d ",count[it]);
-		#endif
-	}
-
-	if (shtns->dylm == NULL) {		// no vector transform : do not try to free
-		count[SHT_TYP_VAN] = -1;		count[SHT_TYP_VSY] = -1;
-	}
-
-	if (count[SHT_TYP_3AN] == 0) {		// analysis may be freed.
-		if (count[SHT_TYP_VAN] == 0) {
-			PRINT_VERB("freeing vector analysis matrix\n");
-			free_unused(shtns, &shtns->dzlm);
-		}
-		if (count[SHT_TYP_SAN] == 0) {
-			PRINT_VERB("freeing scalar analysis matrix\n");
-			free_unused(shtns, &shtns->zlm);
-		}
-	} else if (shtns->mmax > 0) {	// scalar may be reduced to m=0
-		if ((count[SHT_TYP_SAN] == 0) && (ref_count(shtns, &shtns->zlm) == 1)) {
-			PRINT_VERB("keeping scalar analysis matrix up to m=0\n");
-			shtns->zlm = realloc(shtns->zlm, ((LMAX+1)*NLAT_2 +3)*sizeof(double) + marray_size );
-		}
-	}
-	if (count[SHT_TYP_3SY] == 0) {		// synthesis may be freed.
-		if (count[SHT_TYP_VSY] + count[SHT_TYP_GSP] + count[SHT_TYP_GTO] == 0) {
-			PRINT_VERB("freeing vector synthesis matrix\n");
-			free_unused(shtns, &shtns->dylm);
-		}
-		if (count[SHT_TYP_SSY] == 0) {
-			PRINT_VERB("freeing scalar synthesis matrix\n");
-			free_unused(shtns, &shtns->ylm);
-		}
-	} else if (shtns->mmax > 0) {	// scalar may be reduced to m=0
-		if ((count[SHT_TYP_SSY] == 0) && (ref_count(shtns, &shtns->ylm) == 1)) {
-			PRINT_VERB("keeping scalar synthesis matrix up to m=0\n");
-			shtns->ylm = realloc(shtns->ylm, (LMAX+2)*NLAT_2*sizeof(double) + marray_size );
-		}
-	}
-}
-#endif
-
 /// \internal allocate arrays for SHT related to a given grid.
 static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
 {
@@ -413,50 +325,6 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 	shtns->ct = (double *) VMALLOC( sizeof(double) * l0*3 );			/// ct[] (including st and st_1)
 	shtns->st = shtns->ct + l0;		shtns->st_1 = shtns->ct + 2*l0;
 
-	#ifdef SHTNS_MEM
-	shtns->ylm = NULL;		shtns->dylm = NULL;			// synthesis
-	shtns->zlm = NULL;		shtns->dzlm = NULL;			// analysis
-
-	if (on_the_fly == 0) {		// Allocate legendre functions lookup tables.
-		marray_size = (MMAX+1)*sizeof(double*) + (MIN_ALIGNMENT-1);		// for sse2 alignement
-
-		/* ylm */
-		lstride = (LMAX+1);		lstride += (lstride&1);		// even stride.
-		size = sizeof(double) * ((NLM-(LMAX+1)+lstride)*NLAT_2);
-		if (MMAX == 0) size += 3*sizeof(double);			// some overflow needed.
-		shtns->ylm = (double **) malloc( marray_size + size );
-		shtns->ylm[0] = (double *) PTR_ALIGN( shtns->ylm + (MMAX+1) );
-		if (MMAX>0) shtns->ylm[1] = shtns->ylm[0] + NLAT_2*lstride;
-		for (im=1; im<MMAX; im++) shtns->ylm[im+1] = shtns->ylm[im] + NLAT_2*(LMAX+1-im*MRES);
-		/* dylm */		
-		if (vect) {
-			lstride = LMAX;		lstride += (lstride&1);		// even stride.
-			size = sizeof(struct DtDp) * ((NLM-(LMAX+1) +lstride/2)*NLAT_2);
-			if (MMAX == 0) size += 2*sizeof(double);	// some overflow needed.
-			shtns->dylm = (struct DtDp **) malloc( marray_size + size );
-			shtns->dylm[0] = (struct DtDp *) PTR_ALIGN( shtns->dylm + (MMAX+1) );
-			if (MMAX>0) shtns->dylm[1] = shtns->dylm[0] + (lstride/2)*NLAT_2;		// phi-derivative is zero for m=0
-			for (im=1; im<MMAX; im++) shtns->dylm[im+1] = shtns->dylm[im] + NLAT_2*(LMAX+1-im*MRES);
-		}
-		if (analys) {
-			/* zlm */
-			size = sizeof(double) * (NLM*NLAT_2 + (NLAT_2 & 1));
-			if (MMAX == 0) size += 2*(NLAT_2 & 1)*((LMAX+1) & 1) * sizeof(double);
-			shtns->zlm = (double **) malloc( marray_size + size );
-			shtns->zlm[0] = (double *) PTR_ALIGN( shtns->zlm + (MMAX+1) );
-			if (MMAX>0) shtns->zlm[1] = shtns->zlm[0] + NLAT_2*(LMAX+1) + (NLAT_2&1);
-			for (im=1; im<MMAX; im++) shtns->zlm[im+1] = shtns->zlm[im] + NLAT_2*(LMAX+1-im*MRES);
-			/* dzlm */
-			if (vect) {
-				size = sizeof(struct DtDp)* (NLM-1)*NLAT_2;		// remove l=0
-				shtns->dzlm = (struct DtDp **) malloc( marray_size + size );
-				shtns->dzlm[0] = (struct DtDp *) PTR_ALIGN( shtns->dzlm + (MMAX+1) );
-				if (MMAX>0) shtns->dzlm[1] = shtns->dzlm[0] + NLAT_2*(LMAX);
-				for (im=1; im<MMAX; im++) shtns->dzlm[im+1] = shtns->dzlm[im] + NLAT_2*(LMAX+1-im*MRES);
-			}
-		}
-	}
-	#endif
 	#if SHT_VERBOSE > 1
 		if (verbose>1) printf("          Memory used for Ylm and Zlm matrices = %.3f Mb x2\n",3.0*sizeof(double)*NLM*NLAT_2/(1024.*1024.));
 	#endif
@@ -466,13 +334,6 @@ static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analy
 /// \internal free arrays allocated by alloc_SHTarrays.
 static void free_SHTarrays(shtns_cfg shtns)
 {
-	#ifdef SHTNS_MEM
-	free_unused(shtns, &shtns->ylm);
-	free_unused(shtns, &shtns->dylm);
-	free_unused(shtns, &shtns->zlm);
-	free_unused(shtns, &shtns->dzlm);
-	#endif
-
 	if (ref_count(shtns, &shtns->ct) == 1)	VFREE(shtns->ct);
 	shtns->ct = NULL;		shtns->st = NULL;
 }
@@ -680,210 +541,6 @@ static void PolarOptimize(shtns_cfg shtns, double eps)
 	#endif
 	}
 }
-
-#ifdef SHTNS_MEM
-
-/// \internal Perform some optimization on the SHT matrices.
-static void OptimizeMatrices(shtns_cfg shtns, double eps)
-{
-	unsigned short *tm;
-	double **ylm, **zlm;
-	struct DtDp** dylm;
-	struct DtDp** dzlm;
-	int im,m,l,it;
-	int vector = (shtns->dylm != NULL);
-
-	tm = shtns->tm;
-	ylm = shtns->ylm;		dylm = shtns->dylm;
-	zlm = shtns->zlm;		dzlm = shtns->dzlm;
-
-	for (im=0;im<=MMAX;im++)	tm[im] = 0;
-/// POLAR OPTIMIZATION : analyzing coefficients, some can be safely neglected.
-	if (eps > 0.0) {
-		for (im=1;im<=MMAX;im++) {
-			m = im*MRES;
-			tm[im] = NLAT_2;
-			for (l=m;l<=LMAX;l++) {
-				it = tm[im-1];		// tm[im] is monotonic.
-				while( fabs(ylm[im][it*(LMAX-m+1) + (l-m)]) < eps ) { it++; }
-				if (tm[im] > it) tm[im] = it;
-			}
-		}
-#if SHT_VERBOSE > 0
-		if (verbose) printf("        + polar optimization threshold = %.1e\n",eps);
-#endif
-#if SHT_VERBOSE > 1
-		if (verbose>1) {
-			printf("          tm[im]=");
-			for (im=0;im<=MMAX;im++)
-				printf(" %d",tm[im]);
-			printf("\n");
-		}
-#endif
-
-		for (im=1; im<=MMAX; im++) {	//	im >= 1
-		  if (tm[im] > 0) {		// we can remove the data corresponding to polar values.
-			m = im*MRES;
-			ylm[im]  += tm[im]*(LMAX-m+1);		// shift pointers (still one block for each m)
-			if (vector)  dylm[im] += tm[im]*(LMAX-m+1);
-			if (zlm[0] != NULL) {
-			  for (l=m; l<LMAX; l+=2) {
-				for (it=0; it<NLAT_2-tm[im]; it++) {	// copy data to avoid cache misses.
-					zlm[im][(l-m)*(NLAT_2-tm[im]) + it*2]   = zlm[im][(l-m)*NLAT_2 + (it+tm[im])*2];
-					zlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1] = zlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1];
-					if (vector) {
-						dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2].t;
-						dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2].p;
-						dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1].t;
-						dzlm[im][(l-m)*(NLAT_2-tm[im]) + it*2+1].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])*2+1].p;
-					}
-				}
-			  }
-			  if (l==LMAX) {
-				for (it=0; it<NLAT_2-tm[im]; it++) {
-					zlm[im][(l-m)*(NLAT_2-tm[im]) + it]   = zlm[im][(l-m)*NLAT_2 + (it+tm[im])];
-					if (vector) {
-						dzlm[im][(l-m)*(NLAT_2-tm[im]) + it].t = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])].t;
-						dzlm[im][(l-m)*(NLAT_2-tm[im]) + it].p = dzlm[im][(l-m)*NLAT_2 + (it+tm[im])].p;
-					}
-				}
-			  }
-			}
-		  }
-		}
-	}
-
-/// Compression of dzlm for m=0, as .p is 0
-	if ((vector) && (dzlm[0] != NULL)) {		// for sht_reg_poles there is no dzlm defined.
-		im=0;	m=0;
-		double* yg = (double *) dzlm[im];
-		for (l=1; l<LMAX; l+=2) {		// l=0 is zero, so we start at l=1.
-			for (it=0; it<NLAT_2; it++) {
-				yg[(l-1)*NLAT_2 + it*2] = dzlm[im][(l-1)*NLAT_2 + it*2].t;	// l
-				yg[(l-1)*NLAT_2 + it*2+1] = dzlm[im][(l-1)*NLAT_2 + it*2+1].t;	// l+1
-			}
-		}
-		if (l==LMAX) {		// last l is stored right away, without interleaving.
-			for (it=0; it<NLAT_2; it++) {
-				yg[(l-1)*NLAT_2 + it] = dzlm[im][(l-1)*NLAT_2 + it].t;		// l (odd)
-			}
-		}
-	}
-	if ((zlm[0] != NULL) && (NLAT_2 & 1)) {
-		zlm[0][NLAT_2] = 0.0;		// take care to write 0.0 for this sse2 padding value.
-		if ( (MMAX==0) && (!(LMAX & 1)) ) {		// NLAT_2 odd + LMAX even
-			zlm[0][(LMAX+1)*NLAT_2 +1] = 0.0;	// overflow for im=0
-			zlm[0][(LMAX+1)*NLAT_2 +2] = 0.0;
-		}
-	}
-}
-
-// how to access the ylm matrix for im=0
-#define YL0(it, l)  ( shtns->ylm[0][ (it)*(((LMAX+2)>>1)*2) + (l) ] )
-#define DYL0(it, l) ( ((double*)(shtns->dylm[0]))[ (it)*(((LMAX+1)>>1)*2) + (l-1) ] )
-
-#define YLM(it, l, im) ( (im==0) ? YL0(it,l) : shtns->ylm[im][(it)*(LMAX-(im)*MRES+1) + ((l)-(im)*MRES)] )
-#define DTYLM(it, l, im) ( (im==0) ? ( (l==0) ? 0.0 : DYL0(it,l) ) : shtns->dylm[im][(it)*(LMAX-(im)*MRES+1) + ((l)-(im)*MRES)].t )
-#define DPYLM(it, l, im) ( (im==0) ? 0.0 : shtns->dylm[im][(it)*(LMAX-(im)*MRES+1) + ((l)-(im)*MRES)].p )
-
-/// \internal Precompute the matrix for SH synthesis.
-static void init_SH_synth(shtns_cfg shtns)
-{
-	double *yl, *dyl;		// temp storage for derivative for legendre function values.
-	long int it,im,m,l;
-	double *ct = shtns->ct;
-	double *st = shtns->st;
-	int vector = (shtns->dylm != NULL);
-
-	yl = (double*) malloc( 2*sizeof(double) *(LMAX+1) );
-	dyl = yl + (LMAX+1);
-
-	{	im=0;	m=0;
-		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array_hp(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
-			for (l=0; l<=LMAX; l++)   YL0(it, l) = yl[l];
-			for (l=LMAX+1; l<=LMAX+3; l++)	YL0(it, l) = 0.0;	// allow overflow.
-			if (vector) {
-				for (l=1; l<=LMAX; l++)	 DYL0(it, l) = dyl[l];
-				for (l=LMAX+1; l<=LMAX+2; l++)  DYL0(it, l) = 0.0;	// allow overflow.
-			}
-		}
-	}
-	for (im=1; im<=MMAX; im++) {
-		double *ylm = shtns->ylm[im];
-		struct DtDp* dylm = vector ? shtns->dylm[im] : NULL;
-		m = im*MRES;
-		for (it=0; it<NLAT_2; it++) {
-			legendre_sphPlm_deriv_array_hp(shtns, LMAX, im, ct[it], st[it], yl, dyl);	// fixed im legendre functions lookup table.
-			for (l=m; l<=LMAX; l++) {
-				ylm[it*(LMAX-m+1) + (l-m)] = yl[l-m] * st[it];
-				if (vector) {
-					dylm[it*(LMAX-m+1) + (l-m)].t = dyl[l-m];
-					dylm[it*(LMAX-m+1) + (l-m)].p = yl[l-m] *m;	// 1/sint(t) dYlm/dphi
-				}
-			}
-		}
-	}
-	free(yl);
-}
-
-
-/// \internal Precompute matrices for SH synthesis and analysis, on a Gauss-Legendre grid.
-static void init_SH_gauss(shtns_cfg shtns)
-{
-	long int it,im,m,l;
-	int vector = (shtns->dylm != NULL);
-
-	init_SH_synth(shtns);
-
-// for analysis (decomposition, direct transform) : transpose and multiply by gauss weight and other normalizations.
-// interleave l and l+1 : this stores data in the way it will be read.
-	double **zlm = shtns->zlm;
-	struct DtDp** dzlm = shtns->dzlm;
-	for (im=0; im<=MMAX; im++) {
-		m = im*MRES;
-		long int talign = 0;
-
-		for (it=0;it<NLAT_2;it++) {
-			double norm = shtns->wg[it];
-			if ( (m>0) && (shtns->norm & SHT_REAL_NORM) )	norm *= 2;		// "Real" norm : zlm must be doubled for m>0
-			long int l0 = m;
-			if (m==0) {
-				zlm[im][it] = YL0(it, 0) * norm;
-				// les derivees sont nulles pour l=0
-				l0++;
-				talign = (NLAT_2&1);
-			}
-			for (l=l0; l<LMAX; l+=2) {
-				double nz0 = norm;		double nz1 = norm;
-				if (SHT_NORM == sht_schmidt) {
-					nz0 *= (2*l+1);		nz1 *= (2*l+3);
-				}
-				zlm[im][(l-m)*NLAT_2 + it*2 +talign]    =  YLM(it, l, im) * nz0;
-				zlm[im][(l-m)*NLAT_2 + it*2 +1 +talign] =  YLM(it, l+1, im) * nz1;
-				if (vector) {
-					nz0 *= shtns->l_2[l];		nz1 *= shtns->l_2[l+1];
-					dzlm[im][(l-l0)*NLAT_2 + it*2].t = DTYLM(it, l, im) * nz0;
-					dzlm[im][(l-l0)*NLAT_2 + it*2].p = DPYLM(it, l, im) * nz0;
-					dzlm[im][(l-l0)*NLAT_2 + it*2+1].t = DTYLM(it, l+1, im)  * nz1;
-					dzlm[im][(l-l0)*NLAT_2 + it*2+1].p = DPYLM(it, l+1, im) * nz1;
-				}
-			}
-			if (l==LMAX) {		// last l is stored right away, without interleaving.
-				double nz0 = norm;
-				if (SHT_NORM == sht_schmidt)	nz0 *= (2*l+1);
-				zlm[im][(l-m)*NLAT_2 + it +talign]    =  YLM(it, l, im) * nz0;
-				if (vector) {
-					nz0 *= shtns->l_2[l];
-					dzlm[im][(l-l0)*NLAT_2 + it].t = DTYLM(it, l, im) * nz0;
-					dzlm[im][(l-l0)*NLAT_2 + it].p = DPYLM(it, l, im) * nz0;
-				}
-			}
-		}
-	}
-}
-
-#endif
 
 /// \internal Generate a grid (including weights)
 static void grid_weights(shtns_cfg shtns, double latdir)
@@ -1101,11 +758,7 @@ static void choose_best_sht(shtns_cfg shtns, int* nlp, int vector)
 	double t0, t, tt, r;
 	double tdct, tnodct;
 	clock_t tcpu;
-	#ifdef SHTNS_MEM
-	const int on_the_fly_only = (shtns->ylm == NULL);		// only on-the-fly.
-	#else
 	const int on_the_fly_only = 1;		// only on-the-fly.
-	#endif
 	int otf_analys = (shtns->wg != NULL);			// on-the-fly analysis supported.
 
 	if (NLAT < VSIZE2*4) return;			// on-the-fly not possible for NLAT_2 < 2*NWAY (overflow).
@@ -1404,7 +1057,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	if (mres <= 0) shtns_runerr("MRES must be > 0");
 
 	// allocate new setup and initialize some variables (used as flags) :
-	shtns = malloc( SIZEOF_SHTNS_INFO(mmax) );
+	shtns = VMALLOC( SIZEOF_SHTNS_INFO(mmax) );		// aligned on a cache line: the public part fits in a single cache line
 	if (shtns == NULL) return shtns;	// FAIL
 	{
 		void **p0 = (void**) &shtns->tm;	// first pointer in struct.
@@ -1522,7 +1175,7 @@ shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 
 	if (mmax > base->mmax) return (NULL);		// fail if mmax larger than source config.
 
-	shtns = malloc( SIZEOF_SHTNS_INFO(mmax) );
+	shtns = VMALLOC( SIZEOF_SHTNS_INFO(mmax) );			// align on cache line
 	memcpy(shtns, base, SIZEOF_SHTNS_INFO(mmax) );		// copy all
 	shtns->lmidx = (int*) shtns+1;		// lmidx is stored at the end of the struct...
 	shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// ...and tm just after.
@@ -1593,7 +1246,7 @@ void shtns_destroy(shtns_cfg shtns)
 			s2 = s2->next;
 		}
 	}
-	free(shtns);
+	VFREE(shtns);
 }
 
 /// clear all allocated memory (hopefully) and go back to 0 state.
@@ -1650,7 +1303,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	int layout;
 	int nloop = 0;
 	int n_gauss = 0;
-	int on_the_fly = 0;
+	const int on_the_fly = 1;		// only on-the-fly algos are available
 	int quick_init = 0;
 	int vector = !(flags & SHT_SCALAR_ONLY);
 	int latdir = (flags & SHT_SOUTH_POLE_FIRST) ? -1 : 1;		// choose latitudinal direction (change sign of ct)
@@ -1681,15 +1334,12 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	switch (flags) {
 		case sht_auto :		flags = sht_gauss;	break;		// only gauss available.
 		case sht_reg_fast:	quick_init = 1;
-		case sht_reg_dct:	flags = sht_reg_fast; on_the_fly = 1;  break;
-		case sht_gauss_fly :  flags = sht_gauss;  on_the_fly = 1;  break;
+		case sht_reg_dct:	flags = sht_reg_fast; break;
+		case sht_gauss_fly :  flags = sht_gauss;  break;
 		case sht_quick_init : flags = sht_gauss;  quick_init = 1;  break;
-		case sht_reg_poles : on_the_fly = 1;  quick_init = 1;	break;		// WARNING: quick_init mandatory here, as reg_poles needs NWAY>1 to work (quick_init sets NWAY=2)
+		case sht_reg_poles : quick_init = 1;	break;		// WARNING: quick_init mandatory here, as reg_poles needs NWAY>1 to work (quick_init sets NWAY=2)
 		default : break;
 	}
-	#ifndef SHTNS_MEM
-		on_the_fly = 1;
-	#endif
 	#ifdef SHTNS4MAGIC
 		if (flags == sht_reg_poles) shtns_runerr("Grid cannot include poles with MagIC layout.");
 	#endif
@@ -1724,7 +1374,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		if (verbose>1) printf("Memory required for precomputed matrices (estimate) : %.3f Mb\n",t);
 	#endif
 	if ( t > SHTNS_MAX_MEMORY ) {		// huge transform has been requested
-		on_the_fly = 1;
 //		if (t > 10*SHTNS_MAX_MEMORY) quick_init =1;			// do not time such large transforms.
 	}
 
@@ -1737,8 +1386,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	} else {
 		shtns->fftw_plan_mode = FFTW_ESTIMATE;
 		if ((mem < 1.0) && (SHT_VERBOSE < 2)) shtns->nthreads = 1;		// disable threads for small transforms (in quickinit mode).
-		if ((VSIZE2 >= 4) && (*nlat >= VSIZE2*4)) on_the_fly = 1;		// with AVX, on-the-fly should be the default (faster).
-		if ((shtns->nthreads > 1) && (*nlat >= VSIZE2*16)) on_the_fly = 1;		// force multi-thread transforms
 	}
 
 	if (flags == sht_auto) {
@@ -1775,15 +1422,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		case sht_reg_fast :  shtns->grid = GRID_REGULAR;
 	}
 	grid_weights(shtns, latdir);
-	#ifdef SHTNS_MEM
-	if ((on_the_fly == 0) && (flags == sht_gauss)) {
-		init_SH_gauss(shtns);			// precompute matrices
-		OptimizeMatrices(shtns, eps);
-	}
-	if (flags == sht_reg_poles) {
-		for (im=0; im<=MMAX; im++) shtns->tm[im] = 0;	// avoid problems with tm[im] modified ????
-	}
-	#endif
 
 	if (on_the_fly == 1) {
   #if SHT_VERBOSE > 0
@@ -1816,9 +1454,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			choose_best_sht(shtns, &nloop, vector);
 			if (layout & SHT_LOAD_SAVE_CFG) config_save(shtns, req_flags);
 		}
-		#ifdef SHTNS_MEM
-		if (on_the_fly == 0) free_unused_matrices(shtns);
-		#endif
 		t = SHT_error(shtns, vector);		// compute SHT accuracy.
   #if SHT_VERBOSE > 0
 		if (verbose) printf("        + SHT accuracy = %.3g\n",t);

@@ -73,9 +73,9 @@ AS_VAR_POPDEF([CACHEVAR])dnl
 
 AS_IF([test "x$enable_knl" != "xyes"], [
 	# add gcc compile options if supported.
-	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"], [
-		AX_CHECK_COMPILE_FLAG([-mtune=native],[CC="$CC -mtune=native"])
-	])
+	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"])
+	# tune for skylake, it gives significantly better performance on Haswell with gcc 9.2
+	AX_CHECK_COMPILE_FLAG([-mtune=skylake],[CC="$CC -mtune=skylake"])
 	# this is an icc compile option, try if it is supported:
 	AX_CHECK_COMPILE_FLAG([-qopt-zmm-usage=high],[CC="$CC -qopt-zmm-usage=high"])
   ],[
@@ -114,12 +114,10 @@ AS_IF([test "x$enable_python" != "xno"], [
 
 # On many-core systems, enable openmp by default, and disable precomputed matrix support.
 AS_IF([test "x$enable_many_core" != "xno"], [
-  	enable_mem=no
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 # for MagIC code, also disable matrix transforms.
 AS_IF([test "x$enable_magic_layout" != "xno"], [
-  	enable_mem=no
 	#enable_ishioka=no       # workaround unexplained bug
 	#enable_many_core=yes		# optimize for many-core architecture
 	AC_DEFINE([SHTNS4MAGIC],[1],[I need the transforms compatible with the MagIC code, to speed it up!])
@@ -128,7 +126,6 @@ AS_IF([test "x$enable_magic_layout" != "xno"], [
 nvcc_flags=""
 # Disable precomputed matrix support with openmp: to avoid bugs arising with icc + openmp.
 AS_IF([test "x$enable_openmp" = "xyes"], [
-  	enable_mem=no
 	nvcc_flags="-Xcompiler -fopenmp"
 	AC_OPENMP
 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
@@ -261,12 +258,6 @@ AS_IF([test "x$enable_simd" != "xno"], [
 
 AS_IF([test "x$enable_ishioka" == "xyes"], [
        AC_DEFINE([SHTNS_ISHIOKA],[1],[Enable the new recurrence proposed by Ishioka (2018) see https://doi.org/10.2151/jmsj.2018-019 (faster, but experimental)])
-])
-
-# Disable MEM ?
-AS_IF([test "x$enable_mem" == "xyes"], [
-	AC_DEFINE([SHTNS_MEM],[1],[Include algorithms using precomputed matrix stored in memory)])
-	objs="$objs sht_mem.o"		# compile mem transforms
 ])
 
 # Verbosity setting
