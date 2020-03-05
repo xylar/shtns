@@ -1,4 +1,4 @@
-! Fortran 2003 interface to the SHTns library.
+! Fortran 2003 interface to the SHTns library (with contributions from T. Gastine).
 
   integer(C_INT), parameter :: SHT_NATIVE_LAYOUT=0
   integer(C_INT), parameter :: SHT_THETA_CONTIGUOUS=256
@@ -23,7 +23,7 @@
      integer(C_INT) :: nlm
      integer(C_SHORT) :: lmax, mmax, mres
      integer(C_SHORT) :: nphi, nlat, nlat_2
-     type(C_PTR) :: lmidx, li, mi
+     type(C_PTR) :: li, mi
      type(C_PTR) :: ct, st
      integer(C_INT) :: nspat, nlm_cplx
   end type shtns_info

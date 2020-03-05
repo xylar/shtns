@@ -1015,7 +1015,7 @@ int config_load(shtns_cfg shtns, int req_flags)
 #define IS_TOO_LARGE(val, dest) (sizeof(dest) >= sizeof(val)) ? 0 : ( ( val >= (1<<(8*sizeof(dest))) ) ? 1 : 0 )
 
 /// \internal returns the size that must be allocated for an shtns_info.
-#define SIZEOF_SHTNS_INFO(mmax) ( sizeof(struct shtns_info) + (mmax+1)*( sizeof(int)+sizeof(unsigned short) ) )
+#define SIZEOF_SHTNS_INFO(mmax) ( sizeof(struct shtns_info) + (mmax+1)*( sizeof(unsigned short) ) )
 
 /* PUBLIC INITIALIZATION & DESTRUCTION */
 
@@ -1056,8 +1056,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		void **p0 = (void**) &shtns->tm;	// first pointer in struct.
 		void **p1 = (void**) &shtns->Y00_1;	// first non-pointer.
 		while(p0 < p1)	 *p0++ = NULL;		// write NULL to every pointer.
-		shtns->lmidx = (int*) (shtns + 1);		// lmidx is stored at the end of the struct...
-		shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// and tm just after.
+		shtns->tm = (unsigned short*) (shtns + 1);	// tm is stored at the end of the struct...
 		shtns->ct = NULL;	shtns->st = NULL;
 		shtns->nphi = 0;	shtns->nlat = 0;	shtns->nlat_2 = 0;		shtns->nspat = 0;	// public data
 		shtns->ylm_lat = NULL;	shtns->ct_lat = 2.0;	shtns->ifft_lat = NULL;		shtns->nphi_lat = 0;	// _to_lat data
@@ -1093,9 +1092,8 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	s2 = sht_data;		// check if some data can be shared ...
 	while(s2 != NULL) {
 		if ((s2->mmax >= mmax) && (s2->mres == mres)) {
-			if (s2->lmax == lmax) {		// we can reuse the l-related arrays (li + copy lmidx)
+			if (s2->lmax == lmax) {		// we can reuse the l-related arrays (li)
 				shtns->li = s2->li;		shtns->mi = s2->mi;
-				for (im=0; im<=mmax; im++)	shtns->lmidx[im] = s2->lmidx[im];
 				larrays_ok = 1;
 				if (s2->norm == norm) {		// we can reuse the legendre tables.
 					shtns->alm = s2->alm;		shtns->blm = s2->blm;
@@ -1118,7 +1116,6 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->mi = shtns->li + NLM;
 		for (im=0, lm=0; im<=MMAX; im++) {	// init l-related arrays.
 			m = im*MRES;
-			shtns->lmidx[im] = lm -m;		// virtual pointer for l=0
 			for (l=im*MRES;l<=LMAX;l++) {
 				shtns->li[lm] = l;		shtns->mi[lm] = m;
 				lm++;
@@ -1170,13 +1167,11 @@ shtns_cfg shtns_create_with_grid(shtns_cfg base, int mmax, int nofft)
 
 	shtns = VMALLOC( SIZEOF_SHTNS_INFO(mmax) );			// align on cache line
 	memcpy(shtns, base, SIZEOF_SHTNS_INFO(mmax) );		// copy all
-	shtns->lmidx = (int*) shtns+1;		// lmidx is stored at the end of the struct...
-	shtns->tm = (unsigned short*) (shtns->lmidx + (mmax+1));		// ...and tm just after.
+	shtns->tm = (unsigned short*) (shtns+1);		// tm is stored at the end of the struct.
 
 	if (mmax != shtns->mmax) {
 		shtns->mmax = mmax;
 		for (int im=0; im<=mmax; im++) {
-			shtns->lmidx[im] = base->lmidx[im];
 			shtns->tm[im] = base->tm[im];
 		}
 		if (mmax == 0) {

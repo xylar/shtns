@@ -113,7 +113,6 @@ inline static PyObject* SpatArray_New(int size) {
 %rename("sht") shtns_info;
 %ignore SHT_NATIVE_LAYOUT;
 %ignore nlat_2;
-%ignore lmidx;
 %ignore li;
 %ignore mi;
 %ignore ct;

@@ -116,7 +116,6 @@ struct shtns_info {		// MUST start with "int nlm;"
 	unsigned short nphi;		///< number of spatial points in Phi direction (longitude)
 	unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
 	unsigned short nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
-	int *lmidx;					///< (virtual) index in SH array of given im (size mmax+1) : LiM(l,im) = lmidx[im] + l
 	unsigned short *li;			///< degree l for given mode index (size nlm) : li[lm]
 	unsigned short *mi;			///< order m for given mode index (size nlm) : mi[lm]
 	double *ct, *st;			///< cos(theta) and sin(theta) arrays (size nlat)

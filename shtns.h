@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -83,7 +83,6 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 	const unsigned short nphi;		///< number of spatial points in Phi direction (longitude)
 	const unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
 	const unsigned short nlat_2;	///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
-	const int *const lmidx;			///< (virtual) index in SH array of given im (size mmax+1) : LiM(l,im) = lmidx[im] + l
 	const unsigned short *const li;	///< degree l for given mode index (size nlm) : li[lm]
 	const unsigned short *const mi;	///< order m for given mode index (size nlm) : mi[lm]
 	const double *const ct;			///< cos(theta) array (size nlat)
@@ -99,11 +98,9 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
  * The following macros give access to single spherical harmonic coefficient or perform loops spanning all of them.
 **///@{
 ///LiM(shtns, l,im) : macro returning array index for given l and im, corresponding to config shtns.
-#define LiM(shtns, l,im) ( shtns->lmidx[im] + (l) )
-//#define LiM(shtns, l,im) ( ((im)*(2*shtns->lmax + 2 - ((im)+1)*shtns->mres))>>1 + (l) )
+#define LiM(shtns, l,im) ( (((im)*(2*shtns->lmax + 2 - ((im)+1)*shtns->mres))>>1) + (l) )
 /// LM(shtns, l,m) : macro returning array index for given l and m, corresponding to config shtns.
-#define LM(shtns, l,m) ( shtns->lmidx[((unsigned)(m))/shtns->mres] + (l) )
-//#define LM(shtns, l,m) ( ((((unsigned)(m))/shtns->mres)*(2*shtns->lmax + 2 - ((m)+shtns->mres)))>>1 + (l) )
+#define LM(shtns, l,m) ( (((((unsigned short)(m))/shtns->mres)*(2*shtns->lmax + 2 - ((m)+shtns->mres)))>>1) + (l) )
 /// LM_LOOP( shtns, action ) : macro that performs "action" for every (l,m), with lm set, but neither l, m nor im.
 /// \c lm must be a declared int and is the loop counter and the SH array index. more info : \ref spec_data
 #define LM_LOOP( shtns, action ) { int lm=0; do { action } while(++lm < shtns->nlm); }
