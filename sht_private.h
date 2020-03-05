@@ -88,7 +88,7 @@ int cushtns_use_gpu(int);
 /* END COMPILE-TIME SETTINGS */
 
 // sht variants (std, ltr)
-enum sht_variants { SHT_STD, SHT_LTR, SHT_M, SHT_NVAR };
+enum sht_variants { SHT_STD, SHT_M, SHT_NVAR };
 // sht types (scal synth, scal analys, vect synth, ...)
 enum sht_types { SHT_TYP_SSY, SHT_TYP_SAN, SHT_TYP_VSY, SHT_TYP_VAN,
 	SHT_TYP_GSP, SHT_TYP_GTO, SHT_TYP_3SY, SHT_TYP_3AN, SHT_NTYP };

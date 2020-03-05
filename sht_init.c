@@ -167,7 +167,7 @@ enum sht_algos { SHT_MEM, SHT_SV,
 char* sht_name[SHT_NALG] = {"mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu1", "gpu2", "gpu3", "gpu4",
 	"omp1", "omp2", "omp3", "omp4", "omp6", "omp8",  "omp1a", "omp2a", "omp3a", "omp4a", "omp6a", "omp8a",   };
 char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
-char* sht_var[SHT_NVAR] = {"std", "ltr", "m" };
+char* sht_var[SHT_NVAR] = {"std", "m" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 
 extern void* ffly[6][SHT_NTYP];
@@ -229,38 +229,31 @@ static void init_sht_array_func(shtns_cfg shtns)
 	alg_lim -= SHT_FLY1;
 
 	memset(sht_func, 0, SHT_NVAR*SHT_NTYP*SHT_NALG*sizeof(void*) );		// zero out.
-	sht_func[SHT_STD][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2;
-	sht_func[SHT_LTR][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2l;
-	sht_func[SHT_STD][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2;
-	sht_func[SHT_LTR][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2l;
+	sht_func[SHT_STD][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2l;
+	sht_func[SHT_STD][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2l;
 	sht_func[SHT_M][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2ml;
 	sht_func[SHT_M][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2ml;
 
 	if (shtns->nphi==1) {		// axisymmetric transform requested.
 		for (int j=0; j<=alg_lim; j++) {
 			memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
-			memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly_m0[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_M][SHT_FLY1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);
 		}
 	} else {
 		for (int j=0; j<=alg_lim; j++) {
 			if (shtns->nthreads <= 2) {		// don't consider non-parallel algos for large number of threads.
 				memcpy(sht_func[SHT_STD][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
-				memcpy(sht_func[SHT_LTR][SHT_FLY1 + j], &ffly[j], sizeof(void*)*SHT_NTYP);
 			}
 			memcpy(sht_func[SHT_M][SHT_FLY1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);
 		  #ifdef _OPENMP
 			memcpy(sht_func[SHT_STD][SHT_OMP1 + j], &fomp_a[j], sizeof(void*)*SHT_NTYP);
-			memcpy(sht_func[SHT_LTR][SHT_OMP1 + j], &fomp_a[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_STD][SHT_OMP1A + j], &fomp_b[j], sizeof(void*)*SHT_NTYP);
-			memcpy(sht_func[SHT_LTR][SHT_OMP1A + j], &fomp_b[j], sizeof(void*)*SHT_NTYP);
 			memcpy(sht_func[SHT_M][SHT_OMP1 + j], &ffly_m[j], sizeof(void*)*SHT_NTYP);		// no omp algo for SHT_M, use fly instead
 		  #endif
 		}
 	  #ifdef HAVE_LIBCUFFT
 		for (int j=0; j<4; j++) {
 			memcpy(sht_func[SHT_STD][SHT_GPU1+j], &fgpu[j], sizeof(void*)*SHT_NTYP);
-			memcpy(sht_func[SHT_LTR][SHT_GPU1+j], &fgpu[j], sizeof(void*)*SHT_NTYP);
 		}
 	  #endif
 	}
@@ -1443,7 +1436,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if (gpu_ok < 0) {		// disable the GPU functions
 		for (int j=SHT_GPU1; j<=SHT_GPU4; j++) {
 			memset(sht_func[SHT_STD][j], 0, sizeof(void*)*SHT_NTYP);
-			memset(sht_func[SHT_LTR][j], 0, sizeof(void*)*SHT_NTYP);
 		}
 	}
   #endif
