@@ -252,11 +252,13 @@ struct DtDp {		// theta and phi derivatives stored together.
   #define PRINT_VERB(msg) (0)
 #endif
 
+/// Convert from vector 2 scalar SH to vector SH
+/// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
+/// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
+/// m = signed m (for complex SH transform).
+/// double* mx = shtns->mx_van + 2*LM(shtns,m,m);	//(im*(2*(LMAX+1)-(m+MRES))) + 2*m;
 static void SH_2scal_to_vect_reduce(const double *mx, const double* l_2, int llim, int m, rnd* vw, v2d* Sl, v2d* Tl)
-{	// convert from the two scalar SH to vector SH
-	// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
-	// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
-	// double* mx = shtns->mx_van + 2*LM(shtns,m,m);	//(im*(2*(LMAX+1)-(m+MRES))) + 2*m;
+{
 	double em = m;
 	m = abs(m);
 	v2d vl = v2d_reduce(vw[0], vw[1]);
@@ -279,10 +281,12 @@ static void SH_2scal_to_vect_reduce(const double *mx, const double* l_2, int lli
 	}
 }
 
+/// Convert from vector 2 scalar SH to vector SH
+/// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
+/// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
+/// m = signed m (for complex SH transform).
 static void SH_2scal_to_vect(const double *mx, const double* l_2, int llim, int m, v2d* vw, v2d* Sl, v2d* Tl)
-{	// convert from the two scalar SH to vector SH
-	// Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))		=> why does this work ??? (aliasing of 1/sin(theta) ???)
-	// Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
+{
 #if !defined( _GCC_VEC_) || !defined( __AVX__ )
 	double em = m;
 	m = abs(m);
@@ -310,7 +314,7 @@ static void SH_2scal_to_vect(const double *mx, const double* l_2, int llim, int 
 	v4d vwl = vread4(vw, 0);
 	v4d stl = em * vreverse4(vwl);
 	for (int l=0; l<=llim-m; l++) {
-			// SH_vect_to_2scal :: 2 full permutes, 1 mul, 2 fma, 2 128bit-loads, 2 64-bit broadcasts, 1 256-bit store
+			// SH_vect_to_2scal :: 2 full permutes, 1 mul, 2 fma, 2 128-bit stores, 2 64-bit broadcasts, 1 256-bit load
 			// here :: 1 full permutes, 2 mul, 2 fma, 2 128bit-stores, 3 64-bit broadcasts, 1 256-bit load
 		v4d vwu = vread4(vw+2*l+2, 0);		// kept for next iteration
 		v4d mxu = vall4( mx[2*l] );
@@ -521,13 +525,13 @@ static void SH2_to_ishioka(const double* xlm, v2d* VWl, const int llim_m)
 /// m = signed m (for complex SH transform).
 static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* Tl, cplx* VWl)
 {
+	long l;
   #if !defined(_GCC_VEC_) || !defined( __AVX__ )
 	double em = m;
 	v2d sl = ((v2d*)Sl)[m];
 	v2d tl = ((v2d*)Tl)[m];
 	v2d vs = IxKxZ(em, tl);
 	v2d wt = IxKxZ(em, sl);
-	long l;
 	for (l=m; l<llim; l++) {
 		v2d sl1 = ((v2d*)Sl)[l+1];		// kept for next iteration
 		v2d tl1 = ((v2d*)Tl)[l+1];
@@ -540,7 +544,8 @@ static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* 
 		sl = sl1;
 		tl = tl1;
 	}
-	if (l==llim) {
+	//if (l==llim)		// Because m<=llim, this is always true.
+	{
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
 		((v2d*)VWl)[2*l]   = vs;
 		((v2d*)VWl)[2*l+1] = wt;
@@ -551,7 +556,6 @@ static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* 
 	v4d em = (v4d) _mm256_setr_pd(-m,m, m,-m);
 	v4d stl = v2d_x2_to_v4d( -((v2d*)Sl)[m], ((v2d*)Tl)[m]);
 	v4d vswt = em*vreverse4(stl);
-	long l;
 	for (l=m; l<llim; l++) {
 		// 2 full permutes, 1 mul, 2 fma, 2 128bit-loads, 2 64-bit broadcasts, 1 256-bit store
 		v4d stlu = v2d_x2_to_v4d( -((v2d*)Sl)[l+1], ((v2d*)Tl)[l+1]);
@@ -562,7 +566,8 @@ static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* 
 		vswt = em*vreverse4(stlu) - mxl*stl;
 		stl = stlu;			// kept for next iter
 	}
-	if (l==llim) {
+	//if (l==llim)		// Because m<=llim, this is always true.
+	{
 		v4d mxl = vall4(mx[2*l+1]);		// mxl for next iteration
 		vstor4(VWl +2*l, 0, vswt);
 		vstor4(VWl + 2*l+2, 0, -mxl*stl);
@@ -570,7 +575,7 @@ static void SH_vect_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* 
   #endif
 }
 
-static void SH_vect_to_2scal_new(const double *mx, int llim, int m, const cplx* Sl, const cplx* Tl, cplx* VWl)
+static void SH_vect_to_2scal_alt(const double *mx, int llim, int m, const cplx* Sl, const cplx* Tl, cplx* VWl)
 {
 	double em = m;
 	#ifdef _GCC_VEC_
@@ -602,8 +607,8 @@ static void SH_vect_to_2scal_new(const double *mx, int llim, int m, const cplx* 
 		rnd Tll = vread(Tl+l-1, 0);
 	#endif
 	for (; l<=llim-VSIZE2/2; l+=VSIZE2/2) {		// general case 		V[2*l] = mx[2*l-1]*S[l-1]
-		// AVX512: 4 in-lane permutes, 2 full permutes, 2 mul, 4 fma, 7 256bit-loads, 2 256bit stores
-		// AVX: 4 in-lane permutes, 2 full permutes, 2 mul, 4 fma, 5 256bit-loads, 2 256bit stores
+		// AVX512: 4 in-lane permutes, 2 full permutes, 2 mul, 4 fma, 7 512-bit loads, 2 512-bit stores
+		// AVX: 4 in-lane permutes, 2 full permutes, 2 mul, 4 fma, 5 256-bit loads, 2 256-bit stores
 		rnd s = emx * vxchg_even_odd( vread(Tl+l,0) );
 		rnd t = emx * vxchg_even_odd( vread(Sl+l,0) );
 		rnd mxx = vread(mx+2*l-1, 0);
@@ -672,7 +677,8 @@ static void SHsph_to_2scal(const double *mx, int llim, int m, cplx* Sl, cplx* VW
 		wt = IxKxZ(em, sl1);
 		sl = sl1;		// kept for next iteration
 	}
-	if (l==llim) {
+	//if (l==llim)		// Because m<=llim, this is always true.
+	{
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
 		((v2d*)VWl)[2*l]   = vs;
 		((v2d*)VWl)[2*l+1] = wt;
@@ -698,7 +704,8 @@ static void SHtor_to_2scal(const double *mx, int llim, int m, cplx* Tl, cplx* VW
 		vs = IxKxZ(em, tl1);
 		tl = tl1;
 	}
-	if (l==llim) {
+	//if (l==llim)		// Because m<=llim, this is always true.
+	{
 		s2d mxl = vdup(mx[2*l+1]);		// mxl for next iteration
 		((v2d*)VWl)[2*l]   = vs;
 		((v2d*)VWl)[2*l+1] = wt;

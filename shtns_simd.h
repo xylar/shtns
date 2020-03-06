@@ -316,7 +316,7 @@
 		#define vneg_even_xor_cte ((rnd)_mm256_broadcast_pd((v2d*)_neg0))
 		//#define vneg_even_xor_cte ((rnd)_mm256_castsi256_pd( _mm256_setr_epi32(0,0x80000000, 0,0, 0,0x80000000, 0,0)))	// BUGGY ON GCC! DON'T USE!
 		#define vxor(v,x) ((rnd)_mm256_xor_pd(v, x))
-		inline static double reduce_add(rnd a) {
+		inline static double reduce_add(rnd a) {	// Latency=12c Skylake
 			v2d t = (v2d)_mm256_castpd256_pd128(a) + (v2d)_mm256_extractf128_pd(a,1);
 			return _mm_cvtsd_f64(t) + _mm_cvtsd_f64(_mm_unpackhi_pd(t,t));
 		}

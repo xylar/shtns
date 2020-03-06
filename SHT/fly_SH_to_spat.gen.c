@@ -27,6 +27,8 @@
 # S : line for vector transfrom, spheroidal component
 # T : line for vector transform, toroidal component.
 
+	#ifndef SHT_AXISYM
+
 3	void GEN3(_sy3,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, const unsigned im, int it0, int it1);
 QX	void GEN3(_sy1,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, v2d *BrF, long int llim, const unsigned im, int it0, int it1);
   #ifndef SHT_GRAD
@@ -44,6 +46,18 @@ VX	void GEN3(_sy2_hi,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, v2d *Bt
 S	void GEN3(_sy1s_hi,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, v2d *BtF, v2d *BpF, const long int llim, const unsigned im, int it0, int it1);
 T	void GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, const unsigned im, int it0, int it1);
   #endif
+  
+  #endif
+
+3	void GEN3(_sy3,NWAY,_m0l)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, v2d *BrF, v2d *BtF, v2d *BpF, const long int llim, int it0, int it1);
+QX	void GEN3(_sy1,NWAY,_m0l)(shtns_cfg shtns, cplx *Qlm, v2d *BrF, long int llim, int it0, int it1);
+  #ifndef SHT_GRAD
+VX	void GEN3(_sy2,NWAY,_m0l)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, int it0, int it1);
+  #else
+S	void GEN3(_sy1s,NWAY,_m0l)(shtns_cfg shtns, cplx *Slm, v2d *BtF, v2d *BpF, const long int llim, int it0, int it1);
+T	void GEN3(_sy1t,NWAY,_m0l)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, const long int llim, int it0, int it1);
+  #endif
+
 
 3	static void GEN3(SHqst_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, const long int llim) {
 QX	static void GEN3(SH_to_spat_fly,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, const long int llim) {
@@ -76,30 +90,31 @@ VX		BpF = BtF + nv/2;
 	const int it0 = 0;
 	const int it1 = NLAT_2;
 	#ifndef SHT_AXISYM
-	if (llim >= SHT_L_RESCALE_FLY) {
+	if (llim < SHT_L_RESCALE_FLY) {
+	#endif
 		for (int im=0; im <= imlim; im++)
 		{
-3			GEN3(_sy3_hi,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
-QX			GEN3(_sy1_hi,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
+3			GEN3(_sy3,NWAY,_l)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
+QX			GEN3(_sy1,NWAY,_l)(shtns, Qlm, BrF, llim, im, it0, it1);
 	#ifndef SHT_GRAD
-VX			GEN3(_sy2_hi,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
+VX			GEN3(_sy2,NWAY,_l)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
 	#else
-S			GEN3(_sy1s_hi,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
-T			GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
+S			GEN3(_sy1s,NWAY,_l)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
+T			GEN3(_sy1t,NWAY,_l)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
 	#endif
 		}
-	} else
-	#endif
-	{
+  #ifndef SHT_AXISYM
+	} else {
+
 		for (int im=0; im <= imlim; im++)
 		{
-3			GEN3(_sy3,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
-QX			GEN3(_sy1,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
+3				GEN3(_sy3_hi,NWAY,_l)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
+QX				GEN3(_sy1_hi,NWAY,_l)(shtns, Qlm, BrF, llim, im, it0, it1);
 	#ifndef SHT_GRAD
-VX			GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
+VX				GEN3(_sy2_hi,NWAY,_l)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
 	#else
-S			GEN3(_sy1s,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
-T			GEN3(_sy1t,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
+S				GEN3(_sy1s_hi,NWAY,_l)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
+T				GEN3(_sy1t_hi,NWAY,_l)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
 	#endif
 		}
 	}
@@ -111,7 +126,6 @@ V		memset(BtF + NLAT_2*(imlim+1), 0, sizeof(cplx)* NLAT_2 * (NPHI-1-2*imlim));
 V		memset(BpF + NLAT_2*(imlim+1), 0, sizeof(cplx)* NLAT_2 * (NPHI-1-2*imlim));
 	}
 
-  #ifndef SHT_AXISYM
     // NPHI > 1 as SHT_AXISYM is not defined.
   	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode != 1) {
