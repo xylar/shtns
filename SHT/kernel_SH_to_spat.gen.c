@@ -95,13 +95,8 @@ T		double* const Tl0 = (double*) VWl + llim+2;
 3		double* const Ql0 = (double*) (VWl + llim+2);
 		#ifdef SHT_GRAD
 			// TODO: fix k,nk bounds
-		  #ifndef SHT_AXISYM
-S				k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2);
-T				k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2);
-		  #else
-S			if (BpF != NULL) { int k=0; do { BpF[k]=vdup(0.0); } while(++k<NLAT_2); }
-T			if (BtF != NULL) { int k=0; do { BtF[k]=vdup(0.0); } while(++k<NLAT_2); }
-		  #endif
+S			if (BpF != NULL) memset(BpF, 0, sizeof(v2d) * NLAT_2);
+T			if (BtF != NULL) memset(BtF, 0, sizeof(v2d) * NLAT_2);
 		#endif
  		l=1;
 		alm = shtns->alm;
