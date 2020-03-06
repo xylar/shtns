@@ -39,7 +39,7 @@ VX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *
 3	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BrF, double *BtF, double *BpF, cplx *Qlm, cplx *Slm, cplx *Tlm, const long int llim, const unsigned im)
   {
 	// TODO: NW should be larger for SHTNS_ISHIOKA ?, or take a different approach.
-	#define NW (NWAY*16)
+	#define NW (NWAY*2)
 	// another blocking level in theta (64 or 128 should be good)
 	#define NBLK (NWAY*16) //24 //(NWAY*3) //24 //96 // (NWAY*3)  //24
 	// LSPAN can be 2 or 4
@@ -51,8 +51,8 @@ V	#define LSPAN 2
 V	double *l_2;
 	long int nk, k, l,m;
 V	int robert_form;
-Q	v2d qq[llim+LSPAN];
-V	v2d vw[2*llim+2+LSPAN];
+Q	v2d qq[llim+LSPAN] SSE;
+V	v2d vw[2*llim+2+LSPAN] SSE;
 
 	// the SSE macro should align these arrays on vector length.
   #ifndef SHT_AXISYM
@@ -89,6 +89,13 @@ V	//	SYM_ASYM_M0_V(BpF, peori)
 Q		double r0 = split_sym_asym_m0_accl0(BrF, reori, NLAT_2, k_inc, wg);
 V		split_sym_asym_m0(BtF, teori, NLAT_2, k_inc);
 V		split_sym_asym_m0(BpF, peori, NLAT_2, k_inc);
+V		if UNLIKELY(robert_form) {
+V			for (int k=nk-1; k>=0; --k) {
+V				rnd st_1 = vread(shtns->st_1, k);
+V				vstor( teori, 2*k+1, st_1 * vread(teori, 2*k+1) );		vstor( teori, 2*k, st_1 * vread(teori, 2*k) );
+V				vstor( peori, 2*k+1, st_1 * vread(peori, 2*k+1) );		vstor( peori, 2*k, st_1 * vread(peori, 2*k) );
+V			}
+V		}
 
 Q		Qlm[0] = r0 * alm[0];			// l=0 is done.
 V		Slm[0] = 0.0;		Tlm[0] = 0.0;		// l=0 is zero for the vector transform.
@@ -106,6 +113,7 @@ V			rnd sint[NW], dy0[NW], dy1[NW];
 Q			rnd rerk[NW], rork[NW];		// help the compiler to cache into registers.
 V			rnd terk[NW], tork[NW], perk[NW], pork[NW];
 			const int blk_sze = (k+NW <= nk) ? NW : nk-k;		// limit block size to avoid reading garbage as arrays overflow
+			if UNLIKELY(blk_sze <= 0) break;		// allows the compiler to assume blk_sze > 0 in the following.
 			for (int j=0; j<blk_sze; ++j) {
 				cost[j] = vread(ct, k+j);
 				y0[j] = vall(al[0]) * vread(wg, k+j);		// weight of Gauss quadrature appears here
@@ -117,65 +125,54 @@ Q				rerk[j] = vread(reori, (k+j)*2);		rork[j] = vread(reori, (k+j)*2+1);		// ca
 V				terk[j] = vread(teori, (k+j)*2);		tork[j] = vread(teori, (k+j)*2+1);
 V				perk[j] = vread(peori, (k+j)*2);		pork[j] = vread(peori, (k+j)*2+1);
 			}
-V			if (robert_form) {
-V				for (int j=0; j<blk_sze; ++j) {
-V					rnd st_1 = vread(shtns->st_1, k+j);
-V					terk[j] *= st_1;	tork[j] *= st_1;
-V					perk[j] *= st_1;	pork[j] *= st_1;
-V				}
-V			}
 			al+=2;	l=1;
 			while(l<llim) {
+V				for (int j=0; j<blk_sze; ++j) {
+V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*sint[j]) + vall(al[0])*dy0[j];;
+V					y0[j]  = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
+V				}
+Q				rnd q0 = vall(0.0);		rnd q1 = vall(0.0);
+V				rnd s0 = vall(0.0);		rnd s1 = vall(0.0);
+V				rnd t0 = vall(0.0);		rnd t1 = vall(0.0);
 				for (int j=0; j<blk_sze; ++j) {
-V					dy0[j] = vall(al[1])*(cost[j]*dy1[j] + y1[j]*sint[j]) + vall(al[0])*dy0[j];
-					y0[j]  = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
+QX					y0[j]  = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
+Q					q1 += y1[j] * rork[j];
+V					s1 += dy1[j] * terk[j];
+V					t1 += dy1[j] * perk[j];
+QX					y1[j]  = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
+Q					q0 += y0[j] * rerk[j];
+V					s0 += dy0[j] * tork[j];
+V					t0 += dy0[j] * pork[j];
 				}
-Q				rnd q = y1[0] * rork[0];
-V				rnd s = dy1[0] * terk[0];
-V				rnd t = dy1[0] * perk[0];
-				for (int j=1; j<blk_sze; ++j) {
-Q					q += y1[j] * rork[j];
-V					s += dy1[j] * terk[j];
-V					t += dy1[j] * perk[j];
-				}
-Q				q_[l-1]   += reduce_add(q);
-V				v_[2*l-2] += reduce_add(s);
-V				v_[2*l-1] -= reduce_add(t);
-				for (int j=0; j<blk_sze; ++j) {
+Q				vstor2(q_+l-1,0, vread2(q_+l-1, 0) + v2d_reduce(q1, q0) );
+V				#if _GCC_VEC_ && __AVX__
+V				vstor4(v_+2*l-2, 0, vread4(v_+2*l-2, 0) + v4d_reduce(s1, t1, s0, t0) );
+V				#else
+V				vstor2(v_+2*l-2, 0, vread2(v_+2*l-2, 0) + v2d_reduce(s1, t1) );
+V				vstor2(v_+2*l, 0, vread2(v_+2*l, 0) + v2d_reduce(s0, t0) );
+V				#endif
+V				for (int j=0; j<blk_sze; ++j) {
 V					dy1[j] = vall(al[3])*(cost[j]*dy0[j] + y0[j]*sint[j]) + vall(al[2])*dy1[j];
-					y1[j]  = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
-				}
-Q				q = y0[0] * rerk[0];
-V				s = dy0[0] * tork[0];
-V				t = dy0[0] * pork[0];
-				for (int j=1; j<blk_sze; ++j) {
-Q					q += y0[j] * rerk[j];
-V					s += dy0[j] * tork[j];
-V					t += dy0[j] * pork[j];
-				}
-Q				q_[l]     += reduce_add(q);
-V				v_[2*l]   += reduce_add(s);
-V				v_[2*l+1] -= reduce_add(t);
+V					y1[j]  = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
+V				}
 				al+=4;	l+=2;
 			}
 			if (l==llim) {
-Q				rnd q = y1[0] * rork[0];
-V				rnd s = dy1[0] * terk[0];
-V				rnd t = dy1[0] * perk[0];
-				for (int j=1; j<blk_sze; ++j) {
-Q					q += y1[j] * rork[j];
-V					s += dy1[j] * terk[j];
-V					t += dy1[j] * perk[j];
+Q				rnd q1 = vall(0.0);
+V				rnd s1 = vall(0.0);		rnd t1 = vall(0.0);
+				for (int j=0; j<blk_sze; ++j) {
+Q					q1 += y1[j] * rork[j];
+V					s1 += dy1[j] * terk[j];
+V					t1 += dy1[j] * perk[j];
 				}
-Q				q_[l-1]   += reduce_add(q);
-V				v_[2*l-2] += reduce_add(s);
-V				v_[2*l-1] -= reduce_add(t);
+Q				q_[l-1]   += reduce_add(q1);
+V				vstor2(v_+2*l-2, 0, vread2(v_+2*l-2, 0) + v2d_reduce(s1, t1) );
 			}
 			k+=NW;
 		} while (k < nk);
 		for (l=1; l<=llim; ++l) {
 Q			Qlm[l] = q_[l-1];
-V			Slm[l] = v_[2*l-2]*l_2[l];		Tlm[l] = v_[2*l-1]*l_2[l];
+V			Slm[l] = v_[2*l-2]*l_2[l];		Tlm[l] = -v_[2*l-1]*l_2[l];
 		}
 		#ifdef SHT_VAR_LTR
 			for (l=llim+1; l<= LMAX; ++l) {
@@ -576,8 +573,8 @@ V				v[3] += v2d_reduce(ww0, ww1);
 			}	*/
 		#endif
 		} while (k > k0);
-		
-		l = LiM(shtns, m, im);
+
+		l = (im*(2*LMAX+2 - (m-MRES)))>>1;		// offset for l=m
 Q		v2d *Ql = (v2d*) &Qlm[l];
 V		v2d *Sl = (v2d*) &Slm[l];
 V		v2d *Tl = (v2d*) &Tlm[l];
