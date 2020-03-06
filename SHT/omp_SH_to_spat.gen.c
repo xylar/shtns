@@ -86,21 +86,26 @@ VX		BpF = BtF + nv/2;
 		//it1 = it0 + it_step;
 3		GEN3(_sy3_hi,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
 QX		GEN3(_sy1_hi,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
-		if (imlim-im > im) {
+Q		if (imlim-im > im) {
 3			GEN3(_sy3_hi,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, imlim-im, it0, it1);
 QX			GEN3(_sy1_hi,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, imlim-im, it0, it1);
-		}
-	#ifndef SHT_GRAD
-VX		GEN3(_sy2,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
-		if (imlim-im > im) {
-VX			GEN3(_sy2_hi,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim-im, it0, it1);			
-		}
-	#else
+Q		}
+V		#ifndef SHT_GRAD
+VX		GEN3(_sy2_hi,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
+VX		if (imlim-im > im) {
+VX			GEN3(_sy2_hi,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, imlim-im, it0, it1);
+VX		}
+V		#else
 S		GEN3(_sy1s_hi,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
 T		GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
-	#endif
+V		if (imlim-im > im) {
+S			GEN3(_sy1s_hi,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, imlim-im, it0, it1);
+T			GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, imlim-im, it0, it1);		
+V		}
+V		#endif
 	}
 
+  #ifndef SHT_AXISYM
 	// padding for high m's
 	if (NPHI-1 > 2*imlim) {
 		#pragma omp for schedule(dynamic) nowait
@@ -112,7 +117,6 @@ V			memset(BpF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
 	}
   }
 
-  #ifndef SHT_AXISYM
     // NPHI > 1 as SHT_AXISYM is not defined.
   	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode != 1) {
@@ -167,7 +171,6 @@ VX		BpF = BtF + nv/2;
 	#pragma omp for schedule(static,1) nowait
 	for (int im=0; im<=imlim; im++)
 	{
-		#if NWAY < 2
 3		GEN3(_sy3_hi,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
 QX		GEN3(_sy1_hi,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
 	#ifndef SHT_GRAD
@@ -176,15 +179,6 @@ VX		GEN3(_sy2_hi,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
 S		GEN3(_sy1s_hi,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
 T		GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
 	#endif
-		#else
-Q		GEN3(_sy1_hi,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
-	#ifndef SHT_GRAD
-V		GEN3(_sy2_hi,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
-	#else
-S		GEN3(_sy1s_hi,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
-T		GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
-	#endif
-		#endif
 	}
 
 	// padding for high m's
