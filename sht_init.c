@@ -165,7 +165,7 @@ enum sht_algos { SHT_MEM, SHT_SV,
 	SHT_NALG };
 
 char* sht_name[SHT_NALG] = {"mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu1", "gpu2", "gpu3", "gpu4",
-	"omp1", "omp2", "omp3", "omp4", "omp6", "omp8",  "omp1a", "omp2a", "omp3a", "omp4a", "omp6a", "omp8a",   };
+	"omp1a", "omp2a", "omp3a", "omp4a", "omp6a", "omp8a",  "omp1b", "omp2b", "omp3b", "omp4b", "omp6b", "omp8b",   };
 char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 char* sht_var[SHT_NVAR] = {"std", "m" };
 int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
@@ -308,7 +308,7 @@ static int free_unused(shtns_cfg shtns, void* pp)
 }
 
 /// \internal allocate arrays for SHT related to a given grid.
-static void alloc_SHTarrays(shtns_cfg shtns, int on_the_fly, int vect, int analys)
+static void alloc_SHTarrays(shtns_cfg shtns, int vect, int analys)
 {
 	long int im, l0;
 	long int size, marray_size, lstride;
@@ -338,14 +338,13 @@ static void free_SHTarrays(shtns_cfg shtns)
 
 /// \internal initialize FFTs using FFTW.
 /// \param[in] layout defines the spatial layout (see \ref spat).
-/// \param[in] on_the_fly is one, if only on-the-fly transform are considered.
 /// returns the number of double to be allocated for a spatial field.
-static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
+static void planFFT(shtns_cfg shtns, int layout)
 {
 	double cost_fft_ip, cost_fft_oop, cost_ifft_ip, cost_ifft_oop;
 	cplx *ShF;
 	double *Sh;
-	int nfft, ncplx, nreal;
+	int nfft, nreal;
 	int theta_inc, phi_inc, phi_embed;
   #ifdef HAVE_FFTW_COST
 	int in_place = 1;		// try to use in-place real fft.
@@ -363,7 +362,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	#endif
 
 	shtns->k_stride_a = 1;		shtns->m_stride_a = NLAT;		// default strides
-
+	shtns->nlat_padded = NLAT;
 	shtns->nspat = NPHI * NLAT;		// default spatial size
 
 	if (NPHI==1) 	// no FFT needed.
@@ -381,9 +380,16 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	if (layout & SHT_THETA_CONTIGUOUS) {	theta_inc=1;  phi_inc=NLAT;  phi_embed=NPHI;	}
 	if (layout & SHT_PHI_CONTIGUOUS)   {	phi_inc=1;  theta_inc=NPHI;  phi_embed=NPHI;	}
 	nfft = NPHI;
-	ncplx = NPHI/2 +1;
 	nreal = phi_embed;
-	if ((theta_inc != 1)||(phi_inc != NLAT)||(nreal < 2*ncplx))  in_place = 0;		// we need to do the fft out-of-place.
+	if ((theta_inc != 1)||(phi_inc != NLAT))  in_place = 0;		// we need to do the fft out-of-place.
+
+	if ((layout & SHT_ALLOW_PADDING) && (phi_inc % 64 == 0) && (NPHI * phi_inc > 512))
+	{
+		phi_inc += 8;		// we add some padding, to avoid cache bank conflicts.
+		shtns->nspat = NPHI * phi_inc;		// spatial size to be allocated
+		shtns->m_stride_a = phi_inc;		// stride between phi in spectral domain
+		shtns->nlat_padded = phi_inc;		// stride between phi in spatial domain
+	}
 
 	#if SHT_VERBOSE > 0
 	if (verbose) {
@@ -394,8 +400,8 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	#endif
 
 // Allocate dummy Spatial Fields.
-	ShF = (cplx *) VMALLOC(ncplx * NLAT*2 * sizeof(cplx));		// *2 for complex-valued fields
-	Sh = (double *) VMALLOC(ncplx * NLAT*2 * sizeof(cplx));
+	ShF = (cplx *) VMALLOC(shtns->nspat * sizeof(cplx));		// for complex-valued fields
+	Sh = (double *) VMALLOC(shtns->nspat * sizeof(cplx));
 
 // complex fft for fly transform is a bit different.
 	if (layout & SHT_PHI_CONTIGUOUS) {		// out-of-place split dft
@@ -414,8 +420,9 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 		many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2*NPHI;
 		shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
 		shtns->k_stride_a = NPHI;		shtns->m_stride_a = 2;
+		shtns->nlat_padded = NLAT;
 		
-		if (shtns->nthreads > 1) {
+	/*	if (shtns->nthreads > 1) {
 			fftw_plan_with_nthreads(1);
 			// FOR MKL only:
 			//fftw3_mkl.number_of_user_threads = shtns->nthreads;        // required to call the fft of mkl from multiple threads.
@@ -432,7 +439,7 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			many.n = nblk;		many.is = 2*NPHI;	many.os = 2*NPHI;
 			shtns->fftc_block = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
 			fftw_plan_with_nthreads(shtns->nthreads);
-		}
+		}	*/
 
 		// for complex transform it is much simpler (out-of-place):
 		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, NLAT, 1, (cplx*)Sh, &nfft, 1, NPHI, FFTW_BACKWARD, shtns->fftw_plan_mode);
@@ -458,10 +465,10 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 	#endif
 	} else {	//if (layout & SHT_THETA_CONTIGUOUS) {		// use only in-place here, supposed to be faster.
 		shtns->fftc_mode = 0;
-		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, phi_inc/2, 1, ShF, &nfft, phi_inc/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 		shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
-		
-		if (shtns->nthreads > 1) {
+
+	/*	if (shtns->nthreads > 1) {
 			fftw_plan_with_nthreads(1);
 			// FOR MKL only:
 			//fftw3_mkl.number_of_user_threads = shtns->nthreads;        // required to call the fft of mkl from multiple threads.
@@ -472,10 +479,10 @@ static void planFFT(shtns_cfg shtns, int layout, int on_the_fly)
 			shtns->ifftc_block = fftw_plan_many_dft(1, &nfft, nblk, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 			shtns->fftc_block = shtns->ifftc_block;		// same thing, with m>0 and m<0 exchanged.
 			fftw_plan_with_nthreads(shtns->nthreads);
-		}
+		}	*/
 
 		// complex-values spatial fields (in-place):
-		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, NLAT, 1, ShF, &nfft, NLAT, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, phi_inc, 1, ShF, &nfft, phi_inc, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
 		shtns->fft_cplx = shtns->ifft_cplx;		// same thing, with m>0 and m<0 exchanged.
 		#if SHT_VERBOSE > 1
 		if (verbose>1) {
@@ -740,7 +747,6 @@ static double get_time(shtns_cfg shtns, int nloop, int npar, char* name, void *f
 
 /// \internal choose fastest between on-the-fly and gauss algorithms.
 /// *nlp is the number of loops. If zero, it is set to a good value.
-/// on_the_fly : 1 = skip all memory algorithm. 0 = include memory and on-the-fly. -1 = test only DCT.
 /// returns time without dct / best time with dct (or 0 if no dct available).
 static void choose_best_sht(shtns_cfg shtns, int* nlp, int vector)
 {
@@ -1354,6 +1360,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			m = choose_nlat( m );
 			*nlat = m;
 		} else *nlat = n_gauss;
+		if ((layout & SHT_ALLOW_PADDING == 0) && (shtns->nthreads == 1)) {
+			if ((*nlat % 64 == 0) && (*nlat * *nphi > 512)) *nlat += 8;		// heuristics to avoid cache bank conflicts.
+		}
 	}
 
 	mem = sht_mem_size(shtns->lmax, shtns->mmax, shtns->mres, *nlat);
@@ -1399,10 +1408,10 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			fclose(f);
 		}
 	}
-	planFFT(shtns, layout, on_the_fly);		// initialize fftw
+	planFFT(shtns, layout);		// initialize fftw
 	init_sht_array_func(shtns);		// array of SHT functions is now set.
 
-	alloc_SHTarrays(shtns, on_the_fly, vector, analys);		// allocate dynamic arrays
+	alloc_SHTarrays(shtns, vector, analys);		// allocate dynamic arrays
 	shtns->grid = GRID_NONE;
 	switch(flags) {
 		case sht_gauss : 	 shtns->grid = GRID_GAUSS;	break;
@@ -1411,14 +1420,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	}
 	grid_weights(shtns, latdir);
 
-	if (on_the_fly == 1) {
-  #if SHT_VERBOSE > 0
-		if (verbose) printf("        + using on-the-fly transforms.\n");
-  #endif
-		if (NLAT < VSIZE2*4) shtns_runerr("on-the-fly only available for nlat>=32");		// avoid overflow with NLAT_2 < VSIZE2*2
-		PolarOptimize(shtns, eps);
-		set_sht_fly(shtns, 0);		// switch function pointers to "on-the-fly" functions.
-	}
+	if (NLAT < VSIZE2*4) shtns_runerr("nlat is too small! try setting nlat>=32");		// avoid overflow with NLAT_2 < VSIZE2*2
+	PolarOptimize(shtns, eps);
+	set_sht_fly(shtns, 0);		// switch function pointers to "on-the-fly" functions.
 
   #ifdef HAVE_LIBCUFFT
 	int gpu_ok = -1;

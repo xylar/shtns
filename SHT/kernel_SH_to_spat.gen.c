@@ -200,8 +200,9 @@ T				S2D_STORE_4MAGIC((double*)BpF, j+k, pe[j], po[j]);
   #ifndef SHT_AXISYM
 	else
 	{		// im > 0
-Q		BrF += im*NLAT_2;
-V		BtF += im*NLAT_2;	BpF += im*NLAT_2;
+Q		BrF += im*(shtns->nlat_padded >>1);
+V		BtF += im*(shtns->nlat_padded >>1);
+V		BpF += im*(shtns->nlat_padded >>1);
 		m = im*MRES;
 		l = (im*(2*(LMAX+1)-(m+MRES)))>>1;		//l = LiM(shtns, 0,im);
 		#ifndef SHTNS_ISHIOKA
@@ -235,7 +236,7 @@ V		SH2_to_ishioka(xlm, VWl+2*m, llim-m+1);
 		k = (k>>1)*2;		// k must be even.
 		#endif
 		if (it0 < k) {
-			const long ofsm = (NPHI-2*im)*NLAT_2;
+			const long ofsm = (NPHI-2*im)*(shtns->nlat_padded >>1);
 		#ifndef SHTNS4MAGIC
 			#if _GCC_VEC_
 			const long ofs1 = NLAT_2 - k*(VSIZE2/2);
@@ -265,14 +266,15 @@ V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 V			if (robert_form == 0) l=m-1;
 	#ifndef HI_LLIM
 			const long int ny = 0;
-			do {		// sin(theta)^m
+			while(1) {		// sin(theta)^m
 				if (l&1) for (int j=0; j<NWAY; ++j) y0[j] *= cost[j];
+				l >>= 1;
+				if (l==0) break;
 				for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
-			} while(l >>= 1);
+			}
 	#else
 			long int ny = 0;
-			long int nsint = 0;
-			do {		// sin(theta)^m		(use rescaling to avoid underflow)
+			for (long int nsint = 0;;) {		// sin(theta)^m		(use rescaling to avoid underflow)
 				if (l&1) {
 					for (int j=NWAY-1; j>=0; --j) y0[j] *= cost[j];
 					ny += nsint;
@@ -281,13 +283,15 @@ V			if (robert_form == 0) l=m-1;
 						for (int j=NWAY-1; j>=0; --j) y0[j] *= vall(SHT_SCALE_FACTOR);
 					}
 				}
+				l >>= 1;
+				if (l==0) break;
 				for (int j=NWAY-1; j>=0; --j) cost[j] *= cost[j];
 				nsint += nsint;
 				if (vlo(cost[NWAY-1]) < 1.0/SHT_SCALE_FACTOR) {
 					nsint--;
 					for (int j=NWAY-1; j>=0; --j) cost[j] *= vall(SHT_SCALE_FACTOR);
 				}
-			} while(l >>= 1);
+			}
 	#endif
 			al = alm;
 			for (int j=0; j<NWAY; ++j) {
@@ -369,7 +373,7 @@ Q				rnd sr = rer[j] - ror[j];	rer[j] = rer[j] + ror[j];
 Q			  	rnd si = rei[j] - roi[j];	rei[j] = rei[j] + roi[j];
 Q				ror[j] = sr;		roi[j] = si;
 Q			}
-V			for (int j=0; j<NWAY; ++j) {			
+V			for (int j=0; j<NWAY; ++j) {
 V				rnd sr = ter[j] - tor[j];	ter[j] = ter[j] + tor[j];
 V			  	rnd si = tei[j] - toi[j];	tei[j] = tei[j] + toi[j];
 V				tor[j] = sr;		toi[j] = si;
@@ -452,9 +456,9 @@ Q			for (int j=0; j<NWAY/2; ++j) {	S2D_CSTOREX(BrF, k/2+j, 2*j, rer, ror, rei, r
 		#else
 			for (int j=0; j<NWAY; ++j) {
 				if ((k+j)>=nk) break;
-V				S2D_CSTORE_4MAGIC((double*) BtF, (double*) (BtF + (NPHI-2*im)*NLAT_2), k+j, ter[j], tor[j], tei[j], toi[j]);
-V				S2D_CSTORE_4MAGIC((double*) BpF, (double*) (BpF + (NPHI-2*im)*NLAT_2), k+j, per[j], por[j], pei[j], poi[j]);
-Q				S2D_CSTORE_4MAGIC((double*) BrF, (double*) (BrF + (NPHI-2*im)*NLAT_2), k+j, rer[j], ror[j], rei[j], roi[j]);
+V				S2D_CSTORE_4MAGIC((double*) BtF, (double*) (BtF + (NPHI-2*im)*(shtns->nlat_padded>>1)), k+j, ter[j], tor[j], tei[j], toi[j]);
+V				S2D_CSTORE_4MAGIC((double*) BpF, (double*) (BpF + (NPHI-2*im)*(shtns->nlat_padded>>1)), k+j, per[j], por[j], pei[j], poi[j]);
+Q				S2D_CSTORE_4MAGIC((double*) BrF, (double*) (BrF + (NPHI-2*im)*(shtns->nlat_padded>>1)), k+j, rer[j], ror[j], rei[j], roi[j]);
 			}
 		#endif
 			k+=NWAY;

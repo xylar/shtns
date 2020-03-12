@@ -72,6 +72,7 @@ enum shtns_type {
 #define SHT_SCALAR_ONLY (256*16)	///< don't compute vector matrices. (add to flags in shtns_set_grid)
 #define SHT_LOAD_SAVE_CFG (256*64)	///< try to load and save the config. (add to flags in shtns_set_grid)
 #define SHT_ALLOW_GPU (256*128)		///< allows to use a GPU. This needs special care because the same plan cannot be used simultaneously by different threads anymore.
+#define SHT_ALLOW_PADDING (256*256)	///< allows SHTns to add extra space between lines of the spatial array to avoid cache bank conflicts.
 
 
 #ifndef SHTNS_PRIVATE
@@ -80,14 +81,15 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 	const unsigned short lmax;		///< maximum degree (lmax) of spherical harmonics.
 	const unsigned short mmax;		///< maximum order (mmax*mres) of spherical harmonics.
 	const unsigned short mres;		///< the periodicity along the phi axis.
-	const unsigned short nphi;		///< number of spatial points in Phi direction (longitude)
-	const unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
-	const unsigned short nlat_2;	///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	const unsigned short nlat_2;	///< half of spatial points in Theta direction (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	const unsigned int nlat;		///< number of spatial points in Theta direction (latitude) ...
+	const unsigned int nphi;		///< number of spatial points in Phi direction (longitude)
+	const unsigned int nspat;		///< number of real numbers that must be allocated in a spatial field.
 	const unsigned short *const li;	///< degree l for given mode index (size nlm) : li[lm]
 	const unsigned short *const mi;	///< order m for given mode index (size nlm) : mi[lm]
 	const double *const ct;			///< cos(theta) array (size nlat)
 	const double *const st;			///< sin(theta) array (size nlat)
-	const unsigned int nspat;		///< number of real numbers that must be allocated in a spatial field.
+	const unsigned int nlat_padded;	///< number of spatial points in Theta direction, including padding.
 	const unsigned int nlm_cplx;	///< number of complex coefficients to represent a complex-valued spatial field.
 };
 #endif

@@ -99,10 +99,10 @@
 		#define S2D_CSTORE(mem, idx, nr, sr, ni, si)	{	\
 			rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);	\
 			((s2d*)mem)[idx] = vec_mix_lohi(bb, aa);	\
-			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = vec_mix_lohi(aa, bb);	\
+			((s2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) + (idx)] = vec_mix_lohi(aa, bb);	\
 			aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);	\
 			((s2d*)mem)[NLAT_2-1 -(idx)] = vec_mix_lohi(bb, aa);	\
-			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = vec_mix_lohi(aa, bb);	}
+			((s2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) +NLAT_2-1 -(idx)] = vec_mix_lohi(aa, bb);	}
 		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
 			((s2d*)mem)[(idx)*2]   = vec_mergeh(nr, ni);	\
 			((s2d*)mem)[(idx)*2+1] = vec_mergel(nr, ni);	\
@@ -235,10 +235,10 @@
 			nr = _mm512_mask_blend_pd((__mmask8) 0xAA, bb, aa );		ni = _mm512_mask_blend_pd((__mmask8) 0xAA, aa, bb ); \
 			sr = _mm512_mask_blend_pd((__mmask8) 0xAA, dd, cc );		si = _mm512_mask_blend_pd((__mmask8) 0xAA, cc, dd ); \
 			_mm512_storeu_pd(((double*)mem) + (idx)*8, nr); \
-			_mm512_storeu_pd(((double*)mem) + (NPHI-2*im)*NLAT + (idx)*8, ni); \
+			_mm512_storeu_pd(((double*)mem) + (NPHI-2*im)*shtns->nlat_padded + (idx)*8, ni); \
 			sr = _mm512_shuffle_f64x2(sr,sr, 0x1B);			si = _mm512_shuffle_f64x2(si,si, 0x1B);	\
 			_mm512_storeu_pd(((double*)mem) + NLAT-8 -(idx)*8, sr); \
-			_mm512_storeu_pd(((double*)mem) + (NPHI+1-2*im)*NLAT-8 -(idx)*8, si); }
+			_mm512_storeu_pd(((double*)mem) + (NPHI-2*im)*shtns->nlat_padded + NLAT-8 -(idx)*8, si); }
 
 // This may replace the first half of the following macro:
 //    rnd c = _mm512_permutex2var_pd(a, _mm512_set_epi64(11,3,10,2,9,1,8,0), b);
@@ -362,10 +362,10 @@
 			nr = _mm256_blend_pd (bb, aa, 10 );		ni = _mm256_blend_pd (aa, bb, 10 ); \
 			sr = _mm256_blend_pd (dd, cc, 10 );		si = _mm256_blend_pd (cc, dd, 10 ); \
 			_mm256_storeu_pd(((double*)mem) + (idx)*4, nr); \
-			_mm256_storeu_pd(((double*)mem) + (NPHI-2*im)*NLAT + (idx)*4, ni); \
+			_mm256_storeu_pd(((double*)mem) + (NPHI-2*im)*shtns->nlat_padded + (idx)*4, ni); \
 			sr = _mm256_permute2f128_pd(sr,sr,1);	si = _mm256_permute2f128_pd(si,si,1); \
 			_mm256_storeu_pd(((double*)mem) + NLAT-4 - (idx)*4,  sr ); \
-			_mm256_storeu_pd(((double*)mem) + (NPHI+1-2*im)*NLAT-4 - (idx)*4,  si ); }
+			_mm256_storeu_pd(((double*)mem) + (NPHI-2*im)*shtns->nlat_padded + NLAT-4 - (idx)*4,  si ); }
 
 		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
 			rnd aa = (rnd)_mm256_unpacklo_pd(nr, ni);	rnd bb = (rnd)_mm256_unpackhi_pd(nr, ni);	\
@@ -454,10 +454,10 @@
 		#define S2D_CSTORE(mem, idx, nr, sr, ni, si)	{	\
 			rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);	\
 			((s2d*)mem)[idx] = _mm_shuffle_pd(bb, aa, 2 );	\
-			((s2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = _mm_shuffle_pd(aa, bb, 2 );	\
+			((s2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) + (idx)] = _mm_shuffle_pd(aa, bb, 2 );	\
 			aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);	\
 			((s2d*)mem)[NLAT_2-1 -(idx)] = _mm_shuffle_pd(bb, aa, 2 );	\
-			((s2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = _mm_shuffle_pd(aa, bb, 2 );	}
+			((s2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) +NLAT_2-1 -(idx)] = _mm_shuffle_pd(aa, bb, 2 );	}
 		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
 			((s2d*)mem)[(idx)*2]   = _mm_unpacklo_pd(nr, ni);	\
 			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(nr, ni);	\
@@ -577,13 +577,13 @@
 		double a1 = (nr[(v)+1]) + (ni[(v)]); \
 		double b1 = (nr[(v)+1]) - (ni[(v)]); \
 		((v2d*)mem)[(idx)] = b0 + I*a1; \
-		((v2d*)mem)[(NPHI-2*im)*NLAT_2 + (idx)] = a0 + I*b1; \
+		((v2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) + (idx)] = a0 + I*b1; \
 		a1 = (sr[(v)])   + (si[(v)+1]); \
 		b1 = (sr[(v)])   - (si[(v)+1]); \
 		a0 = (sr[(v)+1]) + (si[(v)]); \
 		b0 = (sr[(v)+1]) - (si[(v)]); \
 		((v2d*)mem)[NLAT_2-1 -(idx)] = b0 + I*a1; \
-		((v2d*)mem)[(NPHI+1-2*im)*NLAT_2 -1 -(idx)] = a0 + I*b1; }
+		((v2d*)mem)[(NPHI+2*im)*(shtns->nlat_padded>>1) +NLAT_2-1 -(idx)] = a0 + I*b1; }
 
 	inline static void S2D_STORE_4MAGIC(double* mem, long idx, double n, double s) {
 		((v2d*)mem)[idx] = (n) + I*(s);

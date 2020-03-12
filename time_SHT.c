@@ -726,6 +726,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"point") == 0) point = 1;
 		if (strcmp(name,"loadsave") == 0) loadsave = 1;
 		if (strcmp(name,"robert") == 0) robert_form = t;
+		if (strcmp(name,"padding") == 0) layout |= SHT_ALLOW_PADDING;		// Allow padding if it may improve performance.
 	}
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
@@ -753,13 +754,13 @@ int main(int argc, char *argv[])
 //	write_vect("cost",ct,NLAT);
 //	write_vect("sint",st,NLAT);
 
-	ShF = (complex double *) shtns_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
+	ShF = (complex double *) shtns_malloc( shtns->nspat * sizeof(double));
 	Sh = (double *) ShF;
 	if (ShF == NULL) runerr("memory allocation 1 failed");
 	if (vector) {
-		ThF = (complex double *) shtns_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
+		ThF = (complex double *) shtns_malloc( shtns->nspat * sizeof(double));
 		Th = (double *) ThF;
-		NLF = (complex double *) shtns_malloc( 2*(NPHI/2+1) * NLAT * sizeof(double));
+		NLF = (complex double *) shtns_malloc( shtns->nspat * sizeof(double));
 		NL = (double *) NLF;
 		if ((ThF == NULL)||(NLF == NULL)) runerr("memory allocation 2 failed");
 	}
@@ -785,10 +786,8 @@ int main(int argc, char *argv[])
 		Slm[i] = 0.0;
 		if (vector) Tlm[i] = 0.0;
 	}
-	for (im=0;im<NPHI;im++) {
-		for (i=0;i<NLAT;i++) {
-			Sh[im*NLAT+i] = 0.0;
-		}
+	for (i=0;i<shtns->nspat;i++) {
+		Sh[i] = 0.0;
 	}
 	Slm[LiM(shtns, 1,0)] = sh10_ct(shtns);
 	if ((MMAX > 0)&&(MRES==1))
@@ -797,14 +796,14 @@ int main(int argc, char *argv[])
 //	SH_to_spat_ml(shtns, 0,Slm, Sh, LMAX);
 //	spat_to_SH_ml(shtns, 0,Sh, Slm, LMAX);
 	SH_to_spat(shtns, Slm,Sh);
-	write_mx("spat",Sh,NPHI,NLAT);
+	write_mx("spat",Sh,NPHI,shtns->nlat_padded);
 	if (vector) {
 		SHtor_to_spat(shtns, Slm,Sh,Th);
-		write_mx("spatt",Sh,NPHI,NLAT);
-		write_mx("spatp",Th,NPHI,NLAT);
+		write_mx("spatt",Sh,NPHI,shtns->nlat_padded);
+		write_mx("spatp",Th,NPHI,shtns->nlat_padded);
 		SHtor_to_spat_l(shtns, Slm,Sh,Th,LMAX/2);
-		write_mx("spatt_l",Sh,NPHI,NLAT);
-		write_mx("spatp_l",Th,NPHI,NLAT);
+		write_mx("spatt_l",Sh,NPHI,shtns->nlat_padded);
+		write_mx("spatp_l",Th,NPHI,shtns->nlat_padded);
 	}
 
 //	SHqst_to_lat(Slm,Slm,Tlm,ct[0],Sh,Th,Th,NPHI/2,LMAX,MMAX);

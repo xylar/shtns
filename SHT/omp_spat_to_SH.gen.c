@@ -58,15 +58,15 @@ VX			BpF = BtF + nv;
 3			BrF = (double*) VMALLOC( 3*nv * sizeof(double) );
 3			BtF = BrF + nv;		BpF = BtF + nv;
 		}
-	    if (shtns->fftc_mode != 1) {	// regular FFT
-Q			fftw_execute_dft(shtns->fftc,(cplx*)Vr, (cplx*)BrF);
-V			fftw_execute_dft(shtns->fftc,(cplx*)Vt, (cplx*)BtF);
-V			fftw_execute_dft(shtns->fftc,(cplx*)Vp, (cplx*)BpF);
-		} else {	// split FFT
+		if (shtns->fftc_mode != 1) {
+Q			fftw_execute_dft(shtns->fftc, ((cplx *) Vr), ((cplx *) BrF));
+V			fftw_execute_dft(shtns->fftc, ((cplx *) Vt), ((cplx *) BtF));
+V			fftw_execute_dft(shtns->fftc, ((cplx *) Vp), ((cplx *) BpF));
+		} else {
 Q			fftw_execute_split_dft(shtns->fftc, Vr+NPHI, Vr, BrF+1, BrF);
 V			fftw_execute_split_dft(shtns->fftc, Vt+NPHI, Vt, BtF+1, BtF);
 V			fftw_execute_split_dft(shtns->fftc, Vp+NPHI, Vp, BpF+1, BpF);
-	    }
+		}
 	}
   #endif
 
@@ -101,7 +101,6 @@ V				memset(Tlm+l, 0, (shtns->nlm - l)*sizeof(cplx));
 	}
 
   #ifndef SHT_AXISYM
-
   	if (shtns->fftc_mode > 0) {		// free memory
 Q	    VFREE(BrF);
 VX	    VFREE(BtF);	// this frees also BpF.
@@ -140,38 +139,54 @@ VX		BpF = BtF + nv;
 	{
 		const int nblk = (NLAT/2) / shtns->nthreads;
 		if (shtns->fftc_mode != 1) {
-			#pragma omp for schedule(static)
-			for (int k=0; k<shtns->nthreads; k++) {
+Q			#pragma omp for schedule(dynamic) nowait
+Q			for (int k=0; k<shtns->nthreads; k++)
 Q				fftw_execute_dft(shtns->fftc_block, ((cplx *) Vr) + k*nblk, ((cplx *) BrF) + k*nblk);
+V			#pragma omp for schedule(dynamic) nowait
+V			for (int k=0; k<shtns->nthreads; k++) 
 V				fftw_execute_dft(shtns->fftc_block, ((cplx *) Vt) + k*nblk, ((cplx *) BtF) + k*nblk);
+V			#pragma omp for schedule(dynamic) nowait
+V			for (int k=0; k<shtns->nthreads; k++) 
 V				fftw_execute_dft(shtns->fftc_block, ((cplx *) Vp) + k*nblk, ((cplx *) BpF) + k*nblk);
-			}
 		} else {
-			#pragma omp for schedule(static)
-			for (int k=0; k<shtns->nthreads; k++) {
+Q			#pragma omp for schedule(dynamic) nowait
+Q			for (int k=0; k<shtns->nthreads; k++) 
 Q				fftw_execute_split_dft(shtns->fftc_block, Vr+NPHI*(1+2*k*nblk), Vr+NPHI*2*k*nblk, BrF+1+NPHI*2*k*nblk, BrF+NPHI*2*k*nblk);
+V			#pragma omp for schedule(dynamic) nowait
+V			for (int k=0; k<shtns->nthreads; k++) 
 V				fftw_execute_split_dft(shtns->fftc_block, Vt+NPHI*(1+2*k*nblk), Vt+NPHI*2*k*nblk, BtF+1+NPHI*2*k*nblk, BtF+NPHI*2*k*nblk);
+V			#pragma omp for schedule(dynamic) nowait
+V			for (int k=0; k<shtns->nthreads; k++) 
 V				fftw_execute_split_dft(shtns->fftc_block, Vp+NPHI*(1+2*k*nblk), Vp+NPHI*2*k*nblk, BpF+1+NPHI*2*k*nblk, BpF+NPHI*2*k*nblk);
-			}
 		}
+		#pragma omp barrier
   #else
 	#pragma omp parallel num_threads(shtns->nthreads)
 	{
   #endif
-
 		if (llim < SHT_L_RESCALE_FLY) {
-			#pragma omp for schedule(static,1) nowait
-			for (int im=0; im<=imlim; im++) {
+			#pragma omp for schedule(dynamic,1) nowait
+			for (int im=0; im <= imlim/2; im++) {
 QX				GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, im);
 VX				GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, im);
 3				GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+				if (imlim-im > im) {
+QX					GEN3(_an1,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim-im);
+VX					GEN3(_an2,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim-im);
+3					GEN3(_an3,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim-im);
+				}
 			}
 		} else {
-			#pragma omp for schedule(static,1) nowait
+			#pragma omp for schedule(dynamic,1) nowait
 			for (int im=0; im<=imlim; im++) {
 QX				GEN3(_an1_hi,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, im);
 VX				GEN3(_an2_hi,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, im);
 3				GEN3(_an3_hi,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, im);
+				if (imlim-im > im) {
+QX					GEN3(_an1_hi,NWAY,SUFFIX)(shtns, BrF, Qlm, llim, imlim-im);
+VX					GEN3(_an2_hi,NWAY,SUFFIX)(shtns, BtF, BpF, Slm, Tlm, llim, imlim-im);
+3					GEN3(_an3_hi,NWAY,SUFFIX)(shtns, BrF, BtF, BpF, Qlm, Slm, Tlm, llim, imlim-im);
+				}
 			}
 		}
 		#ifndef SHT_AXISYM

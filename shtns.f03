@@ -8,6 +8,7 @@
   integer(C_INT), parameter :: SHT_SOUTH_POLE_FIRST=8192
   integer(C_INT), parameter :: SHT_SCALAR_ONLY=4096
   integer(C_INT), parameter :: SHT_LOAD_SAVE_CFG=16384
+  integer(C_INT), parameter :: SHT_ALLOW_PADDING=65536
 
   enum, bind(C)
     enumerator :: SHT_GAUSS=0, SHT_AUTO=1, SHT_REG_FAST=2
@@ -22,12 +23,13 @@
   type, bind(C) :: shtns_info
      integer(C_INT) :: nlm
      integer(C_SHORT) :: lmax, mmax, mres
-     integer(C_SHORT) :: nphi, nlat, nlat_2
+     integer(C_SHORT) :: nlat_2
+     integer(C_INT) :: nlat, nphi, nspat
      type(C_PTR) :: li, mi
      type(C_PTR) :: ct, st
-     integer(C_INT) :: nspat, nlm_cplx
+     integer(C_INT) :: nlat_padded, nlm_cplx
   end type shtns_info
-  
+
   interface
 
     subroutine shtns_verbose(i) bind(C, name='shtns_verbose')

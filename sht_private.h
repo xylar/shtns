@@ -113,13 +113,14 @@ struct shtns_info {		// MUST start with "int nlm;"
 	unsigned short lmax;		///< maximum degree (lmax) of spherical harmonics.
 	unsigned short mmax;		///< maximum order (mmax*mres) of spherical harmonics.
 	unsigned short mres;		///< the periodicity along the phi axis.
-	unsigned short nphi;		///< number of spatial points in Phi direction (longitude)
-	unsigned short nlat;		///< number of spatial points in Theta direction (latitude) ...
 	unsigned short nlat_2;		///< ...and half of it (using (shtns.nlat+1)/2 allows odd shtns.nlat.)
+	unsigned int nlat;			///< number of spatial points in Theta direction (latitude) ...
+	unsigned int nphi;			///< number of spatial points in Phi direction (longitude)
+	unsigned int nspat;			///< number of real numbers that must be allocated in a spatial field.
 	unsigned short *li;			///< degree l for given mode index (size nlm) : li[lm]
 	unsigned short *mi;			///< order m for given mode index (size nlm) : mi[lm]
 	double *ct, *st;			///< cos(theta) and sin(theta) arrays (size nlat)
-	unsigned int nspat;			///< number of real numbers that must be allocated in a spatial field.
+	unsigned int nlat_padded;	///< number of spatial points in Theta direction, including padding.
 	unsigned int nlm_cplx;		///< number of complex coefficients to represent a complex-valued spatial field.
 /* END OF PUBLIC PART */
 
@@ -128,7 +129,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	unsigned short *tm;			///< start theta value for SH (polar optimization : near the poles the legendre polynomials go to zero for high m's)
 	short robert_form;			///< flag for Robert formulation: if true, the vector synthesis are multiplied by sin(theta) and the analysis are divided by sin(theta).
 	int k_stride_a;				///< stride in theta direction
-	int m_stride_a;				///< stride in phi direction (m)
+	int m_stride_a;				///< stride in phi direction in intermediate spectral space (m)
 	double *wg;					///< Gauss weights for Gauss-Legendre quadrature.
 	double *st_1;				///< 1/sin(theta);
 	double mpos_scale_analys;	///< scale factor for analysis, handles real-norm (0.5 or 1.0);

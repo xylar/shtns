@@ -42,9 +42,14 @@ VX	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, double *BtF, double *BpF, cplx *
 	#define NW (NWAY*2)
 	// another blocking level in theta (64 or 128 should be good)
 	#define NBLK (NWAY*16) //24 //(NWAY*3) //24 //96 // (NWAY*3)  //24
-	// LSPAN can be 2 or 4
+	// LSPAN can be 2, 4, 6 or 8
+	#ifdef __AVX512F__
+QX	#define LSPAN 6
+V	#define LSPAN 4
+	#else
 QX	#define LSPAN 4
 V	#define LSPAN 2
+	#endif
 
 	double *alm, *al;
 	double *wg, *ct, *st;
@@ -485,14 +490,23 @@ V			while (l<=llim+1) {	// compute even and odd parts
 				while ((ny[ii] < 0) && (ii<NBLK/NWAY)) {		// these are zeros
 					const unsigned imax = (ii+1)*NWAY;
 					do {
-						if (LSPAN==2) {
+						#if LSPAN==2
 							rnd tmp = x[i].y[1];
 							x[i].y[1] = (vall(al[1])*x[i].ct2 + vall(al[0]))*tmp + x[i].y[0];
 							x[i].y[0] = tmp;
-						} else {	// LSPAN == 4
+						#elif LSPAN==4
 							x[i].y[0] = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
-							x[i].y[1] = (vall(al[3])*x[i].ct2 + vall(al[2]))*x[i].y[0] + x[i].y[1];						
-						}
+							x[i].y[1] = (vall(al[3])*x[i].ct2 + vall(al[2]))*x[i].y[0] + x[i].y[1];
+						#elif LSPAN==6
+							rnd y = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
+							x[i].y[0] = (vall(al[3])*x[i].ct2 + vall(al[2]))*y + x[i].y[1];
+							x[i].y[1] = (vall(al[5])*x[i].ct2 + vall(al[4]))*x[i].y[0] + y;
+						#elif LSPAN==8
+							rnd y0 = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
+							rnd y1 = (vall(al[3])*x[i].ct2 + vall(al[2]))*y0 + x[i].y[1];
+							x[i].y[0] = (vall(al[5])*x[i].ct2 + vall(al[4]))*y1 + y0;
+							x[i].y[1] = (vall(al[7])*x[i].ct2 + vall(al[6]))*x[i].y[0] + y1;
+						#endif
 					} while (++i < imax);
 					if (fabs(vlo(x[ii*NWAY+NWAY-1].y[0])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 						++ny[ii];
@@ -510,8 +524,18 @@ Q					ql[ll] = vall(0.0);
 V					vl[ll] = vall(0.0);		wl[ll] = vall(0.0);
 				}
 				while (i<NBLK) {
-					for (int ll=0; ll<LSPAN/2; ll++) {
-						register rnd y = x[i].y[ll];
+					register rnd y;
+					//#pragma GCC unroll 4
+					for (int ll=0; ll < LSPAN/2; ll++) {
+						if (ll<2) {		// LSPAN==2 or 4
+							y = x[i].y[ll];
+						} else if (ll==2) {		// LSPAN==6
+							y = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
+							x[i].y[0] = (vall(al[3])*x[i].ct2 + vall(al[2]))*y + x[i].y[1];
+							x[i].y[1] = (vall(al[5])*x[i].ct2 + vall(al[4]))*x[i].y[0] + y;
+						} else if (ll==3) {		// LSPAN==8
+							y = x[i].y[0];
+						}
 Q						ql[4*ll+0] += y * x[i].rer;		ql[4*ll+1] += y * x[i].rei;
 Q						ql[4*ll+2] += y * x[i].ror;		ql[4*ll+3] += y * x[i].roi;
 V						vl[4*ll+0] += y * x[i].ter;		vl[4*ll+1] += y * x[i].tei;
@@ -519,14 +543,18 @@ V						vl[4*ll+2] += y * x[i].tor;		vl[4*ll+3] += y * x[i].toi;
 V						wl[4*ll+0] += y * x[i].per;		wl[4*ll+1] += y * x[i].pei;
 V						wl[4*ll+2] += y * x[i].por;		wl[4*ll+3] += y * x[i].poi;
 					}
-					if (LSPAN==2) {
+					#if LSPAN==2
 						register rnd tmp = x[i].y[1];
-						x[i].y[1] = (vall(al[1])*x[i].ct2 + vall(al[0]))*tmp + x[i].y[0];
-						x[i].y[0] = tmp;
-					} else {	// LSPAN == 4
-						x[i].y[0] = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
-						x[i].y[1] = (vall(al[3])*x[i].ct2 + vall(al[2]))*x[i].y[0] + x[i].y[1];						
-					}
+						y = (vall(al[1])*x[i].ct2 + vall(al[0]))*tmp + y;
+						x[i].y[0] = tmp;		x[i].y[1] = y;
+					#elif LSPAN==4
+						x[i].y[0] = (vall(al[1])*x[i].ct2 + vall(al[0]))*y + x[i].y[0];
+						x[i].y[1] = (vall(al[3])*x[i].ct2 + vall(al[2]))*x[i].y[0] + y;
+					#elif LSPAN==8
+						register rnd tmp = x[i].y[1];
+						y = (vall(al[7])*x[i].ct2 + vall(al[6]))*tmp + y;
+						x[i].y[0] = tmp;		x[i].y[1] = y;
+					#endif
 					++i;
 				}
 				for (int ll=0; ll<LSPAN/2; ll++) {		// we can overflow, the work arrays are padded.
@@ -547,30 +575,6 @@ Q				q+=LSPAN;
 V				v+=2*LSPAN;
 				l+=LSPAN;	al+=LSPAN;
 			}
-	/*		{
-V				rnd vv0 = y0[0] * terk[0];
-V				rnd vv1 = y0[0] * teik[0];
-V				rnd ww0 = y0[0] * perk[0];
-V				rnd ww1 = y0[0] * peik[0];
-V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * terk[j];		vv1 += y0[j] * teik[j];	}	// real even, imag even
-V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * perk[j];		ww1 += y0[j] * peik[j];	}	// real even, imag even
-V				v[0] += v2d_reduce(vv0, vv1);
-V				v[1] += v2d_reduce(ww0, ww1);
-			}
-			if (l==llim) {
-Q		//		rnd qq0 = y0[0] * rerk[0];
-Q		//		rnd qq1 = y0[0] * reik[0];
-V				rnd vv0 = y0[0] * tork[0];
-V				rnd vv1 = y0[0] * toik[0];
-V				rnd ww0 = y0[0] * pork[0];
-V				rnd ww1 = y0[0] * poik[0];
-Q		//		for (int j=1; j<NW; ++j) {	qq0 += y0[j] * rerk[j];		qq1 += y0[j] * reik[j];	}	// real even, imag even
-V				for (int j=1; j<NW; ++j) {	vv0 += y0[j] * tork[j];		vv1 += y0[j] * toik[j]; }	// real odd, imag odd
-V				for (int j=1; j<NW; ++j) {	ww0 += y0[j] * pork[j];		ww1 += y0[j] * poik[j]; }	// real odd, imag odd
-Q		//		q[0] += v2d_reduce(qq0, qq1);
-V				v[2] += v2d_reduce(vv0, vv1);
-V				v[3] += v2d_reduce(ww0, ww1);
-			}	*/
 		#endif
 		} while (k > k0);
 
@@ -602,3 +606,4 @@ V				Sl[l] = vdup(0.0);		Tl[l] = vdup(0.0);
 
 	#undef BASE
 	#undef LSPAN
+	#undef NBLK

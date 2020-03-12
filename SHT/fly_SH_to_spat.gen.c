@@ -121,9 +121,10 @@ T				GEN3(_sy1t_hi,NWAY,_l)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
 
 	// padding for high m's
 	if (NPHI-1 > 2*imlim) {
-Q		memset(BrF + NLAT_2*(imlim+1), 0, sizeof(cplx)* NLAT_2 * (NPHI-1-2*imlim));
-V		memset(BtF + NLAT_2*(imlim+1), 0, sizeof(cplx)* NLAT_2 * (NPHI-1-2*imlim));
-V		memset(BpF + NLAT_2*(imlim+1), 0, sizeof(cplx)* NLAT_2 * (NPHI-1-2*imlim));
+		const int m_inc = shtns->nlat_padded >> 1;
+Q		memset(BrF + m_inc*(imlim+1), 0, sizeof(cplx)* m_inc * (NPHI-1-2*imlim));
+V		memset(BtF + m_inc*(imlim+1), 0, sizeof(cplx)* m_inc * (NPHI-1-2*imlim));
+V		memset(BpF + m_inc*(imlim+1), 0, sizeof(cplx)* m_inc * (NPHI-1-2*imlim));
 	}
 
     // NPHI > 1 as SHT_AXISYM is not defined.

@@ -46,6 +46,8 @@ T	void GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF
   #endif
 
 
+
+
 3	static void GEN3(SHqst_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
 QX	static void GEN3(SH_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
   #ifndef SHT_GRAD
@@ -53,6 +55,84 @@ VX	static void GEN3(SHsphtor_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *S
   #else
 S	static void GEN3(SHsph_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
 T	static void GEN3(SHtor_to_spat_omp_a,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
+  #endif
+
+	unsigned imlim = 0;
+Q	v2d* BrF = (v2d*) Vr;
+V	v2d* BtF = (v2d*) Vt;	v2d* BpF = (v2d*) Vp;
+
+  #ifndef SHT_AXISYM
+	imlim = MTR;
+	#ifdef SHT_VAR_LTR
+		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
+	#endif
+	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
+		unsigned long nv = shtns->nspat;
+QX		BrF = (v2d*) VMALLOC( nv * sizeof(double) );
+VX		BtF = (v2d*) VMALLOC( 2*nv * sizeof(double) );
+VX		BpF = BtF + nv/2;
+3		BrF = (v2d*) VMALLOC( 3*nv * sizeof(double) );
+3		BtF = BrF + nv/2;		BpF = BrF + nv;
+	}
+  #endif
+
+  #pragma omp parallel num_threads(shtns->nthreads)
+  {
+	const int it0=0;
+	const int it1=NLAT_2;
+	#pragma omp for schedule(static,1) nowait
+	for (int im=0; im<=imlim; im++)
+	{
+3		GEN3(_sy3_hi,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
+QX		GEN3(_sy1_hi,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
+	#ifndef SHT_GRAD
+VX		GEN3(_sy2_hi,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
+	#else
+S		GEN3(_sy1s_hi,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
+T		GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
+	#endif
+	}
+
+  #ifndef SHT_AXISYM
+	// padding for high m's
+	if (NPHI-1 > 2*imlim) {
+		const int m_inc = shtns->nlat_padded >> 1;
+		#pragma omp for schedule(static) nowait
+		for (int im=imlim+1; im < NPHI-imlim; im++)  {
+Q			memset(BrF + m_inc*im, 0, sizeof(cplx)* m_inc );
+V			memset(BtF + m_inc*im, 0, sizeof(cplx)* m_inc );
+V			memset(BpF + m_inc*im, 0, sizeof(cplx)* m_inc );
+		}
+	}
+  #endif
+  }
+
+  #ifndef SHT_AXISYM
+    // NPHI > 1 as SHT_AXISYM is not defined.
+	if (shtns->fftc_mode >= 0) {
+		if (shtns->fftc_mode != 1) {
+Q			fftw_execute_dft(shtns->ifftc, ((cplx *) BrF), ((cplx *) Vr));
+V			fftw_execute_dft(shtns->ifftc, ((cplx *) BtF), ((cplx *) Vt));
+V			fftw_execute_dft(shtns->ifftc, ((cplx *) BpF), ((cplx *) Vp));
+		} else {		// split dft
+Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
+V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
+V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
+Q			VFREE(BrF);
+VX			VFREE(BtF);		// this frees also BpF.
+		}
+	}
+  #endif
+  }
+
+
+3	static void GEN3(SHqst_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
+QX	static void GEN3(SH_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
+  #ifndef SHT_GRAD
+VX	static void GEN3(SHsphtor_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
+  #else
+S	static void GEN3(SHsph_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
+T	static void GEN3(SHtor_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
   #endif
 
 	unsigned imlim = 0;
@@ -115,106 +195,38 @@ V			memset(BtF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
 V			memset(BpF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
 		}
 	}
-  }
-
-    // NPHI > 1 as SHT_AXISYM is not defined.
-  	if (shtns->fftc_mode >= 0) {
-		if (shtns->fftc_mode != 1) {
-Q			fftw_execute_dft(shtns->ifftc, (cplx *) BrF, (cplx *) Vr);
-V			fftw_execute_dft(shtns->ifftc, (cplx *) BtF, (cplx *) Vt);
-V			fftw_execute_dft(shtns->ifftc, (cplx *) BpF, (cplx *) Vp);
-		} else {		// split dft
-Q			fftw_execute_split_dft(shtns->ifftc,((double*)BrF)+1, ((double*)BrF), Vr+NPHI, Vr);
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BtF)+1, ((double*)BtF), Vt+NPHI, Vt);
-V			fftw_execute_split_dft(shtns->ifftc,((double*)BpF)+1, ((double*)BpF), Vp+NPHI, Vp);
-Q			VFREE(BrF);
-VX			VFREE(BtF);		// this frees also BpF.
-		}
-	}
-  #endif
-
-  }
-
-
-3	static void GEN3(SHqst_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, long int llim) {
-QX	static void GEN3(SH_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Qlm, double *Vr, long int llim) {
-  #ifndef SHT_GRAD
-VX	static void GEN3(SHsphtor_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, cplx *Tlm, double *Vt, double *Vp, long int llim) {
-  #else
-S	static void GEN3(SHsph_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Slm, double *Vt, double *Vp, long int llim) {
-T	static void GEN3(SHtor_to_spat_omp_b,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, double *Vt, double *Vp, long int llim) {
-  #endif
-
-	unsigned imlim = 0;
-Q	v2d* BrF = (v2d*) Vr;
-V	v2d* BtF = (v2d*) Vt;	v2d* BpF = (v2d*) Vp;
-
-  #ifndef SHT_AXISYM
-	imlim = MTR;
-	#ifdef SHT_VAR_LTR
-		if (imlim*MRES > (unsigned) llim) imlim = ((unsigned) llim)/MRES;		// 32bit mul and div should be faster
-	#endif
-	if (shtns->fftc_mode > 0) {		// alloc memory for the FFT
-		unsigned long nv = shtns->nspat;
-QX		BrF = (v2d*) VMALLOC( nv * sizeof(double) );
-VX		BtF = (v2d*) VMALLOC( 2*nv * sizeof(double) );
-VX		BpF = BtF + nv/2;
-3		BrF = (v2d*) VMALLOC( 3*nv * sizeof(double) );
-3		BtF = BrF + nv/2;		BpF = BrF + nv;
-	}
-  #endif
-
-  #pragma omp parallel num_threads(shtns->nthreads)
-  {
-	const int it0=0;
-	const int it1=NLAT_2;
-	#pragma omp for schedule(static,1) nowait
-	for (int im=0; im<=imlim; im++)
-	{
-3		GEN3(_sy3_hi,NWAY,SUFFIX)(shtns, Qlm, Slm, Tlm, BrF, BtF, BpF, llim, im, it0, it1);
-QX		GEN3(_sy1_hi,NWAY,SUFFIX)(shtns, Qlm, BrF, llim, im, it0, it1);
-	#ifndef SHT_GRAD
-VX		GEN3(_sy2_hi,NWAY,SUFFIX)(shtns, Slm, Tlm, BtF, BpF, llim, im, it0, it1);
-	#else
-S		GEN3(_sy1s_hi,NWAY,SUFFIX)(shtns, Slm, BtF, BpF, llim, im, it0, it1);
-T		GEN3(_sy1t_hi,NWAY,SUFFIX)(shtns, Tlm, BtF, BpF, llim, im, it0, it1);
-	#endif
-	}
-
-	// padding for high m's
-	if (NPHI-1 > 2*imlim) {
-		#pragma omp for schedule(static) nowait
-		for (int im=imlim+1; im < NPHI-imlim; im++)  {
-Q			memset(BrF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
-V			memset(BtF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
-V			memset(BpF + NLAT_2*im, 0, sizeof(cplx)* NLAT_2 );
-		}
-	}
 
 	if (shtns->fftc_mode >= 0) {
 		const int nblk = (NLAT/2) / shtns->nthreads;
 		#pragma omp barrier
 		if (shtns->fftc_mode != 1) {
-			#pragma omp for schedule(static) nowait
 			for (int k=0; k<shtns->nthreads; k++) {
+Q				#pragma omp single nowait
 Q				fftw_execute_dft(shtns->ifftc_block, ((cplx *) BrF) + k*nblk, ((cplx *) Vr) + k*nblk);
+V				#pragma omp single nowait
 V				fftw_execute_dft(shtns->ifftc_block, ((cplx *) BtF) + k*nblk, ((cplx *) Vt) + k*nblk);
+V				#pragma omp single nowait
 V				fftw_execute_dft(shtns->ifftc_block, ((cplx *) BpF) + k*nblk, ((cplx *) Vp) + k*nblk);
 			}
 		} else {
-			#pragma omp for schedule(static) nowait
 			for (int k=0; k<shtns->nthreads; k++) {
+Q				#pragma omp single nowait
 Q				fftw_execute_split_dft(shtns->ifftc_block,((double*)BrF)+1 +2*k*nblk, ((double*)BrF) +2*k*nblk, Vr+NPHI*(1+2*k*nblk), Vr +NPHI*2*k*nblk);
+V				#pragma omp single nowait
 V				fftw_execute_split_dft(shtns->ifftc_block,((double*)BtF)+1 +2*k*nblk, ((double*)BtF) +2*k*nblk, Vt+NPHI*(1+2*k*nblk), Vt +NPHI*2*k*nblk);
+V				#pragma omp single nowait
 V				fftw_execute_split_dft(shtns->ifftc_block,((double*)BpF)+1 +2*k*nblk, ((double*)BpF) +2*k*nblk, Vp+NPHI*(1+2*k*nblk), Vp +NPHI*2*k*nblk);
 			}
 		}
 	}
+  #endif
   }
-  
+
+  #ifndef SHT_AXISYM
 	if (shtns->fftc_mode > 0) {
 Q			VFREE(BrF);
 VX			VFREE(BtF);		// this frees also BpF.
 	}
+  #endif
 
   }
