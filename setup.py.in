@@ -4,7 +4,7 @@ from distutils.core import setup, Extension
 from numpy import get_include
 
 numpy_inc = get_include()		#  NumPy include path.
-objs = "sht_init.o sht_kernels_a.o @objs@"
+objs = "sht_init.o sht_kernels_a.o sht_kernels_s.o @objs@"
 shtns_o = objs.split()			# transform to list of objects
 libdir = "@prefix@"
 if len(libdir) == 0:
