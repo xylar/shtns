@@ -67,6 +67,14 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v3.4
+	- Change in API/ABI (`shtns.h`, `shtns.f03`): removal of lmidx array and new nlat_padded member
+	  in shtns_cfg structure; function names unchanged.
+	- Ishioka's recurrence is now the default.
+	- Improved performance, especially for small transforms (5 to 35% faster).
+	- Further performance improvements can be enabled with the new `SHT_ALLOW_PADDING` flag (1 to 50%),
+	  especially on KNL.
+
 * v3.3.1  (25 Sep 2019)
 	- Different name for openmp and non-openmp version of shtns library for KNL.
 

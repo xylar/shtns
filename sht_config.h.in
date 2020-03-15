@@ -113,7 +113,7 @@
 #undef SHTNS4MAGIC
 
 /* Enable the new recurrence proposed by Ishioka (2018) see
-   https://doi.org/10.2151/jmsj.2018-019 (faster, but experimental) */
+   https://doi.org/10.2151/jmsj.2018-019 (faster) */
 #undef SHTNS_ISHIOKA
 
 /* Compile the Fortran API */

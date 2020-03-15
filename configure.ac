@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[3.3.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[3.4],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -22,8 +22,6 @@ AC_ARG_ENABLE([mkl],
 	AS_HELP_STRING([--enable-mkl], [Try to link with intel MKL instead of FFTW (can be slightly faster, but NOT THREAD SAFE)]), [], [enable_mkl=default])
 AC_ARG_ENABLE([knl],
 	AS_HELP_STRING([--enable-knl], [Enable compilation for Xeon Phi (KNL)]), [], [enable_knl=no])
-AC_ARG_ENABLE([many-core],
-	AS_HELP_STRING([--enable-many-core], [Enable optimizations for many-core systems (Blue Gene/Q, Xeon Phi,...) and remove single-threaded transforms]), [], [enable_many_core=no])
 AC_ARG_ENABLE([cuda],
 	AS_HELP_STRING([--enable-cuda], [Enable compilation for Nvidia gpu using cuda]), [], [enable_cuda=no])
 AC_ARG_ENABLE([magic-layout],
@@ -35,9 +33,9 @@ AC_ARG_ENABLE([long-double],
 AC_ARG_ENABLE([f77],
 	AS_HELP_STRING([--disable-f77], [Do not include F77 wrapper to call SHTns library from Fortran]))
 AC_ARG_ENABLE([simd],
-	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX or MIC)]))
+	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX, AVX2, AVX-512, or VSX)]))
 AC_ARG_ENABLE([ishioka],
-	AS_HELP_STRING([--enable-ishioka], [Use the new recursion (faster but experimental)]), [], [enable_ishioka=no])
+	AS_HELP_STRING([--disable-ishioka], [Do not use the new and faster recursion]), [], [enable_ishioka=yes])
 
 dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
 dnl generated configure script that the expansion does not occur until
@@ -79,12 +77,12 @@ AS_IF([test "x$enable_knl" != "xyes"], [
 	# this is an icc compile option, try if it is supported:
 	AX_CHECK_COMPILE_FLAG([-qopt-zmm-usage=high],[CC="$CC -qopt-zmm-usage=high"])
   ],[
-	enable_many_core=yes		# optimize for many-core architecture
 	target="libshtns_mic.a"
 	# KNL native cross-compiling
 	AX_CHECK_COMPILE_FLAG([-xMIC-AVX512],[CC="$CC -xMIC-AVX512"], [AC_MSG_ERROR(["Xeon Phi (KNL) not supported. Did you use the Intel Compiler?"])])
-	# With KNL, enable mkl by default.
+	# With KNL, enable mkl and openmp by default.
 	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
+	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
 AX_CHECK_COMPILE_FLAG([-std=gnu99],[CFLAGS="$CFLAGS -std=gnu99"])
@@ -112,14 +110,8 @@ AS_IF([test "x$enable_python" != "xno"], [
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
 
-# On many-core systems, enable openmp by default, and disable precomputed matrix support.
-AS_IF([test "x$enable_many_core" != "xno"], [
-	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
-])
 # for MagIC code, also disable matrix transforms.
 AS_IF([test "x$enable_magic_layout" != "xno"], [
-	#enable_ishioka=no       # workaround unexplained bug
-	#enable_many_core=yes		# optimize for many-core architecture
 	AC_DEFINE([SHTNS4MAGIC],[1],[I need the transforms compatible with the MagIC code, to speed it up!])
 ])
 
@@ -257,7 +249,7 @@ AS_IF([test "x$enable_simd" != "xno"], [
 
 
 AS_IF([test "x$enable_ishioka" == "xyes"], [
-       AC_DEFINE([SHTNS_ISHIOKA],[1],[Enable the new recurrence proposed by Ishioka (2018) see https://doi.org/10.2151/jmsj.2018-019 (faster, but experimental)])
+       AC_DEFINE([SHTNS_ISHIOKA],[1],[Enable the new recurrence proposed by Ishioka (2018) see https://doi.org/10.2151/jmsj.2018-019 (faster)])
 ])
 
 # Verbosity setting

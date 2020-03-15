@@ -110,7 +110,7 @@ docs :
 
 clean :
 	$(MAKE) clean -C SHT
-	rm -f *.o *.a
+	rm -f $(objs) $(libname)
 	rm -rf doc/html
 	rm -rf doc/latex
 	rm -rf build
