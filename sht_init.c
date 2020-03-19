@@ -1360,7 +1360,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			m = choose_nlat( m );
 			*nlat = m;
 		} else *nlat = n_gauss;
-		if ((layout & SHT_ALLOW_PADDING == 0) && (shtns->nthreads == 1)) {
+		if (((layout & SHT_ALLOW_PADDING) == 0) && (shtns->nthreads == 1)) {
 			if ((*nlat % 64 == 0) && (*nlat * *nphi > 512)) *nlat += 8;		// heuristics to avoid cache bank conflicts.
 		}
 	}
