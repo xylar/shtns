@@ -36,6 +36,9 @@ AC_ARG_ENABLE([simd],
 	AS_HELP_STRING([--disable-simd], [Do not use vector extensions (SSE2, AVX, AVX2, AVX-512, or VSX)]))
 AC_ARG_ENABLE([ishioka],
 	AS_HELP_STRING([--disable-ishioka], [Do not use the new and faster recursion]), [], [enable_ishioka=yes])
+AC_ARG_ENABLE([kernel-compiler],
+	AS_HELP_STRING([--enable-kernel-compiler=gcc], [Use a different compiler for kernels (default=gcc)]), [], [enable_kernel_compiler=gcc])
+
 
 dnl Sanitize $prefix. Autoconf does this by itself, but so late in the
 dnl generated configure script that the expansion does not occur until
@@ -47,57 +50,87 @@ if test "x$CFLAGS" = "x"; then
 	CFLAGS="-O2"
 fi
 CFLAGS="$CFLAGS -I$prefix/include -L$prefix/lib"
-AC_PROG_CC
+FFLAGS="$CFLAGS"
+AC_PROG_CC_C99
 AC_PROG_SED
 if test "$SED" = :; then
 	AC_MSG_ERROR([sed program required.])
 fi
 
-# define macrao AX_CHECK_COMPILE_FLAG
-AC_DEFUN([AX_CHECK_COMPILE_FLAG],
-[AS_VAR_PUSHDEF([CACHEVAR],[ax_cv_check_[]_AC_LANG_ABBREV[]flags_$4_$1])dnl
-AC_CACHE_CHECK([whether _AC_LANG compiler accepts $1], CACHEVAR, [
+# define macrao AX_CHECK_COMPILE_FLAG, and add it to CFLAGS
+AC_DEFUN([AX_CHECK_COMPILE_FLAG],[
+  AC_MSG_CHECKING([whether $CC accepts $1])
   ax_check_save_flags=$[]_AC_LANG_PREFIX[]FLAGS
-  _AC_LANG_PREFIX[]FLAGS="$[]_AC_LANG_PREFIX[]FLAGS $4 $1"
+  _AC_LANG_PREFIX[]FLAGS="$[]_AC_LANG_PREFIX[]FLAGS $1"
   AC_COMPILE_IFELSE([AC_LANG_PROGRAM()],
-    [AS_VAR_SET(CACHEVAR,[yes])],
-    [AS_VAR_SET(CACHEVAR,[no])])
-  _AC_LANG_PREFIX[]FLAGS=$ax_check_save_flags])
-AS_IF([test x"AS_VAR_GET(CACHEVAR)" = xyes],
-  [m4_default([$2], :)],
-  [m4_default([$3], :)])
-AS_VAR_POPDEF([CACHEVAR])dnl
+    [_AC_LANG_PREFIX[]FLAGS=$ax_check_save_flags
+     AC_MSG_RESULT([yes])
+     m4_default([$2], [CFLAGS="$CFLAGS $1"])],
+    [_AC_LANG_PREFIX[]FLAGS=$ax_check_save_flags
+     AC_MSG_RESULT([no])
+     m4_default([$3], :)])
 ])dnl AX_CHECK_COMPILE_FLAGS
+
+############################################
+### we can use two compilers. CC and CC2 ###
+############################################
+CC2=$enable_kernel_compiler
+# backup current stuff
+backup_cflags=$CFLAGS
+backup_cc=$CC
+CC=$CC2
+#### setup the kernel compiler
+AS_IF([test "x$enable_knl" != "xyes"], [
+	# add gcc compile options if supported.
+	AX_CHECK_COMPILE_FLAG([-march=native])
+	# tune for skylake, it gives significantly better performance on Haswell with gcc 9.2
+	AX_CHECK_COMPILE_FLAG([-mtune=skylake])
+	# this is an icc compile option, try if it is supported:
+	AX_CHECK_COMPILE_FLAG([-qopt-zmm-usage=high])
+  ],[
+	# KNL native cross-compiling
+	AX_CHECK_COMPILE_FLAG([-march=knl],[], [
+	    CC=icc
+	    AX_CHECK_COMPILE_FLAG([-xMIC-AVX512],[CC="$CC -xMIC-AVX512"], [AC_MSG_ERROR(["Xeon Phi (KNL) not supported by $CC. Use a recent gcc or icc compiler."])])
+	])
+])
+CFLAGS="$CFLAGS -O3"
+AX_CHECK_COMPILE_FLAG([-ffast-math])
+AX_CHECK_COMPILE_FLAG([-std=gnu99])
+AX_CHECK_COMPILE_FLAG([-fopenmp-simd])
+# the following prevents gcc from inserting memset in tight loops for zeroing stuff. Must appear after -O3
+AX_CHECK_COMPILE_FLAG([-fno-tree-loop-distribute-patterns])
+# avoid insering VZEROUPPER instructions everywhere.
+AX_CHECK_COMPILE_FLAG([-mno-vzeroupper])
+CC2=$CC
+CFLAGS2=$CFLAGS
+# restore the standard compiler
+CC=$backup_cc
+CFLAGS=$backup_cflags
+################################
+### kernel compiler is setup ###
+################################
 
 AS_IF([test "x$enable_knl" != "xyes"], [
 	# add gcc compile options if supported.
-	AX_CHECK_COMPILE_FLAG([-march=native],[CC="$CC -march=native"])
+	AX_CHECK_COMPILE_FLAG([-march=native])
 	# tune for skylake, it gives significantly better performance on Haswell with gcc 9.2
-	AX_CHECK_COMPILE_FLAG([-mtune=skylake],[CC="$CC -mtune=skylake"])
+	AX_CHECK_COMPILE_FLAG([-mtune=skylake])
 	# this is an icc compile option, try if it is supported:
-	AX_CHECK_COMPILE_FLAG([-qopt-zmm-usage=high],[CC="$CC -qopt-zmm-usage=high"])
+	AX_CHECK_COMPILE_FLAG([-qopt-zmm-usage=high])
   ],[
 	target="libshtns_mic.a"
 	# KNL native cross-compiling
-	AX_CHECK_COMPILE_FLAG([-xMIC-AVX512],[CC="$CC -xMIC-AVX512"], [AC_MSG_ERROR(["Xeon Phi (KNL) not supported. Did you use the Intel Compiler?"])])
+	AX_CHECK_COMPILE_FLAG([-march=knl],[], [
+	    CC=icc
+	    AX_CHECK_COMPILE_FLAG([-xMIC-AVX512],[CC="$CC -xMIC-AVX512"], [AC_MSG_ERROR(["Xeon Phi (KNL) not supported by $CC. Use a recent gcc or icc compiler."])])
+	])
 	# With KNL, enable mkl and openmp by default.
 	AS_IF([test "x$enable_mkl" = "xdefault"], [enable_mkl=yes])
 	AS_IF([test "x$enable_openmp" = "xdefault"], [enable_openmp=yes])
 ])
-AX_CHECK_COMPILE_FLAG([-ffast-math],[CFLAGS="$CFLAGS -ffast-math"])
-AX_CHECK_COMPILE_FLAG([-std=gnu99],[CFLAGS="$CFLAGS -std=gnu99"])
-
-# with intel compiler, we should not use -O3 (bad performance with icc14 and icc15)
-AC_EGREP_CPP(icc,
-  [#ifdef __INTEL_COMPILER
-   icc
-   #endif
-  ], [shtcc_flags="-O2"], [shtcc_flags="-O3"])
-
-# the following prevents gcc from inserting memset in tight loops for zeroing stuff. Must appear after -O3
-AX_CHECK_COMPILE_FLAG([-fno-tree-loop-distribute-patterns],[shtcc_flags="$shtcc_flags -fno-tree-loop-distribute-patterns"])
-# avoid insering VZEROUPPER instructions everywhere.
-AX_CHECK_COMPILE_FLAG([-mno-vzeroupper],[shtcc_flags="$shtcc_flags -mno-vzeroupper"])
+AX_CHECK_COMPILE_FLAG([-ffast-math])
+AX_CHECK_COMPILE_FLAG([-std=gnu99])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h stdio.h string.h math.h complex.h])
@@ -128,9 +161,6 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 	],[
 		target="libshtns_omp.a"
 	])
-],[
-	# without openmp, we still want vectorization of some decorated loops, if possible.
-	AX_CHECK_COMPILE_FLAG([-fopenmp-simd],[CFLAGS="$CFLAGS -fopenmp-simd"])
 ])
 
 # Check for CUDA
@@ -295,7 +325,9 @@ AC_SUBST([target])
 AC_SUBST([install])
 AC_SUBST([objs])
 AC_SUBST([libname])
-AC_SUBST([shtcc_flags])
+AC_SUBST([CC2])
+AC_SUBST([CFLAGS2])
+AC_SUBST([FFLAGS])
 AC_SUBST([nvcc_flags])
 AC_CONFIG_FILES([Makefile setup.py])
 AC_OUTPUT

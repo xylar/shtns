@@ -622,7 +622,9 @@ ac_includes_default="\
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 nvcc_flags
-shtcc_flags
+FFLAGS
+CFLAGS2
+CC2
 libname
 objs
 install
@@ -697,6 +699,7 @@ enable_long_double
 enable_f77
 enable_simd
 enable_ishioka
+enable_kernel_compiler
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1335,6 +1338,8 @@ Optional Features:
   --disable-simd          Do not use vector extensions (SSE2, AVX, AVX2,
                           AVX-512, or VSX)
   --disable-ishioka       Do not use the new and faster recursion
+  --enable-kernel-compiler=gcc
+                          Use a different compiler for kernels (default=gcc)
   --disable-openmp        do not use OpenMP
 
 Some influential environment variables:
@@ -2309,6 +2314,14 @@ else
   enable_ishioka=yes
 fi
 
+# Check whether --enable-kernel-compiler was given.
+if test "${enable_kernel_compiler+set}" = set; then :
+  enableval=$enable_kernel_compiler;
+else
+  enable_kernel_compiler=gcc
+fi
+
+
 
 if test "$prefix" = "NONE"; then :
   prefix=$ac_default_prefix
@@ -2319,6 +2332,7 @@ if test "x$CFLAGS" = "x"; then
 	CFLAGS="-O2"
 fi
 CFLAGS="$CFLAGS -I$prefix/include -L$prefix/lib"
+FFLAGS="$CFLAGS"
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -3108,6 +3122,183 @@ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
+   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $CC option to accept ISO C99" >&5
+$as_echo_n "checking for $CC option to accept ISO C99... " >&6; }
+if ${ac_cv_prog_cc_c99+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_cv_prog_cc_c99=no
+ac_save_CC=$CC
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <wchar.h>
+#include <stdio.h>
+
+// Check varargs macros.  These examples are taken from C99 6.10.3.5.
+#define debug(...) fprintf (stderr, __VA_ARGS__)
+#define showlist(...) puts (#__VA_ARGS__)
+#define report(test,...) ((test) ? puts (#test) : printf (__VA_ARGS__))
+static void
+test_varargs_macros (void)
+{
+  int x = 1234;
+  int y = 5678;
+  debug ("Flag");
+  debug ("X = %d\n", x);
+  showlist (The first, second, and third items.);
+  report (x>y, "x is %d but y is %d", x, y);
+}
+
+// Check long long types.
+#define BIG64 18446744073709551615ull
+#define BIG32 4294967295ul
+#define BIG_OK (BIG64 / BIG32 == 4294967297ull && BIG64 % BIG32 == 0)
+#if !BIG_OK
+  your preprocessor is broken;
+#endif
+#if BIG_OK
+#else
+  your preprocessor is broken;
+#endif
+static long long int bignum = -9223372036854775807LL;
+static unsigned long long int ubignum = BIG64;
+
+struct incomplete_array
+{
+  int datasize;
+  double data[];
+};
+
+struct named_init {
+  int number;
+  const wchar_t *name;
+  double average;
+};
+
+typedef const char *ccp;
+
+static inline int
+test_restrict (ccp restrict text)
+{
+  // See if C++-style comments work.
+  // Iterate through items via the restricted pointer.
+  // Also check for declarations in for loops.
+  for (unsigned int i = 0; *(text+i) != '\0'; ++i)
+    continue;
+  return 0;
+}
+
+// Check varargs and va_copy.
+static void
+test_varargs (const char *format, ...)
+{
+  va_list args;
+  va_start (args, format);
+  va_list args_copy;
+  va_copy (args_copy, args);
+
+  const char *str;
+  int number;
+  float fnumber;
+
+  while (*format)
+    {
+      switch (*format++)
+	{
+	case 's': // string
+	  str = va_arg (args_copy, const char *);
+	  break;
+	case 'd': // int
+	  number = va_arg (args_copy, int);
+	  break;
+	case 'f': // float
+	  fnumber = va_arg (args_copy, double);
+	  break;
+	default:
+	  break;
+	}
+    }
+  va_end (args_copy);
+  va_end (args);
+}
+
+int
+main ()
+{
+
+  // Check bool.
+  _Bool success = false;
+
+  // Check restrict.
+  if (test_restrict ("String literal") == 0)
+    success = true;
+  char *restrict newvar = "Another string";
+
+  // Check varargs.
+  test_varargs ("s, d' f .", "string", 65, 34.234);
+  test_varargs_macros ();
+
+  // Check flexible array members.
+  struct incomplete_array *ia =
+    malloc (sizeof (struct incomplete_array) + (sizeof (double) * 10));
+  ia->datasize = 10;
+  for (int i = 0; i < ia->datasize; ++i)
+    ia->data[i] = i * 1.234;
+
+  // Check named initializers.
+  struct named_init ni = {
+    .number = 34,
+    .name = L"Test wide string",
+    .average = 543.34343,
+  };
+
+  ni.number = 58;
+
+  int dynamic_array[ni.number];
+  dynamic_array[ni.number - 1] = 543;
+
+  // work around unused variable warnings
+  return (!success || bignum == 0LL || ubignum == 0uLL || newvar[0] == 'x'
+	  || dynamic_array[ni.number - 1] != 543);
+
+  ;
+  return 0;
+}
+_ACEOF
+for ac_arg in '' -std=gnu99 -std=c99 -c99 -AC99 -D_STDC_C99= -qlanglvl=extc99
+do
+  CC="$ac_save_CC $ac_arg"
+  if ac_fn_c_try_compile "$LINENO"; then :
+  ac_cv_prog_cc_c99=$ac_arg
+fi
+rm -f core conftest.err conftest.$ac_objext
+  test "x$ac_cv_prog_cc_c99" != "xno" && break
+done
+rm -f conftest.$ac_ext
+CC=$ac_save_CC
+
+fi
+# AC_CACHE_VAL
+case "x$ac_cv_prog_cc_c99" in
+  x)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: none needed" >&5
+$as_echo "none needed" >&6; } ;;
+  xno)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: unsupported" >&5
+$as_echo "unsupported" >&6; } ;;
+  *)
+    CC="$CC $ac_cv_prog_cc_c99"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_prog_cc_c99" >&5
+$as_echo "$ac_cv_prog_cc_c99" >&6; } ;;
+esac
+if test "x$ac_cv_prog_cc_c99" != xno; then :
+
+fi
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for a sed that does not truncate output" >&5
 $as_echo_n "checking for a sed that does not truncate output... " >&6; }
 if ${ac_cv_path_SED+:} false; then :
@@ -3181,20 +3372,26 @@ if test "$SED" = :; then
 	as_fn_error $? "sed program required." "$LINENO" 5
 fi
 
-# define macrao AX_CHECK_COMPILE_FLAG
+# define macrao AX_CHECK_COMPILE_FLAG, and add it to CFLAGS
 
+############################################
+### we can use two compilers. CC and CC2 ###
+############################################
+CC2=$enable_kernel_compiler
+# backup current stuff
+backup_cflags=$CFLAGS
+backup_cc=$CC
+CC=$CC2
+#### setup the kernel compiler
 
 if test "x$enable_knl" != "xyes"; then :
 
 	# add gcc compile options if supported.
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -march=native" >&5
-$as_echo_n "checking whether C compiler accepts -march=native... " >&6; }
-if ${ax_cv_check_cflags___march_native+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
 
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -march=native" >&5
+$as_echo_n "checking whether $CC accepts -march=native... " >&6; }
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -march=native"
+  CFLAGS="$CFLAGS -march=native"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3207,30 +3404,24 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___march_native=yes
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -march=native"
 else
-  ax_cv_check_cflags___march_native=no
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___march_native" >&5
-$as_echo "$ax_cv_check_cflags___march_native" >&6; }
-if test x"$ax_cv_check_cflags___march_native" = xyes; then :
-  CC="$CC -march=native"
-else
-  :
-fi
 
 	# tune for skylake, it gives significantly better performance on Haswell with gcc 9.2
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mtune=skylake" >&5
-$as_echo_n "checking whether C compiler accepts -mtune=skylake... " >&6; }
-if ${ax_cv_check_cflags___mtune_skylake+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
 
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -mtune=skylake" >&5
+$as_echo_n "checking whether $CC accepts -mtune=skylake... " >&6; }
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -mtune=skylake"
+  CFLAGS="$CFLAGS -mtune=skylake"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3243,30 +3434,24 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___mtune_skylake=yes
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -mtune=skylake"
 else
-  ax_cv_check_cflags___mtune_skylake=no
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___mtune_skylake" >&5
-$as_echo "$ax_cv_check_cflags___mtune_skylake" >&6; }
-if test x"$ax_cv_check_cflags___mtune_skylake" = xyes; then :
-  CC="$CC -mtune=skylake"
-else
-  :
-fi
 
 	# this is an icc compile option, try if it is supported:
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -qopt-zmm-usage=high" >&5
-$as_echo_n "checking whether C compiler accepts -qopt-zmm-usage=high... " >&6; }
-if ${ax_cv_check_cflags___qopt_zmm_usage_high+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
 
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -qopt-zmm-usage=high" >&5
+$as_echo_n "checking whether $CC accepts -qopt-zmm-usage=high... " >&6; }
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -qopt-zmm-usage=high"
+  CFLAGS="$CFLAGS -qopt-zmm-usage=high"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3279,34 +3464,343 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___qopt_zmm_usage_high=yes
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -qopt-zmm-usage=high"
 else
-  ax_cv_check_cflags___qopt_zmm_usage_high=no
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___qopt_zmm_usage_high" >&5
-$as_echo "$ax_cv_check_cflags___qopt_zmm_usage_high" >&6; }
-if test x"$ax_cv_check_cflags___qopt_zmm_usage_high" = xyes; then :
-  CC="$CC -qopt-zmm-usage=high"
+
+
 else
-  :
+
+	# KNL native cross-compiling
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -march=knl" >&5
+$as_echo_n "checking whether $CC accepts -march=knl... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -march=knl"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -march=knl"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+	    CC=icc
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -xMIC-AVX512" >&5
+$as_echo_n "checking whether $CC accepts -xMIC-AVX512... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -xMIC-AVX512"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CC="$CC -xMIC-AVX512"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     as_fn_error $? "\"Xeon Phi (KNL) not supported by $CC. Use a recent gcc or icc compiler.\"" "$LINENO" 5
 fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
+fi
+CFLAGS="$CFLAGS -O3"
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -ffast-math" >&5
+$as_echo_n "checking whether $CC accepts -ffast-math... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -ffast-math"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -ffast-math"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -std=gnu99" >&5
+$as_echo_n "checking whether $CC accepts -std=gnu99... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -std=gnu99"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -std=gnu99"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -fopenmp-simd" >&5
+$as_echo_n "checking whether $CC accepts -fopenmp-simd... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -fopenmp-simd"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -fopenmp-simd"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+# the following prevents gcc from inserting memset in tight loops for zeroing stuff. Must appear after -O3
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -fno-tree-loop-distribute-patterns" >&5
+$as_echo_n "checking whether $CC accepts -fno-tree-loop-distribute-patterns... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -fno-tree-loop-distribute-patterns"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -fno-tree-loop-distribute-patterns"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+# avoid insering VZEROUPPER instructions everywhere.
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -mno-vzeroupper" >&5
+$as_echo_n "checking whether $CC accepts -mno-vzeroupper... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -mno-vzeroupper"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -mno-vzeroupper"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+CC2=$CC
+CFLAGS2=$CFLAGS
+# restore the standard compiler
+CC=$backup_cc
+CFLAGS=$backup_cflags
+################################
+### second compiler is setup ###
+################################
+
+if test "x$enable_knl" != "xyes"; then :
+
+	# add gcc compile options if supported.
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -march=native" >&5
+$as_echo_n "checking whether $CC accepts -march=native... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -march=native"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -march=native"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	# tune for skylake, it gives significantly better performance on Haswell with gcc 9.2
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -mtune=skylake" >&5
+$as_echo_n "checking whether $CC accepts -mtune=skylake... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -mtune=skylake"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -mtune=skylake"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	# this is an icc compile option, try if it is supported:
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -qopt-zmm-usage=high" >&5
+$as_echo_n "checking whether $CC accepts -qopt-zmm-usage=high... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -qopt-zmm-usage=high"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -qopt-zmm-usage=high"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
 else
 
 	target="libshtns_mic.a"
 	# KNL native cross-compiling
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -xMIC-AVX512" >&5
-$as_echo_n "checking whether C compiler accepts -xMIC-AVX512... " >&6; }
-if ${ax_cv_check_cflags___xMIC_AVX512+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
 
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -march=knl" >&5
+$as_echo_n "checking whether $CC accepts -march=knl... " >&6; }
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -xMIC-AVX512"
+  CFLAGS="$CFLAGS -march=knl"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3319,20 +3813,47 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___xMIC_AVX512=yes
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -march=knl"
 else
-  ax_cv_check_cflags___xMIC_AVX512=no
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -xMIC-AVX512" >&5
+$as_echo_n "checking whether $CC accepts -xMIC-AVX512... " >&6; }
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS -xMIC-AVX512"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CC="$CC -xMIC-AVX512"
+else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     as_fn_error $? "\"Xeon Phi (KNL) not supported by $CC. Use a recent gcc or icc compiler.\"" "$LINENO" 5
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+
+
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___xMIC_AVX512" >&5
-$as_echo "$ax_cv_check_cflags___xMIC_AVX512" >&6; }
-if test x"$ax_cv_check_cflags___xMIC_AVX512" = xyes; then :
-  CC="$CC -xMIC-AVX512"
-else
-  as_fn_error $? "\"Xeon Phi (KNL) not supported. Did you use the Intel Compiler?\"" "$LINENO" 5
-fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 	# With KNL, enable mkl and openmp by default.
 	if test "x$enable_mkl" = "xdefault"; then :
@@ -3343,49 +3864,11 @@ fi
 fi
 
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -ffast-math" >&5
-$as_echo_n "checking whether C compiler accepts -ffast-math... " >&6; }
-if ${ax_cv_check_cflags___ffast_math+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
 
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -ffast-math" >&5
+$as_echo_n "checking whether $CC accepts -ffast-math... " >&6; }
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -ffast-math"
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___ffast_math=yes
-else
-  ax_cv_check_cflags___ffast_math=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___ffast_math" >&5
-$as_echo "$ax_cv_check_cflags___ffast_math" >&6; }
-if test x"$ax_cv_check_cflags___ffast_math" = xyes; then :
   CFLAGS="$CFLAGS -ffast-math"
-else
-  :
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -std=gnu99" >&5
-$as_echo_n "checking whether C compiler accepts -std=gnu99... " >&6; }
-if ${ax_cv_check_cflags___std_gnu99+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -std=gnu99"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3398,23 +3881,49 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___std_gnu99=yes
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -ffast-math"
 else
-  ax_cv_check_cflags___std_gnu99=no
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___std_gnu99" >&5
-$as_echo "$ax_cv_check_cflags___std_gnu99" >&6; }
-if test x"$ax_cv_check_cflags___std_gnu99" = xyes; then :
+
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -std=gnu99" >&5
+$as_echo_n "checking whether $CC accepts -std=gnu99... " >&6; }
+  ax_check_save_flags=$CFLAGS
   CFLAGS="$CFLAGS -std=gnu99"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+     CFLAGS="$CFLAGS -std=gnu99"
 else
-  :
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     :
 fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
-# with intel compiler, we should not use -O3 (bad performance with icc14 and icc15)
+# Checks for header files.
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -3683,96 +4192,6 @@ $as_echo "$ac_cv_path_EGREP" >&6; }
  EGREP="$ac_cv_path_EGREP"
 
 
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#ifdef __INTEL_COMPILER
-   icc
-   #endif
-
-_ACEOF
-if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
-  $EGREP "icc" >/dev/null 2>&1; then :
-  shtcc_flags="-O2"
-else
-  shtcc_flags="-O3"
-fi
-rm -f conftest*
-
-
-# the following prevents gcc from inserting memset in tight loops for zeroing stuff. Must appear after -O3
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-tree-loop-distribute-patterns" >&5
-$as_echo_n "checking whether C compiler accepts -fno-tree-loop-distribute-patterns... " >&6; }
-if ${ax_cv_check_cflags___fno_tree_loop_distribute_patterns+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fno-tree-loop-distribute-patterns"
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fno_tree_loop_distribute_patterns=yes
-else
-  ax_cv_check_cflags___fno_tree_loop_distribute_patterns=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_tree_loop_distribute_patterns" >&5
-$as_echo "$ax_cv_check_cflags___fno_tree_loop_distribute_patterns" >&6; }
-if test x"$ax_cv_check_cflags___fno_tree_loop_distribute_patterns" = xyes; then :
-  shtcc_flags="$shtcc_flags -fno-tree-loop-distribute-patterns"
-else
-  :
-fi
-
-# avoid insering VZEROUPPER instructions everywhere.
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mno-vzeroupper" >&5
-$as_echo_n "checking whether C compiler accepts -mno-vzeroupper... " >&6; }
-if ${ax_cv_check_cflags___mno_vzeroupper+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -mno-vzeroupper"
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___mno_vzeroupper=yes
-else
-  ax_cv_check_cflags___mno_vzeroupper=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___mno_vzeroupper" >&5
-$as_echo "$ax_cv_check_cflags___mno_vzeroupper" >&6; }
-if test x"$ax_cv_check_cflags___mno_vzeroupper" = xyes; then :
-  shtcc_flags="$shtcc_flags -mno-vzeroupper"
-else
-  :
-fi
-
-
-# Checks for header files.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ANSI C header files" >&5
 $as_echo_n "checking for ANSI C header files... " >&6; }
 if ${ac_cv_header_stdc+:} false; then :
@@ -4066,45 +4485,6 @@ else
 
 fi
 
-else
-
-	# without openmp, we still want vectorization of some decorated loops, if possible.
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fopenmp-simd" >&5
-$as_echo_n "checking whether C compiler accepts -fopenmp-simd... " >&6; }
-if ${ax_cv_check_cflags___fopenmp_simd+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fopenmp-simd"
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fopenmp_simd=yes
-else
-  ax_cv_check_cflags___fopenmp_simd=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fopenmp_simd" >&5
-$as_echo "$ax_cv_check_cflags___fopenmp_simd" >&6; }
-if test x"$ax_cv_check_cflags___fopenmp_simd" = xyes; then :
-  CFLAGS="$CFLAGS -fopenmp-simd"
-else
-  :
-fi
-
-
 fi
 
 # Check for CUDA
@@ -4267,14 +4647,11 @@ if test "x$enable_mkl" = "xyes"; then :
 
 $as_echo "#define HAVE_LIBFFTW3_OMP 1" >>confdefs.h
 
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mkl" >&5
-$as_echo_n "checking whether C compiler accepts -mkl... " >&6; }
-if ${ax_cv_check_cflags___mkl+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
 
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -mkl" >&5
+$as_echo_n "checking whether $CC accepts -mkl... " >&6; }
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -mkl"
+  CFLAGS="$CFLAGS -mkl"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -4287,16 +4664,9 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___mkl=yes
-else
-  ax_cv_check_cflags___mkl=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
   CFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___mkl" >&5
-$as_echo "$ax_cv_check_cflags___mkl" >&6; }
-if test x"$ax_cv_check_cflags___mkl" = xyes; then :
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
 
 	LIBS="-mkl $LIBS"	# easy way !
 	ac_fn_c_check_func "$LINENO" "fftw_plan_many_dft" "ac_cv_func_fftw_plan_many_dft"
@@ -4309,6 +4679,9 @@ fi
 
 
 else
+  CFLAGS=$ax_check_save_flags
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 
 	# assume 64 bit mode, add default directory to find the MKL
 	LDFLAGS="$LDFLAGS -L$MKLROOT/lib/intel64"
@@ -4370,6 +4743,7 @@ fi
 $as_echo "$as_me: \"FFTW interface found in MKL, link with $mkl_libs\"" >&6;}
 
 fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
 else
@@ -5009,6 +5383,8 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 #### end Fortran #####
 
 echo "prefix=$prefix"
+
+
 
 
 

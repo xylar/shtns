@@ -1,22 +1,14 @@
 ## path prefix for make install (installs to $(PREFIX)/lib and $(PREFIX)/include)
 PREFIX=@prefix@
 SED=@SED@
-CC=@CC@
-CFLAGS=@CFLAGS@ @LDFLAGS@
 LIBS=@LIBS@
 PYTHON=@PYTHON@
 
-
-## global options for gcc
-## there should be -ffast-math or at least -fcx-limited-range to produce fast code.
-go= $(CFLAGS) -D_GNU_SOURCE
-
-
 # compiler command with options for the sht codelets
-shtcc = $(CC) $(go) @shtcc_flags@
+shtcc=@CC2@ @CFLAGS2@ -D_GNU_SOURCE
 # compiler command with options for other source (initialization, ...)
-cc = $(CC) $(go) -O2
-fc = @FC@ $(go) -O2
+cc=@CC@ @CFLAGS@ -D_GNU_SOURCE @LDFLAGS@
+fc=@FC@ @FFLAGS@ @LDFLAGS@
 
 hfiles = sht_private.h sht_config.h shtns.h shtns_simd.h
 objs = sht_init.o sht_kernels_a.o sht_kernels_s.o @objs@
@@ -69,12 +61,10 @@ SHT/spat_to_SH_kernel.c : SHT/kernel_spat_to_SH.gen.c
 sht_init.o : sht_init.c Makefile sht_legendre.c sht_func.c sht_com.c $(hfiles)
 	$(cc) -c $< -o $@
 
-sht_mem.o : sht_mem.c Makefile $(hfiles) SHT/SH_to_spat.c SHT/spat_to_SH.c
-	$(shtcc) -c $< -o $@
 sht_fly.o : sht_fly.c Makefile $(hfiles) SHT/SH_to_spat_fly.c SHT/spat_to_SH_fly.c
-	$(shtcc) -c $< -o $@
+	$(cc) -c $< -o $@
 sht_omp.o : sht_omp.c Makefile $(hfiles) SHT/SH_to_spat_omp.c SHT/spat_to_SH_omp.c
-	$(shtcc) -c $< -o $@
+	$(cc) -c $< -o $@
 sht_kernels_s.o : sht_kernels_s.c Makefile $(hfiles) SHT/SH_to_spat_kernel.c
 	$(shtcc) -c $< -o $@
 sht_kernels_a.o : sht_kernels_a.c Makefile $(hfiles) SHT/spat_to_SH_kernel.c
