@@ -105,7 +105,7 @@ if __name__ == "__main__":
     ug.shape = (nlats,1)
     ug = ug*np.ones((nlats,nlons),dtype=np.float) # broadcast to shape (nlats,nlonss)
     # height perturbation.
-    hbump = hamp*np.cos(lats)*np.exp(-(lons/alpha)**2)*np.exp(-(phi2-lats)**2/beta)
+    hbump = hamp*np.cos(lats)*np.exp(-(lons/alpha)**2)*np.exp(-((phi2-lats)/beta)**2)
 
     # initial vorticity, divergence in spectral space
     vrtspec, divspec =  x.getvrtdivspec(ug,vg)
