@@ -1,11 +1,13 @@
-#!/usr/bin/python
+#! /usr/bin/env python3
 
+##
 ## "non-linear barotropically unstable shallow water test case"
 ## example provided by Jeffrey Whitaker
 ## https://gist.github.com/jswhit/3845307
 ##
 ## Running the script should pop up a window with this image:
 ## http://i.imgur.com/ZlxR1.png
+##
 
 
 import numpy as np
@@ -105,7 +107,7 @@ if __name__ == "__main__":
     ug.shape = (nlats,1)
     ug = ug*np.ones((nlats,nlons),dtype=np.float) # broadcast to shape (nlats,nlonss)
     # height perturbation.
-    hbump = hamp*np.cos(lats)*np.exp(-(lons/alpha)**2)*np.exp(-((phi2-lats)/beta)**2)
+    hbump = hamp*np.cos(lats)*np.exp(-((lons-np.pi)/alpha)**2)*np.exp(-(phi2-lats)**2/beta)
 
     # initial vorticity, divergence in spectral space
     vrtspec, divspec =  x.getvrtdivspec(ug,vg)
@@ -132,7 +134,7 @@ if __name__ == "__main__":
     nnew = 0; nnow = 1; nold = 2
 
     # time loop.
-    time1 = time.clock()
+    time1 = time.time()
     for ncycle in range(itmax+1):
         t = ncycle*dt
         # get vort,u,v,phi on grid
@@ -179,7 +181,7 @@ if __name__ == "__main__":
         nsav1 = nnew; nsav2 = nnow
         nnew = nold; nnow = nsav1; nold = nsav2
 
-    time2 = time.clock()
+    time2 = time.time()
     print('CPU time = ',time2-time1)
 
     # make a contour plot of potential vorticity in the Northern Hem.
@@ -189,7 +191,7 @@ if __name__ == "__main__":
     print('max/min PV',pvg.min(), pvg.max())
     lons1d = (180./np.pi)*x.lons-180.; lats1d = (180./np.pi)*x.lats
     levs = np.arange(-0.2,1.801,0.1)
-    cs=plt.contourf(lons1d,lats1d,pvg,levs,cmap=plt.cm.spectral,extend='both')
+    cs=plt.contourf(lons1d,lats1d,pvg,levs,extend='both')
     cb=plt.colorbar(cs,orientation='horizontal') # add colorbar
     cb.set_label('potential vorticity')
     plt.grid()
@@ -201,4 +203,5 @@ if __name__ == "__main__":
     plt.axis('tight')
     plt.ylim(0,lats1d[0])
     plt.title('PV (T%s with hyperdiffusion, hour %6.2f)' % (ntrunc,t/3600.))
+    plt.savefig("output_swe.pdf")
     plt.show()
