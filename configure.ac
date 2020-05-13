@@ -199,14 +199,17 @@ AS_IF([test "x$enable_cuda" = "xyes"], [
 ])
 libname=$target		# set the libname befor checking for python.
 
-# Check for FFTW (FFTW preferred, MKL optional)
-AS_IF([test "x$enable_mkl" = "xyes"], [
-  # optionally use MKL instead of fftw3
-  AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
+# Check for FFTW (MKL preferred, FFTW optional)
+AS_IF([test "x$enable_mkl" == "xyes"], [
+  mkl_found=no
   AX_CHECK_COMPILE_FLAG([-mkl], [
 	LIBS="-mkl $LIBS"	# easy way !
-	AC_CHECK_FUNC(fftw_plan_many_dft, [AC_MSG_NOTICE(["FFTW interface found in MKL, link with -mkl"])],
-		[AC_MSG_ERROR(["FFTW interface not found in MKL libraries (-mkl)."])])
+	AC_CHECK_FUNC(fftw_plan_many_dft, [
+	    AC_MSG_NOTICE(["FFTW interface found in MKL, link with -mkl"])
+	    mkl_found=yes
+	],[
+	    AC_MSG_NOTICE(["FFTW interface not found in MKL libraries (-mkl)."])
+	])
   ],[
 	# assume 64 bit mode, add default directory to find the MKL
 	LDFLAGS="$LDFLAGS -L$MKLROOT/lib/intel64"
@@ -218,12 +221,23 @@ AS_IF([test "x$enable_mkl" = "xyes"], [
 		# sequential MKL libs
 		mkl_libs="-Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
 	])
-	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [LIBS="$mkl_libs $LIBS"],
-		AC_MSG_ERROR(["FFTW interface not found in MKL libraries ($mkl_libs). Please add 'LDFLAGS=-L/path/to/mkl' to ./configure command line."]),
-	["$mkl_libs"])
-	AC_MSG_NOTICE(["FFTW interface found in MKL, link with $mkl_libs"])
+	AC_CHECK_LIB(mkl_intel_lp64, fftw_plan_many_dft, [
+	    LIBS="$mkl_libs $LIBS"
+	    AC_MSG_NOTICE(["FFTW interface found in MKL, link with $mkl_libs"])
+	    mkl_found=yes
+	],[
+	    AC_MSG_NOTICE(["FFTW interface not found in MKL libraries ($mkl_libs). Try to add 'LDFLAGS=-L/path/to/mkl' to ./configure command line."])
+	],["$mkl_libs"])
   ])
-],[
+  AS_IF([test "x$mkl_found" == "xno"], [
+    AS_IF([test "x$enable_mkl" == "xyes"], [AC_MSG_ERROR(["FFTW interface not found in MKL."])], [enable_mkl=no])
+  ],[
+    AC_DEFINE(HAVE_LIBFFTW3_OMP, 1, [MKL has the multi-thread fftw interface.])
+  ])
+])
+
+# Check for FFTW, if MKL was not required and not found.
+AS_IF([test "x$enable_mkl" != "xyes"], [
 	# fftw3
 	AC_CHECK_LIB([fftw3],[fftw_plan_many_dft],,AC_MSG_ERROR([FFTW3 library required. Or try using the intel MKL library with --enable-mkl]))
 	AS_IF([test "x$enable_openmp" = "xyes"], [

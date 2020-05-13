@@ -3696,7 +3696,7 @@ CFLAGS2=$CFLAGS
 CC=$backup_cc
 CFLAGS=$backup_cflags
 ################################
-### second compiler is setup ###
+### kernel compiler is setup ###
 ################################
 
 if test "x$enable_knl" != "xyes"; then :
@@ -3822,6 +3822,7 @@ else
      { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 
+	    CC=icc
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -xMIC-AVX512" >&5
 $as_echo_n "checking whether $CC accepts -xMIC-AVX512... " >&6; }
@@ -4640,13 +4641,10 @@ fi
 fi
 libname=$target		# set the libname befor checking for python.
 
-# Check for FFTW (FFTW preferred, MKL optional)
-if test "x$enable_mkl" = "xyes"; then :
+# Check for FFTW (MKL preferred, FFTW optional)
+if test "x$enable_mkl" == "xyes"; then :
 
-  # optionally use MKL instead of fftw3
-
-$as_echo "#define HAVE_LIBFFTW3_OMP 1" >>confdefs.h
-
+  mkl_found=no
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC accepts -mkl" >&5
 $as_echo_n "checking whether $CC accepts -mkl... " >&6; }
@@ -4671,10 +4669,16 @@ $as_echo "yes" >&6; }
 	LIBS="-mkl $LIBS"	# easy way !
 	ac_fn_c_check_func "$LINENO" "fftw_plan_many_dft" "ac_cv_func_fftw_plan_many_dft"
 if test "x$ac_cv_func_fftw_plan_many_dft" = xyes; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: \"FFTW interface found in MKL, link with -mkl\"" >&5
+
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: \"FFTW interface found in MKL, link with -mkl\"" >&5
 $as_echo "$as_me: \"FFTW interface found in MKL, link with -mkl\"" >&6;}
+	    mkl_found=yes
+
 else
-  as_fn_error $? "\"FFTW interface not found in MKL libraries (-mkl).\"" "$LINENO" 5
+
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: \"FFTW interface not found in MKL libraries (-mkl).\"" >&5
+$as_echo "$as_me: \"FFTW interface not found in MKL libraries (-mkl).\"" >&6;}
+
 fi
 
 
@@ -4734,19 +4738,43 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&5
 $as_echo "$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" >&6; }
 if test "x$ac_cv_lib_mkl_intel_lp64_fftw_plan_many_dft" = xyes; then :
-  LIBS="$mkl_libs $LIBS"
+
+	    LIBS="$mkl_libs $LIBS"
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: \"FFTW interface found in MKL, link with $mkl_libs\"" >&5
+$as_echo "$as_me: \"FFTW interface found in MKL, link with $mkl_libs\"" >&6;}
+	    mkl_found=yes
+
 else
-  as_fn_error $? "\"FFTW interface not found in MKL libraries ($mkl_libs). Please add 'LDFLAGS=-L/path/to/mkl' to ./configure command line.\"" "$LINENO" 5
+
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: \"FFTW interface not found in MKL libraries ($mkl_libs). Try to add 'LDFLAGS=-L/path/to/mkl' to ./configure command line.\"" >&5
+$as_echo "$as_me: \"FFTW interface not found in MKL libraries ($mkl_libs). Try to add 'LDFLAGS=-L/path/to/mkl' to ./configure command line.\"" >&6;}
+
 fi
 
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: \"FFTW interface found in MKL, link with $mkl_libs\"" >&5
-$as_echo "$as_me: \"FFTW interface found in MKL, link with $mkl_libs\"" >&6;}
 
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+  if test "x$mkl_found" == "xno"; then :
+
+    if test "x$enable_mkl" == "xyes"; then :
+  as_fn_error $? "\"FFTW interface not found in MKL.\"" "$LINENO" 5
+else
+  enable_mkl=no
+fi
 
 else
+
+
+$as_echo "#define HAVE_LIBFFTW3_OMP 1" >>confdefs.h
+
+
+fi
+
+fi
+
+# Check for FFTW, if MKL was not required and not found.
+if test "x$enable_mkl" != "xyes"; then :
 
 	# fftw3
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fftw_plan_many_dft in -lfftw3" >&5
