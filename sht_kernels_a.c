@@ -100,6 +100,17 @@ void split_sym_asym_m0(double* F0, double* eo, unsigned nlat_2, int k_inc)
 	unsigned nk = ((nlat_2 +(VSIZE2-1))/VSIZE2)*VSIZE2;
 	long int k=0;
 	#if VSIZE2 >= 2
+	if LIKELY(k_inc == 1) {		// optimized and vectorized for k_inc==1
+		do {
+			rnd an = vread(F0 + k, 0);
+			rnd as = vread(F0 + 2*nlat_2-k-VSIZE2, 0);
+			as = vreverse(as);
+			vstor(eo+2*k, 0, an+as);
+			vstor(eo+2*k, 1, an-as);
+			k+=VSIZE2;
+		} while(k < nk);
+		return;
+	}
 	do {
 		v2d an[VSIZE2/2];	v2d as[VSIZE2/2];
 		for (int j=0; j<VSIZE2/2; j++) {
