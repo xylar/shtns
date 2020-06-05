@@ -140,6 +140,21 @@ double split_sym_asym_m0_accl0(double* F0, double* eo, unsigned nlat_2, int k_in
 	unsigned nk = ((nlat_2 +(VSIZE2-1))/VSIZE2)*VSIZE2;
 	long int k=0;
   #if VSIZE2 >= 2
+	if LIKELY(k_inc == 1) {		// optimized and vectorized for k_inc==1
+		rnd r0 = vall(0.0);
+		do {
+			rnd an = vread(F0 + k, 0);
+			rnd as = vread(F0 + 2*nlat_2-k-VSIZE2, 0);
+			as = vreverse(as);
+			rnd ev = an+as;
+			rnd od = an-as;
+			vstor(eo+2*k, 0, ev);
+			vstor(eo+2*k, 1, od);
+			r0 += ev * vread(wg+k, 0);
+			k+=VSIZE2;
+		} while(k < nk);
+		return reduce_add(r0);
+	}
 	v2d r0[VSIZE2/2];
 	for (int j=0; j<VSIZE2/2; j++) r0[j] = vdup(0.0);	// independent accumulators
 	do {
