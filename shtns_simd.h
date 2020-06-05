@@ -583,7 +583,7 @@
 		a0 = (sr[(v)+1]) + (si[(v)]); \
 		b0 = (sr[(v)+1]) - (si[(v)]); \
 		((v2d*)mem)[NLAT_2-1 -(idx)] = b0 + I*a1; \
-		((v2d*)mem)[(NPHI+2*im)*(shtns->nlat_padded>>1) +NLAT_2-1 -(idx)] = a0 + I*b1; }
+		((v2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) +NLAT_2-1 -(idx)] = a0 + I*b1; }
 
 	inline static void S2D_STORE_4MAGIC(double* mem, long idx, double n, double s) {
 		((v2d*)mem)[idx] = (n) + I*(s);
