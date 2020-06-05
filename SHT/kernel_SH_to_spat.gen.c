@@ -444,9 +444,10 @@ V			}
 		  }
 		#ifndef SHTNS4MAGIC
 		  #ifdef _GCC_VEC_
-V			for (int j=0; j<NWAY; ++j) { S2D_CSTORE(BtF, k+j, ter[j], tor[j], tei[j], toi[j]) }
-V			for (int j=0; j<NWAY; ++j) { S2D_CSTORE(BpF, k+j, per[j], por[j], pei[j], poi[j]) }
-Q			for (int j=0; j<NWAY; ++j) { S2D_CSTORE(BrF, k+j, rer[j], ror[j], rei[j], roi[j]) }
+			const long ofs = (NPHI-2*im)*shtns->nlat_padded;
+V			for (int j=0; j<NWAY; ++j) cstore_north_south((double*) BtF, ((double*) (BtF)) +ofs, k+j, NLAT, ter[j], tor[j], tei[j], toi[j]);
+V			for (int j=0; j<NWAY; ++j) cstore_north_south((double*) BpF, ((double*) (BpF)) +ofs, k+j, NLAT, per[j], por[j], pei[j], poi[j]);
+Q			for (int j=0; j<NWAY; ++j) cstore_north_south((double*) BrF, ((double*) (BrF)) +ofs, k+j, NLAT, rer[j], ror[j], rei[j], roi[j]);
 		  #else
 		  	// NWAY is even when _GCC_VEC_ is not defined
 V			for (int j=0; j<NWAY/2; ++j) {	S2D_CSTOREX(BtF, k/2+j, 2*j, ter, tor, tei, toi)  }

@@ -95,14 +95,16 @@
 		return vk*vxchg(z);
 	}
 
+	void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd nr, rnd sr, rnd ni, rnd si) {
+		rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);
+		((s2d*)mem)[idx]   = vec_mix_lohi(bb, aa);
+		((s2d*)mem_m)[idx] = vec_mix_lohi(aa, bb);
+		aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);
+		((s2d*)mem)[(nlat>>1) -1 -idx]   = vec_mix_lohi(bb, aa);
+		((s2d*)mem_m)[(nlat>>1) -1 -idx] = vec_mix_lohi(aa, bb);
+	}
+
 		#define S2D_STORE(mem, idx, n, s)		((s2d*)(mem))[idx] = n;		((s2d*)(mem))[NLAT_2-1 - (idx)] = vxchg(s);
-		#define S2D_CSTORE(mem, idx, nr, sr, ni, si)	{	\
-			rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);	\
-			((s2d*)mem)[idx] = vec_mix_lohi(bb, aa);	\
-			((s2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) + (idx)] = vec_mix_lohi(aa, bb);	\
-			aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);	\
-			((s2d*)mem)[NLAT_2-1 -(idx)] = vec_mix_lohi(bb, aa);	\
-			((s2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) +NLAT_2-1 -(idx)] = vec_mix_lohi(aa, bb);	}
 		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
 			((s2d*)mem)[(idx)*2]   = vec_mergeh(nr, ni);	\
 			((s2d*)mem)[(idx)*2+1] = vec_mergel(nr, ni);	\
@@ -229,17 +231,6 @@
 			_mm512_storeu_pd(mem_m + ridx, si);
 		}
 
-		#define S2D_CSTORE(mem, idx, nr, sr, ni, si)	{	\
-			ni = vxchg_even_odd(ni);		sr = vxchg_even_odd(sr);	\
-			rnd aa = ni + nr;	rnd bb = nr - ni;		rnd cc = sr + si;	rnd dd = sr - si;	\
-			nr = _mm512_mask_blend_pd((__mmask8) 0xAA, bb, aa );		ni = _mm512_mask_blend_pd((__mmask8) 0xAA, aa, bb ); \
-			sr = _mm512_mask_blend_pd((__mmask8) 0xAA, dd, cc );		si = _mm512_mask_blend_pd((__mmask8) 0xAA, cc, dd ); \
-			_mm512_storeu_pd(((double*)mem) + (idx)*8, nr); \
-			_mm512_storeu_pd(((double*)mem) + (NPHI-2*im)*shtns->nlat_padded + (idx)*8, ni); \
-			sr = _mm512_shuffle_f64x2(sr,sr, 0x1B);			si = _mm512_shuffle_f64x2(si,si, 0x1B);	\
-			_mm512_storeu_pd(((double*)mem) + NLAT-8 -(idx)*8, sr); \
-			_mm512_storeu_pd(((double*)mem) + (NPHI-2*im)*shtns->nlat_padded + NLAT-8 -(idx)*8, si); }
-
 // This may replace the first half of the following macro:
 //    rnd c = _mm512_permutex2var_pd(a, _mm512_set_epi64(11,3,10,2,9,1,8,0), b);
 //    rnd d = _mm512_permutex2var_pd(a, _mm512_set_epi64(15,7,14,6,13,5,12,4), b);
@@ -355,18 +346,6 @@
 			_mm256_storeu_pd(mem_m + ridx,  si );
 		}
 
-		#define S2D_CSTORE(mem, idx, nr, sr, ni, si)	{	\
-			ni = vxchg_even_odd(ni);		sr = vxchg_even_odd(sr); \
-			rnd aa = ni + nr;		rnd bb = nr - ni;	\
-			rnd cc = sr + si;		rnd dd = sr - si;	\
-			nr = _mm256_blend_pd (bb, aa, 10 );		ni = _mm256_blend_pd (aa, bb, 10 ); \
-			sr = _mm256_blend_pd (dd, cc, 10 );		si = _mm256_blend_pd (cc, dd, 10 ); \
-			_mm256_storeu_pd(((double*)mem) + (idx)*4, nr); \
-			_mm256_storeu_pd(((double*)mem) + (NPHI-2*im)*shtns->nlat_padded + (idx)*4, ni); \
-			sr = _mm256_permute2f128_pd(sr,sr,1);	si = _mm256_permute2f128_pd(si,si,1); \
-			_mm256_storeu_pd(((double*)mem) + NLAT-4 - (idx)*4,  sr ); \
-			_mm256_storeu_pd(((double*)mem) + (NPHI-2*im)*shtns->nlat_padded + NLAT-4 - (idx)*4,  si ); }
-
 		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
 			rnd aa = (rnd)_mm256_unpacklo_pd(nr, ni);	rnd bb = (rnd)_mm256_unpackhi_pd(nr, ni);	\
 			rnd nrx = _mm256_permute2f128_pd(aa, bb, 0x20);		rnd nix = _mm256_permute2f128_pd(aa, bb, 0x31);  \
@@ -451,13 +430,6 @@
 			((s2d*)mem_m)[(nlat>>1) -1 -idx] = _mm_shuffle_pd(aa, bb, 2 );
 		}
 
-		#define S2D_CSTORE(mem, idx, nr, sr, ni, si)	{	\
-			rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);	\
-			((s2d*)mem)[idx] = _mm_shuffle_pd(bb, aa, 2 );	\
-			((s2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) + (idx)] = _mm_shuffle_pd(aa, bb, 2 );	\
-			aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);	\
-			((s2d*)mem)[NLAT_2-1 -(idx)] = _mm_shuffle_pd(bb, aa, 2 );	\
-			((s2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) +NLAT_2-1 -(idx)] = _mm_shuffle_pd(aa, bb, 2 );	}
 		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
 			((s2d*)mem)[(idx)*2]   = _mm_unpacklo_pd(nr, ni);	\
 			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(nr, ni);	\
@@ -546,8 +518,10 @@
 	typedef double s2d;
 	typedef complex double v2d;
 	typedef double rnd;
-	#define vread(mem, idx) ((double*)mem)[idx]
-	#define vstor(mem, idx, v) ((double*)mem)[idx] = v;
+	#define vread(mem, idx) ((double*)(mem))[idx]
+	#define vstor(mem, idx, v) ((double*)(mem))[idx] = v;
+	#define vread2(mem, idx) ((v2d*)(mem))[idx]
+	#define vstor2(mem, idx, v) ((v2d*)(mem))[idx] = v;
 	#define reduce_add(a) (a)
 	#define v2d_reduce(a,b) ((a) +I*(b))	
 	#define vlo(a) (a)
@@ -564,12 +538,7 @@
 	}
 
 	#define S2D_STORE(mem, idx, n, s)		((double*)mem)[idx] = n;		((double*)mem)[NLAT-1 - (idx)] = s;
-	#define S2D_CSTORE(mem, idx, nr, sr, ni, si)	mem[idx] = (nr) + I*(ni); 	mem[NLAT-1-(idx)] = (sr) + I*(si);
 	#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	mem[idx] = (nr) + I*(ni); 	mem[NLAT-1-(idx)] = (sr) + I*(si);
-	void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, double nr, double sr, double ni, double si) {
-		((v2d*)mem)[idx] = (nr) + I*(si);
-		((v2d*)mem)[nlat-1-idx] = (sr) + I*(si);
-	}
 
 	#define S2D_CSTOREX(mem, idx, v, nr, sr, ni, si) { \
 		double a0 = (nr[(v)])   + (ni[(v)+1]); \
