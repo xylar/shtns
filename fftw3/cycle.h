@@ -433,6 +433,27 @@ INLINE_ELAPSED(__inline)
 
 #define HAVE_TICK_COUNTER
 #endif
+
+/*----------------------------------------------------------------*/
+/* ARM64 */
+#if defined(__aarch64__) && !defined(HAVE_TICK_COUNTER)
+
+typedef int64_t ticks;
+
+static inline ticks getticks(void)
+{
+        int64_t timer;
+        asm volatile("mrs %0, cntvct_el0" : "=r"(timer));
+        return timer;
+}
+
+static inline double elapsed(ticks t1, ticks t0)
+{
+        return t1-t0;
+}
+#define HAVE_TICK_COUNTER
+#endif
+
 /*----------------------------------------------------------------*/
 /* SGI/Irix */
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_SGI_CYCLE) && !defined(HAVE_TICK_COUNTER)
