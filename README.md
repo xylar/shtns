@@ -64,16 +64,31 @@ DOCUMENTATION:
           year = {2013},
         }
 
+  If you use Ishioka's recurrence (the default since SHTns v3.4), you may also want to cite his paper:
+
+        @article {ishioka2018,
+          author={Ishioka, Keiichi},
+          title={A New Recurrence Formula for Efficient Computation of Spherical Harmonic Transform},
+          journal={Journal of the Meteorological Society of Japan},
+          doi = {10.2151/jmsj.2018-019}, volume={96}, number={2}, pages={241--249},
+          year={2018},
+        }
+
+
 CHANGE LOG:
 -----------
 
-* v3.4
-	- Change in API/ABI (`shtns.h`, `shtns.f03`): removal of lmidx array and new nlat_padded member
-	  in shtns_cfg structure; function names unchanged.
-	- Ishioka's recurrence is now the default.
-	- Improved performance, especially for small transforms (5 to 35% faster).
-	- Further performance improvements can be enabled with the new `SHT_ALLOW_PADDING` flag (1 to 50%),
+* v3.4  (10 Jun 2020)
+	- Change in API/ABI (`shtns.h`, `shtns.f03`): removal of `lmidx` array and new `nlat_padded` member
+	  in `shtns_cfg` structure; function names and signatures remain unchanged.
+	- Ishioka's recurrence is now the default (faster).
+	- Further performance improvements, especially for small transforms (5 to 35% faster).
+	- Even more performance improvements can be enabled with the new `SHT_ALLOW_PADDING` flag (1 to 50%),
 	  especially on KNL.
+	- Regardless of the CC variable, gcc is now used by default for kernels (faster).
+          Use `--enable-kernel-compiler=` to override.
+	- Bugfixes in the shallow water examples, thanks to M. Schreiber.
+	- New FAQ in the docs.
 
 * v3.3.1  (25 Sep 2019)
 	- Different name for openmp and non-openmp version of shtns library for KNL.

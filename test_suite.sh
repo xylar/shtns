@@ -1,7 +1,8 @@
 #!/bin/bash
 # script to test many sht cases
 
-id=`hg id`
+#id=`git branch | sed -e '/^[^*]/d' -e 's/* //'`
+id=`git rev-parse HEAD`
 log="test_suite.log"
 
 function test1 {
