@@ -1361,7 +1361,13 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 			*nlat = m;
 		} else *nlat = n_gauss;
 		if (((layout & SHT_ALLOW_PADDING) == 0) && (shtns->nthreads == 1)) {
-			if ((*nlat % 64 == 0) && (*nlat * *nphi > 512)) *nlat += 8;		// heuristics to avoid cache bank conflicts.
+			if ((*nlat % 64 == 0) && (*nlat * *nphi > 512)) {		// heuristics to avoid cache bank conflicts.
+			#ifndef SHTNS4MAGIC
+				*nlat += 8;			// cache line assumed to be 64 bytes == 8 doubles.
+			#else
+				*nlat += (VSIZE2 > 4) ? 2*VSIZE2 : 8;		// here we also need nlat to be a multiple of 2*VSIZE2.
+			#endif
+			}
 		}
 	}
 
