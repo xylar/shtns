@@ -1105,6 +1105,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 					shtns->alm = s2->alm;		shtns->blm = s2->blm;
 					#ifdef SHTNS_ISHIOKA
 					shtns->xlm = s2->xlm;		shtns->x2lm = s2->x2lm;
+					shtns->clm = s2->clm;
 					#endif
 					legendre_ok = 1;
 				}
