@@ -15,7 +15,6 @@ program SHT_example
    real(dp), parameter :: pi=acos(-1.0_dp)
 
    type(shtns_info), pointer :: shtns
-   integer, pointer :: lmidx(:)
    real(dp), pointer :: cosTheta(:), sinTheta(:)
    type(c_ptr) :: shtns_c
 
@@ -32,7 +31,7 @@ program SHT_example
    mmax = 3
    mres = 1
    nphi = 10
-   nlat = 32
+   nlat = 64
 
    !-- Polar optimisation threshold
    eps_polar = 1.0e-10_dp
@@ -52,9 +51,6 @@ program SHT_example
    call c_f_pointer(cptr=shtns_c, fptr=shtns)
    call c_f_pointer(cptr=shtns%ct, fptr=cosTheta, shape=[shtns%nlat])
    call c_f_pointer(cptr=shtns%st, fptr=sinTheta, shape=[shtns%nlat])
-   call c_f_pointer(cptr=shtns%lmidx, fptr=lmidx, shape=[shtns%nlm])
-
-   print*, lmidx(0)+12
 
    print*, 'cosTheta', cosTheta
    print*, 'sinTheta', sinTheta
