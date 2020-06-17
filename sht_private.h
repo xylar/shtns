@@ -24,7 +24,10 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <complex.h>
+#ifndef __cplusplus
+  // with C, include complex.h before fftw3.h to make "fftw_complex" match "complex double".
+  #include <complex.h>
+#endif
 #include <math.h>
 // FFTW la derivee d/dx = ik	(pas de moins !)
 #include "fftw3/fftw3.h"

@@ -19,19 +19,13 @@
  \brief shtns.h is the definition file for SHTns : include this file in your source code to use SHTns.
 **/
 
-#ifdef _COMPLEX_H
-	/// double precision complex number data type
-	typedef complex double cplx;
-#else
-  #ifdef __cplusplus
+#ifdef __cplusplus
 	#include <complex>
-	typedef std::complex<double> cplx;
-  #else
+	typedef std::complex<double> cplx;		///< double precision complex number data type
+#else
 	#include <complex.h>
-	typedef complex double cplx;
-  #endif
+	typedef complex double cplx;			///< double precision complex number data type
 #endif
-
 
 #ifdef __cplusplus
 extern "C" {

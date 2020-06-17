@@ -394,7 +394,7 @@ void spat_to_fourier_host(shtns_cfg shtns, double* q, double* qf)
 	// FFT on host
 	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode != 1) {
-			fftw_execute_dft(shtns->fftc, (cplx *) q, (cplx *) qf);
+			fftw_execute_dft(shtns->fftc, (fftw_complex *) q, (fftw_complex *) qf);
 		} else {		// split dft
 			printf("ERROR fft not supported\n");
 		}
@@ -405,7 +405,7 @@ void fourier_to_spat_host(shtns_cfg shtns, double* qf, double* q)
 {
 	if (shtns->fftc_mode >= 0) {
 		if (shtns->fftc_mode != 1) {
-			fftw_execute_dft(shtns->ifftc, (cplx *) qf, (cplx *) q);
+			fftw_execute_dft(shtns->ifftc, (fftw_complex *) qf, (fftw_complex *) q);
 		} else {		// split dft
 			printf("ERROR fft not supported\n");
 		}

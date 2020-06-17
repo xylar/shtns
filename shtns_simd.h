@@ -516,7 +516,14 @@
 	#define VSIZE2 1
 	#define _SIMD_NAME_ "scalar"
 	typedef double s2d;
+	#ifndef __cplusplus
+	#include <complex.h>
 	typedef complex double v2d;
+	#else
+	#include <complex>
+	typedef std::complex<double> v2d;
+	#define I v2d(0.,1.)
+	#endif
 	typedef double rnd;
 	#define vread(mem, idx) ((double*)(mem))[idx]
 	#define vstor(mem, idx, v) ((double*)(mem))[idx] = v;

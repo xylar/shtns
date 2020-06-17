@@ -166,6 +166,7 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 # Check for CUDA
 AS_IF([test "x$enable_cuda" = "xyes"], [
 	CFLAGS="$CFLAGS -I$CUDA_PATH/include"
+	CFLAGS2="$CFLAGS2 -I$CUDA_PATH/include"
 	# assume 64 bit mode, add default directory to find CUDA
 	LDFLAGS="$LDFLAGS -L$CUDA_PATH/lib64"
 	echo $LDFLAGS
