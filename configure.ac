@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[3.4],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[3.4.1],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -98,6 +98,7 @@ CFLAGS="$CFLAGS -O3"
 AX_CHECK_COMPILE_FLAG([-ffast-math])
 AX_CHECK_COMPILE_FLAG([-std=gnu99])
 AX_CHECK_COMPILE_FLAG([-fopenmp-simd])
+AX_CHECK_COMPILE_FLAG([-qopenmp-simd])
 # the following prevents gcc from inserting memset in tight loops for zeroing stuff. Must appear after -O3
 AX_CHECK_COMPILE_FLAG([-fno-tree-loop-distribute-patterns])
 # avoid insering VZEROUPPER instructions everywhere.

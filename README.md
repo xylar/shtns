@@ -78,6 +78,9 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v3.4.1  (22 Jun 2020)
+	- fix several bugs (segfaults and compilation issues), thanks to 3 reporters.
+
 * v3.4  (10 Jun 2020)
 	- Change in API/ABI (`shtns.h`, `shtns.f03`): removal of `lmidx` array and new `nlat_padded` member
 	  in `shtns_cfg` structure; function names and signatures remain unchanged.
