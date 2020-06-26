@@ -560,8 +560,6 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 	if ((alm==0) || (blm==0)) shtns_runerr("not enough memory.");
 	shtns->alm = alm;		shtns->blm = blm;
 
-	shtns->mpos_scale_analys = 0.5/mpos_renorm; 	// (shtns->norm & SHT_REAL_NORM) ? 1.0 : 0.5;		// handles real-norm
-
 /// - Compute and store the prefactor (independant of x) of the starting value for the recurrence :
 /// \f[  Y_m^m(x) = Y_0^0 \ \sqrt{ \prod_{k=1}^{m} \frac{2k+1}{2k} } \ \ (-1)^m \ (1-x^2)^{m/2}  \f]
 	if (norm != sht_orthonormal) {

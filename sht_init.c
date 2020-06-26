@@ -774,11 +774,12 @@ static void choose_best_sht(shtns_cfg shtns, int* nlp, int vector)
 	}
 
 	for (i=0;i<NLM;i++) {
-		int l = shtns->li[i];
-		Slm[i] = shtns->l_2[l] + 0.5*I*shtns->l_2[l];
+		const int l = shtns->li[i];
+		const double l_2_ = shtns->l_2[l];
+		Slm[i] = l_2_ + 0.5*l_2_*I;
 		if (vector) {
-			Tlm[i] = 0.5*shtns->l_2[l] + I*shtns->l_2[l];
-			Qlm[i] = 3*shtns->l_2[l] + 2*I*shtns->l_2[l];
+			Tlm[i] = 0.5*l_2_ + l_2_*I;
+			Qlm[i] = 3.*l_2_ + 2.*l_2_*I;
 		}
 	}
 
@@ -1042,12 +1043,6 @@ int config_load(shtns_cfg shtns, int req_flags)
 shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 {
 	shtns_cfg shtns, s2;
-	int im, m, l, lm;
-	int with_cs_phase = 1;		/// Condon-Shortley phase (-1)^m is used by default.
-	double mpos_renorm = 1.0;	/// renormalization of m>0.
-	int larrays_ok = 0;
-	int legendre_ok = 0;
-	int l_2_ok = 0;
 
 //	if (lmax < 1) shtns_runerr("lmax must be larger than 1");
 	if (lmax < 2) shtns_runerr("lmax must be at least 2");
@@ -1076,13 +1071,11 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		#endif
 	}
 
-	// copy sizes.
 	shtns->norm = norm;
-	if (norm & SHT_NO_CS_PHASE)
-		with_cs_phase = 0;
-	if (norm & SHT_REAL_NORM)
-		mpos_renorm = 0.5;		// normalization for 'real' spherical harmonics.
+	const int with_cs_phase = (norm & SHT_NO_CS_PHASE) ? 0 : 1;		/// Condon-Shortley phase (-1)^m is used by default.
+	const double mpos_renorm = (norm & SHT_REAL_NORM) ? 0.5 : 1.0;	/// renormalization of m>0.
 
+	// copy sizes.
 	shtns->mmax = mmax;		shtns->mres = mres;		shtns->lmax = lmax;
 	shtns->nlm = nlm_calc(lmax, mmax, mres);
 	shtns->nlm_cplx = 2*shtns->nlm - (lmax+1);	// = nlm_cplx_calc(lmax, mmax, mres);
@@ -1095,6 +1088,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 	}
 	#endif
 
+	int larrays_ok=0, legendre_ok=0, l_2_ok=0;
 	s2 = sht_data;		// check if some data can be shared ...
 	while(s2 != NULL) {
 		if ((s2->mmax >= mmax) && (s2->mres == mres)) {
@@ -1121,9 +1115,10 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		// alloc spectral arrays
 		shtns->li = (unsigned short *) malloc( 2*NLM*sizeof(unsigned short) );	// NLM defined at runtime.
 		shtns->mi = shtns->li + NLM;
-		for (im=0, lm=0; im<=MMAX; im++) {	// init l-related arrays.
-			m = im*MRES;
-			for (l=im*MRES;l<=LMAX;l++) {
+		long lm=0;
+		for (int im=0; im<=MMAX; im++) {	// init l-related arrays.
+			int m = im*MRES;
+			for (int l=im*MRES;l<=LMAX;l++) {
 				shtns->li[lm] = l;		shtns->mi[lm] = m;
 				lm++;
 			}
@@ -1137,7 +1132,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 		shtns->l_2 = (double *) malloc( (LMAX+1)*sizeof(double) );
 		shtns->l_2[0] = 0.0;	// undefined for l=0 => replace with 0.
 		real one = 1.0;
-		for (l=1; l<=LMAX; l++)		shtns->l_2[l] = one/(l*(l+1));
+		for (int l=1; l<=LMAX; l++)		shtns->l_2[l] = one/(l*(l+1));
 	}
 
 	switch(SHT_NORM) {
@@ -1153,6 +1148,7 @@ shtns_cfg shtns_create(int lmax, int mmax, int mres, enum shtns_norm norm)
 			shtns->Y00_1 = sqrt(4.*M_PI);		shtns->Y10_ct = sqrt(4.*M_PI/3.);
 //			Y11_st = sqrt(2.*M_PI/3.);		// orthonormal :  \f$ \sin\theta\cos\phi/(Y_1^1 + Y_1^{-1}) = -\sqrt{2 \pi /3} \f$
 	}
+	shtns->mpos_scale_analys = 0.5/mpos_renorm;
 	shtns->Y11_st = shtns->Y10_ct * sqrt(0.5/mpos_renorm);
 	if (with_cs_phase)	shtns->Y11_st *= -1.0;		// correct Condon-Shortley phase
 
