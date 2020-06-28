@@ -61,15 +61,6 @@ int cushtns_use_gpu(int);
 
 /* BEGIN COMPILE-TIME SETTINGS */
 
-/// defines the maximum amount of memory in megabytes that SHTns should use.
-#define SHTNS_MAX_MEMORY 2048
-
-/// Minimum performance improve for DCT in \ref sht_auto mode. If not atained, we may switch back to gauss.
-#define MIN_PERF_IMPROVE_DCT 1.05
-
-/// Try to enforce at least this accuracy for DCT in sht_auto mode.
-#define MIN_ACCURACY_DCT 1.e-8
-
 /// The default \ref opt_polar threshold (0 disabled, 1.e-6 is aggressive, 1.e-10 is safe, 1.e-14 is VERY safe)
 #define SHT_DEFAULT_POLAR_OPT 1.e-10
 
@@ -81,9 +72,6 @@ int cushtns_use_gpu(int);
 /// 1 : no non-linear terms. 2 : quadratic non-linear terms (default), 3 : triadic, ...
 /// must be larger or equal to 1.
 #define SHT_DEFAULT_NL_ORDER 1
-
-/// minimum NLAT to consider the use of DCT acceleration.
-#define SHT_MIN_NLAT_DCT 64
 
 /// time-limit for timing individual transforms (in seconds)
 #define SHT_TIME_LIMIT 0.2

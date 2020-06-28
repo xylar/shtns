@@ -78,6 +78,9 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v3.4.2  (28 Jun 2020)
+	- fix critical bug leading to wrong analysis in some multiple-plan cases.
+
 * v3.4.1  (22 Jun 2020)
 	- fix several bugs (segfaults and compilation issues), thanks to 3 reporters.
 

@@ -801,7 +801,7 @@ static void choose_best_sht(shtns_cfg shtns, int* nlp, int vector)
 			tcpu = clock();
 			t0 = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][ref_alg][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			tcpu = clock() - tcpu;		tt = 1.e-6 * tcpu;
-			if (tt >= SHT_TIME_LIMIT) break;			// we should not exceed 1 second
+			if (tt >= SHT_TIME_LIMIT) break;			// we should not exceed some time-limit
 			t = get_time(shtns, nloop, 2, "", sht_func[SHT_STD][ref_alg][SHT_TYP_SSY], Slm, Tlm, Qlm, Sh, Th, Qh, LMAX);
 			r = fabs(2.0*(t-t0)/(t+t0));
 			#if SHT_VERBOSE > 1
@@ -1289,7 +1289,7 @@ static int choose_nlat(int n)
 */
 int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int nl_order, int *nlat, int *nphi)
 {
-	double t, mem;
+	double t;
 	int im,m;
 	int layout;
 	int nloop = 0;
@@ -1368,15 +1368,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		}
 	}
 
-	mem = sht_mem_size(shtns->lmax, shtns->mmax, shtns->mres, *nlat);
-	t=mem;	if (analys) t*=2;		if (vector) t*=3;
-	#if SHT_VERBOSE > 1
-		if (verbose>1) printf("Memory required for precomputed matrices (estimate) : %.3f Mb\n",t);
-	#endif
-	if ( t > SHTNS_MAX_MEMORY ) {		// huge transform has been requested
-//		if (t > 10*SHTNS_MAX_MEMORY) quick_init =1;			// do not time such large transforms.
-	}
-
 	if (quick_init == 0) {		// do not waste too much time finding optimal fftw.
 		//shtns->fftw_plan_mode = FFTW_EXHAUSTIVE;		// defines the default FFTW planner mode.
 		shtns->fftw_plan_mode = FFTW_PATIENT;		// defines the default FFTW planner mode.
@@ -1385,14 +1376,6 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		if (*nphi > 1024) shtns->fftw_plan_mode = FFTW_MEASURE;
 	} else {
 		shtns->fftw_plan_mode = FFTW_ESTIMATE;
-		if ((mem < 1.0) && (SHT_VERBOSE < 2)) shtns->nthreads = 1;		// disable threads for small transforms (in quickinit mode).
-	}
-
-	if (flags == sht_auto) {
-		if ( ((nl_order>=2)&&(MMAX*MRES > LMAX/2)) || (*nlat < SHT_MIN_NLAT_DCT) || (*nlat & 1) || (*nlat <= LMAX+1) ) {
-			flags = sht_gauss;		// avoid computing DCT stuff when it is not expected to be faster.
-			if (n_gauss > 0) *nlat = n_gauss;
-		}
 	}
 
 	if ((flags == sht_gauss)&&(*nlat <= shtns->lmax)) shtns_runerr("Nlat must be larger than Lmax");
@@ -1443,21 +1426,22 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
   #endif
 
 	if ((layout & SHT_LOAD_SAVE_CFG) && (!cfg_loaded)) cfg_loaded = (config_load(shtns, req_flags) > 0);
-	if (quick_init == 0) {
-		if (!cfg_loaded) {
-			choose_best_sht(shtns, &nloop, vector);
-			if (layout & SHT_LOAD_SAVE_CFG) config_save(shtns, req_flags);
-		}
+	if ((quick_init == 0) && (!cfg_loaded)) {
+		choose_best_sht(shtns, &nloop, vector);
+		if (layout & SHT_LOAD_SAVE_CFG) config_save(shtns, req_flags);
+	}
+	double t_estimate = 5e-10*LMAX*NLAT*MMAX/VSIZE2;		// very rough cost estimate (in seconds for 1 core @ 1Ghz).
+	if ((t_estimate < 0.3*shtns->nthreads) || ((quick_init == 0) && (!cfg_loaded))) {	// don't perform accuracy checks for too large transforms (takes too much time).
 		t = SHT_error(shtns, vector);		// compute SHT accuracy.
-  #if SHT_VERBOSE > 0
-		if (verbose) printf("        + SHT accuracy = %.3g\n",t);
-  #endif
-  #if SHT_VERBOSE < 2
-		if ((t > 1.e-3) || isNotFinite(t)) {
-			shtns_print_cfg(shtns);
+		#if SHT_VERBOSE > 0
+			if (verbose) printf("        + SHT accuracy = %.3g\n",t);
+		#endif
+		if ((t > 1.e-6) || isNotFinite(t)) {
+			printf("\033[93m Accuracy test failed. Please file a bug report at https://bitbucket.org/nschaeff/shtns/issues \033[0m\n");
+			#if SHT_VERBOSE < 2
 			shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
+			#endif
 		}
-  #endif
 	}
 
 //	set_sht_fly(shtns, SHT_TYP_VAN);

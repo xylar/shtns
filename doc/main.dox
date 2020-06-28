@@ -174,9 +174,9 @@ In this layout, increasing latitude are stored next to each other for each longi
 That is \f$ A(\theta,\phi) \f$ = \c A[ip*NLAT + it] in C or \c A(it,ip) in Fortran.
 Use \ref SHT_THETA_CONTIGUOUS to instruct \ref shtns_init to use this spatial data layout.
 
-Additionally, \ref SHT_ALLOW_PADDING instructs to shtns to optimize the layout to avoid cache bank conflicts.
+Additionally, \ref SHT_ALLOW_PADDING instructs shtns to optimize the layout to avoid cache bank conflicts.
 This can lead to significant performance boost (from 1% to 50% depending on the architecture).
-In that case, shtns_info#nlat_padded > shtns_inf#nlat and shtns_info#nspat > shtns_info#nlat * shtns_info*nphi to reflect the data layout.
+In that case, shtns_info#nlat_padded > shtns_info#nlat and shtns_info#nspat > shtns_info#nlat * shtns_info#nphi to reflect the data layout.
 
 \section native Native layout
 
