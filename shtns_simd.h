@@ -86,7 +86,7 @@
 	#define vhi(a) vec_extract(a, 1)
 	#define vcplx_real(a) vec_extract(a, 0)
 	#define vcplx_imag(a) vec_extract(a, 1)
-	inline static s2d vec_mix_lohi(s2d a, s2d b) {	// same as _mm_shuffle_pd(a,b,2)
+	inline static s2d vblend_even_odd(s2d a, s2d b) {	// same as _mm_shuffle_pd(a,b,2)
 		const vector unsigned char perm = {0,1,2,3,4,5,6,7, 24,25,26,27,28,29,30,31};
 		return vec_perm(a,b,perm);
 	}
@@ -97,11 +97,11 @@
 
 	void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd nr, rnd sr, rnd ni, rnd si) {
 		rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);
-		((s2d*)mem)[idx]   = vec_mix_lohi(bb, aa);
-		((s2d*)mem_m)[idx] = vec_mix_lohi(aa, bb);
+		((s2d*)mem)[idx]   = vblend_even_odd(bb, aa);
+		((s2d*)mem_m)[idx] = vblend_even_odd(aa, bb);
 		aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);
-		((s2d*)mem)[(nlat>>1) -1 -idx]   = vec_mix_lohi(bb, aa);
-		((s2d*)mem_m)[(nlat>>1) -1 -idx] = vec_mix_lohi(aa, bb);
+		((s2d*)mem)[(nlat>>1) -1 -idx]   = vblend_even_odd(bb, aa);
+		((s2d*)mem_m)[(nlat>>1) -1 -idx] = vblend_even_odd(aa, bb);
 	}
 
 		#define S2D_STORE(mem, idx, n, s)		((s2d*)(mem))[idx] = n;		((s2d*)(mem))[NLAT_2-1 - (idx)] = vxchg(s);
@@ -176,6 +176,7 @@
 		#define vdup_even(v) ((rnd)_mm512_movedup_pd(v))
 		#define vdup_odd(v)	 ((rnd)_mm512_permute_pd(v,0xFF))
 		#define vxchg_even_odd(v) ((rnd)_mm512_permute_pd(v,0x55))
+		#define vblend_even_odd(a,b) ((rnd)_mm512_mask_blend_pd((__mmask8) 0xAA, a,b))
 		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
 			return _mm512_fmaddsub_pd(vall(0.0), vall(0.0), v);
 		}
@@ -191,16 +192,16 @@
 		}	*/
 		inline static v2d v2d_reduce(rnd a, rnd b) {	// KNL Latency=37
 			rnd x = (rnd)_mm512_shuffle_pd(a,b,0x55);	// a1,b0,a3,b2,...	// L=7
-			a = (rnd)_mm512_mask_blend_pd((__mmask8) 0xAA, a, b );		// a0,b1,a2,b3,...  // (L=2, hidden)
+			a = vblend_even_odd(a,b);		// a0,b1,a2,b3,...  // (L=2, hidden)
 			x+=a;		// L=13
 			v4d y = (v4d)_mm512_castpd512_pd256(x) + (v4d)_mm512_extractf64x4_pd(x,1);	// Latency 12c
 			return (v2d)_mm256_castpd256_pd128(y) + (v2d)_mm256_extractf128_pd(y,1);	// Latency 12c
 		}
 		inline static v4d v4d_reduce(rnd a, rnd b, rnd c, rnd d) {		// KNL Latency=40c
 			rnd x = (rnd)_mm512_shuffle_pd(a,b,0x55);	// a1,b0,a3,b2,...	// L=7
-			a = (rnd)_mm512_mask_blend_pd((__mmask8) 0xAA, a, b );		// a0,b1,a2,b3,...  // (L=2, hidden)
+			a = vblend_even_odd(a,b);		// a0,b1,a2,b3,...  // (L=2, hidden)
 			rnd y = (rnd)_mm512_shuffle_pd(c,d,0x55);
-			c = (rnd)_mm512_mask_blend_pd((__mmask8) 0xAA, c, d );
+			c = vblend_even_odd(c,d);
 			x += a;		y += c;
 			v4d a4 = (v4d)_mm512_castpd512_pd256(x) + (v4d)_mm512_extractf64x4_pd(x,1);
 			v4d c4 = (v4d)_mm512_castpd512_pd256(y) + (v4d)_mm512_extractf64x4_pd(y,1);
@@ -222,13 +223,13 @@
 			ni = vxchg_even_odd(ni);		sr = vxchg_even_odd(sr);
 			const long ridx = nlat - (idx+1)*8;
 			rnd aa = ni + nr;	rnd bb = nr - ni;		rnd cc = sr + si;	rnd dd = sr - si;
-			nr = _mm512_mask_blend_pd((__mmask8) 0xAA, bb, aa );		ni = _mm512_mask_blend_pd((__mmask8) 0xAA, aa, bb );
-			sr = _mm512_mask_blend_pd((__mmask8) 0xAA, dd, cc );		si = _mm512_mask_blend_pd((__mmask8) 0xAA, cc, dd );
-			_mm512_storeu_pd(mem + idx*8, nr);
-			_mm512_storeu_pd(mem_m + idx*8, ni);
-			sr = _mm512_shuffle_f64x2(sr,sr, 0x1B);			si = _mm512_shuffle_f64x2(si,si, 0x1B);
-			_mm512_storeu_pd(mem + ridx, sr);
-			_mm512_storeu_pd(mem_m + ridx, si);
+			nr = vblend_even_odd(bb, aa);		ni = vblend_even_odd(aa, bb);
+			sr = vblend_even_odd(dd, cc);		si = vblend_even_odd(cc, dd);
+			vstor(mem, idx, nr);
+			vstor(mem_m, idx, ni);
+			sr = vreverse_pairs(sr);			si = vreverse_pairs(si);
+			vstor(mem + ridx, 0, sr);
+			vstor(mem_m + ridx, 0, si);
 		}
 
 // This may replace the first half of the following macro:
@@ -301,6 +302,7 @@
 		#define vdup_odd(v)  ((rnd)_mm256_unpackhi_pd(v,v))
 		// intra-lane exchange, same as _mm256_permute_pd(xm, 0x5), but faster with gcc<10
 		#define vxchg_even_odd(v) ((rnd)_mm256_shuffle_pd(v,v,0x5))
+		#define vblend_even_odd(a,b) ((rnd)_mm256_blend_pd (a,b,0xA))
 		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
 			return _mm256_addsub_pd(vall(0.0), v);
 		}
@@ -337,13 +339,13 @@
 			rnd aa = ni + nr;		rnd bb = nr - ni;
 			const long ridx = nlat - (idx+1)*4;
 			rnd cc = sr + si;		rnd dd = sr - si;
-			nr = _mm256_blend_pd (bb, aa, 10 );		ni = _mm256_blend_pd (aa, bb, 10 );
-			_mm256_storeu_pd(mem + idx*4, nr);
-			sr = _mm256_blend_pd (dd, cc, 10 );		si = _mm256_blend_pd (cc, dd, 10 );
-			_mm256_storeu_pd(mem_m + idx*4, ni);
-			sr = _mm256_permute2f128_pd(sr,sr,1);	si = _mm256_permute2f128_pd(si,si,1);
-			_mm256_storeu_pd(mem + ridx,  sr );
-			_mm256_storeu_pd(mem_m + ridx,  si );
+			nr = vblend_even_odd( bb, aa );		ni = vblend_even_odd( aa, bb );
+			vstor(mem, idx, nr);
+			sr = vblend_even_odd( dd, cc );		si = vblend_even_odd( cc, dd );
+			vstor(mem_m, idx, ni);
+			sr = vreverse_pairs(sr);			si = vreverse_pairs(si);
+			vstor(mem + ridx, 0, sr);
+			vstor(mem_m + ridx, 0, si);
 		}
 
 		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
@@ -416,6 +418,12 @@
 		#define vdup_even(v) ((rnd)_mm_unpacklo_pd(v,v))
 		#define vdup_odd(v)  ((rnd)_mm_unpackhi_pd(v,v))
 		#define vxchg_even_odd(v) vxchg(v)
+		#ifdef __SSE4_1__
+			#include <smmintrin.h>
+			#define vblend_even_odd(a,b) ((rnd)_mm_blend_pd(a,b,2))
+		#else
+			#define vblend_even_odd(a,b) ((rnd)_mm_shuffle_pd(a,b,2))
+		#endif
 		#define vneg_even_xor_cte (*(v2d*)_neg0)
 		#define vxor(v,x) vxor2(v,x)
 		#define reduce_add(a) ( _mm_cvtsd_f64(a) + _mm_cvtsd_f64(_mm_unpackhi_pd(a,a)) )
@@ -423,11 +431,11 @@
 
 		void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd nr, rnd sr, rnd ni, rnd si) {
 			rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);
-			((s2d*)mem)[idx]   = _mm_shuffle_pd(bb, aa, 2 );
-			((s2d*)mem_m)[idx] = _mm_shuffle_pd(aa, bb, 2 );
+			((s2d*)mem)[idx]   = vblend_even_odd( bb, aa );
+			((s2d*)mem_m)[idx] = vblend_even_odd( aa, bb );
 			aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);
-			((s2d*)mem)[(nlat>>1) -1 -idx]   = _mm_shuffle_pd(bb, aa, 2 );
-			((s2d*)mem_m)[(nlat>>1) -1 -idx] = _mm_shuffle_pd(aa, bb, 2 );
+			((s2d*)mem)[(nlat>>1) -1 -idx]   = vblend_even_odd( bb, aa );
+			((s2d*)mem_m)[(nlat>>1) -1 -idx] = vblend_even_odd( aa, bb );
 		}
 
 		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
