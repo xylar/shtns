@@ -730,3 +730,12 @@ static void zero_mem(v2d* F0, long n) {
 		((double*)F0)[i] = 0.0;
 	}
 }
+
+inline static
+void S2D_CSTORE2(double* mem, long idx, long nlat, rnd nr, rnd sr, rnd ni, rnd si) {
+	vinterleave(nr,ni);
+	vstor(mem, idx*2, nr);		vstor(mem, idx*2+1, ni);
+	vinterleave_reverse(sr,si);
+	vstor(mem + nlat*2, -(2*idx+1), si);
+	vstor(mem + nlat*2, -(2*idx+2), sr);
+}

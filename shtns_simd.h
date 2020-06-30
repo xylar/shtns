@@ -72,6 +72,8 @@
 		v2d c = vec_mergel(a, b);		b = vec_mergeh(a, b);
 		return b + c;
 	}
+	#define vinterleave(a,b) { rnd x = vec_mergeh(a,b);		b = vec_mergel(a,b);	a = x; }
+	#define vinterleave_reverse(a,b)	{ rnd x = vec_mergeh(a,b);		a = vec_mergel(a,b);	b = x; }
 /*	inline static v2d addi(v2d a, v2d b) {
 		const s2d mp = {-1.0, 1.0};
 		return a + vxchg(b)*mp;
@@ -86,6 +88,7 @@
 	#define vhi(a) vec_extract(a, 1)
 	#define vcplx_real(a) vec_extract(a, 0)
 	#define vcplx_imag(a) vec_extract(a, 1)
+	#define vreverse_pairs(v) (v)
 	inline static s2d vblend_even_odd(s2d a, s2d b) {	// same as _mm_shuffle_pd(a,b,2)
 		const vector unsigned char perm = {0,1,2,3,4,5,6,7, 24,25,26,27,28,29,30,31};
 		return vec_perm(a,b,perm);
@@ -95,31 +98,6 @@
 		return vk*vxchg(z);
 	}
 
-	void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd nr, rnd sr, rnd ni, rnd si) {
-		rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);
-		((s2d*)mem)[idx]   = vblend_even_odd(bb, aa);
-		((s2d*)mem_m)[idx] = vblend_even_odd(aa, bb);
-		aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);
-		((s2d*)mem)[(nlat>>1) -1 -idx]   = vblend_even_odd(bb, aa);
-		((s2d*)mem_m)[(nlat>>1) -1 -idx] = vblend_even_odd(aa, bb);
-	}
-
-		#define S2D_STORE(mem, idx, n, s)		((s2d*)(mem))[idx] = n;		((s2d*)(mem))[NLAT_2-1 - (idx)] = vxchg(s);
-		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
-			((s2d*)mem)[(idx)*2]   = vec_mergeh(nr, ni);	\
-			((s2d*)mem)[(idx)*2+1] = vec_mergel(nr, ni);	\
-			((s2d*)mem)[NLAT-1-(idx)*2] = vec_mergeh(sr, si);	\
-			((s2d*)mem)[NLAT-2-(idx)*2] = vec_mergel(sr, si);	}
-		inline static void S2D_STORE_4MAGIC(double* mem, long idx, s2d n, s2d s) {
-			((s2d*)mem)[(idx)*2] = vec_mergeh(n, s);
-			((s2d*)mem)[(idx)*2+1] = vec_mergel(n, s);
-		}
-		inline static void S2D_CSTORE_4MAGIC(double* mem, double* mem_m, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
-			((s2d*)mem)[idx*2]     = vec_mergeh(nr-si,  sr+ni);
-			((s2d*)mem_m)[idx*2]   = vec_mergeh(nr+si,  sr-ni);
-			((s2d*)mem)[idx*2+1]   = vec_mergel(nr-si,  sr+ni);
-			((s2d*)mem_m)[idx*2+1] = vec_mergel(nr+si,  sr-ni);
-		}
 		inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
 			((s2d*)mem)[idx*4]   = vec_mergeh(nr, ni);
 			((s2d*)mem)[idx*4+1] = vec_mergeh(sr, si);
@@ -180,7 +158,7 @@
 		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
 			return _mm512_fmaddsub_pd(vall(0.0), vall(0.0), v);
 		}
-		#define vneg_even_xor_cte ((rnd)_mm512_castsi512_pd(_mm512_broadcast_i32x4(*(__m128i*)_neg0)))
+		#define vneg_even_xor_cte ((rnd)_mm512_castsi512_pd(_mm512_broadcast_i32x4(*(const __m128i*)_neg0)))
 		#define vxor(v,x) ((rnd)_mm512_castsi512_pd( _mm512_xor_epi64(_mm512_castpd_si512(v), _mm512_castpd_si512(x))))
 		inline static double reduce_add(rnd a) {
 			return _mm512_reduce_add_pd(a);
@@ -209,67 +187,42 @@
 			v4d x4 = _mm256_blend_pd(a4,c4,0xc);			// _mm256_setr_pd(a[0],a[1],c[2],c[3]);
 			return x4+y4;
 		}
+
+		// inplace operation: a=[a0,b0,a1,b1, a2,b2,a3,b3]  b=[a4,b4,a5,b5, a6,b6,a7,b7]
+		/*#define vinterleave(a,b) { \
+			a = (rnd)_mm512_permutex_pd(a, 0xD8);           b = (rnd)_mm512_permutex_pd(b, 0xD8);   \
+			rnd ev = (rnd)_mm512_unpacklo_pd(a, b);         rnd od = (rnd)_mm512_unpackhi_pd(a, b); \
+			a = _mm512_shuffle_f64x2(ev,od, 0x44);          b = _mm512_shuffle_f64x2(ev,od, 0xEE); } */
+		#define vinterleave(a,b) { /*
+		*/	a = (rnd)_mm512_permutex_pd(a, 0xD8);	 /* a0,a2,a1,a3, a4,a6,a5,a7
+		*/	b = (rnd)_mm512_permutex_pd(b, 0x72);	 /* b2,b0,b3,b1, b6,b4,b7,b5
+		*/	rnd od = (rnd)_mm512_shuffle_pd(a, b, 0x55);				/* a2,b2,a3,b3, a6,b6,a7,b7
+		*/	rnd ev = (rnd)_mm512_mask_blend_pd((__mmask8) 0xAA, a,b);	/* a0,b0,a1,b1, a4,b4,a5,b5
+		*/	a = (rnd)_mm512_shuffle_f64x2(ev,od, 0x44);	  /* a0,b0,a1,b1, a2,b2,a3,b3
+		*/  b = (rnd)_mm512_shuffle_f64x2(ev,od, 0xEE); } /* a4,b4,a5,b5, a6,b6,a7,b7 */
+		/*#define vinterleave(a,b) { \
+			rnd x = _mm512_permutex2var_pd(a, _mm512_setr_epi64(0,8,1,9,2,10,3,11), b);	\
+			b = _mm512_permutex2var_pd(a, _mm512_setr_epi64(4,12,5,13,6,14,7,15), b);	a = x;	}	*/
+		/*#define vinterleave_reverse(a,b) { \
+			a = (rnd)_mm512_permutex_pd(a, 0x8D);		b = (rnd)_mm512_permutex_pd(b, 0x8D);	\
+			rnd ev = (rnd)_mm512_unpacklo_pd(a, b);		rnd od = (rnd)_mm512_unpackhi_pd(a, b);	\
+			b = _mm512_shuffle_f64x2(od,ev, 0x44);		a = _mm512_shuffle_f64x2(od,ev, 0xEE); }	*/
+		#define vinterleave_reverse(a,b) { /*
+		*/	a = (rnd)_mm512_permutex_pd(a, 0x8D);	 /* a1,a3,a0,a2, a5,a7,a4,a6
+		*/	b = (rnd)_mm512_permutex_pd(b, 0x27);	 /* b3,b1,b2,b0, b7,b5,b6,b4
+		*/	rnd od = (rnd)_mm512_shuffle_pd(a, b, 0x55);				/* a3,b3,a2,b2, a7,b7,a6,b6
+		*/	rnd ev = (rnd)_mm512_mask_blend_pd((__mmask8) 0xAA, a,b);	/* a1,b1,a0,b0, a5,b5,a4,b4
+		*/	b = (rnd)_mm512_shuffle_f64x2(od,ev, 0x44);	  /* a3,b3,a2,b2, a1,b1,a0,b0
+		*/  a = (rnd)_mm512_shuffle_f64x2(od,ev, 0xEE); } /* a7,b7,a6,b6, a5,b5,a4,b4 */
+
 		/* Some AVX512 vector tricks:
 		 * pair-wise exchange: _mm512_permute_pd(a, 0x55)	=> [1,0,3,2,5,4,7,6]
 		 * exchange middle elements of quartets: _mm512_permutex_pd(a, 0xD8)  => [0,2,1,3,4,6,5,7]
 		 * exchange middle elements of quartets + swap pairs: _mm512_permutex_pd(a, 0x8D)	=> [1,3,0,2,5,7,4,6]
 		 * reverse vector of pairs: _mm512_shuffle_f64x2(a,a, 0x1B)	=> [6,7,4,5,2,3,0,1]
 		 */
-		#define S2D_STORE(mem, idx, n, s) \
-			_mm512_storeu_pd(((double*)mem) + (idx)*8,   n); \
-			_mm512_storeu_pd(((double*)mem) + NLAT-8 -(idx)*8,  vreverse(s));
 
-		void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd nr, rnd sr, rnd ni, rnd si) {
-			ni = vxchg_even_odd(ni);		sr = vxchg_even_odd(sr);
-			const long ridx = nlat - (idx+1)*8;
-			rnd aa = ni + nr;	rnd bb = nr - ni;		rnd cc = sr + si;	rnd dd = sr - si;
-			nr = vblend_even_odd(bb, aa);		ni = vblend_even_odd(aa, bb);
-			sr = vblend_even_odd(dd, cc);		si = vblend_even_odd(cc, dd);
-			vstor(mem, idx, nr);
-			vstor(mem_m, idx, ni);
-			sr = vreverse_pairs(sr);			si = vreverse_pairs(si);
-			vstor(mem + ridx, 0, sr);
-			vstor(mem_m + ridx, 0, si);
-		}
-
-// This may replace the first half of the following macro:
-//    rnd c = _mm512_permutex2var_pd(a, _mm512_set_epi64(11,3,10,2,9,1,8,0), b);
-//    rnd d = _mm512_permutex2var_pd(a, _mm512_set_epi64(15,7,14,6,13,5,12,4), b);
-		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
-			rnd nrx = (rnd)_mm512_permutex_pd(nr, 0xD8);		rnd nix = (rnd)_mm512_permutex_pd(ni, 0xD8);	\
-			rnd srx = (rnd)_mm512_permutex_pd(sr, 0x8D);		rnd six = (rnd)_mm512_permutex_pd(si, 0x8D);	\
-			rnd aa = (rnd)_mm512_unpacklo_pd(nrx, nix);	rnd bb = (rnd)_mm512_unpackhi_pd(nrx, nix);	\
-			nrx = _mm512_shuffle_f64x2(aa,bb, 0x44);		nix = _mm512_shuffle_f64x2(aa,bb, 0xEE); \
-			rnd cc = (rnd)_mm512_unpacklo_pd(srx, six);	rnd dd = (rnd)_mm512_unpackhi_pd(srx, six);	\
-			srx = _mm512_shuffle_f64x2(dd,cc, 0xEE);		six = _mm512_shuffle_f64x2(dd,cc, 0x44); \
-			_mm512_storeu_pd(((double*)mem) + (idx)*16,	nrx);	\
-			_mm512_storeu_pd(((double*)mem) + (idx)*16+8, nix);	\
-			_mm512_storeu_pd(((double*)mem) + NLAT*2-16 - (idx)*16,	srx);	\
-			_mm512_storeu_pd(((double*)mem) + NLAT*2-8  - (idx)*16, six); }
-
-		inline static void S2D_STORE_4MAGIC(double* mem, long idx, rnd n, rnd s) {
-			n =  _mm512_permutex_pd(n,0xD8);	s = _mm512_permutex_pd(s,0xD8);		// [0,2,1,3, 4,6,5,7]
-			rnd a = _mm512_unpacklo_pd(n, s);	rnd b = _mm512_unpackhi_pd(n, s);	// [00,11, 44,55] and [22,33, 66,77]
-			_mm512_storeu_pd(mem + idx*16,    _mm512_shuffle_f64x2(a,b, 0x44) );	// [00,11, 22,33]
-			_mm512_storeu_pd(mem + idx*16 +8, _mm512_shuffle_f64x2(a,b, 0xEE) );	// [44,55, 66,77]
-		}
-
-		inline static void S2D_CSTORE_4MAGIC(double* mem, double* mem_m, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
-			rnd er = nr - si;			rnd ei = sr + ni;
-			rnd od = nr + si;			rnd oi = sr - ni;
-			er = _mm512_permutex_pd(er,0xD8);	ei = _mm512_permutex_pd(ei,0xD8);	// [0,2,1,3, 4,6,5,7]
-			od = _mm512_permutex_pd(od,0xD8);	oi = _mm512_permutex_pd(oi,0xD8);
-			nr = _mm512_unpacklo_pd(er,  ei);		// [00,11, 44,55]
-			ni = _mm512_unpackhi_pd(er,  ei);		// [22,33, 66,77]
-			sr = _mm512_unpacklo_pd(od,  oi);		// [00,11, 44,55]
-			si = _mm512_unpackhi_pd(od,  oi);		// [22,33, 66,77]
-			_mm512_storeu_pd(mem +   idx*16,    _mm512_shuffle_f64x2(nr,ni, 0x44) );		// [00,11,22,33]
-			_mm512_storeu_pd(mem +   idx*16 +8, _mm512_shuffle_f64x2(nr,ni, 0xEE) );		// [44,55,66,77]
-			_mm512_storeu_pd(mem_m + idx*16,    _mm512_shuffle_f64x2(sr,si, 0x44) );
-			_mm512_storeu_pd(mem_m + idx*16 +8, _mm512_shuffle_f64x2(sr,si, 0xEE) );
-		}
-
-		inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
+	/*	inline static void S2D_CSTORE2_4MAGIC_OLD(double* mem, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
 			rnd aa = (rnd)_mm512_unpacklo_pd(nr, sr);	rnd bb = (rnd)_mm512_unpackhi_pd(nr, sr);	// [n0,s0,n2,s2,n4,s4,n6,s6] and [n1,s1,n3,s3,n5,s5,n7,s7]
 			rnd cc = (rnd)_mm512_unpacklo_pd(ni, si);	rnd dd = (rnd)_mm512_unpackhi_pd(ni, si);	// same with imaginary part
 			aa = _mm512_permutex_pd(aa, 0xD8);		bb = _mm512_permutex_pd(bb, 0xD8);	// [n0,n2,s0,s2,n4,n6,s4,s6] and [n1,n3,s1,s3,n5,n7,s5,s7]
@@ -282,8 +235,25 @@
 			_mm512_storeu_pd(mem + idx*32 +8,  _mm512_shuffle_f64x2(sr,si, 0x44) ); //[n2,s2,n3,s3]
 			_mm512_storeu_pd(mem + idx*32 +16, _mm512_shuffle_f64x2(nr,ni, 0xEE) ); //[n4,s4,n5,s5]
 			_mm512_storeu_pd(mem + idx*32 +24, _mm512_shuffle_f64x2(sr,si, 0xEE) ); //[n6,s6,n7,s7]
+		}	*/
+		// FASTER ALTERNATIVE (easier on shuffle port)
+		inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
+			nr = (rnd)_mm512_permutex_pd(nr, 0x72);		sr = (rnd)_mm512_permutex_pd(sr, 0x27);		//	nr:[2,0,3,1, 6,4,7,5], sr:[3,1,2,0, 7,5,6,4]
+			ni = (rnd)_mm512_permutex_pd(ni, 0xD8);		si = (rnd)_mm512_permutex_pd(si, 0x8D);		//  ni:[0,2,1,3, 4,6,5,7], si:[1,3,0,2, 5,7,4,6]
+			rnd ar = (rnd)_mm512_mask_blend_pd((__mmask8) 0xCC, nr,sr);		// [n2,n0,s2,s0,  n6,n4,s6,s4]
+			rnd br = (rnd)_mm512_mask_blend_pd((__mmask8) 0xCC, sr,nr);		// [s3,s1,n3,n1,  s7,s5,n7,n5]
+			rnd ai = (rnd)_mm512_mask_blend_pd((__mmask8) 0xCC, ni,si);		// [n0,n2,s0,s2,  n4,n6,s4,s6]
+			rnd bi = (rnd)_mm512_mask_blend_pd((__mmask8) 0xCC, si,ni);		// [s1,s3,n1,n3,  s5,s7,n5,n7]
+			nr = (rnd)_mm512_shuffle_f64x2(ar,br, 0x14);		// n2,n0,s2,s0, n3,n1,s3,s1
+			ni = (rnd)_mm512_shuffle_f64x2(ai,bi, 0x14);		// n0,n2,s0,s2, n1,n3,s1,s3
+			sr = (rnd)_mm512_shuffle_f64x2(ar,br, 0xBE);		// n6,n4,s6,s4, n7,n5,s7,s5
+			si = (rnd)_mm512_shuffle_f64x2(ai,bi, 0xBE);		// n4,n6,s4,s6, n5,n7,s5,s7
+			vstor(mem, idx*4,   _mm512_shuffle_pd(nr,ni, 0x55) ); //[n0,s0,n1,s1]
+			vstor(mem, idx*4+1, vblend_even_odd(nr,ni) );		  //[n2,s2,n3,s3]
+			vstor(mem, idx*4+2, _mm512_shuffle_pd(sr,si, 0x55) ); //[n4,s4,n5,s5]
+			vstor(mem, idx*4+3, vblend_even_odd(sr,si) );		  //[n6,s6,n7,s7]
 		}
-			
+
 	#elif defined __AVX__
 		#define MIN_ALIGNMENT 32
 		#define VSIZE2 4
@@ -303,10 +273,11 @@
 		// intra-lane exchange, same as _mm256_permute_pd(xm, 0x5), but faster with gcc<10
 		#define vxchg_even_odd(v) ((rnd)_mm256_shuffle_pd(v,v,0x5))
 		#define vblend_even_odd(a,b) ((rnd)_mm256_blend_pd (a,b,0xA))
+		//#define vblend_even_odd(a,b) ((rnd)_mm256_shuffle_pd (a,b,0xA))
 		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
 			return _mm256_addsub_pd(vall(0.0), v);
 		}
-		#define vneg_even_xor_cte ((rnd)_mm256_broadcast_pd((v2d*)_neg0))
+		#define vneg_even_xor_cte ((rnd)_mm256_broadcast_pd((const v2d*)_neg0))
 		//#define vneg_even_xor_cte ((rnd)_mm256_castsi256_pd( _mm256_setr_epi32(0,0x80000000, 0,0, 0,0x80000000, 0,0)))	// BUGGY ON GCC! DON'T USE!
 		#define vxor(v,x) ((rnd)_mm256_xor_pd(v, x))
 		inline static double reduce_add(rnd a) {	// Latency=12c Skylake
@@ -329,59 +300,28 @@
 			v4d x = _mm256_blend_pd(a,c,0xc);			// _mm256_setr_pd(a[0],a[1],c[2],c[3]);
 			return x+y;
 		}
-		#define S2D_STORE(mem, idx, n, s) \
-			_mm256_storeu_pd(((double*)mem) + (idx)*4,   n); \
-			_mm256_storeu_pd(((double*)mem) + NLAT-4-(idx)*4,   vreverse(s));
 
-		void inline static
-		cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd nr, rnd sr, rnd ni, rnd si) {
-			ni = vxchg_even_odd(ni);		sr = vxchg_even_odd(sr);
-			rnd aa = ni + nr;		rnd bb = nr - ni;
-			const long ridx = nlat - (idx+1)*4;
-			rnd cc = sr + si;		rnd dd = sr - si;
-			nr = vblend_even_odd( bb, aa );		ni = vblend_even_odd( aa, bb );
-			vstor(mem, idx, nr);
-			sr = vblend_even_odd( dd, cc );		si = vblend_even_odd( cc, dd );
-			vstor(mem_m, idx, ni);
-			sr = vreverse_pairs(sr);			si = vreverse_pairs(si);
-			vstor(mem + ridx, 0, sr);
-			vstor(mem_m + ridx, 0, si);
-		}
+		// inplace operation: a=[a0,b0,a1,b1] b=[a2,b2,a3,b3]
+		#define vinterleave(a,b) { \
+			rnd ev = (rnd)_mm256_unpacklo_pd(a, b);		rnd od = (rnd)_mm256_unpackhi_pd(a, b);	\
+			a = _mm256_permute2f128_pd(ev, od, 0x20);	b = _mm256_permute2f128_pd(ev, od, 0x31); }
+		#define vinterleave_reverse(a,b) { \
+			rnd ev = (rnd)_mm256_unpacklo_pd(a, b);		rnd od = (rnd)_mm256_unpackhi_pd(a, b);	\
+			b = _mm256_permute2f128_pd(od, ev, 0x20);	a = _mm256_permute2f128_pd(od, ev, 0x31); }
 
-		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
-			rnd aa = (rnd)_mm256_unpacklo_pd(nr, ni);	rnd bb = (rnd)_mm256_unpackhi_pd(nr, ni);	\
-			rnd nrx = _mm256_permute2f128_pd(aa, bb, 0x20);		rnd nix = _mm256_permute2f128_pd(aa, bb, 0x31);  \
-			rnd cc = (rnd)_mm256_unpacklo_pd(sr, si);	rnd dd = (rnd)_mm256_unpackhi_pd(sr, si);	\
-			_mm256_storeu_pd(((double*)mem) + (idx)*8,    nrx); \
-			_mm256_storeu_pd(((double*)mem) + (idx)*8 +4, nix); \
-			rnd srx = _mm256_permute2f128_pd(dd, cc, 0x20);		rnd six = _mm256_permute2f128_pd(dd, cc, 0x31);  \
-			_mm256_storeu_pd(((double*)mem) + NLAT*2 -4 -(idx)*8, srx); \
-			_mm256_storeu_pd(((double*)mem) + NLAT*2 -8 -(idx)*8, six); }
-
-		inline static void S2D_STORE_4MAGIC(double* mem, long idx, rnd n, rnd s) {
-			rnd a = _mm256_unpacklo_pd(n, s);	rnd b = _mm256_unpackhi_pd(n, s);
-			_mm256_storeu_pd(((double*)mem) + (idx)*8,    _mm256_permute2f128_pd(a,b,0x20) );
-			_mm256_storeu_pd(((double*)mem) + (idx)*8 +4, _mm256_permute2f128_pd(a,b,0x31) );
-		}
-
-		inline static void S2D_CSTORE_4MAGIC(double* mem, double* mem_m, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
-			rnd a0 = _mm256_unpacklo_pd(nr-si,  sr+ni);
-			rnd b0 = _mm256_unpacklo_pd(nr+si,  sr-ni);
-			rnd a1 = _mm256_unpackhi_pd(nr-si,  sr+ni);
-			rnd b1 = _mm256_unpackhi_pd(nr+si,  sr-ni);
-			_mm256_storeu_pd(mem   + idx*8,    _mm256_permute2f128_pd(a0,a1,0x20) );
-			_mm256_storeu_pd(mem   + idx*8 +4, _mm256_permute2f128_pd(a0,a1,0x31) );
-			_mm256_storeu_pd(mem_m + idx*8,    _mm256_permute2f128_pd(b0,b1,0x20) );
-			_mm256_storeu_pd(mem_m + idx*8 +4, _mm256_permute2f128_pd(b0,b1,0x31) );
-		}
+		#define vinterleave_x4(nr, sr, ni, si) { \
+			rnd ar = (rnd)_mm256_permute2f128_pd(nr,sr,0x20);	rnd ai = (rnd)_mm256_permute2f128_pd(ni,si,0x20);	\
+			rnd br = (rnd)_mm256_permute2f128_pd(nr,sr,0x31);	rnd bi = (rnd)_mm256_permute2f128_pd(ni,si,0x31);	\
+			nr = _mm256_unpacklo_pd(ar, ai);	ni = _mm256_unpackhi_pd(ar, ai);  \
+			sr = _mm256_unpacklo_pd(br, bi);	si = _mm256_unpackhi_pd(br, bi); }
 
 		inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
-			rnd aa = (rnd)_mm256_unpacklo_pd(nr, ni);	rnd bb = (rnd)_mm256_unpackhi_pd(nr, ni);
-			rnd cc = (rnd)_mm256_unpacklo_pd(sr, si);	rnd dd = (rnd)_mm256_unpackhi_pd(sr, si);
-			_mm256_storeu_pd(mem + idx*16,     _mm256_permute2f128_pd(aa,cc,0x20) );
-			_mm256_storeu_pd(mem + idx*16 +4,  _mm256_permute2f128_pd(bb,dd,0x20) );
-			_mm256_storeu_pd(mem + idx*16 +8,  _mm256_permute2f128_pd(aa,cc,0x31) );
-			_mm256_storeu_pd(mem + idx*16 +12, _mm256_permute2f128_pd(bb,dd,0x31) );
+			rnd ar = (rnd)_mm256_permute2f128_pd(nr,sr,0x20);	rnd ai = (rnd)_mm256_permute2f128_pd(ni,si,0x20);	// n0,n1,s0,s1
+			rnd br = (rnd)_mm256_permute2f128_pd(nr,sr,0x31);	rnd bi = (rnd)_mm256_permute2f128_pd(ni,si,0x31);	// n2,n3,s2,s3
+			_mm256_storeu_pd(mem + idx*16,     _mm256_unpacklo_pd(ar, ai));		// nr0,ni0, sr0,si0
+			_mm256_storeu_pd(mem + idx*16 +4,  _mm256_unpackhi_pd(ar, ai));		// nr1,ni1, sr1,si1
+			_mm256_storeu_pd(mem + idx*16 +8,  _mm256_unpacklo_pd(br, bi));		// nr2,ni2, sr2,si2
+			_mm256_storeu_pd(mem + idx*16 +12, _mm256_unpackhi_pd(br, bi));		// nr3,ni3, sr3,si3
 		}
 	#else
 		#define MIN_ALIGNMENT 16
@@ -418,49 +358,12 @@
 		#define vdup_even(v) ((rnd)_mm_unpacklo_pd(v,v))
 		#define vdup_odd(v)  ((rnd)_mm_unpackhi_pd(v,v))
 		#define vxchg_even_odd(v) vxchg(v)
-		#ifdef __SSE4_1__
-			#include <smmintrin.h>
-			#define vblend_even_odd(a,b) ((rnd)_mm_blend_pd(a,b,2))
-		#else
-			#define vblend_even_odd(a,b) ((rnd)_mm_shuffle_pd(a,b,2))
-		#endif
-		#define vneg_even_xor_cte (*(v2d*)_neg0)
+		#define vblend_even_odd(a,b) ((rnd)_mm_shuffle_pd(a,b,2))
+		#define vneg_even_xor_cte (*(const v2d*)_neg0)
 		#define vxor(v,x) vxor2(v,x)
 		#define reduce_add(a) ( _mm_cvtsd_f64(a) + _mm_cvtsd_f64(_mm_unpackhi_pd(a,a)) )
-		#define S2D_STORE(mem, idx, n, s)		((s2d*)mem)[idx] = n;		((s2d*)mem)[NLAT_2-1 - (idx)] = vxchg(s);
-
-		void inline static cstore_north_south(double* mem, double* mem_m, long idx, long nlat, rnd nr, rnd sr, rnd ni, rnd si) {
-			rnd aa = vxchg(ni) + (nr);		rnd bb = (nr) - vxchg(ni);
-			((s2d*)mem)[idx]   = vblend_even_odd( bb, aa );
-			((s2d*)mem_m)[idx] = vblend_even_odd( aa, bb );
-			aa = vxchg(sr) + (si);		bb = vxchg(sr) - (si);
-			((s2d*)mem)[(nlat>>1) -1 -idx]   = vblend_even_odd( bb, aa );
-			((s2d*)mem_m)[(nlat>>1) -1 -idx] = vblend_even_odd( aa, bb );
-		}
-
-		#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	{	\
-			((s2d*)mem)[(idx)*2]   = _mm_unpacklo_pd(nr, ni);	\
-			((s2d*)mem)[(idx)*2+1] = _mm_unpackhi_pd(nr, ni);	\
-			((s2d*)mem)[NLAT-1-(idx)*2] = _mm_unpacklo_pd(sr, si);	\
-			((s2d*)mem)[NLAT-2-(idx)*2] = _mm_unpackhi_pd(sr, si);	}
-
-		inline static void S2D_STORE_4MAGIC(double* mem, long idx, rnd n, rnd s) {
-			((s2d*)mem)[idx*2]   = _mm_unpacklo_pd(n, s);	// [n0,s0]
-			((s2d*)mem)[idx*2+1] = _mm_unpackhi_pd(n, s);	// [n1,s1]
-		}
-
-		inline static void S2D_CSTORE_4MAGIC(double* mem, double* mem_m, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
-			rnd er = nr - si;		rnd od = sr+ni;
-			rnd ei = nr + si;		rnd oi = sr-ni;
-			nr = _mm_unpacklo_pd(er,  od);
-			sr = _mm_unpackhi_pd(er,  od);
-			ni = _mm_unpacklo_pd(ei,  oi);
-			si = _mm_unpackhi_pd(ei,  oi);
-			((s2d*)mem)[idx*2]     = nr;
-			((s2d*)mem)[idx*2+1]   = sr;
-			((s2d*)mem_m)[idx*2]   = ni;
-			((s2d*)mem_m)[idx*2+1] = si;
-		}
+		#define vinterleave(a,b) {  rnd x = _mm_unpacklo_pd(a,b);	b = _mm_unpackhi_pd(a, b);	a = x; }
+		#define vinterleave_reverse(a,b)	{  rnd x = _mm_unpacklo_pd(a,b);	a = _mm_unpackhi_pd(a, b);	b = x; }
 
 		inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
 			((s2d*)mem)[idx*4]   = _mm_unpacklo_pd(nr, ni);	// aa = north_ri[0]
@@ -551,32 +454,11 @@
 	inline static v2d IxKxZ(double k, v2d z) {		// I*k*z
 		return I*k*z;
 	}
-
-	#define S2D_STORE(mem, idx, n, s)		((double*)mem)[idx] = n;		((double*)mem)[NLAT-1 - (idx)] = s;
-	#define S2D_CSTORE2(mem, idx, nr, sr, ni, si)	mem[idx] = (nr) + I*(ni); 	mem[NLAT-1-(idx)] = (sr) + I*(si);
-
-	#define S2D_CSTOREX(mem, idx, v, nr, sr, ni, si) { \
-		double a0 = (nr[(v)])   + (ni[(v)+1]); \
-		double b0 = (nr[(v)])   - (ni[(v)+1]); \
-		double a1 = (nr[(v)+1]) + (ni[(v)]); \
-		double b1 = (nr[(v)+1]) - (ni[(v)]); \
-		((v2d*)mem)[(idx)] = b0 + I*a1; \
-		((v2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) + (idx)] = a0 + I*b1; \
-		a1 = (sr[(v)])   + (si[(v)+1]); \
-		b1 = (sr[(v)])   - (si[(v)+1]); \
-		a0 = (sr[(v)+1]) + (si[(v)]); \
-		b0 = (sr[(v)+1]) - (si[(v)]); \
-		((v2d*)mem)[NLAT_2-1 -(idx)] = b0 + I*a1; \
-		((v2d*)mem)[(NPHI-2*im)*(shtns->nlat_padded>>1) +NLAT_2-1 -(idx)] = a0 + I*b1; }
-
-	inline static void S2D_STORE_4MAGIC(double* mem, long idx, double n, double s) {
-		((v2d*)mem)[idx] = (n) + I*(s);
-	}
-
-	inline static void S2D_CSTORE_4MAGIC(double* mem, double* mem_m, long idx, double nr, double sr, double ni, double si) {
-		((v2d*)mem)[idx]   = (nr-si) + I*(sr+ni);
-		((v2d*)mem_m)[idx] = (nr+si) + I*(sr-ni);
-	}
+	#define vinterleave(a,b)
+	#define vinterleave_reverse(a,b)
+	#define vreverse(a) (a)
+	//#define vreverse_pairs(a) (a)
+	//#define vxchg_even_odd(a) (a)
 
 	inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, double nr, double sr, double ni, double si) {
 		((v2d*)mem)[2*idx]   = (nr) + I*(ni);
