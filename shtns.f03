@@ -269,8 +269,6 @@
       real(C_DOUBLE), intent(out) :: Gt(*)
       real(C_DOUBLE), intent(out) :: Gp(*)
     end subroutine SH_to_grad_spat
-
-
     
     subroutine spat_cplx_to_SHsphtor(shtns,Vt,Vp,Slm,Tlm) bind(C, name='spat_cplx_to_SHsphtor')
       import
@@ -300,6 +298,17 @@
       real(C_DOUBLE), intent(out) :: Vt(*)
       real(C_DOUBLE), intent(out) :: Vp(*)
     end subroutine SHqst_to_spat
+
+    subroutine spat_to_SHqst(shtns,Vr,Vt,Vp,Qlm,Slm,Tlm) bind(C, name='spat_to_SHqst')
+      import
+      type(C_PTR), value :: shtns
+      real(C_DOUBLE), intent(inout) :: Vr(*)
+      real(C_DOUBLE), intent(inout) :: Vt(*)
+      real(C_DOUBLE), intent(inout) :: Vp(*)
+      complex(C_DOUBLE_COMPLEX), intent(out) :: Qlm(*)
+      complex(C_DOUBLE_COMPLEX), intent(out) :: Slm(*)
+      complex(C_DOUBLE_COMPLEX), intent(out) :: Tlm(*)
+    end subroutine spat_to_SHqst
     
     subroutine spat_cplx_to_SHqst(shtns,Vr,Vt,Vp,Qlm,Slm,Tlm) bind(C, name='spat_cplx_to_SHqst')
       import
