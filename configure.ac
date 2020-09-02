@@ -23,7 +23,7 @@ AC_ARG_ENABLE([mkl],
 AC_ARG_ENABLE([knl],
 	AS_HELP_STRING([--enable-knl], [Enable compilation for Xeon Phi (KNL)]), [], [enable_knl=no])
 AC_ARG_ENABLE([cuda],
-	AS_HELP_STRING([--enable-cuda], [Enable compilation for Nvidia gpu using cuda]), [], [enable_cuda=no])
+	AS_HELP_STRING([--enable-cuda@<:@=kepler|pascal|volta|ampere@:>@], [Enable compilation for Nvidia gpu using cuda, optionally specifying architecture]), [], [enable_cuda=no])
 AC_ARG_ENABLE([magic-layout],
 	AS_HELP_STRING([--enable-magic-layout], [Compile specific version for the MagIC code]), [], [enable_magic_layout=no])
 AC_ARG_ENABLE([python],
@@ -70,6 +70,17 @@ AC_DEFUN([AX_CHECK_COMPILE_FLAG],[
      AC_MSG_RESULT([no])
      m4_default([$3], :)])
 ])dnl AX_CHECK_COMPILE_FLAGS
+
+# define macrao AX_CHECK_COMPILE_FLAG, and add it to CFLAGS
+AC_DEFUN([AX_CHECK_CUDA_ARCH],[
+  AC_MSG_CHECKING([whether nvcc supports gpu with compute capability $1])
+  AS_IF([nvcc sht_gpu.cu -c -arch=sm_$1 --dryrun > /dev/null 2>&1], [
+	AC_MSG_RESULT(yes)
+	nvcc_gencode_flags="$nvcc_gencode_flags -gencode=arch=compute_$1,code=sm_$1"
+  ],[
+	AC_MSG_RESULT(no)
+  ])
+])dnl AX_CHECK_CUDA_ARCH
 
 ############################################
 ### we can use two compilers. CC and CC2 ###
@@ -165,7 +176,7 @@ AS_IF([test "x$enable_openmp" = "xyes"], [
 ])
 
 # Check for CUDA
-AS_IF([test "x$enable_cuda" = "xyes"], [
+AS_IF([test "x$enable_cuda" != "xno"], [
 	CFLAGS="$CFLAGS -I$CUDA_PATH/include"
 	CFLAGS2="$CFLAGS2 -I$CUDA_PATH/include"
 	# assume 64 bit mode, add default directory to find CUDA
@@ -176,27 +187,21 @@ AS_IF([test "x$enable_cuda" = "xyes"], [
 	objs="$objs sht_gpu.o"
 	target="libshtns_cuda.a"
 
-	cuda_arch=''
-	AC_MSG_CHECKING([whether nvcc supports Kepler gpu])
-	AS_IF([nvcc sht_gpu.cu -c -arch=sm_30 --dryrun > /dev/null 2>&1], [
-	    cuda_arch=30
-	    AC_MSG_RESULT(yes)
-	],[ AC_MSG_RESULT(no) ])
-	AC_MSG_CHECKING([whether nvcc supports Pascal gpu])
-	AS_IF([nvcc sht_gpu.cu -c -arch=sm_60 --dryrun > /dev/null 2>&1], [
-	    cuda_arch=60
-	    AC_MSG_RESULT(yes)
-	],[ AC_MSG_RESULT(no) ])
-	AC_MSG_CHECKING([whether nvcc supports Volta gpu])
-	AS_IF([nvcc sht_gpu.cu -c -arch=sm_70 --dryrun > /dev/null 2>&1], [
-	    cuda_arch=70
-	    AC_MSG_RESULT(yes)
-	],[ AC_MSG_RESULT(no) ])
-
-	AS_IF([test "x$cuda_arch" == "x"], [
+	nvcc_gencode_flags=""
+	# find cuda arch:
+	AS_IF([test "x$enable_cuda" == "xyes"],[
+	    AX_CHECK_CUDA_ARCH([30])
+	    AX_CHECK_CUDA_ARCH([60])
+	    AX_CHECK_CUDA_ARCH([70])
+	    AX_CHECK_CUDA_ARCH([80])
+	],[
+	    AS_CASE([$enable_cuda], "kepler", [cuda_cc=30], "pascal", [cuda_cc=60], "volta", [cuda_cc=70], 'ampere', [cuda_cc=80], [cuda_cc=$enable_cuda])
+	    AX_CHECK_CUDA_ARCH([$cuda_cc])
+	])
+	AS_IF([test "x$nvcc_gencode_flags" == "x"],
 	    AC_MSG_ERROR([nvcc does not support any compatible gpu. Is nvcc available ?])
 	])
-	nvcc_flags="$nvcc_flags -gencode=arch=compute_$cuda_arch,code=sm_$cuda_arch"
+	nvcc_flags="$nvcc_flags $nvcc_gencode_flags"
 	LIBS="$LIBS -lstdc++"	# cuda uses the c++ standard library. This is needed to link with gcc
 ])
 libname=$target		# set the libname befor checking for python.

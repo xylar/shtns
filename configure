@@ -1328,7 +1328,9 @@ Optional Features:
   --enable-mkl            Try to link with intel MKL instead of FFTW (can be
                           slightly faster, but NOT THREAD SAFE)
   --enable-knl            Enable compilation for Xeon Phi (KNL)
-  --enable-cuda           Enable compilation for Nvidia gpu using cuda
+  --enable-cuda[=kepler|pascal|volta|ampere]
+                          Enable compilation for Nvidia gpu using cuda,
+                          optionally specifying architecture
   --enable-magic-layout   Compile specific version for the MagIC code
   --enable-python         Build Python interface
   --enable-long-double    Use long double during initialization for (maybe)
@@ -3374,6 +3376,8 @@ fi
 
 # define macrao AX_CHECK_COMPILE_FLAG, and add it to CFLAGS
 
+# define macrao AX_CHECK_COMPILE_FLAG, and add it to CFLAGS
+
 ############################################
 ### we can use two compilers. CC and CC2 ###
 ############################################
@@ -4518,7 +4522,7 @@ fi
 fi
 
 # Check for CUDA
-if test "x$enable_cuda" = "xyes"; then :
+if test "x$enable_cuda" != "xno"; then :
 
 	CFLAGS="$CFLAGS -I$CUDA_PATH/include"
 	CFLAGS2="$CFLAGS2 -I$CUDA_PATH/include"
@@ -4622,52 +4626,114 @@ fi
 	objs="$objs sht_gpu.o"
 	target="libshtns_cuda.a"
 
-	cuda_arch=''
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports Kepler gpu" >&5
-$as_echo_n "checking whether nvcc supports Kepler gpu... " >&6; }
-	if nvcc sht_gpu.cu -c -arch=sm_30 --dryrun > /dev/null 2>&1; then :
+	nvcc_gencode_flags=""
+	# find cuda arch:
+	if test "x$enable_cuda" == "xyes"; then :
 
-	    cuda_arch=30
-	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports gpu with compute capability 30" >&5
+$as_echo_n "checking whether nvcc supports gpu with compute capability 30... " >&6; }
+  if nvcc sht_gpu.cu -c -arch=sm_30 --dryrun > /dev/null 2>&1; then :
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
+	nvcc_gencode_flags="$nvcc_gencode_flags -gencode=arch=compute_30,code=sm_30"
 
 else
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports Pascal gpu" >&5
-$as_echo_n "checking whether nvcc supports Pascal gpu... " >&6; }
-	if nvcc sht_gpu.cu -c -arch=sm_60 --dryrun > /dev/null 2>&1; then :
 
-	    cuda_arch=60
-	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports gpu with compute capability 60" >&5
+$as_echo_n "checking whether nvcc supports gpu with compute capability 60... " >&6; }
+  if nvcc sht_gpu.cu -c -arch=sm_60 --dryrun > /dev/null 2>&1; then :
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
+	nvcc_gencode_flags="$nvcc_gencode_flags -gencode=arch=compute_60,code=sm_60"
 
 else
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports Volta gpu" >&5
-$as_echo_n "checking whether nvcc supports Volta gpu... " >&6; }
-	if nvcc sht_gpu.cu -c -arch=sm_70 --dryrun > /dev/null 2>&1; then :
 
-	    cuda_arch=70
-	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports gpu with compute capability 70" >&5
+$as_echo_n "checking whether nvcc supports gpu with compute capability 70... " >&6; }
+  if nvcc sht_gpu.cu -c -arch=sm_70 --dryrun > /dev/null 2>&1; then :
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
+	nvcc_gencode_flags="$nvcc_gencode_flags -gencode=arch=compute_70,code=sm_70"
 
 else
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-fi
-
-	if test "x$cuda_arch" == "x"; then :
-
-	    as_fn_error $? "nvcc does not support any compatible gpu. Is nvcc available ?" "$LINENO" 5
 
 fi
-	nvcc_flags="$nvcc_flags -gencode=arch=compute_$cuda_arch,code=sm_$cuda_arch"
+
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports gpu with compute capability 80" >&5
+$as_echo_n "checking whether nvcc supports gpu with compute capability 80... " >&6; }
+  if nvcc sht_gpu.cu -c -arch=sm_80 --dryrun > /dev/null 2>&1; then :
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	nvcc_gencode_flags="$nvcc_gencode_flags -gencode=arch=compute_80,code=sm_80"
+
+else
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+
+
+else
+
+	    case $enable_cuda in #(
+  "kepler") :
+    cuda_cc=30 ;; #(
+  "pascal") :
+    cuda_cc=60 ;; #(
+  "volta") :
+    cuda_cc=70 ;; #(
+  'ampere') :
+    cuda_cc=80 ;; #(
+  *) :
+    cuda_cc=$enable_cuda ;;
+esac
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether nvcc supports gpu with compute capability $cuda_cc" >&5
+$as_echo_n "checking whether nvcc supports gpu with compute capability $cuda_cc... " >&6; }
+  if nvcc sht_gpu.cu -c -arch=sm_$cuda_cc --dryrun > /dev/null 2>&1; then :
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	nvcc_gencode_flags="$nvcc_gencode_flags -gencode=arch=compute_$cuda_cc,code=sm_$cuda_cc"
+
+else
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+
+
+fi
+	if test "x$nvcc_gencode_flags" == "x"; then :
+  as_fn_error $? "nvcc does not support any compatible gpu. Is nvcc available ?" "$LINENO" 5
+
+fi
+	nvcc_flags="$nvcc_flags $nvcc_gencode_flags"
 	LIBS="$LIBS -lstdc++"	# cuda uses the c++ standard library. This is needed to link with gcc
-
+]
 fi
 libname=$target		# set the libname befor checking for python.
 
