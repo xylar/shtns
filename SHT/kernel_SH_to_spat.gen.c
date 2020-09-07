@@ -56,6 +56,9 @@ T	void GEN3(BASE,NWAY,SUFFIX)(shtns_cfg shtns, cplx *Tlm, v2d *BtF, v2d *BpF, co
 	#if !defined( _GCC_VEC_ ) && (NWAY & 1)
 	#error "NWAY must be even when compiled without explicit vectorization."
 	#endif
+	#if VSIZE2*NWAY > 32
+	#error "VSIZE2*NWAY must not exceed 32"
+	#endif
 
   #ifndef SHT_AXISYM
    #ifndef SHTNS_ISHIOKA

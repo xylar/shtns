@@ -53,6 +53,7 @@
 	#include "SHT/spat_to_SHst_omp.c"
 	#include "SHT/SHst_to_spat_omp.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SH_omp.c"
 	#include "SHT/SH_to_spat_omp.c"
@@ -65,6 +66,7 @@
 	#include "SHT/spat_to_SHst_omp.c"
 	#include "SHT/SHst_to_spat_omp.c"
 	#undef NWAY
+  #endif
 
 #define SHT_GRAD
 	#define NWAY 2
@@ -108,6 +110,7 @@
 	#include "SHT/spat_to_SHqst_omp.c"
 	#include "SHT/SHqst_to_spat_omp.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SHqst_omp.c"
 	#include "SHT/SHqst_to_spat_omp.c"
@@ -116,6 +119,7 @@
 	#include "SHT/spat_to_SHqst_omp.c"
 	#include "SHT/SHqst_to_spat_omp.c"
 	#undef NWAY
+  #endif
 #undef SHT_3COMP
 
 #ifndef _GCC_VEC_
@@ -149,10 +153,14 @@ void* fomp_a[6][SHT_NTYP] = {
 		SHsph_to_spat_omp_a3_l, SHtor_to_spat_omp_a3_l, SHqst_to_spat_omp_a3_l, spat_to_SHqst_omp_a3_l },
 	{ SH_to_spat_omp_a4_l, spat_to_SH_omp_a4_l, SHsphtor_to_spat_omp_a4_l, spat_to_SHsphtor_omp_a4_l,
 		SHsph_to_spat_omp_a4_l, SHtor_to_spat_omp_a4_l, SHqst_to_spat_omp_a4_l, spat_to_SHqst_omp_a4_l },
+#if VSIZE2 <= 4
 	{ SH_to_spat_omp_a6_l, spat_to_SH_omp_a6_l, SHsphtor_to_spat_omp_a6_l, spat_to_SHsphtor_omp_a6_l,
 		NULL, NULL, SHqst_to_spat_omp_a6_l, spat_to_SHqst_omp_a6_l },
 	{ SH_to_spat_omp_a8_l, spat_to_SH_omp_a8_l, SHsphtor_to_spat_omp_a8_l, spat_to_SHsphtor_omp_a8_l,
 		NULL, NULL, SHqst_to_spat_omp_a8_l, spat_to_SHqst_omp_a8_l }
+#else
+	{NULL}, {NULL}		// with large VSIZE2 (e.g. avx512), there are accuracy issues for NWAY > 4
+#endif
 };
 
 void* fomp_b[6][SHT_NTYP] = {NULL}; /*

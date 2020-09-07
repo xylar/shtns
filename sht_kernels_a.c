@@ -266,6 +266,7 @@ double split_sym_asym_m0_accl0(double* F0, double* eo, unsigned nlat_2, int k_in
 	#include "SHT/spat_to_SH_kernel.c"
 	#include "SHT/spat_to_SHst_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SH_kernel.c"
 	#include "SHT/spat_to_SHst_kernel.c"
@@ -274,6 +275,7 @@ double split_sym_asym_m0_accl0(double* F0, double* eo, unsigned nlat_2, int k_in
 	#include "SHT/spat_to_SH_kernel.c"
 	#include "SHT/spat_to_SHst_kernel.c"
 	#undef NWAY
+  #endif
 
 #define SHT_3COMP
 	#define NWAY 1
@@ -288,12 +290,14 @@ double split_sym_asym_m0_accl0(double* F0, double* eo, unsigned nlat_2, int k_in
 	#define NWAY 4
 	#include "SHT/spat_to_SHqst_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SHqst_kernel.c"
 	#undef NWAY
 	#define NWAY 8
 	#include "SHT/spat_to_SHqst_kernel.c"
 	#undef NWAY
+  #endif
 #undef SHT_3COMP
 
 // genaral case, low lmax
@@ -317,6 +321,7 @@ double split_sym_asym_m0_accl0(double* F0, double* eo, unsigned nlat_2, int k_in
 	#include "SHT/spat_to_SH_kernel.c"
 	#include "SHT/spat_to_SHst_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SH_kernel.c"
 	#include "SHT/spat_to_SHst_kernel.c"
@@ -325,6 +330,7 @@ double split_sym_asym_m0_accl0(double* F0, double* eo, unsigned nlat_2, int k_in
 	#include "SHT/spat_to_SH_kernel.c"
 	#include "SHT/spat_to_SHst_kernel.c"
 	#undef NWAY
+  #endif
 
 #define SHT_3COMP
 	#define NWAY 1
@@ -339,11 +345,13 @@ double split_sym_asym_m0_accl0(double* F0, double* eo, unsigned nlat_2, int k_in
 	#define NWAY 4
 	#include "SHT/spat_to_SHqst_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SHqst_kernel.c"
 	#undef NWAY
 	#define NWAY 8
 	#include "SHT/spat_to_SHqst_kernel.c"
 	#undef NWAY
+  #endif
 #undef SHT_3COMP
 

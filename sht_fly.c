@@ -55,6 +55,7 @@
 	#include "SHT/spat_to_SHst_fly.c"
 	#include "SHT/SHst_to_spat_fly.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SH_fly.c"
 	#include "SHT/SH_to_spat_fly.c"
@@ -67,6 +68,7 @@
 	#include "SHT/spat_to_SHst_fly.c"
 	#include "SHT/SHst_to_spat_fly.c"
 	#undef NWAY
+  #endif
 
 #define SHT_GRAD
 	#define NWAY 2
@@ -110,6 +112,7 @@
 	#include "SHT/spat_to_SHqst_fly.c"
 	#include "SHT/SHqst_to_spat_fly.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SHqst_fly.c"
 	#include "SHT/SHqst_to_spat_fly.c"
@@ -118,6 +121,7 @@
 	#include "SHT/spat_to_SHqst_fly.c"
 	#include "SHT/SHqst_to_spat_fly.c"
 	#undef NWAY
+  #endif
 #undef SHT_3COMP
 
 // axisymmetric
@@ -149,6 +153,7 @@
 	#include "SHT/spat_to_SH_fly.c"
 	#include "SHT/SH_to_spat_fly.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/spat_to_SH_fly.c"
 	#include "SHT/SH_to_spat_fly.c"
@@ -157,6 +162,7 @@
 	#include "SHT/spat_to_SH_fly.c"
 	#include "SHT/SH_to_spat_fly.c"
 	#undef NWAY
+  #endif
 
 #define SHT_GRAD
 	#define NWAY 2
@@ -250,10 +256,14 @@ void* ffly[6][SHT_NTYP] = {
 		SHsph_to_spat_fly3_l, SHtor_to_spat_fly3_l, SHqst_to_spat_fly3_l, spat_to_SHqst_fly3_l },
 	{ SH_to_spat_fly4_l, spat_to_SH_fly4_l, SHsphtor_to_spat_fly4_l, spat_to_SHsphtor_fly4_l,
 		SHsph_to_spat_fly4_l, SHtor_to_spat_fly4_l, SHqst_to_spat_fly4_l, spat_to_SHqst_fly4_l },
+#if VSIZE2 <= 4
 	{ SH_to_spat_fly6_l, spat_to_SH_fly6_l, SHsphtor_to_spat_fly6_l, spat_to_SHsphtor_fly6_l,
 		NULL, NULL, SHqst_to_spat_fly6_l, spat_to_SHqst_fly6_l },
 	{ SH_to_spat_fly8_l, spat_to_SH_fly8_l, SHsphtor_to_spat_fly8_l, spat_to_SHsphtor_fly8_l,
 		NULL, NULL, SHqst_to_spat_fly8_l, spat_to_SHqst_fly8_l },
+#else
+	{NULL}, {NULL}		// with large VSIZE2 (e.g. avx512), there are accuracy issues for NWAY > 4
+#endif
 };
 
 void* ffly_m0[6][SHT_NTYP] = {
@@ -265,10 +275,14 @@ void* ffly_m0[6][SHT_NTYP] = {
 		SHsph_to_spat_fly3_m0l, SHtor_to_spat_fly3_m0l, SHqst_to_spat_fly3_m0l, spat_to_SHqst_fly3_m0l },
 	{ SH_to_spat_fly4_m0l, spat_to_SH_fly4_m0l, NULL, NULL,
 		SHsph_to_spat_fly4_m0l, SHtor_to_spat_fly4_m0l, NULL, NULL },
+#if VSIZE2 <= 4
 	{ SH_to_spat_fly6_m0l, spat_to_SH_fly6_m0l, NULL, NULL,
 		NULL, NULL, NULL, NULL },
 	{ SH_to_spat_fly8_m0l, spat_to_SH_fly8_m0l, NULL, NULL,
 		NULL, NULL, NULL, NULL }
+#else
+	{NULL}, {NULL}		// with large VSIZE2 (e.g. avx512), there are accuracy issues for NWAY > 4
+#endif
 };
 
 void* ffly_m[6][SHT_NTYP] = {
@@ -280,8 +294,12 @@ void* ffly_m[6][SHT_NTYP] = {
 		SHsph_m_to_spat_fly3_l, SHtor_m_to_spat_fly3_l, SHqst_m_to_spat_fly3_l, spat_to_SHqst_m_fly3_l },
 	{ SH_m_to_spat_fly4_l, spat_to_SH_m_fly4_l, NULL, NULL,
 		SHsph_m_to_spat_fly4_l, SHtor_m_to_spat_fly4_l, NULL, NULL },
+#if VSIZE2 <= 4
 	{ SH_m_to_spat_fly6_l, spat_to_SH_m_fly6_l, NULL, NULL,
 		NULL, NULL, NULL, NULL },
 	{ SH_m_to_spat_fly8_l, spat_to_SH_m_fly8_l, NULL, NULL,
 		NULL, NULL, NULL, NULL }
+#else
+	{NULL}, {NULL}		// with large VSIZE2 (e.g. avx512), there are accuracy issues for NWAY > 4
+#endif
 };

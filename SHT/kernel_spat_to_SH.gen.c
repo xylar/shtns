@@ -24,6 +24,10 @@
 #
 //////////////////////////////////////////////////
 
+	#if VSIZE2*NWAY > 32
+	#error "VSIZE2*NWAY must not exceed 32"
+	#endif
+
 	#ifdef HI_LLIM
 QX	#define BASE _an1_hi
 VX	#define BASE _an2_hi

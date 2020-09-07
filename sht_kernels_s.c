@@ -124,6 +124,7 @@
 	#include "SHT/SH_to_spat_kernel.c"
 	#include "SHT/SHst_to_spat_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/SH_to_spat_kernel.c"
 	#include "SHT/SHst_to_spat_kernel.c"
@@ -132,6 +133,7 @@
 	#include "SHT/SH_to_spat_kernel.c"
 	#include "SHT/SHst_to_spat_kernel.c"
 	#undef NWAY
+  #endif
 
 #define SHT_GRAD
 	#define NWAY 2
@@ -169,12 +171,14 @@
 	#define NWAY 4
 	#include "SHT/SHqst_to_spat_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/SHqst_to_spat_kernel.c"
 	#undef NWAY
 	#define NWAY 8
 	#include "SHT/SHqst_to_spat_kernel.c"
 	#undef NWAY
+  #endif
 #undef SHT_3COMP
 
 // genaral case, low lmax
@@ -200,6 +204,7 @@
 	#include "SHT/SH_to_spat_kernel.c"
 	#include "SHT/SHst_to_spat_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/SH_to_spat_kernel.c"
 	#include "SHT/SHst_to_spat_kernel.c"
@@ -208,6 +213,7 @@
 	#include "SHT/SH_to_spat_kernel.c"
 	#include "SHT/SHst_to_spat_kernel.c"
 	#undef NWAY
+  #endif
 
 #define SHT_GRAD
 	#define NWAY 2
@@ -245,12 +251,14 @@
 	#define NWAY 4
 	#include "SHT/SHqst_to_spat_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/SHqst_to_spat_kernel.c"
 	#undef NWAY
 	#define NWAY 8
 	#include "SHT/SHqst_to_spat_kernel.c"
 	#undef NWAY
+  #endif
 #undef SHT_3COMP
 
 
@@ -275,12 +283,14 @@
 	#define NWAY 4
 	#include "SHT/SH_to_spat_kernel.c"
 	#undef NWAY
+  #if VSIZE2 <= 4
 	#define NWAY 6
 	#include "SHT/SH_to_spat_kernel.c"
 	#undef NWAY
 	#define NWAY 8
 	#include "SHT/SH_to_spat_kernel.c"
 	#undef NWAY
+  #endif
 
 #define SHT_GRAD
 	#define NWAY 2
