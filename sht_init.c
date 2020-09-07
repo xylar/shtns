@@ -1438,6 +1438,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 		#endif
 		if ((t > 1.e-6) || isNotFinite(t)) {
 			printf("\033[93m Accuracy test failed. Please file a bug report at https://bitbucket.org/nschaeff/shtns/issues \033[0m\n");
+			#if (VSIZE2 == 8) && (defined __GNUC__) && !(defined __INTEL_COMPILER)
+			printf("\033[93m You may need to upgrade the 'binutils' package, see https://bitbucket.org/nschaeff/shtns/issues/37/ \033[0m\n");
+			#endif
 			#if SHT_VERBOSE < 2
 			shtns_runerr("bad SHT accuracy");		// stop if something went wrong (but not in debug mode)
 			#endif
