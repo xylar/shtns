@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.62])
-AC_INIT([SHTns],[3.4.2],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
+AC_INIT([SHTns],[3.4.3],[],[shtns],[https://bitbucket.org/nschaeff/shtns])
 AC_LANG([C])
 AC_CONFIG_SRCDIR([sht_init.c])
 AC_CONFIG_HEADERS([sht_config.h])
@@ -114,6 +114,14 @@ AX_CHECK_COMPILE_FLAG([-qopenmp-simd])
 AX_CHECK_COMPILE_FLAG([-fno-tree-loop-distribute-patterns])
 # avoid insering VZEROUPPER instructions everywhere.
 AX_CHECK_COMPILE_FLAG([-mno-vzeroupper])
+
+## check for nasty bug in binutils, apply possible workaround. See https://bitbucket.org/nschaeff/shtns/issues/37/
+bug_as=`echo 'asm("vmovaps 64(,%rax), %zmm0");' > x.c ; $CC -c x.c ; objdump -dw x.o | grep -c '1('`
+rm -f x.c x.o
+AS_IF([test "x$bug_as" == "x1"], [
+    AX_CHECK_COMPILE_FLAG([-fno-tree-pre])
+])
+
 CC2=$CC
 CFLAGS2=$CFLAGS
 # restore the standard compiler
@@ -352,3 +360,11 @@ AC_SUBST([FFLAGS])
 AC_SUBST([nvcc_flags])
 AC_CONFIG_FILES([Makefile setup.py])
 AC_OUTPUT
+
+## if binutils bug: warn the user.
+AS_IF([test "x$bug_as" == "x1"], [
+    AC_MSG_NOTICE(["WARNING! your version of binutils is buggy. Please update the binutils package to v2.32 or more recent.
+	Meanwhile, I try to apply a workaround (no guarantee, possible performance loss).
+	See https://bitbucket.org/nschaeff/shtns/issues/37/"])
+])
+

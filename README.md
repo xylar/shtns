@@ -78,11 +78,19 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v3.4.3  (8 Sep 2020)
+	- Fix critical bug sometimes causing intermittent accuracy errors with avx512 and large 
+	  sizes (Lmax>=1800).
+	- Detection and workaround for a bug in some versions `binutils` causing systematic failures 
+	  with avx512 and gcc as the compiler. The bug is fixed in `binutils` 2.32 or more recent.
+	- Better handling of cuda by `./configure` allowing to set target architecture/compute 
+	  capability (e.g. `--enable-cuda=pascal`)
+
 * v3.4.2  (28 Jun 2020)
-	- fix critical bug leading to wrong analysis in some multiple-plan cases.
+	- Fix critical bug leading to wrong analysis in some multiple-plan cases.
 
 * v3.4.1  (22 Jun 2020)
-	- fix several bugs (segfaults and compilation issues), thanks to 3 reporters.
+	- Fix several bugs (segfaults and compilation issues), thanks to 3 reporters.
 
 * v3.4  (10 Jun 2020)
 	- Change in API/ABI (`shtns.h`, `shtns.f03`): removal of `lmidx` array and new `nlat_padded` member
