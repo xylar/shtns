@@ -961,7 +961,7 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 	ror = 0.0;	roi = 0.0;
 	rer = 0.0;	rei = 0.0;
 	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
-	if (_any(m - llim*y1 <= max(50,llim/200))) {		// polar optimization (see Reinecke 2013), avoiding warp divergence
+	if (_any(m - llim*y1 <= max(80, llim>>7))) {		// polar optimization (see Reinecke 2013), avoiding warp divergence
 		y0 = 1.0;	// y0
 		l = m - S;
 		int ny = 0;
