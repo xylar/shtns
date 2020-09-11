@@ -317,6 +317,17 @@ void test_SHT()
 	return;
 }
 
+void test_SHT_accuracy()
+{
+	for (int i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
+	for (int jj=0; jj< SHT_ITER; jj++) {
+		SH_to_spat(shtns, Slm,Sh);
+		spat_to_SH(shtns, Sh, Tlm);
+		scal_error(Tlm, Slm0, LMAX);
+	}
+	return;
+}
+
 void test_SHT_m0()
 {
 	long int jj,i;
@@ -688,6 +699,7 @@ int main(int argc, char *argv[])
 	int vector = 0;
 	int loadsave = 0;
 	int robert_form = -1;
+	int accuracy_test = 0;
 	char name[20];
 	FILE* fw;
 
@@ -727,6 +739,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"loadsave") == 0) loadsave = 1;
 		if (strcmp(name,"robert") == 0) robert_form = t;
 		if (strcmp(name,"padding") == 0) layout |= SHT_ALLOW_PADDING;		// Allow padding if it may improve performance.
+		if (strcmp(name,"accuracy") == 0) accuracy_test = 1;			// Parform an accuracy test instead of a speed test.
 	}
 
 	if (vector == 0) layout |= SHT_SCALAR_ONLY;
@@ -860,6 +873,10 @@ int main(int argc, char *argv[])
 //	printf("** performing %d scalar SHT with NL evaluation\n", SHT_ITER);
 	printf("** performing %d scalar SHT\n", SHT_ITER);
 	printf(":: STD\n");
+	if (accuracy_test) {
+		test_SHT_accuracy();
+		exit(0);
+	}
 	test_SHT();
 	printf(":: LTR\n");
 	test_SHT_l(LMAX/2);
