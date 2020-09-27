@@ -1,18 +1,18 @@
 #
 #  Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
 #  written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
-#  
+#
 #  nathanael.schaeffer@univ-grenoble-alpes.fr
-#  
+#
 #  This software is governed by the CeCILL license under French law and
 #  abiding by the rules of distribution of free software. You can use,
 #  modify and/or redistribute the software under the terms of the CeCILL
 #  license as circulated by CEA, CNRS and INRIA at the following URL
 #  "http://www.cecill.info".
-#  
+#
 #  The fact that you are presently reading this means that you have had
 #  knowledge of the CeCILL license and that you accept its terms.
-#  
+#
 
 ###################################
 # SHTns Python interface example  #
@@ -56,7 +56,7 @@ y = sh.synth(ylm)		# transform sh description ylm into spatial representation y 
 
 print(y)				# display spatial field
 
-i_theta = sh.nlat/2
+i_theta = sh.nlat//2
 i_phi = 1
 print(y[i_theta, i_phi])	# spatial element of coordinate i_theta, i_phi
 
