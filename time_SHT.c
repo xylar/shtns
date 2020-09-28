@@ -909,19 +909,38 @@ int main(int argc, char *argv[])
 		const int im = (MMAX > 0) ? 1 : 0;
 		if (im == 0) {
 			shtns_free(ShF);
-			ShF = shtns_malloc(sizeof(cplx) * shtns->nlat);	Sh = (double*) ShF;
+			ShF = shtns_malloc(sizeof(cplx) * shtns->nlat);  Sh = (double*) ShF;
 			for (int i=0; i<=LMAX; i++) Slm0[i] = creal(Slm0[i]);
+			if (vector) {
+				shtns_free(ThF);
+				ThF = (complex double *) shtns_malloc( sizeof(cplx) * shtns->nspat);  Th = (double *) ThF;
+				for (int i=0; i<=LMAX; i++) Tlm0[i] = creal(Tlm0[i]);
+			}
 		}
 		memset(Slm+im*(LMAX+1), 0, sizeof(cplx)*(LMAX-im*MRES+1));
-		SH_to_spat_ml(shtns, im, Slm0+im*(LMAX+1), (cplx*) Sh, LMAX);
-		spat_to_SH_ml(shtns, im, (cplx*) Sh, Slm+im*(LMAX+1), LMAX);
+		if (vector) {
+			memset(Tlm+im*(LMAX+1), 0, sizeof(cplx)*(LMAX-im*MRES+1));
+			SHsphtor_to_spat_ml(shtns, im, Slm0+im*(LMAX+1), Tlm0+im*(LMAX+1), (cplx*) Sh, (cplx*) Th, LMAX);
+			spat_to_SHsphtor_ml(shtns, im, (cplx*) Sh, (cplx*) Th, Slm+im*(LMAX+1), Tlm+im*(LMAX+1), LMAX);
+		} else {
+			SH_to_spat_ml(shtns, im, Slm0+im*(LMAX+1), (cplx*) Sh, LMAX);
+			spat_to_SH_ml(shtns, im, (cplx*) Sh, Slm+im*(LMAX+1), LMAX);
+		}
 		double err = 0.0;
 		for (int i=0; i<=LMAX-im*MRES; i++) {
 			double t = cabs(Slm[i+im*(LMAX+1)]-Slm0[i+im*(LMAX+1)]);
 			err += t*t;
-			if (t > 1e-6) printf("l=%d, Slm=%g,%g   Slm0=%g,%g\n", creal(Slm[i+im*(LMAX+1)]), cimag(Slm[i+im*(LMAX+1)]), creal(Slm0[i+im*(LMAX+1)]), cimag(Slm0[i+im*(LMAX+1)]));
+			if (vector) {
+				double t = cabs(Tlm[i+im*(LMAX+1)]-Tlm0[i+im*(LMAX+1)]);
+				err += t*t;
+			}
+			if (t > 1e-6) {
+				printf("l=%d, Slm=%g,%g   Slm0=%g,%g\n", i, creal(Slm[i+im*(LMAX+1)]), cimag(Slm[i+im*(LMAX+1)]), creal(Slm0[i+im*(LMAX+1)]), cimag(Slm0[i+im*(LMAX+1)]));
+				if (vector)
+				printf("l=%d, Tlm=%g,%g   Tlm0=%g,%g\n", i, creal(Tlm[i+im*(LMAX+1)]), cimag(Tlm[i+im*(LMAX+1)]), creal(Tlm0[i+im*(LMAX+1)]), cimag(Tlm0[i+im*(LMAX+1)]));
+			}
 		}
-		printf("Test Legendre only (m=%d) :: err = %g\n",im,sqrt(err));
+		printf("Test Legendre only (m=%d) :: err = %g\n",im*MRES,sqrt(err));
 	}
 
 	shtns_create(LMAX, MMAX, MRES, shtnorm);		// test memory allocation and management.
