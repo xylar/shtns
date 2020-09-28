@@ -633,6 +633,8 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
 
 \example shallow_water.py
   \brief Solves the non-linear barotropically unstable shallow water test case in Python.
+  Running the script should pop up a window with this image:
+  \image html shallow_water.png width=800px
 
 */
 
