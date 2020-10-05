@@ -1363,12 +1363,15 @@ static cplx special_eiphi(const double phi)
 /// Set the rotation angle, and compute associated Legendre functions.
 void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, double gamma)
 {
-	if ((beta < 0) || (beta > M_PI)) {
-		printf("ERROR: angle must be between 0 and pi\n");
+	if (fabs(beta) > M_PI) {
+		printf("ERROR: angle must be between -pi and pi\n");
 		exit(1);
 	}
-	
-	if (beta == 0.0) {
+	if (beta < 0.0) {	// translate to beta>0 as beta<0 is not supported.
+		alpha = (alpha>0) ? alpha-M_PI : alpha+M_PI;		// rotate by 180°
+		beta = fabs(beta);
+		gamma = (gamma>0) ? gamma-M_PI : gamma+M_PI;		// rotate by 180°
+	} else if (beta == 0.0) {
 		alpha += gamma;
 		gamma = 0.0;
 	}
@@ -1394,7 +1397,6 @@ void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, doubl
 			}
 		}
 	}
-
 }
 
 void shtns_rotation_set_angles_ZXZ(shtns_rot r, double alpha, double beta, double gamma)
