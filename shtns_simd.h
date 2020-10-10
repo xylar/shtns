@@ -57,13 +57,23 @@
 	#define VSIZE2 2
 	#define _SIMD_NAME_ "vsx"
 	#define vall(x) vec_splats((double)x)
-	inline static s2d vreverse(s2d a) {
+	/*inline static s2d vreverse(s2d a) {
 		const vector unsigned char perm = { 8,9,10,11,12,13,14,15, 0,1,2,3,4,5,6,7 };
 		return vec_perm(a,a,perm);
-	}
+	}*/
+	#define vreverse(a) vec_reve(a)
 	#define vxchg(a) vreverse(a)
+	#define vdup_even(v) vec_mergeh(v,v)
+	#define vdup_odd(v)  vec_mergel(v,v)
+	#define vxchg_even_odd(a) vreverse(a)
 	#define vread(mem, idx) vec_ld((int)(idx)*16, ((const vector double*)(mem)))
 	#define vstor(mem, idx, v) vec_st((v2d)v, (int)(idx)*16, ((vector double*)(mem)))
+	#define vread2 vread
+	#define vstor2 vstor
+	static const unsigned long long _neg0[2] __attribute__((aligned (16))) = {0x8000000000000000ULL, 0} ;		// a constant needed to change the sign of vectors
+	#define vneg_even_xor_cte (*(const v2d*)_neg0)
+	#define vxor(v,x) vec_xor(v,x)
+	#define vxor2 vxor
 	inline static double reduce_add(rnd a) {
 		rnd b = a + vec_mergel(a, a);
 		return( vec_extract(b,0) );
@@ -71,6 +81,10 @@
 	inline static v2d v2d_reduce(rnd a, rnd b) {
 		v2d c = vec_mergel(a, b);		b = vec_mergeh(a, b);
 		return b + c;
+	}
+	inline static s2d vneg_even_precalc(s2d a) {
+		const s2d ne = {-1.0, 1.0};
+		return ne * a;
 	}
 	#define vinterleave(a,b) { rnd x = vec_mergeh(a,b);		b = vec_mergel(a,b);	a = x; }
 	#define vinterleave_reverse(a,b)	{ rnd x = vec_mergeh(a,b);		a = vec_mergel(a,b);	b = x; }
@@ -88,7 +102,15 @@
 	#define vhi(a) vec_extract(a, 1)
 	#define vcplx_real(a) vec_extract(a, 0)
 	#define vcplx_imag(a) vec_extract(a, 1)
+	#define vlo_to_dbl(a) vec_extract(a, 0)
+	#define vhi_to_dbl(a) vec_extract(a, 1)
 	#define vreverse_pairs(v) (v)
+	#define v2d_lo(a) (a)
+	// vset(lo, hi) takes two doubles and pack them in a vector
+	//#define vset(lo, hi) _mm_set_pd(hi, lo)
+	//#define vlo_to_cplx(a) vec_insert(0.0, a, 1)
+	//#define vhi_to_cplx(a) vec_mergel(a, vdup(0.0))
+
 	inline static s2d vblend_even_odd(s2d a, s2d b) {	// same as _mm_shuffle_pd(a,b,2)
 		const vector unsigned char perm = {0,1,2,3,4,5,6,7, 24,25,26,27,28,29,30,31};
 		return vec_perm(a,b,perm);
