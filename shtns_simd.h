@@ -277,7 +277,7 @@
 		inline static rnd vneg_even_precalc(rnd v) {		// don't use in an intesive loop.
 			return _mm256_addsub_pd(vall(0.0), v);
 		}
-		#define vneg_even_xor_cte ((rnd)_mm256_broadcast_pd((const v2d*)_neg0))
+		#define vneg_even_xor_cte ((rnd)_mm256_broadcast_pd((const __m128d*)_neg0))
 		//#define vneg_even_xor_cte ((rnd)_mm256_castsi256_pd( _mm256_setr_epi32(0,0x80000000, 0,0, 0,0x80000000, 0,0)))	// BUGGY ON GCC! DON'T USE!
 		#define vxor(v,x) ((rnd)_mm256_xor_pd(v, x))
 		inline static double reduce_add(rnd a) {	// Latency=12c Skylake
@@ -372,14 +372,14 @@
 			((s2d*)mem)[idx*4+3] = _mm_unpackhi_pd(sr, si);	// dd = south_ri[1]
 		}
 	#endif
-	#ifdef __SSE3__
-		#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd((b),(b),1))		// a + I*b
+/*	#ifdef __SSE3__
+		//#define addi(a,b) _mm_addsub_pd(a, _mm_shuffle_pd((b),(b),1))		// a + I*b
 		//#define subadd(a,b) _mm_addsub_pd(a, b)		// [al-bl, ah+bh]
 		//#define CMUL(a,b) _mm_addsub_pd(_mm_shuffle_pd(a,a,0)*b, _mm_shuffle_pd(a,a,3)*_mm_shuffle_pd(b,b,1))
 	#else
-		#define addi(a,b) ( (a) + (_mm_shuffle_pd((b),(b),1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
+		//#define addi(a,b) ( (a) + (_mm_shuffle_pd((b),(b),1) * _mm_set_pd(1.0, -1.0)) )		// a + I*b		[note: _mm_set_pd(imag, real)) ]
 		//#define subadd(a,b) ( (a) + (b) * _mm_set_pd(1.0, -1.0) )		// [al-bl, ah+bh]
-	#endif
+	#endif	*/
 	inline static v2d IxKxZ(double k, v2d z) {		// I*k*z,  allowing to use FMA.
 		return (v2d) _mm_setr_pd(-k,k) * vxchg(z);
 	}
