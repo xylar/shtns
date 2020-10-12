@@ -78,6 +78,12 @@ DOCUMENTATION:
 CHANGE LOG:
 -----------
 
+* v3.4.4  (12 Oct 2020)
+	- Fix accuracy loss with cuda-transforms on GPU at large sizes (Lmax around 8000)
+	- Fix wrong sign for rotation around Z-axis in `shtns_rotation_set_angle*()`
+	- Fix compilations issues arising with some compilers and systems.
+	- Rotations: allow beta<0 in `shtns_rotation_set_angles_Z?Z()`
+
 * v3.4.3  (8 Sep 2020)
 	- Fix critical bug sometimes causing intermittent accuracy errors with avx512 and large 
 	  sizes (Lmax>=1800).
