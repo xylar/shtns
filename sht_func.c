@@ -1380,8 +1380,8 @@ void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, doubl
 	const double cos_beta = cos(beta);   //((beta == M_PI_2)||(beta == M_PI/2)) ? 0.0 : cos(beta);
 	r->cos_beta = cos_beta;
 	r->sin_beta = sqrt((1.-cos_beta)*(1.+cos_beta));
-	r->eia = special_eiphi(alpha);
-	r->eig = special_eiphi(gamma);
+	r->eia = special_eiphi(-alpha);
+	r->eig = special_eiphi(-gamma);
 	r->alpha = alpha;
 	r->beta = beta;
 	r->gamma = gamma;
@@ -1605,7 +1605,7 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 	if (r->beta == 0.0) {	// only rotation along Z-axis.
 		if (Rlm != Qlm)		for (int l=0; l<lmax; l++) 	Rlm[l] = Qlm[l];		// copy m=0
 		long lm = lmax;
-		cplx ei_alpha = r->eia;
+		const cplx ei_alpha = r->eia;
 		cplx eim_alpha = ei_alpha;
 		for (int m=1; m<=mmax; m++) {
 			for (int l=m; l<lmax; l++) {
@@ -1886,7 +1886,7 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 
 	if (r->beta == 0.0) {	// only rotation along Z-axis.
 		long lm = 0;
-		cplx eia = r->eia;
+		const cplx eia = r->eia;
 		for (int l=0; l<lmax; l++) {
 			long ll = (l<=mmax) ? l*(l+1) : mmax*(2*l-mmax) + l;
 			cplx eim_alpha = eia;
