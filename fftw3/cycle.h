@@ -575,3 +575,26 @@ static inline ticks getticks(void)
 INLINE_ELAPSED(inline)
 #define HAVE_TICK_COUNTER
 #endif
+
+#ifndef HAVE_TICK_COUNTER
+    // no hardware counter found.
+    // let's revert to something else...
+    #warning "no hardware time counter could be used."
+    typedef double ticks;
+    #ifdef _OPENMP
+        #define getticks omp_get_wtime
+    #elif defined( HAVE_SYS_TIME_H )
+        #include <sys/time.h>
+        static inline ticks getticks() {			// use gettimeofday
+            static long sec_base = 0;
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            if (sec_base == 0) sec_base = tv.tv_sec;
+            return tv.tv_usec*1e-6 + (tv.tv_sec - sec_base);
+        }
+    #else
+        #error "no time counter found."
+    #endif
+    INLINE_ELAPSED(inline)
+#endif
+
