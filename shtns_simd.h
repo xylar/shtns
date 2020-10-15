@@ -57,11 +57,11 @@
 	#define VSIZE2 2
 	#define _SIMD_NAME_ "vsx"
 	#define vall(x) vec_splats((double)x)
-	/*inline static s2d vreverse(s2d a) {
+	inline static s2d vreverse(s2d a) {
 		const vector unsigned char perm = { 8,9,10,11,12,13,14,15, 0,1,2,3,4,5,6,7 };
 		return vec_perm(a,a,perm);
-	}*/
-	#define vreverse(a) vec_reve(a)
+	}
+	//#define vreverse(a) vec_reve(a)
 	#define vxchg(a) vreverse(a)
 	#define vdup_even(v) vec_mergeh(v,v)
 	#define vdup_odd(v)  vec_mergel(v,v)
