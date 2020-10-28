@@ -43,6 +43,7 @@ int NPHI = 0;
 // number of SH iterations
 int SHT_ITER = 50;		// do 50 iterations by default
 
+int error = 0;
 
 #include <sys/time.h>
 
@@ -145,9 +146,9 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 //		if (isNotFinite(t)) printf("NaN or Inf @ lm=%ld (l=%d)  Slm=%g,%g  Slm0=%g,%g\n",i,shtns->li[i], creal(Slm[i]), cimag(Slm[i]), creal(Slm0[i]), cimag(Slm0[i]));
 		if (t>tmax) { tmax = t; jj = i; }
 	}
-	if (isNotFinite(sqrt(n2/NLM))) printf("!!! ERROR: nan or inf !!!\n");
+	if (isNotFinite(sqrt(n2/NLM))) {	printf("!!! ERROR: nan or inf !!!\n");	error++;  }
 	printf("   => max error = %g (l=%d,lm=%ld)   rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
-	if (tmax > 1e-3) {
+	if (tmax > 1e-4) {
 		if (NLM < 15) {
 			printf("\n orig:");
 			for (i=0; i<NLM;i++)
@@ -164,7 +165,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 					printf("  %g,%g",creal(Slm[i]),cimag(Slm[i]));
 				}
 		}
-		printf("    **** ERROR ****\n");
+		printf("    **** ERROR ****\n");	error++;
 	}
 	else printf("\n");
 	return(tmax);
@@ -189,7 +190,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		if (t>tmax) { tmax = t; jj = i; }
 	}
 	printf("   Spheroidal => max error = %g (l=%d,lm=%ld)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
-	if (tmax > 1e-3) {
+	if (tmax > 1e-4) {
 		if (NLM < 15) {
 			printf("\n orig:");
 			for (i=0; i<NLM;i++)
@@ -206,7 +207,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 					printf("  %g,%g",creal(Slm[i]),cimag(Slm[i]));
 				}
 		}
-		printf("    **** ERROR ****\n");
+		printf("    **** ERROR ****\n");	error++;
 	}
 		else printf("\n");
 //	write_vect("Slm",Slm,NLM*2);
@@ -226,7 +227,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 		if (t>tmax) { tmax = t; jj = i; }
 	}
 	printf("   Toroidal => max error = %g (l=%d,lm=%ld)    rms error = %g",tmax,shtns->li[jj],jj,sqrt(n2/NLM));
-	if (tmax > 1e-3) {
+	if (tmax > 1e-4) {
 		if (NLM < 15) {
 			printf("\n orig:");
 			for (i=0; i<NLM;i++)
@@ -243,7 +244,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 					printf("  %g,%g",creal(Tlm[i]),cimag(Tlm[i]));
 				}
 		}
-		printf("    **** ERROR ****\n");
+		printf("    **** ERROR ****\n");	error++;
 	}
 		else printf("\n");
 //	write_vect("Tlm",Tlm,NLM*2);
@@ -875,7 +876,7 @@ int main(int argc, char *argv[])
 	printf(":: STD\n");
 	if (accuracy_test) {
 		test_SHT_accuracy();
-		exit(0);
+		exit(error);
 	}
 	test_SHT();
 	printf(":: LTR\n");
@@ -956,5 +957,6 @@ int main(int argc, char *argv[])
 
 	shtns_reset();
 	fftw_cleanup();
+	return error;
 }
 

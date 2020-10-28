@@ -157,4 +157,5 @@ int main()
 	} else {
 		printf("\n** "COLOR_ERR "ERROR" COLOR_END ": %d tests out of %d " COLOR_ERR "FAILED" COLOR_END "** \n", global_fail, global_count);
 	}
+	return global_fail;
 }
