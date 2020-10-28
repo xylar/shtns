@@ -905,16 +905,23 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (MMAX > 0) {
-		memset(Slm+LMAX+1, 0, sizeof(cplx)*(LMAX-MRES+1));
-		SH_to_spat_ml(shtns, 1, Slm0+LMAX+1, (cplx*) Sh, LMAX);
-		spat_to_SH_ml(shtns, 1, (cplx*) Sh, Slm+LMAX+1, LMAX);
-		double err = 0.0;
-		for (int i=0; i<=LMAX-MRES; i++) {
-			double t = cabs(Slm[i+LMAX+1]-Slm0[i+LMAX+1]);
-			err += t*t;
+	{	// test Legendre only:
+		const int im = (MMAX > 0) ? 1 : 0;
+		if (im == 0) {
+			shtns_free(ShF);
+			ShF = shtns_malloc(sizeof(cplx) * shtns->nlat);	Sh = (double*) ShF;
+			for (int i=0; i<=LMAX; i++) Slm0[i] = creal(Slm0[i]);
 		}
-		printf("Test Legendre only (m=%d) :: err = %g\n",MRES,sqrt(err));
+		memset(Slm+im*(LMAX+1), 0, sizeof(cplx)*(LMAX-im*MRES+1));
+		SH_to_spat_ml(shtns, im, Slm0+im*(LMAX+1), (cplx*) Sh, LMAX);
+		spat_to_SH_ml(shtns, im, (cplx*) Sh, Slm+im*(LMAX+1), LMAX);
+		double err = 0.0;
+		for (int i=0; i<=LMAX-im*MRES; i++) {
+			double t = cabs(Slm[i+im*(LMAX+1)]-Slm0[i+im*(LMAX+1)]);
+			err += t*t;
+			if (t > 1e-6) printf("l=%d, Slm=%g,%g   Slm0=%g,%g\n", creal(Slm[i+im*(LMAX+1)]), cimag(Slm[i+im*(LMAX+1)]), creal(Slm0[i+im*(LMAX+1)]), cimag(Slm0[i+im*(LMAX+1)]));
+		}
+		printf("Test Legendre only (m=%d) :: err = %g\n",im,sqrt(err));
 	}
 
 	shtns_create(LMAX, MMAX, MRES, shtnorm);		// test memory allocation and management.
