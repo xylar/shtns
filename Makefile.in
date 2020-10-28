@@ -19,6 +19,8 @@ default : @target@
 install : @install@
 
 test : test_suite test_rot
+	./test_suite
+	./test_rot
 
 @libname@ : Makefile $(objs)
 	ar rcs @libname@ $(objs)
@@ -78,10 +80,8 @@ time_SHT : time_SHT.c $(libname) shtns.h
 
 test_suite : examples/test_suite.c $(libname) shtns.h
 	$(cc) examples/test_suite.c -I. ./$(libname) $(LIBS) -o test_suite
-	./test_suite
 test_rot : examples/test_rot.c $(libname) shtns.h
 	$(cc) examples/test_rot.c -I. ./$(libname) $(LIBS) -o test_rot
-	./test_rot
 
 SHT_example : examples/SHT_example.c $(libname) shtns.h
 	$(cc) examples/SHT_example.c -I. ./$(libname) $(LIBS) -o SHT_example
