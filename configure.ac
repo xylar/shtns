@@ -288,6 +288,7 @@ AS_IF([test "x$enable_python" != "xno"], [
 	AC_SUBST([numpy_inc])
 	AC_SUBST([python_inc])
 	CFLAGS="$CFLAGS -fpic"	# required compile flag for python extensions.
+	CFLAGS2="$CFLAGS2 -fpic"	# required compile flag for python extensions.
 	target="_shtns.so"	# build python extension instead of C library.
 	install="install-py"	# install python extension instead of C library.
 ])
