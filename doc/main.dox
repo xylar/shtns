@@ -14,16 +14,16 @@
  * - can be used from <b>Fortran, c/c++, Python, and Java</b> programs.
  * - a highly efficient Gauss algorithm working with <b>Gauss nodes</b> (based on Gauss-Legendre quadrature).
  * - support for <b>regular grids</b> (but they require twice the number of nodes than Gauss grid).
- * - support for SSE2, SSE3 and <b>AVX, AVX2, AVX-512</b> vectorization, as well as Xeon Phi (KNL), Blue Gene/Q and AltiVec VSX.
+ * - support for SSE2, SSE3 and <b>AVX, AVX2, AVX-512</b> vectorization, as well as Xeon Phi (KNL) and AltiVec VSX.
  * - <b>parallel transforms with OpenMP</b>.
- * - *Beta*: automatic <b>\link gpu GPU off-loading\endlink</b> with nvidia cuda (Kepler & Pascal).
+ * - *Beta*: automatic <b>\link gpu GPU off-loading\endlink</b> with nvidia cuda (Kepler, Pascal & Volta).
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
  * - <b>on-the-fly transforms</b> : saving memory and bandwidth, they are even faster on modern architecture.
  * - accurate up to spherical harmonic degree l=16383 (at least).
  * - \link rotation rotation functions\endlink to rotate spherical harmonics (beta).
  * - \link operators special spectral operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
  * - scalar transforms and rotations for complex spatial fields.
- * - SHT at fixed m (without fft, aka Legendre transform - beta).
+ * - SHT at fixed m (without fft, aka Legendre transform).
  *
  * Using several \link opt optimizations\endlink, it is intended to be \link bench very fast\endlink.
  *
