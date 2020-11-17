@@ -15,6 +15,7 @@ build:
     - sed -i "s/native/nehalem/" Makefile && make time_SHT && mv time_SHT time_SHT_sse3
     - sed -i "s/nehalem/haswell/" Makefile && make time_SHT && mv time_SHT time_SHT_avx2
     - sed -i "s/haswell/skylake-avx512/" Makefile && make time_SHT && mv time_SHT time_SHT_avx512
+    - sed -i "s/skylake-avx512/native/" Makefile && make  # build regular library for artifacts
     - ./configure --enable-python
     - make
     - python setup.py install --user
