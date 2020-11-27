@@ -8,6 +8,7 @@
   integer(C_INT), parameter :: SHT_SOUTH_POLE_FIRST=8192
   integer(C_INT), parameter :: SHT_SCALAR_ONLY=4096
   integer(C_INT), parameter :: SHT_LOAD_SAVE_CFG=16384
+  integer(C_INT), parameter :: SHT_ALLOW_GPU=32768
   integer(C_INT), parameter :: SHT_ALLOW_PADDING=65536
 
   enum, bind(C)

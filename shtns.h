@@ -117,7 +117,7 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 /// phi angle value in degrees for given index ip.
 #define PHI_DEG(shtns, ip) (360./(shtns->nphi*shtns->mres))*(ip)
 /// phi angle value in radians for given index ip.
-#define PHI_RAD(shtns, ip) (M_PI/(shtns->nphi*shtns->mres))*(2*ip)
+#define PHI_RAD(shtns, ip) (2.*M_PI/(shtns->nphi*shtns->mres))*(ip)
 
 
 // FUNCTIONS //
