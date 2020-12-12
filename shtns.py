@@ -450,6 +450,10 @@ class sht(object):
         r"""SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"""
         return _shtns.sht_SH_to_point(self, Qlm, cost, phi)
 
+    def SH_to_point_cplx(self, alm, cost, phi):
+        r"""evaluate spherical harmonic expansion of a complex-valued scalar field at point given by cost=cos(theta) and phi."""
+        return _shtns.sht_SH_to_point_cplx(self, alm, cost, phi)
+
     def SH_to_grad_point(self, DrSlm, Slm, cost, phi):
         r"""SH_to_grad_point(sht self, PyObject * DrSlm, PyObject * Slm, double cost, double phi)"""
         return _shtns.sht_SH_to_grad_point(self, DrSlm, Slm, cost, phi)

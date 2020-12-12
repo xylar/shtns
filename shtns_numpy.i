@@ -562,9 +562,19 @@ struct shtns_rot_ {		// describe a rotation matrix
 	%}
 
 	/* local evaluations */
+	%feature("autodoc", "evaluate spherical harmonic expansion Qlm of a real-valued scalar field at point given by cost=cos(theta) and phi.") SH_to_point;
 	double SH_to_point(PyObject *Qlm, double cost, double phi) {
 		if (check_spectral(1,Qlm, $self->nlm))	return SH_to_point($self, PyArray_Data(Qlm), cost, phi);
 		return 0.0;
+	}
+	%feature("autodoc", "evaluate spherical harmonic expansion alm of a complex-valued scalar field at point given by cost=cos(theta) and phi.") SH_to_point_cplx;
+	PyObject* SH_to_point_cplx(PyObject *alm, double cost, double phi) {
+		PyObject* obj;
+		int n = $self->lmax + 1;
+		cplx a = 0.0;
+		if (check_spectral(1,alm, n*n))	a = SH_to_point_cplx($self, PyArray_Data(alm), cost, phi);
+		obj = PyComplex_FromDoubles(creal(a), cimag(a));
+		return obj;
 	}
 	%apply double *OUTPUT { double *vr };
 	%apply double *OUTPUT { double *vt };

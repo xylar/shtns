@@ -3209,6 +3209,14 @@ SWIGINTERN double shtns_info_SH_to_point(struct shtns_info *self,PyObject *Qlm,d
 		if (check_spectral(1,Qlm, self->nlm))	return SH_to_point(self, PyArray_Data(Qlm), cost, phi);
 		return 0.0;
 	}
+SWIGINTERN PyObject *shtns_info_SH_to_point_cplx(struct shtns_info *self,PyObject *alm,double cost,double phi){
+		PyObject* obj;
+		int n = self->lmax + 1;
+		cplx a = 0.0;
+		if (check_spectral(1,alm, n*n))	a = SH_to_point_cplx(self, PyArray_Data(alm), cost, phi);
+		obj = PyComplex_FromDoubles(creal(a), cimag(a));
+		return obj;
+	}
 SWIGINTERN void shtns_info_SH_to_grad_point(struct shtns_info *self,PyObject *DrSlm,PyObject *Slm,double cost,double phi,double *vr,double *vt,double *vp){
 		if (check_spectral(1,DrSlm, self->nlm) && check_spectral(2,Slm, self->nlm))
 			SH_to_grad_point(self, PyArray_Data(DrSlm), PyArray_Data(Slm), cost, phi, vr, vt, vp);
@@ -4749,6 +4757,53 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_sht_SH_to_point_cplx(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_info *arg1 = (struct shtns_info *) 0 ;
+  PyObject *arg2 = (PyObject *) 0 ;
+  double arg3 ;
+  double arg4 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  double val3 ;
+  int ecode3 = 0 ;
+  double val4 ;
+  int ecode4 = 0 ;
+  PyObject *swig_obj[4] ;
+  PyObject *result = 0 ;
+  
+  if (!SWIG_Python_UnpackTuple(args, "sht_SH_to_point_cplx", 4, 4, swig_obj)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_info, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "sht_SH_to_point_cplx" "', argument " "1"" of type '" "struct shtns_info *""'"); 
+  }
+  arg1 = (struct shtns_info *)(argp1);
+  arg2 = swig_obj[1];
+  ecode3 = SWIG_AsVal_double(swig_obj[2], &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "sht_SH_to_point_cplx" "', argument " "3"" of type '" "double""'");
+  } 
+  arg3 = (double)(val3);
+  ecode4 = SWIG_AsVal_double(swig_obj[3], &val4);
+  if (!SWIG_IsOK(ecode4)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "sht_SH_to_point_cplx" "', argument " "4"" of type '" "double""'");
+  } 
+  arg4 = (double)(val4);
+  {
+    shtns_error = 0;	// clear exception
+    result = (PyObject *)shtns_info_SH_to_point_cplx(arg1,arg2,arg3,arg4);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = result;
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_sht_SH_to_grad_point(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
@@ -6102,6 +6157,7 @@ static PyMethodDef SwigMethods[] = {
 	 { "sht_spat_cplx_to_SHqst", _wrap_sht_spat_cplx_to_SHqst, METH_VARARGS, "sht_spat_cplx_to_SHqst(sht self, PyObject * Vr, PyObject * Vt, PyObject * Vp, PyObject * Qlm, PyObject * Slm, PyObject * Tlm)"},
 	 { "sht_SHqst_to_spat_cplx", _wrap_sht_SHqst_to_spat_cplx, METH_VARARGS, "sht_SHqst_to_spat_cplx(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp)"},
 	 { "sht_SH_to_point", _wrap_sht_SH_to_point, METH_VARARGS, "sht_SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"},
+	 { "sht_SH_to_point_cplx", _wrap_sht_SH_to_point_cplx, METH_VARARGS, "evaluate spherical harmonic expansion of a complex-valued scalar field at point given by cost=cos(theta) and phi."},
 	 { "sht_SH_to_grad_point", _wrap_sht_SH_to_grad_point, METH_VARARGS, "sht_SH_to_grad_point(sht self, PyObject * DrSlm, PyObject * Slm, double cost, double phi)"},
 	 { "sht_SHqst_to_point", _wrap_sht_SHqst_to_point, METH_VARARGS, "sht_SHqst_to_point(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, double cost, double phi)"},
 	 { "sht_SH_to_lat", _wrap_sht_SH_to_lat, METH_VARARGS, "sht_SH_to_lat(sht self, PyObject * Qlm, double cost, PyObject * Vr)"},

@@ -512,6 +512,52 @@ void SH_mul_mx(shtns_cfg shtns, double* mx, cplx *Qlm, cplx *Rlm)
 */
 ///@{
 
+/// Evaluate complex scalar SH representation \b qlm at physical point defined by \b cost = cos(theta) and \b phi
+cplx SH_to_point_cplx(shtns_cfg shtns, cplx *alm, double cost, double phi)
+{
+	double yl[LMAX+1];
+	cplx vr0, vr1;
+	long int l,m,im;
+
+	vr0 = 0.0;		vr1 = 0.0;
+	m=0;	im=0;
+		legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
+
+		int ll = 0;
+		for (l=0; l<LTR; l+=2) {
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+			vr0 += alm[ll] * yl[l];
+			ll += (l<MMAX) ? 2*l+2 : 2*MMAX+1;
+			vr1 += alm[ll] * yl[l+1];
+		}
+		if (l==LTR) {
+			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+			vr0 += alm[ll] * yl[l];
+		}
+		vr0 += vr1;
+	if (MTR>0) {
+		im = 1;  do {
+			m = im*MRES;
+			legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
+
+			cplx vrm = 0.0;		cplx vim = 0.0;
+			int ll = (m-1)*m;
+			for (int l=m; l<=LMAX; l++) {			// gather from cplx rep
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+				cplx rr = alm[ll+m];	// +m
+				cplx ii = alm[ll-m];	// -m
+				if (m&1) ii = -ii;				// m<0, m odd
+				vrm += yl[l] * rr;
+				vim += yl[l] * ii;
+			}
+			cplx eimp = cos(m*phi) + I*sin(m*phi);		// we need something accurate here.
+			vr0 += vrm*eimp + vim*conj(eimp);
+		} while(++im <= MTR);
+	}
+	return vr0;
+}
+
+
 /// Evaluate scalar SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
 double SH_to_point(shtns_cfg shtns, cplx *Qlm, double cost, double phi)
 {
