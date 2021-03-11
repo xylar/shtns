@@ -1079,7 +1079,7 @@ static void leg_m_highllim(shtns_cfg shtns, const double *ql, double *q, const i
 
 
 template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
-ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int q_dist=0, const int ql_dist=0)
+ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const double mpos_scale, const int q_dist=0, const int ql_dist=0)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -1243,7 +1243,7 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 
 		y1 = sqrt(1.0 - cost*cost);	// sin(theta)
 
-		y0 = 0.5 * ak[0];	// y0
+		y0 = mpos_scale * ak[0];	// y0
 		l = m - S;
 		do {		// sin(theta)^(m-S)
 		if (l&1) y0 *= y1;
@@ -1334,12 +1334,12 @@ static void ileg_m_lowllim(shtns_cfg shtns, const double* q, double *ql, const i
 	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
-	ileg_m_lowllim_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) q, (double*) ql, llim, nlat_2, lmax,mres, nphi, q_dist, ql_dist);
+	ileg_m_lowllim_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) q, (double*) ql, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys, q_dist, ql_dist);
 }
 
 
 template<int BLOCKSIZE, int LSPAN, int S> __global__ void
-ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
+ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const double mpos_scale)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -1429,7 +1429,7 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 
 		y1 = sqrt(1.0 - cost*cost);	// sin(theta)
 
-		y0 = 0.5;	// y0
+		y0 = mpos_scale;	// y0
 		l = m - S;
 		int ny = 0;
 		int nsint = 0;
@@ -1532,7 +1532,7 @@ static void ileg_m_highllim(shtns_cfg shtns, const double* q, double *ql, const 
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
 	for (int f=0; f<NFIELDS; f++) {
-		ileg_m_highllim_kernel<BLOCKSIZE, LSPAN_, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, q + f*q_dist, ql + f*ql_dist, llim, nlat_2, lmax,mres, nphi);
+		ileg_m_highllim_kernel<BLOCKSIZE, LSPAN_, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, q + f*q_dist, ql + f*ql_dist, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys);
 	}
 }
 
