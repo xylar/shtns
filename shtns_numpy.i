@@ -38,6 +38,7 @@
 #include <numpy/arrayobject.h>
 #include "sht_private.h"
 
+
 // variables used for exception handling.
 static int shtns_error = 0;
 static char* shtns_err_msg;
@@ -118,12 +119,27 @@ inline static PyObject* SpatArray_New(int size) {
 %ignore ct;
 %ignore st;
 
+// shtns_rot_ is renamed to "rotation"
+%rename("rotation") shtns_rot_;
+%ignore flag_alpha_gamma;
+%ignore cos_beta;
+%ignore sin_beta;
+%ignore sht;
+
 %rename(print_version) shtns_print_version;
 %rename(set_verbosity) shtns_verbose;
 
 %feature("autodoc");
 %include "shtns.h"
 %include "exception.i"
+
+struct shtns_rot_ {		// describe a rotation matrix
+	const shtns_cfg sht;
+	const int lmax, mmax;
+	const int flag_alpha_gamma;
+	const double cos_beta, sin_beta;
+	const double alpha, beta, gamma; 	// Euler angles, in ZYZ convention
+};
 
 
 %extend shtns_info {
@@ -676,3 +692,57 @@ inline static PyObject* SpatArray_New(int size) {
 	}
 
 };
+
+
+%extend shtns_rot_ {
+	%exception {
+		shtns_error = 0;	// clear exception
+		$function
+		if (shtns_error) {	// test for exception
+			SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+		}
+	}
+
+	%feature("kwargs") shtns_rot_;
+	shtns_rot_(int lmax, int mmax=-1) {	// default arguments : mmax
+		if (lmax < 2) {
+			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
+		}
+		if (mmax < 0) mmax = lmax;		// default mmax
+		if (mmax > lmax) {
+			throw_exception(SWIG_ValueError,1,"lmax < mmax invalid");	return NULL;
+		}
+		return shtns_rotation_create(lmax, mmax);
+	}
+
+	~shtns_rot_() {
+		shtns_rotation_destroy($self);		// free memory.
+	}
+
+	void set_angles_ZYZ(double alpha, double beta, double gamma) {
+		shtns_rotation_set_angles_ZYZ($self, alpha, beta, gamma);
+	}
+	void set_angles_ZXZ(double alpha, double beta, double gamma) {
+		shtns_rotation_set_angles_ZXZ($self, alpha, beta, gamma);
+	}
+	void set_angle_axis(double theta, double Vx, double Vy, double Vz) {
+		shtns_rotation_set_angle_axis($self, theta, Vx, Vy, Vz);
+	}
+	PyObject* wigner_d_matrix(const int l) {
+		npy_intp dims[2] = {2*l+1, 2*l+1};
+		PyObject *mx = PyArray_New(&PyArray_Type, 2, &dims[0], NPY_DOUBLE, NULL, NULL, sizeof(double), 0, NULL);
+		shtns_rotation_wigner_d_matrix($self, l, PyArray_Data(mx));
+		return mx;
+	}
+	PyObject* apply_real(PyObject* Qlm) {
+		PyObject *Rlm = SpecArray_New(nlm_calc($self->lmax, $self->mmax, 1));
+		shtns_rotation_apply_real($self, PyArray_Data(Qlm), PyArray_Data(Rlm));
+		return Rlm;
+	}
+	PyObject* apply_cplx(PyObject* Qlm) {
+		PyObject *Rlm = SpecArray_New(nlm_cplx_calc($self->lmax, $self->mmax, 1));
+		shtns_rotation_apply_cplx($self, PyArray_Data(Qlm), PyArray_Data(Rlm));
+		return Rlm;
+	}
+};
+

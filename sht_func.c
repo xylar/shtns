@@ -1302,17 +1302,6 @@ void SH_to_spat_grad(shtns_cfg shtns, cplx *alm, double *gt, double *gp)
 //* see https://arxiv.org/abs/1403.7698  or  https://doi.org/10.1007/978-3-319-13230-3_5
 //* Thanks to Alex J. Yuffa, ayuffa@gmail.com  for his suggestions and help.
 
-struct shtns_rot_ {		// describe a rotation matrix
-	shtns_cfg sht;
-	int lmax, mmax;
-	int flag_alpha_gamma;
-	double cos_beta, sin_beta;
-	double alpha, beta, gamma; 	// Euler angles, in ZYZ convention
-	double* plm_beta;
-	cplx eia;
-	cplx eig;
-};
-
 /// Allocate memory and precompute some recurrence coefficients for rotation (independent of angle).
 /// Setting mmax < lmax will result in approximate rotations if not aligned with the z-axis, while mmax=lmax leads to exact rotations.
 shtns_rot shtns_rotation_create(const int lmax, const int mmax)

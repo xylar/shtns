@@ -2673,8 +2673,9 @@ SWIGINTERN PyObject *SWIG_PyStaticMethod_New(PyObject *SWIGUNUSEDPARM(self), PyO
 #define SWIGTYPE_p_double_complex swig_types[2]
 #define SWIGTYPE_p_int swig_types[3]
 #define SWIGTYPE_p_shtns_info swig_types[4]
-static swig_type_info *swig_types[6];
-static swig_module_info swig_module = {swig_types, 5, 0, 0, 0, 0};
+#define SWIGTYPE_p_shtns_rot_ swig_types[5]
+static swig_type_info *swig_types[7];
+static swig_module_info swig_module = {swig_types, 6, 0, 0, 0, 0};
 #define SWIG_TypeQuery(name) SWIG_TypeQueryModule(&swig_module, &swig_module, name)
 #define SWIG_MangledTypeQuery(name) SWIG_MangledTypeQueryModule(&swig_module, &swig_module, name)
 
@@ -2709,6 +2710,7 @@ static swig_module_info swig_module = {swig_types, 5, 0, 0, 0, 0};
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
 #include "sht_private.h"
+
 
 // variables used for exception handling.
 static int shtns_error = 0;
@@ -3309,6 +3311,44 @@ SWIGINTERN void shtns_info_SHqst_to_spat_m(struct shtns_info *self,PyObject *Qlm
 		if (check_spectral(4,Vr, self->nlat) && check_spectral(5,Vt, self->nlat) && check_spectral(6,Vp, self->nlat)
 			&& check_spectral(1,Qlm, nelem) && check_spectral(2,Slm, nelem) && check_spectral(3,Tlm, nelem))
 		SHqst_to_spat_ml(self, im_, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
+	}
+SWIGINTERN struct shtns_rot_ *new_shtns_rot_(int lmax,int mmax){	// default arguments : mmax
+		if (lmax < 2) {
+			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
+		}
+		if (mmax < 0) mmax = lmax;		// default mmax
+		if (mmax > lmax) {
+			throw_exception(SWIG_ValueError,1,"lmax < mmax invalid");	return NULL;
+		}
+		return shtns_rotation_create(lmax, mmax);
+	}
+SWIGINTERN void delete_shtns_rot_(struct shtns_rot_ *self){
+		shtns_rotation_destroy(self);		// free memory.
+	}
+SWIGINTERN void shtns_rot__set_angles_ZYZ(struct shtns_rot_ *self,double alpha,double beta,double gamma){
+		shtns_rotation_set_angles_ZYZ(self, alpha, beta, gamma);
+	}
+SWIGINTERN void shtns_rot__set_angles_ZXZ(struct shtns_rot_ *self,double alpha,double beta,double gamma){
+		shtns_rotation_set_angles_ZXZ(self, alpha, beta, gamma);
+	}
+SWIGINTERN void shtns_rot__set_angle_axis(struct shtns_rot_ *self,double theta,double Vx,double Vy,double Vz){
+		shtns_rotation_set_angle_axis(self, theta, Vx, Vy, Vz);
+	}
+SWIGINTERN PyObject *shtns_rot__wigner_d_matrix(struct shtns_rot_ *self,int const l){
+		npy_intp dims[2] = {2*l+1, 2*l+1};
+		PyObject *mx = PyArray_New(&PyArray_Type, 2, &dims[0], NPY_DOUBLE, NULL, NULL, sizeof(double), 0, NULL);
+		shtns_rotation_wigner_d_matrix(self, l, PyArray_Data(mx));
+		return mx;
+	}
+SWIGINTERN PyObject *shtns_rot__apply_real(struct shtns_rot_ *self,PyObject *Qlm){
+		PyObject *Rlm = SpecArray_New(nlm_calc(self->lmax, self->mmax, 1));
+		shtns_rotation_apply_real(self, PyArray_Data(Qlm), PyArray_Data(Rlm));
+		return Rlm;
+	}
+SWIGINTERN PyObject *shtns_rot__apply_cplx(struct shtns_rot_ *self,PyObject *Qlm){
+		PyObject *Rlm = SpecArray_New(nlm_cplx_calc(self->lmax, self->mmax, 1));
+		shtns_rotation_apply_cplx(self, PyArray_Data(Qlm), PyArray_Data(Rlm));
+		return Rlm;
 	}
 #ifdef __cplusplus
 extern "C" {
@@ -5534,6 +5574,467 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_rotation_lmax_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  int result;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_lmax_get" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  result = (int)(int) ((arg1)->lmax);
+  resultobj = SWIG_From_int((int)(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_mmax_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  int result;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_mmax_get" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  result = (int)(int) ((arg1)->mmax);
+  resultobj = SWIG_From_int((int)(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_alpha_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  double result;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_alpha_get" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  result = (double)(double) ((arg1)->alpha);
+  resultobj = SWIG_From_double((double)(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_beta_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  double result;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_beta_get" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  result = (double)(double) ((arg1)->beta);
+  resultobj = SWIG_From_double((double)(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_gamma_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  double result;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_gamma_get" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  result = (double)(double) ((arg1)->gamma);
+  resultobj = SWIG_From_double((double)(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_new_rotation(PyObject *SWIGUNUSEDPARM(self), PyObject *args, PyObject *kwargs) {
+  PyObject *resultobj = 0;
+  int arg1 ;
+  int arg2 = (int) -1 ;
+  int val1 ;
+  int ecode1 = 0 ;
+  int val2 ;
+  int ecode2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  char * kwnames[] = {
+    (char *)"lmax",  (char *)"mmax",  NULL 
+  };
+  struct shtns_rot_ *result = 0 ;
+  
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O:new_rotation", kwnames, &obj0, &obj1)) SWIG_fail;
+  ecode1 = SWIG_AsVal_int(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "new_rotation" "', argument " "1"" of type '" "int""'");
+  } 
+  arg1 = (int)(val1);
+  if (obj1) {
+    ecode2 = SWIG_AsVal_int(obj1, &val2);
+    if (!SWIG_IsOK(ecode2)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "new_rotation" "', argument " "2"" of type '" "int""'");
+    } 
+    arg2 = (int)(val2);
+  }
+  {
+    shtns_error = 0;	// clear exception
+    result = (struct shtns_rot_ *)new_shtns_rot_(arg1,arg2);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_shtns_rot_, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_delete_rotation(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[1] ;
+  
+  if (!args) SWIG_fail;
+  swig_obj[0] = args;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "delete_rotation" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  {
+    shtns_error = 0;	// clear exception
+    delete_shtns_rot_(arg1);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_set_angles_ZYZ(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  double arg2 ;
+  double arg3 ;
+  double arg4 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  double val2 ;
+  int ecode2 = 0 ;
+  double val3 ;
+  int ecode3 = 0 ;
+  double val4 ;
+  int ecode4 = 0 ;
+  PyObject *swig_obj[4] ;
+  
+  if (!SWIG_Python_UnpackTuple(args, "rotation_set_angles_ZYZ", 4, 4, swig_obj)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_set_angles_ZYZ" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  ecode2 = SWIG_AsVal_double(swig_obj[1], &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "rotation_set_angles_ZYZ" "', argument " "2"" of type '" "double""'");
+  } 
+  arg2 = (double)(val2);
+  ecode3 = SWIG_AsVal_double(swig_obj[2], &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "rotation_set_angles_ZYZ" "', argument " "3"" of type '" "double""'");
+  } 
+  arg3 = (double)(val3);
+  ecode4 = SWIG_AsVal_double(swig_obj[3], &val4);
+  if (!SWIG_IsOK(ecode4)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "rotation_set_angles_ZYZ" "', argument " "4"" of type '" "double""'");
+  } 
+  arg4 = (double)(val4);
+  {
+    shtns_error = 0;	// clear exception
+    shtns_rot__set_angles_ZYZ(arg1,arg2,arg3,arg4);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_set_angles_ZXZ(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  double arg2 ;
+  double arg3 ;
+  double arg4 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  double val2 ;
+  int ecode2 = 0 ;
+  double val3 ;
+  int ecode3 = 0 ;
+  double val4 ;
+  int ecode4 = 0 ;
+  PyObject *swig_obj[4] ;
+  
+  if (!SWIG_Python_UnpackTuple(args, "rotation_set_angles_ZXZ", 4, 4, swig_obj)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_set_angles_ZXZ" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  ecode2 = SWIG_AsVal_double(swig_obj[1], &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "rotation_set_angles_ZXZ" "', argument " "2"" of type '" "double""'");
+  } 
+  arg2 = (double)(val2);
+  ecode3 = SWIG_AsVal_double(swig_obj[2], &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "rotation_set_angles_ZXZ" "', argument " "3"" of type '" "double""'");
+  } 
+  arg3 = (double)(val3);
+  ecode4 = SWIG_AsVal_double(swig_obj[3], &val4);
+  if (!SWIG_IsOK(ecode4)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "rotation_set_angles_ZXZ" "', argument " "4"" of type '" "double""'");
+  } 
+  arg4 = (double)(val4);
+  {
+    shtns_error = 0;	// clear exception
+    shtns_rot__set_angles_ZXZ(arg1,arg2,arg3,arg4);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_set_angle_axis(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  double arg2 ;
+  double arg3 ;
+  double arg4 ;
+  double arg5 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  double val2 ;
+  int ecode2 = 0 ;
+  double val3 ;
+  int ecode3 = 0 ;
+  double val4 ;
+  int ecode4 = 0 ;
+  double val5 ;
+  int ecode5 = 0 ;
+  PyObject *swig_obj[5] ;
+  
+  if (!SWIG_Python_UnpackTuple(args, "rotation_set_angle_axis", 5, 5, swig_obj)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_set_angle_axis" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  ecode2 = SWIG_AsVal_double(swig_obj[1], &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "rotation_set_angle_axis" "', argument " "2"" of type '" "double""'");
+  } 
+  arg2 = (double)(val2);
+  ecode3 = SWIG_AsVal_double(swig_obj[2], &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "rotation_set_angle_axis" "', argument " "3"" of type '" "double""'");
+  } 
+  arg3 = (double)(val3);
+  ecode4 = SWIG_AsVal_double(swig_obj[3], &val4);
+  if (!SWIG_IsOK(ecode4)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "rotation_set_angle_axis" "', argument " "4"" of type '" "double""'");
+  } 
+  arg4 = (double)(val4);
+  ecode5 = SWIG_AsVal_double(swig_obj[4], &val5);
+  if (!SWIG_IsOK(ecode5)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode5), "in method '" "rotation_set_angle_axis" "', argument " "5"" of type '" "double""'");
+  } 
+  arg5 = (double)(val5);
+  {
+    shtns_error = 0;	// clear exception
+    shtns_rot__set_angle_axis(arg1,arg2,arg3,arg4,arg5);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_wigner_d_matrix(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  int arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  int val2 ;
+  int ecode2 = 0 ;
+  PyObject *swig_obj[2] ;
+  PyObject *result = 0 ;
+  
+  if (!SWIG_Python_UnpackTuple(args, "rotation_wigner_d_matrix", 2, 2, swig_obj)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_wigner_d_matrix" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  ecode2 = SWIG_AsVal_int(swig_obj[1], &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "rotation_wigner_d_matrix" "', argument " "2"" of type '" "int""'");
+  } 
+  arg2 = (int)(val2);
+  {
+    shtns_error = 0;	// clear exception
+    result = (PyObject *)shtns_rot__wigner_d_matrix(arg1,arg2);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = result;
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_apply_real(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  PyObject *arg2 = (PyObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[2] ;
+  PyObject *result = 0 ;
+  
+  if (!SWIG_Python_UnpackTuple(args, "rotation_apply_real", 2, 2, swig_obj)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_apply_real" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  arg2 = swig_obj[1];
+  {
+    shtns_error = 0;	// clear exception
+    result = (PyObject *)shtns_rot__apply_real(arg1,arg2);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = result;
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_rotation_apply_cplx(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
+  PyObject *arg2 = (PyObject *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject *swig_obj[2] ;
+  PyObject *result = 0 ;
+  
+  if (!SWIG_Python_UnpackTuple(args, "rotation_apply_cplx", 2, 2, swig_obj)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_shtns_rot_, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "rotation_apply_cplx" "', argument " "1"" of type '" "struct shtns_rot_ *""'"); 
+  }
+  arg1 = (struct shtns_rot_ *)(argp1);
+  arg2 = swig_obj[1];
+  {
+    shtns_error = 0;	// clear exception
+    result = (PyObject *)shtns_rot__apply_cplx(arg1,arg2);
+    if (shtns_error) {
+      // test for exception
+      SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
+    }
+  }
+  resultobj = result;
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *rotation_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *obj;
+  if (!SWIG_Python_UnpackTuple(args, "swigregister", 1, 1, &obj)) return NULL;
+  SWIG_TypeNewClientData(SWIGTYPE_p_shtns_rot_, SWIG_NewClientData(obj));
+  return SWIG_Py_Void();
+}
+
+SWIGINTERN PyObject *rotation_swiginit(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  return SWIG_Python_InitShadowInstance(args);
+}
+
 static PyMethodDef SwigMethods[] = {
 	 { "SWIG_PyInstanceMethod_New", SWIG_PyInstanceMethod_New, METH_O, NULL},
 	 { "sht_nlm_get", _wrap_sht_nlm_get, METH_O, "sht_nlm_get(sht self) -> unsigned int const"},
@@ -5598,6 +6099,21 @@ static PyMethodDef SwigMethods[] = {
 	 { "nlm_cplx_calc", _wrap_nlm_cplx_calc, METH_VARARGS, "nlm_cplx_calc(long lmax, long mmax, long mres) -> long"},
 	 { "set_verbosity", _wrap_set_verbosity, METH_O, "set_verbosity(int arg1)"},
 	 { "print_version", _wrap_print_version, METH_NOARGS, "print_version()"},
+	 { "rotation_lmax_get", _wrap_rotation_lmax_get, METH_O, "rotation_lmax_get(rotation self) -> int const"},
+	 { "rotation_mmax_get", _wrap_rotation_mmax_get, METH_O, "rotation_mmax_get(rotation self) -> int const"},
+	 { "rotation_alpha_get", _wrap_rotation_alpha_get, METH_O, "rotation_alpha_get(rotation self) -> double const"},
+	 { "rotation_beta_get", _wrap_rotation_beta_get, METH_O, "rotation_beta_get(rotation self) -> double const"},
+	 { "rotation_gamma_get", _wrap_rotation_gamma_get, METH_O, "rotation_gamma_get(rotation self) -> double const"},
+	 { "new_rotation", (PyCFunction)(void(*)(void))_wrap_new_rotation, METH_VARARGS|METH_KEYWORDS, "new_rotation(int lmax, int mmax=-1) -> rotation"},
+	 { "delete_rotation", _wrap_delete_rotation, METH_O, "delete_rotation(rotation self)"},
+	 { "rotation_set_angles_ZYZ", _wrap_rotation_set_angles_ZYZ, METH_VARARGS, "rotation_set_angles_ZYZ(rotation self, double alpha, double beta, double gamma)"},
+	 { "rotation_set_angles_ZXZ", _wrap_rotation_set_angles_ZXZ, METH_VARARGS, "rotation_set_angles_ZXZ(rotation self, double alpha, double beta, double gamma)"},
+	 { "rotation_set_angle_axis", _wrap_rotation_set_angle_axis, METH_VARARGS, "rotation_set_angle_axis(rotation self, double theta, double Vx, double Vy, double Vz)"},
+	 { "rotation_wigner_d_matrix", _wrap_rotation_wigner_d_matrix, METH_VARARGS, "rotation_wigner_d_matrix(rotation self, int const l) -> PyObject *"},
+	 { "rotation_apply_real", _wrap_rotation_apply_real, METH_VARARGS, "rotation_apply_real(rotation self, PyObject * Qlm) -> PyObject *"},
+	 { "rotation_apply_cplx", _wrap_rotation_apply_cplx, METH_VARARGS, "rotation_apply_cplx(rotation self, PyObject * Qlm) -> PyObject *"},
+	 { "rotation_swigregister", rotation_swigregister, METH_O, NULL},
+	 { "rotation_swiginit", rotation_swiginit, METH_VARARGS, NULL},
 	 { NULL, NULL, 0, NULL }
 };
 
@@ -5613,6 +6129,7 @@ static swig_type_info _swigt__p_double = {"_p_double", "double *", 0, 0, (void*)
 static swig_type_info _swigt__p_double_complex = {"_p_double_complex", "cplx *|double complex *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_int = {"_p_int", "int *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_shtns_info = {"_p_shtns_info", "struct shtns_info *|shtns_info *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_shtns_rot_ = {"_p_shtns_rot_", "struct shtns_rot_ *|shtns_rot_ *", 0, 0, (void*)0, 0};
 
 static swig_type_info *swig_type_initial[] = {
   &_swigt__p_char,
@@ -5620,6 +6137,7 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_double_complex,
   &_swigt__p_int,
   &_swigt__p_shtns_info,
+  &_swigt__p_shtns_rot_,
 };
 
 static swig_cast_info _swigc__p_char[] = {  {&_swigt__p_char, 0, 0, 0},{0, 0, 0, 0}};
@@ -5627,6 +6145,7 @@ static swig_cast_info _swigc__p_double[] = {  {&_swigt__p_double, 0, 0, 0},{0, 0
 static swig_cast_info _swigc__p_double_complex[] = {  {&_swigt__p_double_complex, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_int[] = {  {&_swigt__p_int, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_shtns_info[] = {  {&_swigt__p_shtns_info, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_shtns_rot_[] = {  {&_swigt__p_shtns_rot_, 0, 0, 0},{0, 0, 0, 0}};
 
 static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_char,
@@ -5634,6 +6153,7 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_double_complex,
   _swigc__p_int,
   _swigc__p_shtns_info,
+  _swigc__p_shtns_rot_,
 };
 
 

@@ -184,6 +184,17 @@ struct shtns_info {		// MUST start with "int nlm;"
 	// the end should be aligned on the size of int, to allow the storage of small arrays.
 };
 
+struct shtns_rot_ {		// describe a rotation matrix
+	shtns_cfg sht;
+	int lmax, mmax;
+	int flag_alpha_gamma;
+	double cos_beta, sin_beta;
+	double alpha, beta, gamma; 	// Euler angles, in ZYZ convention
+	double* plm_beta;
+	cplx eia;
+	cplx eig;
+};
+
 // define shortcuts to sizes.
 #define NLM shtns->nlm
 #define LMAX shtns->lmax

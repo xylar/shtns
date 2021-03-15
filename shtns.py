@@ -537,5 +537,48 @@ def set_verbosity(arg1):
 def print_version():
     r"""print_version()"""
     return _shtns.print_version()
+class rotation(object):
+    r"""Proxy of C shtns_rot_ struct."""
+
+    thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
+    __repr__ = _swig_repr
+    lmax = property(_shtns.rotation_lmax_get, doc=r"""lmax : q(const).int""")
+    mmax = property(_shtns.rotation_mmax_get, doc=r"""mmax : q(const).int""")
+    alpha = property(_shtns.rotation_alpha_get, doc=r"""alpha : q(const).double""")
+    beta = property(_shtns.rotation_beta_get, doc=r"""beta : q(const).double""")
+    gamma = property(_shtns.rotation_gamma_get, doc=r"""gamma : q(const).double""")
+
+    def __init__(self, lmax, mmax=-1):
+        r"""__init__(rotation self, int lmax, int mmax=-1) -> rotation"""
+        _shtns.rotation_swiginit(self, _shtns.new_rotation(lmax, mmax))
+    __swig_destroy__ = _shtns.delete_rotation
+
+    def set_angles_ZYZ(self, alpha, beta, gamma):
+        r"""set_angles_ZYZ(rotation self, double alpha, double beta, double gamma)"""
+        return _shtns.rotation_set_angles_ZYZ(self, alpha, beta, gamma)
+
+    def set_angles_ZXZ(self, alpha, beta, gamma):
+        r"""set_angles_ZXZ(rotation self, double alpha, double beta, double gamma)"""
+        return _shtns.rotation_set_angles_ZXZ(self, alpha, beta, gamma)
+
+    def set_angle_axis(self, theta, Vx, Vy, Vz):
+        r"""set_angle_axis(rotation self, double theta, double Vx, double Vy, double Vz)"""
+        return _shtns.rotation_set_angle_axis(self, theta, Vx, Vy, Vz)
+
+    def wigner_d_matrix(self, l):
+        r"""wigner_d_matrix(rotation self, int const l) -> PyObject *"""
+        return _shtns.rotation_wigner_d_matrix(self, l)
+
+    def apply_real(self, Qlm):
+        r"""apply_real(rotation self, PyObject * Qlm) -> PyObject *"""
+        return _shtns.rotation_apply_real(self, Qlm)
+
+    def apply_cplx(self, Qlm):
+        r"""apply_cplx(rotation self, PyObject * Qlm) -> PyObject *"""
+        return _shtns.rotation_apply_cplx(self, Qlm)
+
+# Register rotation in _shtns:
+_shtns.rotation_swigregister(rotation)
+
 
 
