@@ -1364,7 +1364,7 @@ static cplx special_eiphi(const double phi)
 void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, double gamma)
 {
 	if (fabs(beta) > M_PI) {
-		printf("ERROR: angle must be between -pi and pi\n");
+		printf("ERROR: angle 'beta' must be between -pi and pi\n");
 		exit(1);
 	}
 	if (beta < 0.0) {	// translate to beta>0 as beta<0 is not supported.
@@ -1375,6 +1375,7 @@ void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, doubl
 		alpha += gamma;
 		gamma = 0.0;
 	}
+	//printf("set_angles_ZYZ: %g, %g, %g\n", alpha*180./M_PI, beta*180./M_PI, gamma*180./M_PI);
 
 	// step 0 : compute plm(beta)
 	const double cos_beta = cos(beta);   //((beta == M_PI_2)||(beta == M_PI/2)) ? 0.0 : cos(beta);
@@ -1386,15 +1387,12 @@ void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, doubl
 	r->beta = beta;
 	r->gamma = gamma;
 	r->flag_alpha_gamma = (alpha != 0) + 2*(gamma != 0);
-	const int lmax = r->lmax + 1;			// need SH up to lmax+1.
-	#pragma omp parallel
-	{
-		if (beta != 0.0) {
-			#pragma omp for schedule(dynamic) nowait
-			for (int m=0; m<=lmax; m++) {
-				const long ofs = m*(lmax+2) - (m*(m+1))/2;
-				legendre_sphPlm_array(r->sht, lmax, m, cos_beta, r->plm_beta + ofs);
-			}
+	if (beta != 0.0) {
+		const int lmax = r->lmax + 1;			// need SH up to lmax+1.
+		#pragma omp parallel for schedule(dynamic) firstprivate(lmax,cos_beta)
+		for (int m=0; m<=lmax; m++) {
+			const long ofs = m*(lmax+2) - (m*(m+1))/2;
+			legendre_sphPlm_array(r->sht, lmax, m, cos_beta, r->plm_beta + ofs);
 		}
 	}
 }
