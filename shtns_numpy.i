@@ -181,7 +181,7 @@ inline static PyObject* SpatArray_New(int size) {
 	%apply int *OUTPUT { int *nlat_out };
 	%apply int *OUTPUT { int *nphi_out };
 	%feature("kwargs") set_grid;
-	void set_grid(int nlat=0, int nphi=0, int flags=sht_quick_init, double polar_opt=1.0e-8, int nl_order=1, int *nlat_out, int *nphi_out) {	// default arguments
+	void set_grid(int nlat=0, int nphi=0, int flags=sht_quick_init, double polar_opt=1.0e-10, int nl_order=1, int *nlat_out, int *nphi_out) {	// default arguments
 		if (nlat != 0) {
 			if (nlat <= $self->lmax) {	// nlat too small
 				throw_exception(SWIG_ValueError,1,"nlat <= lmax");		return;
