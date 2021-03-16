@@ -194,6 +194,12 @@ inline static PyObject* SpatArray_New(int size) {
 			throw_exception(SWIG_ValueError,2,"nphi <= 2*mmax");	return;
 		}
 		if (!(flags & SHT_THETA_CONTIGUOUS))  flags |= SHT_PHI_CONTIGUOUS;	// default to SHT_PHI_CONTIGUOUS.
+		int grd = flags & 255;
+		// avoid slow initialization (which sometimes hangs with python)
+		if ((grd == sht_auto) || (grd == sht_gauss_fly) || (grd == sht_gauss)) {
+			grd = sht_quick_init;
+		} else if (grd == sht_reg_dct) grd = sht_reg_fast;
+		flags = (flags &~ 255) | grd;
 		*nlat_out = nlat;		*nphi_out = nphi;
 		shtns_set_grid_auto($self, flags, polar_opt, nl_order, nlat_out, nphi_out);
 	}
