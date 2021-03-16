@@ -15,7 +15,7 @@ gamma = 0
 rot.set_angles_ZYZ(alpha, beta, gamma)   # defines rotation by giving Euler angles (alpha, beta, gamma), around axes Z,Y and Z respectively.
 ### or alternatively:
 # rot.set_angles_ZXZ(alpha, beta, gamma)  # same, but around axes Z, X and Z
-# rot.set_angle_axis(theta, Vx, Vy, Vz)   # same, but rotation of angle "theta" around vector (Vx,Vy,Vz)  [ !! beta, to be tested !!]
+# rot.set_angle_axis(theta, Vx, Vy, Vz)   # same, but rotation of angle "theta" around vector (Vx,Vy,Vz)
 
 ### If you like, you can get the Wigner-d matrix https://en.wikipedia.org/wiki/Wigner_D-matrix#Wigner_(small)_d-matrix
 # W3 = rot.wigner_d_matrix(3)  # Wigner-d rotation matrix for degree l=3

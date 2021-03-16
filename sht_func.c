@@ -1328,6 +1328,7 @@ void shtns_rotation_destroy(shtns_rot r)
 	}
 }
 
+/// retruns cos(phi) + I*sin(phi), with specialization for some particular values of phi.
 static cplx special_eiphi(const double phi)
 {
 	cplx eip;
@@ -1335,11 +1336,11 @@ static cplx special_eiphi(const double phi)
 		eip = 1.0;
 	} else if (phi == M_PI) {
 		eip = -1.0;
-	} else if ((phi == M_PI/2) || (phi == M_PI_2)) {
+	} else if (phi == M_PI/2) {
 		eip = I;
-	} else if ((phi == 3*M_PI/2) || (phi == -M_PI/2) || (phi == -M_PI_2)) {
+	} else if ((phi == 3*M_PI/2) || (phi == -M_PI/2)) {
 		eip = -I;
-	} else if ((phi == M_PI/4) || (phi == M_PI_4)) {
+	} else if (phi == M_PI/4) {
 		eip = sqrt(0.5) + I*sqrt(0.5);
 	} else if (phi == M_PI/3) {
 		eip = 0.5 + I*sqrt(3)*0.5;
@@ -1364,12 +1365,11 @@ void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, doubl
 		alpha += gamma;
 		gamma = 0.0;
 	}
-	//printf("set_angles_ZYZ: %g, %g, %g\n", alpha*180./M_PI, beta*180./M_PI, gamma*180./M_PI);
 
 	// step 0 : compute plm(beta)
-	const double cos_beta = cos(beta);   //((beta == M_PI_2)||(beta == M_PI/2)) ? 0.0 : cos(beta);
-	r->cos_beta = cos_beta;
-	r->sin_beta = sqrt((1.-cos_beta)*(1.+cos_beta));
+	const cplx eib = special_eiphi(beta);
+	r->cos_beta = creal(eib);
+	r->sin_beta = cimag(eib);
 	r->eia = special_eiphi(-alpha);
 	r->eig = special_eiphi(-gamma);
 	r->alpha = alpha;
@@ -1378,17 +1378,17 @@ void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, doubl
 	r->flag_alpha_gamma = (alpha != 0) + 2*(gamma != 0);
 	if (beta != 0.0) {
 		const int lmax = r->lmax + 1;			// need SH up to lmax+1.
-		#pragma omp parallel for schedule(dynamic) firstprivate(lmax,cos_beta)
+		#pragma omp parallel for schedule(dynamic) firstprivate(lmax)
 		for (int m=0; m<=lmax; m++) {
 			const long ofs = m*(lmax+2) - (m*(m+1))/2;
-			legendre_sphPlm_array(r->sht, lmax, m, cos_beta, r->plm_beta + ofs);
+			legendre_sphPlm_array(r->sht, lmax, m, r->cos_beta, r->plm_beta + ofs);
 		}
 	}
 }
 
 void shtns_rotation_set_angles_ZXZ(shtns_rot r, double alpha, double beta, double gamma)
 {
-	shtns_rotation_set_angles_ZYZ(r, alpha-M_PI/2, beta, gamma+M_PI/2);
+	shtns_rotation_set_angles_ZYZ(r, alpha+M_PI/2, beta, gamma-M_PI/2);
 }
 
 void shtns_rotation_set_angle_axis(shtns_rot r, double theta, double Vx, double Vy, double Vz)
@@ -1403,16 +1403,15 @@ void shtns_rotation_set_angle_axis(shtns_rot r, double theta, double Vx, double 
 		double n = s / sqrt(Vx*Vx + Vy*Vy + Vz*Vz);
 		Vx *= n;	Vy *= n;	Vz *= n;
 
-		// 2) convert from quaternion to euler angle ZXZ:
+		// 2) convert from quaternion to extrinsic Euler angles:
 		double beta = acos( 1.0 - 2.0*(Vx*Vx + Vy*Vy) );  // = acos( c*c + Vz*Vz - (Vx*Vx + Vy*Vy) );
 		double Vxz = Vx*Vz;
 		double Vyz = Vy*Vz;
 		double cVx = c*Vx;
 		double cVy = c*Vy;
-		double alpha = atan2( Vxz + cVy, cVx - Vyz );
-		double gamma = atan2( Vxz - cVy, cVx + Vyz );
-
-		shtns_rotation_set_angles_ZXZ(r, alpha, beta, gamma);
+		double alpha = atan2( Vyz - cVx, cVy + Vxz );		// note: for ZXZ convention: switch x with y and alpha with gamma.
+		double gamma = atan2( Vyz + cVx, cVy - Vxz );
+		shtns_rotation_set_angles_ZYZ(r, gamma, beta, alpha);	// extrinsic rotation: swap gamma and alpha. See https://en.wikipedia.org/wiki/Euler_angles#Conventions_by_intrinsic_rotations
 	}
 }
 
