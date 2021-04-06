@@ -222,7 +222,7 @@ V			v2d* v = vw;
 			int ny[NBLK/NWAY];		// exponent to extend double precision range.
 			int lnz = llim;			// apriori, we go up to llim.
 		#endif
-			int imin = (k<k0) ? imin = k0-k-(NWAY-1) : 0;	// the last block may be smaller.
+			int imin = (k<k0) ? k0-k-(NWAY-1) : 0;	// the last block may be smaller.
 			for (int i=NBLK-NWAY; i>=imin; i-=NWAY) {		// iterate over blocks, start from the right-most (IMPORTANT!)
 				rnd y0[NWAY], cost[NWAY];		// should fit in registers
 				for (int j=0; j<NWAY; j++) {
@@ -239,6 +239,7 @@ V				l=m-1;
 						for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
 					} while(l >>= 1);
 		#else  /* HI_LLIM */
+				cost[NWAY-1] = vreverse(cost[NWAY-1]);	// for testing the largest one.
 				{	int nsint = 0;
 					do {		// sin(theta)^m		(use rescaling to avoid underflow)
 						if (l&1) {
@@ -263,6 +264,9 @@ V				l=m-1;
 				for (int j=0; j<NWAY; ++j) {
 					int idx = k+i+j;	if (idx < 0) idx=0;		// don't read below data.
 					cost[j] = vread(ct, idx);		// cos(theta)
+					#ifdef HI_LLIM
+					if (j==NWAY-1) cost[j] = vreverse(cost[j]);
+					#endif
 					#ifndef SHTNS_ISHIOKA
 					y0[j] *= vall(al[0]);
 					y1[j]  = (vall(al[1])*y0[j]) * cost[j];
@@ -302,6 +306,9 @@ V				l=m-1;
 QX				if ((l > llim) && (ny0<0)) break;	// nothing more to do in this block.
 V				if ((l > llim+1) && (ny0<0)) break;	// nothing more to do in this block.
 				lnz = l;				// record the minimum l for significant values, over this block, do not go above that afterwards
+				y0[NWAY-1] = vreverse(y0[NWAY-1]);
+				y1[NWAY-1] = vreverse(y1[NWAY-1]);
+				cost[NWAY-1] = vreverse(cost[NWAY-1]);
 		#endif
 				for (int j=0; j<NWAY; ++j) {	// store other stuff for recurrence.
 					y01ct[i+j][0] = y0[j];

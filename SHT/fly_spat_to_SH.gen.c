@@ -341,6 +341,7 @@ V			rnd perk[NWAY], peik[NWAY], pork[NWAY], poik[NWAY];
 				cost[j] = vread(st, k+j);
 				y0[j] = vall(1.0);
 			}
+			cost[NWAY-1] = vreverse(cost[NWAY-1]);	// reverse to bring high-value to the front for cheap testing.
 Q			l=m;
 V			l=m-1;
 			long int ny = 0;	// exponent to extend double precision range.
@@ -371,6 +372,7 @@ V			l=m-1;
 			for (int j=0; j<NWAY; ++j) {
 				y0[j] *= vall(alm0_rescale);
 				cost[j] = vread(ct, k+j);
+				if (j==NWAY-1) cost[j] = vreverse(cost[j]);	// reverse to bring high-value to the front for cheap testing.
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];
 			}
 			l=m;	al+=2;
@@ -390,6 +392,9 @@ V			l=m-1;
 				}
 			}
 		  if (ny == 0) {
+			y0[NWAY-1] = vreverse(y0[NWAY-1]);	// reverse back to natural order
+			y1[NWAY-1] = vreverse(y1[NWAY-1]);
+			cost[NWAY-1] = vreverse(cost[NWAY-1]);
 Q			q+=2*(l-m);
 V			v+=4*(l-m);
 			for (int j=0; j<NWAY; ++j) {	// prefetch
