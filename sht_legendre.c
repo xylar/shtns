@@ -141,7 +141,7 @@ static double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
 }
 
 
-/// \internal Returns the value of a legendre polynomial of degree l and order im*MRES, noramalized for spherical harmonics, using recurrence.
+/// \internal Returns the value of a legendre polynomial of degree l and order im*MRES, normalized for spherical harmonics, using recurrence.
 /// Requires a previous call to \ref legendre_precomp().
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm(l, m, x)
 static double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, const double x)
@@ -725,85 +725,143 @@ static double legendre_Pl(const int l, double x)
 
 /// \internal Generates the abscissa and weights for a Gauss-Legendre quadrature.
 /// Newton method from initial Guess to find the zeros of the Legendre Polynome
-/// \param x = abscissa, \param w = weights, \param n points.
+/// \param x = abscissa, \param st = sin(theta)=sqrt(1-x*x), \param w = weights, \param n points.
 /// \note Reference:  Numerical Recipes, Cornell press.
-static void gauss_nodes(real *x, real *w, const int n)
+void gauss_nodes(double *x, double* st, double *w, const int n)
 {
-	long int i,l,m, k;
-	real z, z1, p1, p2, p3, pp;
-	real eps;
+	double eps = 2.3e-16;		// desired precision, minimum = 2.2204e-16 (double)
+	if ((sizeof(real) > 8) && (long_double_caps > 1))	eps = 1.1e-19;		// desired precision, minimum = 1.0842e-19 (long double i387)
 
-	eps = 2.3e-16;		// desired precision, minimum = 2.2204e-16 (double)
-	if ((sizeof(eps) > 8) && (long_double_caps > 1))	eps = 1.1e-19;		// desired precision, minimum = 1.0842e-19 (long double i387)
-
-	m = (n+1)/2;
-	for (i=1;i<=m;++i) {
-		k=10;		// maximum Newton iteration count to prevent infinite loop.
-		p1 = M_PIl;		p2 = 2*n;
-		z = (1.0 - (n-1)/(p2*p2*p2)) * COS((p1*(4*i-1))/(4*n+2));	// initial guess
+	const long m = (n+1)/2;
+	#pragma omp parallel for
+	for (long i=0;i<m;++i) {
+		real z, z1, pp, p2, p1;
+		int k=10;		// maximum Newton iteration count to prevent infinite loop.
+		z = (1.0 - (n-1.)/(8.*n*n*n)) * cos((M_PI*(4*i+3))/(4*n+2));	// initial guess
 		do {
-			p1 = z;		// P_1
+			p1 = z;	// P_1
 			p2 = 1.0;	// P_0
-			for(l=2;l<=n;++l) {		 // recurrence : l P_l = (2l-1) z P_{l-1} - (l-1) P_{l-2}	(works ok up to l=100000)
-				p3 = p2;
+			for(long l=2;l<=n;++l) {		 // recurrence : l P_l = (2l-1) z P_{l-1} - (l-1) P_{l-2}	(works ok up to l=100000)
+				real p3 = p2;
 				p2 = p1;
 				p1 = ((2*l-1)*z*p2 - (l-1)*p3)/l;		// The Legendre polynomial...
 			}
-			pp = ((1.-z)*(1.+z))/(n*(p2-z*p1));			// ... and its inverse derivative.
+			pp = n*(p2-z*p1);			// ... and its (almost) derivative.
 			z1 = z;
-			z -= p1*pp;		// Newton's method
-		} while (( FABS(z-z1) > (z1+z)*0.5*eps ) && (--k > 0));
-		x[i-1] = z;		// Build up the abscissas.
-		w[i-1] = 2.0*pp*pp/((1.-z)*(1.+z));		// Build up the weights.
-		x[n-i] = -z;
-		w[n-i] = w[i-1];
+			z -= p1*(1.-z*z)/pp;		// Newton's method
+		} while (( fabs(z-z1) > ((double)(z1+z))*0.5*eps ) && (--k > 0));
+		if (k==0) printf("i=%ld, k=%ld, z=%g, z1=%g, abs(z-z1)=%g, err=%g\n",i,k, (double) z, (double) z1, fabs(z-z1), 2*fabs(z-z1)/((double)(z1+z)) );
+		real s2 = 1.-z*z;
+		x[i] = z;		// Build up the abscissas.
+		x[n-1-i] = -z;
+		w[i] = 2.0*s2/(pp*pp);		// Build up the weights.
+		w[n-1-i] = w[i];
+		st[i] = SQRT(s2);
+		st[n-1-i] = st[i];
+		if (eps < 1e-16) printf("i=%d, sin(theta)=%g, sqrt(1-z2)=%g, err=%g\n", i, st[i], sqrt(1.-x[i]*x[i]), (st[i] - sqrt(1.-x[i]*x[i]))/st[i] );
 	}
-	if (n&1) x[n/2] = 0.0;		// exactly zero.
+	if (n&1) {
+		x[n/2]  = 0.0;		// exactly zero.
+		st[n/2] = 1.0;
+			real p2 = 1.0;	// P_0
+			for(long l=2;l<=n;l+=2) {		 // recurrence : l P_l = (2l-1) z P_{l-1} - (l-1) P_{l-2}	(works ok up to l=100000)
+				p2 *= (1.0-l)/l;		// The Legendre polynomial...
+			}
+			real pp = 1./(n*p2);			// ... and its inverse derivative.
+		w[n/2] = 2.0*pp*pp;
+	}
 
 #if SHT_VERBOSE > 1
 // test integral to compute :
 	if (verbose) {
-		z = 0;
-		for (i=0;i<m;++i) {
-			z += w[i]*x[i]*x[i];
-		}
-		#ifndef HAVE_LONG_DOUBLE_WIDER
-			printf("          Gauss quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*3.,z*3.-1.0);
-		#else
-			printf("          Gauss quadrature for 3/2.x^2 = %Lg (should be 1.0) error = %Lg\n",z*3.,z*3.-1.0);
-		#endif
+		double z = 0;
+		for (long i=0;i<m;++i)	z += w[i]*x[i]*x[i];
+		printf("          Gauss quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*3., z*3.-1.0);
+		z=0;
+		for (long i=0;i<m;++i)	z += w[i]*st[i]*st[i];
+		printf("          Gauss quadrature for 2/pi*sin2(theta) = %g (should be 1.0) error = %g\n",z*3./2., z*3./2. - 1.0);
 	}
 #endif
 
-// as we started with initial guesses, we should check if the gauss points are actually unique.
-	for (i=m-1; i>0; i--) {
-		if (((double) x[i]) == ((double) x[i-1])) shtns_runerr("bad gauss points");
+// as we started with initial guesses, we should check if the gauss points are actually unique and ordered.
+	for (long i=m-1; i>0; i--) {
+		if (((double) x[i]) >= ((double) x[i-1])) shtns_runerr("bad gauss points");
 	}
 }
+
+/// Accurate evalutation of Nth-root of unity
+/// Expect 0 <= k <= n.  (use k=k%n to enforce)
+/// Should work well up to n = 2^48.
+cplx exp_2IpiK_N_accurate(long k, long n)
+{
+	// range reduction to 0..2*pi
+	//if ((unsigned) k > n)	k = k % n;		// k modulo n.
+	// range reduction from 0..2*pi to 0..pi/4
+	int quadrant = 0;	// record the quadrant of the result
+	// from 0..2pi to 0..pi
+	if (2*k > n) {
+		quadrant |= 1;	// change sign of sin
+		k = n-k;
+	}
+	// from 0..pi to 0..pi/2
+	if (4*k > n) {
+		quadrant |= 2;	// change sign of cos
+		k = n - 2*k;
+		n *= 2;
+	}
+	// from 0..pi/2 to 0..pi/4
+	if (8*k > n) {		// exchange sin and cos
+		quadrant |= 4;
+		k = n - 4*k;
+		n *= 4;
+	}
+	double c = 1.0;
+	double s = 0.0;
+	if (k != 0) {
+		double xd = ((double)(2*k)/n) * M_PI;		// x should be:  0 <= x <= pi/4
+		c = cos(xd);
+		s = sin(xd);
+	}
+	if (quadrant & 4) {
+		double t = c;	c = s;	s = t;		// exchange sin and cos
+	}
+	if (quadrant & 2) c = -c;
+	if (quadrant & 1) s = -s;
+	return c + I*s;
+}
+
 
 /// \internal Generates the abscissa and weights for a Féjer quadrature (#1).
 /// Compute weights via FFT
 /// \param x = abscissa, \param w = weights, \param n points.
 /// \note Reference: Waldvogel (2006) "Fast Construction of the Fejér and Clenshaw-Curtis Quadrature Rules"
 /// requires n > 2*lmax
-static void fejer1_nodes(real *x, real *w, const int n)
+static void fejer1_nodes(double *x, double *st, double *w, const int n)
 {
 	fftw_plan ifft;
 	double* wf = (double*) malloc( (2*n+2) * sizeof(double) );
 	cplx* v1 = (cplx*) (wf + n);
 
 	// the nodes
-	for (int i=0; i<n; i++) {
-		x[i] = cos(M_PI*(0.5+i)/n);
+	for (int i=0; i<(n+1)/2; i++) {
+		cplx cs = exp_2IpiK_N_accurate(2*i+1, 4*n);
+		if (fabs(creal(cs) - cos(M_PI*(0.5+i)/n)) > 1e-15) printf("BAD POINTS\n");
+		x[i]      =  creal(cs);		// cos(M_PI*(0.5+i)/n);
+		x[n-1-i]  = -creal(cs);
+		st[i]     =  cimag(cs);
+		st[n-1-i] =  cimag(cs);
 	}
 
 	// the weights
-	for (int k=0; k<n/2+1; k++) {
-		double t = (M_PI*k)/n;
-		v1[k] = (cos(t) + I*sin(t)) * 2.0/(1.0 - 4.0*k*k);
-	}
-
 	ifft = fftw_plan_dft_c2r_1d(n, v1, wf, FFTW_ESTIMATE);
+	for (int k=0; k<n/2+1; k++) {
+		cplx cs = exp_2IpiK_N_accurate(k, 2*n);
+		double t = (M_PI*k)/n;	// 2*M_PI*k/(2*n)
+		if (cabs(cos(t) + I*sin(t) - cs) > 1e-15) printf("BAD WEIGHTS\n");
+		//v1[k] = (cos(t) + I*sin(t)) * 2.0/(1.0 - 4.0*k*k);
+		v1[k] = cs * 2.0/(1.0 - 4.0*k*k);
+	}
+	if ((n&1) == 0) v1[n/2] = 0;
 	fftw_execute_dft_c2r(ifft,v1,wf);
 
 	for (int k=0; k<n; k++)
@@ -813,23 +871,30 @@ static void fejer1_nodes(real *x, real *w, const int n)
 	free(wf);
 }
 
-static void clenshaw_curtis_nodes(real *x, real *w, const int n)
+static void clenshaw_curtis_nodes(double *x, double* st, double *w, const int n)
 {
 	fftw_plan ifft;
-	double* wf = (double*) malloc( (2*n+2) * sizeof(double) );
-	cplx* v1 = (cplx*) (wf + n);
+	double* wf = (double*) malloc( (2*n+10) * sizeof(double) );
+	cplx* v1 = (cplx*) (wf + n+4);
 
 	// the nodes
 	for (int i=0; i<n; i++) {
-		x[i] = cos((M_PI*i)/(n-1));
+		cplx cs = exp_2IpiK_N_accurate(i, 2*(n-1));
+		if (fabs(creal(cs) - cos((M_PI*i)/(n-1))) > 1e-15) printf("BAD POINTS\n");
+		x[i]  = creal(cs);	// cos((M_PI*i)/(n-1));
+		st[i] = cimag(cs);	// sin((M_PI*i)/(n-1));
 	}
 
 	// the weights
-	for (int k=0; k<(n-1)/2+1; k++) {
-		v1[k] = 2.0/(1.0 - 4.0*k*k);
-	}
-
+	double w0 = 1.0/((n-1)*(n-1)-1 + ((n-1)&1));
 	ifft = fftw_plan_dft_c2r_1d(n-1, v1, wf, FFTW_ESTIMATE);
+	for (int k=0; k<n/2; k++) {
+		v1[k] = 2.0/(1.0 - 4.0*k*k);
+		//v1[k] -= w0;
+	}
+	v1[n/2] = (n-1-3.0)/(2*((n-1)/2)-1) - 1.0;
+	//v1[n/2] += w0 * ((2 - ((n-1)&1))*(n-1)-1);
+
 	fftw_execute_dft_c2r(ifft,v1,wf);
 
 	wf[0] *= 0.5;
@@ -853,6 +918,7 @@ static void fejer2_nodes(real *x, real *w, const int n)
 
 	// the nodes
 	for (int i=0; i<n; i++) {
+		cplx cs = exp_2IpiK_N_accurate(i+1, 2*(n+1));
 		x[i] = cos((M_PI*(i+1))*norm);
 		if (n<=128) printf("%g ",acos(x[i])*180./M_PI);
 	}

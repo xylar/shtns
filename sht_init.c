@@ -546,8 +546,8 @@ static void PolarOptimize(shtns_cfg shtns, double eps)
 static void grid_weights(shtns_cfg shtns, double latdir)
 {
 	long int it;
-	real iylm_fft_norm;
-	real xg[NLAT], wgl[NLAT];	// gauss points and weights.
+	double iylm_fft_norm;
+	double xg[NLAT], stg[NLAT], wg[NLAT];	// gauss points and weights.
 	const int overflow = 8*VSIZE2-1;
 	const unsigned char grid = shtns->grid;
 
@@ -563,7 +563,7 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 			if (2*NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Gauss-Legendre anti-aliasing condition 2*Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
 		}
 		#endif
-		gauss_nodes(xg,wgl,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
+		gauss_nodes(xg,stg,wg,NLAT);	// generate gauss nodes and weights : ct = ]1,-1[ = cos(theta)
 	} else if (grid == GRID_REGULAR) {
 		#if SHT_VERBOSE > 0
 		if (verbose) {
@@ -571,7 +571,7 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 			if (NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Regular-Fejer anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
 		}
 		#endif
-		fejer1_nodes(xg,wgl,NLAT);
+		fejer1_nodes(xg,stg,wg,NLAT);
 	} else if (grid == GRID_POLES) {
 		#if SHT_VERBOSE > 0
 		if (verbose) {
@@ -579,18 +579,20 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 			if (NLAT <= (SHT_NL_ORDER +1)*LMAX) printf("     !! Warning : Regular-Clenshaw-Curtis anti-aliasing condition Nlat > %d*Lmax is not met.\n",SHT_NL_ORDER+1);
 		}
 		#endif
-		clenshaw_curtis_nodes(xg,wgl,NLAT);
+		clenshaw_curtis_nodes(xg,stg,wg,NLAT);
 	} else shtns_runerr("unknown grid.");
 	for (it=0; it<NLAT; it++) {
 		shtns->ct[it] = latdir * xg[it];
-		shtns->st[it] = SQRT((1.-xg[it])*(1.+xg[it]));
-		shtns->st_1[it] = 1.0/SQRT((1.-xg[it])*(1.+xg[it]));
+		shtns->st[it] = stg[it];
+		shtns->st_1[it] = 1.0/stg[it];
 	}
+	if (shtns->st[0] == 0.0)  shtns->st_1[0] = 0.0;
+	if (shtns->st[NLAT-1] == 0.0)  shtns->st_1[NLAT-1] = 0.0;
 	double s=0;
-	for (it=0; it<NLAT; it++) s += wgl[it];
+	for (it=0; it<NLAT; it++) s += wg[it];
 	if (fabs(s-2.0) > 1e-12) printf(" !! Warning: sum of weigths = 2 + %g (should be 2)", s-2.0);
 	for (it=0; it<NLAT_2; it++)
-		shtns->wg[it] = wgl[it]*iylm_fft_norm;		// faster double-precision computations.
+		shtns->wg[it] = wg[it]*iylm_fft_norm;		// faster double-precision computations.
 	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point. (required for Gauss, untested for regular grids... TODO CHECK)
 		shtns->wg[NLAT_2-1] *= 0.5;
 	}
