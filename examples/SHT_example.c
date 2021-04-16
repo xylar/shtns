@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <complex.h>
 #include <math.h>
-#include <fftw3.h>
 
 #include <shtns.h>
 
@@ -41,15 +40,18 @@ void write_mx(char *fn, double *mx, int N1, int N2);
 int main()
 {
 	shtns_cfg shtns;		// handle to a sht transform configuration
-	long int lmax,mmax,nlat,nphi,mres, NLM;
+	long int NLM;
 	complex double *Slm, *Tlm;	// spherical harmonics coefficients (l,m space): complex numbers.
 	double *Sh, *Th;		// real space : theta,phi
 	long int i,im,lm;
 	double t;
 
-	lmax = 5;	nlat = 32;
-	mmax = 3;	nphi = 10;
-	mres = 1;
+	const int lmax = 5;		// maximum degree of spherical harmonics
+	const int mmax = 3;		// maximum order of spherical harmonics
+	const int mres = 1;		// periodicity in phi (1 for full-sphere, 2 for half the sphere, 3 for 1/3, etc...)
+	const int nlat = 64;	// number of points in the latitude direction  (constraint: nlat >= lmax+1)
+	const int nphi = 16;	// number of points in the longitude direction (constraint: nphi >= 2*mmax+1)
+
 	shtns_verbose(1);			// displays informations during initialization.
 	shtns_use_threads(0);		// enable multi-threaded transforms (if supported).
 	shtns = shtns_init( sht_gauss, lmax, mmax, mres, nlat, nphi );
@@ -57,14 +59,17 @@ int main()
 //	shtns_set_grid(shtns, sht_gauss, 0.0, nlat, nphi);
 	NLM = shtns->nlm;
 
-// Memory allocation : the use of fftw_malloc is required because we need proper 16-byte alignement.
+// Memory allocation : the use of shtns_malloc is recommended for proper alignement, 
+// or to use 'pinned' memory for faster GPU transfers (if CUDA is used).
+// Use shtns_free() to free the memory when no more needed.
+
 // allocate spatial fields.
-	Sh = (double *) fftw_malloc( NSPAT_ALLOC(shtns) * sizeof(double));
-	Th = (double *) fftw_malloc( NSPAT_ALLOC(shtns) * sizeof(double));
+	Sh = (double *) shtns_malloc( NSPAT_ALLOC(shtns) * sizeof(double));
+	Th = (double *) shtns_malloc( NSPAT_ALLOC(shtns) * sizeof(double));
 
 // allocate SH representations.
-	Slm = (complex double *) fftw_malloc( NLM * sizeof(complex double));
-	Tlm = (complex double *) fftw_malloc( NLM * sizeof(complex double));
+	Slm = (complex double *) shtns_malloc( NLM * sizeof(complex double));
+	Tlm = (complex double *) shtns_malloc( NLM * sizeof(complex double));
 
 // SH_to_spat
 	LM_LOOP(shtns,  Slm[lm]=0.0;  Tlm[lm] = 0.0; )		/* this is the same as :
@@ -93,7 +98,7 @@ int main()
 			Sh[im*nlat+i] *= Sh[im*nlat+i];
 		}
 	}
-	spat_to_SH(shtns, Sh, Tlm);
+	spat_to_SH(shtns, Sh, Tlm);		//  /!\ WARNING! this destroys the spatial data in Sh
 	write_vect("ylm_nl",(double *) Tlm, NLM*2);
 
 // vector transform
@@ -108,7 +113,7 @@ int main()
 			Sh[im*nlat+i] = shtns->ct[i];			// use cos(theta) array
 		}
 	}
-	spat_to_SH(shtns, Sh,Slm);
+	spat_to_SH(shtns, Sh,Slm);		//  /!\ WARNING! this destroys the spatial data in Sh
 	write_vect("ylm_v",(double *) Slm,NLM*2);
 }
 

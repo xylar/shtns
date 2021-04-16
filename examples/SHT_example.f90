@@ -78,7 +78,7 @@ program SHT_example
 
    print*, 'Y(1,0)', Sh(1,:) ! It should be sqrt(3/4/pi) * cos(theta)
 
-   !-- Spat -> Spec
+   !-- Spat -> Spec,  DOES NOT PRESERVE THE CONTENT OF INPUT 'Sh'
    call spat_to_SH(shtns_c, Sh, Slm)
 
    !-- print S(1,0) to check it 1.0 is recovered.

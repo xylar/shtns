@@ -239,7 +239,7 @@ void SH_mul_mx(shtns_cfg, double* mx, cplx *Qlm, cplx *Rlm);
 //@{
 /// transform the scalar field Vr into its spherical harmonic representation Qlm.
 /// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by \ref shtns_set_grid or \ref shtns_set_grid_auto
-/// \param[in] Vr = spatial scalar field : double array of size shtns->nspat.
+/// \param[in] Vr = spatial scalar field : double array of size shtns->nspat; NOT GUARANTEED TO BE PRESERVED.
 /// \param[out] Qlm = spherical harmonics coefficients : cplx array of size shtns->nlm.
 void spat_to_SH(shtns_cfg shtns, double *Vr, cplx *Qlm);
 /// transform the spherical harmonic coefficients Qlm into its spatial representation Vr.

@@ -85,6 +85,7 @@
         print*,Sh(i,:)
       enddo
 
+! spatial to spectral transform. DOES NOT PRESERVE THE CONTENT OF INPUT 'Sh'
       call shtns_spat_to_sh(Sh, Slm)
 
       print*

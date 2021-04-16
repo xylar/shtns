@@ -108,7 +108,7 @@ void test_analys()
 		}
 	}
 	
-	spat_to_SH(sht, (double*) d, q);
+	spat_to_SH(sht, (double*) d, q);	// Note that this destroys the content fof 'd'
 	
 	//for (int lm=0; lm < sht->nlm; lm++) 	printf("lm=%d [%g %g]\n", lm, creal(q[lm]), cimag(q[lm]));
 
