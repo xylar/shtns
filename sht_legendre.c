@@ -135,7 +135,7 @@ static double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
 	while ((nv < 0) && (val > 1.0/SHT_SCALE_FACTOR)) {	// try to minimize |nv|
 		++nv;	val *= 1.0/SHT_SCALE_FACTOR;
 	}
-	if (val0 < 0) val *= -1.0;		// restore sign.
+	if (val0 < 0) val = -val;		// restore sign.
 	*nval = nv;
 	return val;		// 1/S^2 < val < 1
 }
@@ -526,7 +526,6 @@ static void legendre_sphPlm_deriv_array_equ(shtns_cfg shtns, const int lmax, con
 	}
 }
 
-
 /// \internal Precompute constants for the recursive generation of Legendre associated functions, with given normalization.
 /// this function is called by \ref shtns_set_size, and assumes up-to-date values in \ref shtns.
 /// For the same conventions as GSL, use \c legendre_precomp(sht_orthonormal,1);
@@ -570,12 +569,23 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 		alm[0] = SQRT(t1);		/// \f$ Y_0^0 = 1/\sqrt{4\pi} \f$ for orthonormal
 	}
 	t1 *= mpos_renorm;		// renormalization for m>0
+	real e=0.0;
 	for (int im=1, m=0; im<=MMAX; ++im) {
 		while(m<im*MRES) {
 			++m;
-			t1 *= ((real)m + 0.5)/m;	// t1 *= (m+0.5)/m;
+			real x = ((real)m + 0.5)/m;
+		#if HAVE_LONG_DOUBLE_WIDER
+			t1 *= x;	// t1 *= (m+0.5)/m;
+		#else
+			// compensated product algorithm, see Algorithm 3.4 of https://hal.archives-ouvertes.fr/hal-00164607
+			// => gets some extra bits of precision at negligible cost (which is dominated by the division above)
+			real tt = t1*x;
+			real t1e = fma(t1,x,-tt);	// = t1*x -tt  (C99)
+			t1 = tt;
+			e = fma(e,x,t1e);	// = e*x+t1e (C99) => accumulate error
+		#endif
 		}
-		t2 = SQRT(t1);
+		t2 = SQRT(t1+e);
 		if ( m & with_cs_phase ) t2 = -t2;		/// optional \f$ (-1)^m \f$ Condon-Shortley phase.
 		alm_im(shtns, im)[0] = t2;
 	}
