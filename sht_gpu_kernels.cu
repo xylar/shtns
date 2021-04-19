@@ -109,11 +109,11 @@ transpose_cplx_kernel(const double* in, double* out, const int dim0, const int d
 
 /// dim0, dim1 : size in complex numbers !
 /// BLOCK_DIM_Y must be a power of 2 between 1 and 16
-template<int BLOCK_DIM_Y> __global__ void
-transpose_cplx_zero_kernel(const double* in, double* out, const int dim0, const int dim1, const int mmax)
+template<int BLOCK_DIM_Y, typename real=double> __global__ void
+transpose_cplx_zero_kernel(const real* in, real* out, const int dim0, const int dim1, const int mmax)
 {
 	const int TILE_DIM = WARPSZE/2;		// 16 double2 per warp, read as 32 doubles.
-	__shared__ double shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
+	__shared__ real shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
 
 	const int ly = threadIdx.y;
 	const int lx = threadIdx.x >> 1;
@@ -157,11 +157,11 @@ transpose_cplx_zero_kernel(const double* in, double* out, const int dim0, const 
 
 /// dim0, dim1 : size in complex numbers !
 /// BLOCK_DIM_Y must be a power of 2 between 1 and 16
-template<int BLOCK_DIM_Y> __global__ void
-transpose_cplx_skip_kernel(const double* in, double* out, const int dim0, const int dim1, const int mmax)
+template<int BLOCK_DIM_Y, typename real=double> __global__ void
+transpose_cplx_skip_kernel(const real* in, real* out, const int dim0, const int dim1, const int mmax)
 {
 	const int TILE_DIM = WARPSZE/2;		// 16 double2 per warp, read as 32 doubles.
-	__shared__ double shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
+	__shared__ real shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
 
 	const int lx = threadIdx.x >> 1;
 	const int ly = threadIdx.y;
@@ -207,40 +207,42 @@ transpose_cplx(cudaStream_t stream, const double* in, double* out, const int dim
 }
 
 /// dim0, dim1 must be multiple of 16.
+template <typename real=double>
 static void
-transpose_cplx_zero(cudaStream_t stream, const double* in, double* out, const int dim0, const int dim1, const int mmax)
+transpose_cplx_zero(cudaStream_t stream, const real* in, real* out, const int dim0, const int dim1, const int mmax)
 {
 	const int block_dim_y = 4;		// good performance with 4 (MUST be power of 2 between 1 and 16)
 	dim3 blocks(dim0/16, dim1/16);
 	dim3 threads(32, block_dim_y);
-	transpose_cplx_zero_kernel<block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1, mmax);
+	transpose_cplx_zero_kernel<block_dim_y, real> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1, mmax);
 }
 
 /// dim0, dim1 must be multiple of 16.
+template <typename real=double>
 static void
-transpose_cplx_skip(cudaStream_t stream, const double* in, double* out, const int dim0, const int dim1, const int mmax)
+transpose_cplx_skip(cudaStream_t stream, const real* in, real* out, const int dim0, const int dim1, const int mmax)
 {
 	const int block_dim_y = 4;		// good performance with 4 (MUST be power of 2 between 1 and 16)
 	dim3 blocks(dim0/16, dim1/16);
 	dim3 threads(32, block_dim_y);
-	transpose_cplx_skip_kernel<block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1, mmax);
+	transpose_cplx_skip_kernel<block_dim_y,real> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1, mmax);
 }
 
 
 
 /// On KEPLER, This kernel is fastest with THREADS_PER_BLOCK=256 and NW=1
-template<int S, int NW> __global__ void
-leg_m0_kernel(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2)
+template<int S, int NW, typename real=double> __global__ void
+leg_m0_kernel(const double *al, const double *ct, const real *ql, real *q, const int llim, const int nlat_2)
 {
 	// im = 0
 	const int it = blockDim.x * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
 
-	//__shared__ double ak[THREADS_PER_BLOCK];		// size blockDim.x
-	//__shared__ double qk[THREADS_PER_BLOCK/2];	// size blockDim.x / 2
+	//__shared__ real ak[THREADS_PER_BLOCK];		// size blockDim.x
+	//__shared__ real qk[THREADS_PER_BLOCK/2];	// size blockDim.x / 2
 
 	extern __shared__ double ak[];			// size blockDim.x
-	double* const qk = ak + blockDim.x;		// size blockDim.x / 2
+	real* const qk = ((real*) ak) + blockDim.x;		// size blockDim.x / 2
 
 	ak[j] = al[j];
 	if ((j <= llim)&&(j<blockDim.x/2)) qk[j] = ql[2*j];
@@ -248,9 +250,9 @@ leg_m0_kernel(const double *al, const double *ct, const double *ql, double *q, c
 
 	int l = 0;
 	int k = 0;	int kq = 0;
-	double cost[NW];
-	double y0[NW];    double y1[NW];
-	double re[NW];    double ro[NW];
+	real cost[NW];
+	real y0[NW];    real y1[NW];
+	real re[NW];    real ro[NW];
 
 	for (int i=0; i<NW; i++) {
 	cost[i] = (it+i<nlat_2) ? ct[it+i] : 0.0;
@@ -317,8 +319,8 @@ leg_m0_kernel(const double *al, const double *ct, const double *ql, double *q, c
 	*/
 }
 
-template<int S, int NFIELDS>
-static void leg_m0(shtns_cfg shtns, const double *ql, double *q, const int llim, int spat_dist = 0)
+template<int S, int NFIELDS, typename real=double>
+static void leg_m0(shtns_cfg shtns, const real *ql, real *q, const int llim, int spat_dist = 0)
 {
 	const int nlat_2 = shtns->nlat_2;
 	double *d_alm = shtns->d_alm;
@@ -333,7 +335,7 @@ static void leg_m0(shtns_cfg shtns, const double *ql, double *q, const int llim,
 	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	for (int f=0; f<NFIELDS; f++) {
-		leg_m0_kernel<S,1> <<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2);
+		leg_m0_kernel<S,1,real> <<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(real), stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2);
 	}
 }
 
@@ -365,8 +367,8 @@ void warp_reduce_add(double& ev) {
 }
 */
 
-template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
-ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int q_dist=0, const int ql_dist=0)
+template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS, typename real=double> __global__ void
+ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, const real* __restrict__ q, real *ql, const int llim, const int nlat_2, const int lmax, const int q_dist=0, const int ql_dist=0)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -374,15 +376,15 @@ ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, con
 	// re-assign each thread an l (transpose)
 	const int ll = j / (BLOCKSIZE/LSPAN);
 
-	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
+	__shared__ real ak[2*LSPAN+2];	// cache
+	__shared__ real yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
 	const int l_inc = BLOCKSIZE;
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
-	double y0, y1;
+	const real cost = (it < nlat_2) ? ct[it] : 0.0;
+	real y0, y1;
 
 	if (LSPAN < 4) printf("ERROR: LSPAN<4\n");
 
-	double my_reo[NFIELDS][LSPAN];			// in registers
+	real my_reo[NFIELDS][LSPAN];			// in registers
 	if (j < 2*LSPAN+2) ak[j] = al[j];
 
 	#pragma unroll
@@ -424,7 +426,7 @@ ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, con
 		}
 		if(BLOCKSIZE > WARPSZE)	__syncthreads();
 
-		double qll[NFIELDS];	// accumulator
+		real qll[NFIELDS];	// accumulator
 		// now re-assign each thread an l (transpose)
 		const int itl = ll*l_inc + j % (BLOCKSIZE/LSPAN);
 		#pragma unroll
@@ -488,8 +490,8 @@ ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, con
 	}
 }
 
-template<int S, int NFIELDS>
-static void ileg_m0(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+template<int S, int NFIELDS, typename real=double>
+static void ileg_m0(shtns_cfg shtns, const real* q, real *ql, const int llim, int q_dist=0, int ql_dist=0)
 {
 	const int nlat_2 = shtns->nlat_2;
 	double *d_alm = shtns->d_alm;
@@ -504,7 +506,7 @@ static void ileg_m0(shtns_cfg shtns, const double* q, double *ql, const int llim
 	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
 	if (q_dist == 0) q_dist = shtns->spat_stride;
 	if (ql_dist == 0) ql_dist = shtns->nlm_stride;
-	ileg_m0_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, q, ql, llim, nlat_2, q_dist, ql_dist);
+	ileg_m0_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS, real><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, q, ql, llim, nlat_2, q_dist, ql_dist);
 }
 
 
@@ -634,9 +636,9 @@ void scal2sphtor_gpu(shtns_cfg shtns, cplx* d_Vlm, cplx* d_Wlm, cplx* d_Slm, cpl
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim MUST BE <= 1800
 /// S can only be 0 (for scalar) or 1 (for spin 1 / vector)
-template<int BLOCKSIZE, int S, int NFIELDS, int NW>
+template<int BLOCKSIZE, int S, int NFIELDS, int NW, typename real=double>
 static __global__ void leg_m_lowllim_kernel(
-	const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ ql, double *q, 
+	const double* __restrict__ al, const double* __restrict__ ct, const real* __restrict__ ql, real *q,
 	const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int ql_dist=0, const int q_dist=0)
 {
 	const int it = BLOCKSIZE*NW * blockIdx.x + threadIdx.x;
@@ -645,12 +647,12 @@ static __global__ void leg_m_lowllim_kernel(
 	const int m_inc = 2*nlat_2;
 	const int k_inc = 1;
 
-	__shared__ double ak[BLOCKSIZE];		// size blockDim.x
-	__shared__ double qk[NFIELDS][BLOCKSIZE];	// size blockDim.x * NFIELDS
+	__shared__ real ak[BLOCKSIZE];		// size blockDim.x
+	__shared__ real qk[NFIELDS][BLOCKSIZE];	// size blockDim.x * NFIELDS
 
-	double cost[NW];
-	double y0[NW];
-	double y1[NW];
+	real cost[NW];
+	real y0[NW];
+	real y1[NW];
 	#pragma unroll
 	for (int i=0; i<NW; i++) {
 		const int iit = it+i*BLOCKSIZE;
@@ -663,7 +665,7 @@ static __global__ void leg_m_lowllim_kernel(
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) 	qk[f][j] = ql[j  + f*ql_dist];
 		}
-		double re[NFIELDS][NW], ro[NFIELDS][NW];
+		real re[NFIELDS][NW], ro[NFIELDS][NW];
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
 			#pragma unroll
@@ -745,7 +747,7 @@ static __global__ void leg_m_lowllim_kernel(
 			}
 		}
 	} else { 	// m>0
-		double rer[NFIELDS][NW], ror[NFIELDS][NW], rei[NFIELDS][NW], roi[NFIELDS][NW];
+		real rer[NFIELDS][NW], ror[NFIELDS][NW], rei[NFIELDS][NW], roi[NFIELDS][NW];
 		int m = im*mres;
 		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
 		al += 2*(l+m);
@@ -861,8 +863,8 @@ static __global__ void leg_m_lowllim_kernel(
 				roi[f][i] = shfl_xor(roi[f][i], 1);
 			}
 		}
-		double nr[NFIELDS][NW];
-		const double sgn = 1 - 2*(j&1);
+		real nr[NFIELDS][NW];
+		const real sgn = 1 - 2*(j&1);
 		#pragma unroll
 		for (int i=0; i<NW; i++) {
 			const int iit = it+i*BLOCKSIZE;
@@ -886,8 +888,8 @@ static __global__ void leg_m_lowllim_kernel(
 	}
 }
 
-template<int S, int NFIELDS>
-static void leg_m_lowllim(shtns_cfg shtns, const double *ql, double *q, const int llim, const int mmax, int spat_dist=0)
+template<int S, int NFIELDS, typename real=double>
+static void leg_m_lowllim(shtns_cfg shtns, const real *ql, real *q, const int llim, const int mmax, int spat_dist=0)
 {
 	const int lmax = shtns->lmax;
 	const int mres = shtns->mres;
@@ -906,13 +908,13 @@ static void leg_m_lowllim(shtns_cfg shtns, const double *ql, double *q, const in
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
-	leg_m_lowllim_kernel<BLOCKSIZE, S, NFIELDS, NW> <<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) ql, (double*) q, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
+	leg_m_lowllim_kernel<BLOCKSIZE, S, NFIELDS, NW, real> <<<blocks, threads, 0, stream>>>(d_alm, d_ct, (real*) ql, (real*) q, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
 }
 
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim can be arbitrarily large (> 1800)
-template<int S> __global__ void
-leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
+template<int S, typename real=double> __global__ void
+leg_m_highllim_kernel(const double *al, const double *ct, const real *ql, real *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
 {
 	const int it = blockDim.x * blockIdx.x + threadIdx.x;
 	const int im = blockIdx.y;
@@ -920,21 +922,21 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 	const int m_inc = 2*nlat_2;
 	const int k_inc = 1;
 
-	//__shared__ double ak[THREADS_PER_BLOCK];	// cache
-	//__shared__ double qk[THREADS_PER_BLOCK];
+	//__shared__ real ak[THREADS_PER_BLOCK];	// cache
+	//__shared__ real qk[THREADS_PER_BLOCK];
 	// two arrays in shared memory of size blockDim.x :
 	extern __shared__ double ak[];
-	double* const qk = ak + blockDim.x;
+	real* const qk = ((real*) ak) + blockDim.x;
 
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
+	const real cost = (it < nlat_2) ? ct[it] : 0.0;
 
 	if (im==0) {
 	int l = 0;
-	double y0 = al[0];
+	real y0 = al[0];
 	if (S==1) y0 *= rsqrt(1.0 - cost*cost);
-	double re = y0 * ql[0];
-	double y1 = y0 * al[1] * cost;
-	double ro = y1 * ql[2];
+	real re = y0 * ql[0];
+	real y1 = y0 * al[1] * cost;
+	real ro = y1 * ql[2];
 	al+=2;    l+=2;
 	while(l<llim) {
 		y0  = al[1]*(cost*y1) + al[0]*y0;
@@ -957,7 +959,7 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 	int l = (im*(2*(lmax+1)-(m+mres)))>>1;
 	al += 2*(l+m);
 	ql += 2*(l + S*im);
-	double rer,ror, rei,roi, y0, y1;
+	real rer,ror, rei,roi, y0, y1;
 	ror = 0.0;	roi = 0.0;
 	rer = 0.0;	rei = 0.0;
 	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
@@ -1036,13 +1038,13 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 	}
 
 	/// store mangled for complex fft
-	double nr = rer+ror;
-	double sr = rer-ror;
-	const double sgn = 1 - 2*(j&1);
+	real nr = rer+ror;
+	real sr = rer-ror;
+	const real sgn = 1 - 2*(j&1);
 	rei = shfl_xor(rei, 1);
 	roi = shfl_xor(roi, 1);
-	double nix = sgn*(rei+roi);
-	double six = sgn*(rei-roi);
+	real nix = sgn*(rei+roi);
+	real six = sgn*(rei-roi);
 	if (it < nlat_2) {
 		q[im*m_inc + it*k_inc]                     = nr - nix;
 		q[(nphi-im)*m_inc + it*k_inc]              = nr + nix;
@@ -1052,8 +1054,8 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 	}
 }
 
-template<int S, int NFIELDS>
-static void leg_m_highllim(shtns_cfg shtns, const double *ql, double *q, const int llim, const int mmax, int spat_dist = 0)
+template<int S, int NFIELDS, typename real=double>
+static void leg_m_highllim(shtns_cfg shtns, const real *ql, real *q, const int llim, const int mmax, int spat_dist = 0)
 {
 	const int lmax = shtns->lmax;
 	const int mres = shtns->mres;
@@ -1073,13 +1075,13 @@ static void leg_m_highllim(shtns_cfg shtns, const double *ql, double *q, const i
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
 	for (int f=0; f<NFIELDS; f++) {
-		leg_m_highllim_kernel<S> <<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2, lmax,mres, nphi);
+		leg_m_highllim_kernel<S,real> <<<blocks, threads, 2*threadsPerBlock*sizeof(real), stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2, lmax,mres, nphi);
 	}
 }
 
 
-template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
-ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const double mpos_scale, const int q_dist=0, const int ql_dist=0)
+template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS, typename real=double> __global__ void
+ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ ct, const real* __restrict__ q, real *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const real mpos_scale, const int q_dist=0, const int ql_dist=0)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -1091,16 +1093,16 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 	const int ll = j / (BLOCKSIZE/LSPAN);
 	const int ri = j / (BLOCKSIZE/(2*LSPAN)) % 2;	// real (0) or imag (1)
 
-	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
+	__shared__ real ak[2*LSPAN+2];	// cache
+	__shared__ real yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
 	const int l_inc = BLOCKSIZE;
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
-	double y0, y1;
+	const real cost = (it < nlat_2) ? ct[it] : 0.0;
+	real y0, y1;
 
 	if (LSPAN < 4) printf("ERROR: LSPAN<4\n");
 
 	if (im == 0) {
-		double my_reo[NFIELDS][LSPAN];			// in registers
+		real my_reo[NFIELDS][LSPAN];			// in registers
 		if (j < 2*LSPAN+2) ak[j] = al[j];
 
 		#pragma unroll
@@ -1142,7 +1144,7 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 			}
 			if(BLOCKSIZE > WARPSZE)	__syncthreads();
 
-			double qll[NFIELDS];	// accumulator
+			real qll[NFIELDS];	// accumulator
 			// now re-assign each thread an l (transpose)
 			const int itl = ll*l_inc + j % (BLOCKSIZE/LSPAN);
 			#pragma unroll
@@ -1205,23 +1207,23 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 			l+=LSPAN;
 		}
 	} else {	// im > 0
-		double my_reo[NFIELDS][2*LSPAN];			// in registers
+		real my_reo[NFIELDS][2*LSPAN];			// in registers
 		int m = im*mres;
 		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
 		al += 2*(l+m);
 		ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
 
 		if (j < 2*LSPAN+2) ak[j] = al[j];
-		const double sgn = 2*(j&1) - 1;	// -/+
+		const real sgn = 2*(j&1) - 1;	// -/+
 		
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
 			y0         = (it < nlat_2) ? q[im*m_inc + it + f*q_dist] : 0.0;		// north imag (ani)
-			double qer = (it < nlat_2) ? q[(nphi-im)*m_inc + it + f*q_dist] : 0.0;	// north real (an)
+			real qer = (it < nlat_2) ? q[(nphi-im)*m_inc + it + f*q_dist] : 0.0;	// north real (an)
 			y1         = (it < nlat_2) ? q[im*m_inc + nlat_2*2-1-it + f*q_dist] : 0.0;	// south imag (asi)
-			double qor = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it + f*q_dist] : 0.0;	// south real (as)
-			double qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
-			double qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
+			real qor = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it + f*q_dist] : 0.0;	// south real (as)
+			real qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
+			real qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
 			y0 = shfl_xor(qei, 1);	// exchange between adjacent lanes.
 			y1 = shfl_xor(qoi, 1);
 
@@ -1265,7 +1267,7 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 
 			// transposed work:
 			if (BLOCKSIZE > WARPSZE)	__syncthreads();
-			double qlri[NFIELDS];	// accumulator
+			real qlri[NFIELDS];	// accumulator
 			const int itl = ll*l_inc + j % (BLOCKSIZE/(2*LSPAN));
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++)	qlri[f] = my_reo[f][0] * yl[itl];		// first element
@@ -1311,8 +1313,8 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 	}
 }
 
-template<int S, int NFIELDS> 
-static void ileg_m_lowllim(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+template<int S, int NFIELDS, typename real=double>
+static void ileg_m_lowllim(shtns_cfg shtns, const real* q, real *ql, const int llim, int q_dist=0, int ql_dist=0)
 {
 	const int lmax = shtns->lmax;
 	const int mres = shtns->mres;
@@ -1334,12 +1336,12 @@ static void ileg_m_lowllim(shtns_cfg shtns, const double* q, double *ql, const i
 	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
-	ileg_m_lowllim_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) q, (double*) ql, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys, q_dist, ql_dist);
+	ileg_m_lowllim_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS, real><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (real*) q, (real*) ql, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys, q_dist, ql_dist);
 }
 
 
-template<int BLOCKSIZE, int LSPAN, int S> __global__ void
-ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const double mpos_scale)
+template<int BLOCKSIZE, int LSPAN, int S, typename real=double> __global__ void
+ileg_m_highllim_kernel(const double *al, const double *ct, const real *q, real *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const real mpos_scale)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -1347,12 +1349,12 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 	const int m_inc = 2*nlat_2;
 //    const int k_inc = 1;
 
-	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*BLOCKSIZE];
-	__shared__ double reo[4*BLOCKSIZE];
+	__shared__ real ak[2*LSPAN+2];	// cache
+	__shared__ real yl[LSPAN*BLOCKSIZE];
+	__shared__ real reo[4*BLOCKSIZE];
 	const int l_inc = BLOCKSIZE;
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
-	double y0, y1;
+	const real cost = (it < nlat_2) ? ct[it] : 0.0;
+	real y0, y1;
 
 
 	if (im == 0) {
@@ -1380,7 +1382,7 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 				al += 4;
 			}
 			if (BLOCKSIZE > WARPSZE)	__syncthreads();
-			double qll = 0.0;	// accumulator
+			real qll = 0.0;	// accumulator
 			// now re-assign each thread an l (transpose)
 			const int ll = j / (BLOCKSIZE/LSPAN);
 			for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN) {
@@ -1413,13 +1415,13 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 
 		if (j < 2*LSPAN+2) ak[j] = al[j];
 		if (BLOCKSIZE > WARPSZE)	__syncthreads();
-		const double sgn = 2*(j&1) - 1;	// -/+
+		const real sgn = 2*(j&1) - 1;	// -/+
 		y0    = (it < nlat_2) ? q[im*m_inc + it] : 0.0;		// north imag (ani)
-		double qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
+		real qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
 		y1    = (it < nlat_2) ? q[im*m_inc + nlat_2*2-1-it] : 0.0;	// south imag (asi)
-		double qor    = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it] : 0.0;	// south real (as)
-		double qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
-		double qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
+		real qor    = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it] : 0.0;	// south real (as)
+		real qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
+		real qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
 		y0 = shfl_xor(qei, 1);	// exchange between adjacent lanes.
 		y1 = shfl_xor(qoi, 1);
 		reo[j] 			    = qer + qor;	// rer
@@ -1477,7 +1479,7 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 			}
 
 			if (BLOCKSIZE > WARPSZE)	__syncthreads();
-			double qlri = 0.0;	// accumulator
+			real qlri = 0.0;	// accumulator
 			// now re-assign each thread an l (transpose)
 			const int ll = j / (BLOCKSIZE/LSPAN);
 			const int ri = j / (BLOCKSIZE/(2*LSPAN)) % 2;	// real (0) or imag (1)
@@ -1508,8 +1510,8 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 	}
 }
 
-template<int S, int NFIELDS>
-static void ileg_m_highllim(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+template<int S, int NFIELDS, typename real=double>
+static void ileg_m_highllim(shtns_cfg shtns, const real* q, real *ql, const int llim, int q_dist=0, int ql_dist=0)
 {
 	const int lmax = shtns->lmax;
 	const int mres = shtns->mres;
@@ -1532,42 +1534,42 @@ static void ileg_m_highllim(shtns_cfg shtns, const double* q, double *ql, const 
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
 	for (int f=0; f<NFIELDS; f++) {
-		ileg_m_highllim_kernel<BLOCKSIZE, LSPAN_, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, q + f*q_dist, ql + f*ql_dist, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys);
+		ileg_m_highllim_kernel<BLOCKSIZE, LSPAN_, S, real><<<blocks, threads, 0, stream>>>(d_alm, d_ct, q + f*q_dist, ql + f*ql_dist, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys);
 	}
 }
 
 
-template<int S, int NFIELDS>
-static void legendre(shtns_cfg shtns, const double *ql, double *q, const int llim, const int mmax, int spat_dist = 0)
+template<int S, int NFIELDS, typename real=double>
+static void legendre(shtns_cfg shtns, const real *ql, real *q, const int llim, const int mmax, int spat_dist = 0)
 {
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	if (mmax==0) {
-		leg_m0<S,NFIELDS>(shtns, ql, q, llim);
+		leg_m0<S,NFIELDS,real>(shtns, ql, q, llim);
 	} else {
 		if (llim <= SHT_L_RESCALE_FLY) {
-			leg_m_lowllim<S,NFIELDS>(shtns, ql, q, llim, mmax, spat_dist);
+			leg_m_lowllim<S,NFIELDS,real>(shtns, ql, q, llim, mmax, spat_dist);
 		} else {
-			leg_m_highllim<S,NFIELDS>(shtns, ql, q, llim, mmax);
+			leg_m_highllim<S,NFIELDS,real>(shtns, ql, q, llim, mmax);
 		}
 	}
 }
 
 /// Perform SH transform on data that is already on the GPU. d_Qlm and d_Vr are pointers to GPU memory (obtained by cudaMalloc() for instance)
-template<int S, int NFIELDS>
-static void ilegendre(shtns_cfg shtns, const double *q, double* ql, const int llim, int spat_dist = 0)
+template<int S, int NFIELDS, typename real=double>
+static void ilegendre(shtns_cfg shtns, const real *q, real* ql, const int llim, int spat_dist = 0)
 {
 	int mmax = shtns->mmax;
 	const int mres = shtns->mres;
 
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
-	cudaMemsetAsync(ql, 0, sizeof(double) * NFIELDS * shtns->nlm_stride, shtns->comp_stream);		// set to zero before we start.
+	cudaMemsetAsync(ql, 0, sizeof(real) * NFIELDS * shtns->nlm_stride, shtns->comp_stream);		// set to zero before we start.
 	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
 	if (mmax==0) {
-		ileg_m0<S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
+		ileg_m0<S, NFIELDS, real>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
 	} else
 	if (llim <= SHT_L_RESCALE_FLY) {
-		ileg_m_lowllim<S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
+		ileg_m_lowllim<S, NFIELDS, real>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
 	} else {
-		ileg_m_highllim<S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
+		ileg_m_highllim<S, NFIELDS, real>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
 	}
 }

@@ -171,6 +171,7 @@ struct shtns_info {		// MUST start with "int nlm;"
 	size_t nlm_stride, spat_stride;
 	cudaStream_t xfer_stream, comp_stream;		// the cuda streams
 	cufftHandle cufft_plan;						// the cufft Handle
+	cufftHandle cufft_plan_float;						// the cufft Handle single precision
 	#endif
 
 	/* other misc informations */
