@@ -241,7 +241,8 @@ leg_m0_kernel(const double *al, const double *ct, const real *ql, real *q, const
 	//__shared__ real ak[THREADS_PER_BLOCK];		// size blockDim.x
 	//__shared__ real qk[THREADS_PER_BLOCK/2];	// size blockDim.x / 2
 
-	extern __shared__ double ak[];			// size blockDim.x
+	extern __shared__ double ak_[];			// size blockDim.x
+	real *ak = (real*) ak_;
 	real* const qk = ((real*) ak) + blockDim.x;		// size blockDim.x / 2
 
 	ak[j] = al[j];
@@ -925,7 +926,8 @@ leg_m_highllim_kernel(const double *al, const double *ct, const real *ql, real *
 	//__shared__ real ak[THREADS_PER_BLOCK];	// cache
 	//__shared__ real qk[THREADS_PER_BLOCK];
 	// two arrays in shared memory of size blockDim.x :
-	extern __shared__ double ak[];
+	extern __shared__ double ak_[];
+	real *ak = (real*) ak_;
 	real* const qk = ((real*) ak) + blockDim.x;
 
 	const real cost = (it < nlat_2) ? ct[it] : 0.0;
