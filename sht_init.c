@@ -588,9 +588,26 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 	}
 	if (shtns->st[0] == 0.0)  shtns->st_1[0] = 0.0;
 	if (shtns->st[NLAT-1] == 0.0)  shtns->st_1[NLAT-1] = 0.0;
-	double s=0;
-	for (it=0; it<NLAT; it++) s += wg[it];
-	if (fabs(s-2.0) > 1e-12) printf(" !! Warning: sum of weigths = 2 + %g (should be 2)", s-2.0);
+
+	{	// *** perform some sanity checks, by computing simple integrals ***
+		double s=0, x2=0, st2=0;
+		for (long i=0; i<NLAT_2; i++) {		// sum symmetric contributions together (have same weights, increasing with i)
+			int i2 = NLAT-1-i;
+			s += wg[i] + wg[i2];						// sum of weights == 2
+			x2 += wg[i]*xg[i]*xg[i] + wg[i2]*xg[i2]*xg[i2];		// integral of x2 == 2/3
+			st2 += wg[i]*stg[i]*stg[i] + wg[i2]*stg[i2]*stg[i2];		// integral fo sin2(theta) == 4/3
+		}
+		// compute deviation from exact value:
+		s = s - 2.0;
+		x2 = x2*1.5 - 1.;
+		st2 = st2*0.75 - 1.;
+		if (verbose>1) {
+			printf("          Sum of weigths = 2 + %g (should be 2)\n", s);
+			printf("          Applying quadrature rule to 3/2.x^2 = 1 + %g (should be 1)\n", x2);
+			printf("          Applying quadrature rule to 3/4.sin2(theta) = 1 + %g (should be 1)\n", st2);
+		} else if (fabs(s)+fabs(x2)+fabs(st2) > 1e-14)	shtns_runerr("Bad quadrature accuracy.");
+	}
+
 	for (it=0; it<NLAT_2; it++)
 		shtns->wg[it] = wg[it]*iylm_fft_norm;		// faster double-precision computations.
 	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point. (required for Gauss, untested for regular grids... TODO CHECK)

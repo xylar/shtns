@@ -85,7 +85,7 @@ static real a_sint_pow_n_hp(real val, real cost, long int n)
 	if (sizeof(s2) > 8) k = 0;		// enough accuracy, we do not bother.
 
 #ifdef LEG_RANGE_CHECK
-	if (s2 < 0) shtns_runerr("sin(t)^2 < 0 !!!");
+	if (s2 < 0) return NAN;		// sin(t)^2 < 0 !
 #endif
 
 	if (n&1) val *= SQRT(s2);	// = sin(t)
@@ -115,7 +115,7 @@ static double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
 	int nv = *nval;
 
 #ifdef LEG_RANGE_CHECK
-	if (s2 < 0) shtns_runerr("sin(t)^2 < 0 !!!");
+	if (s2 < 0) return NAN;		// sin(t)^2 < 0 !!!
 #endif
 
 	val = fabs(val);		// val >= 0
@@ -780,18 +780,6 @@ void gauss_nodes(double *x, double* st, double *w, const int n)
 			real pp = 1./(n*p2);			// ... and its inverse derivative.
 		w[n/2] = 2.0*pp*pp;
 	}
-
-#if SHT_VERBOSE > 1
-// test integral to compute :
-	if (verbose) {
-		double z = 0;
-		for (long i=0;i<m;++i)	z += w[i]*x[i]*x[i];
-		printf("          Gauss quadrature for 3/2.x^2 = %g (should be 1.0) error = %g\n",z*3., z*3.-1.0);
-		z=0;
-		for (long i=0;i<m;++i)	z += w[i]*st[i]*st[i];
-		printf("          Gauss quadrature for 2/pi*sin2(theta) = %g (should be 1.0) error = %g\n",z*3./2., z*3./2. - 1.0);
-	}
-#endif
 
 // as we started with initial guesses, we should check if the gauss points are actually unique and ordered.
 	for (long i=m-1; i>0; i--) {
