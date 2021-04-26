@@ -130,7 +130,7 @@ int isNotNormal(double x) {
 
 void print_error(double err_rms, double err_max, int l_max, int lm_max, char* name)
 {
-	printf("  %s => max error = %g (l=%d,lm=%ld)   rms error = %g   ",	name, err_max, l_max, lm_max, err_rms);
+	printf("  %s => max error = %g (l=%d,lm=%d)   rms error = %g   ",	name, err_max, l_max, lm_max, err_rms);
 
 	if ((err_max > 1e-4) || (err_rms > 1e-6) || isNotFinite(err_rms)) {
 		printf(COLOR_ERR " **** ERROR **** " COLOR_END "\n");

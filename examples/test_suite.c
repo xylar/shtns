@@ -153,9 +153,9 @@ int main()
 	test_analys();
 	
 	if (global_fail==0)	{
-		printf("\n** %d tests " COLOR_OK "ALL OK" COLOR_END " **\n", global_count);
+		printf("\n** %ld tests " COLOR_OK "ALL OK" COLOR_END " **\n", global_count);
 	} else {
-		printf("\n** "COLOR_ERR "ERROR" COLOR_END ": %d tests out of %d " COLOR_ERR "FAILED" COLOR_END "** \n", global_fail, global_count);
+		printf("\n** "COLOR_ERR "ERROR" COLOR_END ": %ld tests out of %ld " COLOR_ERR "FAILED" COLOR_END "** \n", global_fail, global_count);
 	}
 	return global_fail;
 }
