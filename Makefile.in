@@ -3,11 +3,13 @@ PREFIX=@prefix@
 SED=@SED@
 LIBS=@LIBS@
 PYTHON=@PYTHON@
+shtns_ver := $(shell grep -m 1 -e "^* v" CHANGELOG.md | sed -e "s/^* v\([^ ]*\).*/-DSHTNS_VER=\\\\\"\1\\\\\"/")
+git_id := $(shell git describe --tags --always --dirty=*)
 
 # compiler command with options for the sht codelets
 shtcc=@CC2@ @CFLAGS2@ -D_GNU_SOURCE
 # compiler command with options for other source (initialization, ...)
-cc=@CC@ @CFLAGS@ -D_GNU_SOURCE @LDFLAGS@
+cc=@CC@ @CFLAGS@ -D_GNU_SOURCE -DSHTNS_GIT=\"$(git_id)\" $(shtns_ver) @LDFLAGS@
 fc=@FC@ @FFLAGS@ @LDFLAGS@
 
 hfiles = sht_private.h sht_config.h shtns.h shtns_simd.h

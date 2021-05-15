@@ -59,10 +59,14 @@ void shtns_verbose(int v) {
 #define _SHTNS_ID_ _SIMD_NAME_
 #endif
 
+#ifndef SHTNS_VER
+#define SHTNS_VER PACKAGE_VERSION
+#endif
+
 /// \internal Abort program with error message.
 static void shtns_runerr(const char * error_text)
 {
-	printf("*** [" PACKAGE_NAME "] Run-time error : %s\n",error_text);
+	printf("*** [SHTns] Run-time error : %s\n",error_text);
 	exit(1);
 }
 
@@ -898,10 +902,13 @@ done:
 
 void shtns_print_version() {
   #ifndef SHTNS4MAGIC
-	printf("[" PACKAGE_STRING "] built " __DATE__ ", " __TIME__ ", id: " _SHTNS_ID_ "\n");
+	printf("[SHTns " SHTNS_VER "] built ");
   #else
-	printf("[" PACKAGE_STRING "] built for MagIC " __DATE__ ", " __TIME__  ", id: " _SHTNS_ID_ "\n");
+	printf("[SHTns " SHTNS_VER "] built for MagIC ");
   #endif
+	printf(__DATE__ ", " __TIME__  ", id: ");
+	if (strlen(SHTNS_GIT) > 0) printf(SHTNS_GIT ",");
+	printf(_SHTNS_ID_ "\n");
 }
 
 
@@ -965,7 +972,7 @@ int config_save(shtns_cfg shtns, int req_flags)
 
 	FILE *fcfg = fopen("shtns_cfg","a");
 	if (fcfg != NULL) {
-		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",PACKAGE_VERSION, _SHTNS_ID_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, -1);
+		fprintf(fcfg, "%s %s %d %d %d %d %d %d %d %d %d %d",SHTNS_VER, _SHTNS_ID_, shtns->lmax, shtns->mmax, shtns->mres, shtns->nphi, shtns->nlat, shtns->grid, shtns->nthreads, req_flags, shtns->nlorder, -1);
 		fprint_ftable(fcfg, shtns->ftable);
 		fprintf(fcfg,"\n");
 		fclose(fcfg);
@@ -1473,7 +1480,7 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	if ((omp_threads > 1)&&(verbose>1)) printf(" nthreads = %d\n",shtns->nthreads);
   #endif
   #if SHT_VERBOSE > 0
-	if (verbose) printf("        => " PACKAGE_NAME " is ready.\n");
+	if (verbose) printf("        => SHTns is ready.\n");
   #endif
 	return(shtns->nspat);	// returns the number of doubles to be allocated for a spatial field.
 }

@@ -1,6 +1,13 @@
 SHTNS CHANGE LOG:
 -----------------
 
+* v3.4.6  (15 May 2021)
+	- Fix major bug arising in complex-valued synthesis since v3.4 (issue #42).
+	- Fix accuracy error for regular grids including poles and lmax>=1000.
+	- Fix hang occuring sometimes with python `set_grid()` method.
+	- Fix normalization issue with CUDA for analysis when using `SHT_REAL_NORM`.
+	- other minor fixes and improvements.
+
 * v3.4.5  (13 Nov 2020)
 	- Fix compilation of python module with older versions of gcc.
 
