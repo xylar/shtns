@@ -335,14 +335,13 @@ V		}
 		l = shtns->tm[im];
 		l = ((unsigned) l) / VSIZE2;
 		#ifndef SHTNS4MAGIC
-Q		 	zero_poles2_vect(BrF, NLAT-l, 2*l);
-V		 	zero_poles4_vect(BtF, NLAT-l, BpF-BtF, 2*l);
+Q		 	zero_poles2_vect(BrF, NLAT-l*VSIZE2, 2*l);
+V		 	zero_poles4_vect(BtF, NLAT-l*VSIZE2, BpF-BtF, 2*l);
 		#else
 Q			#pragma omp simd
 Q			for (k=0; k<l*4*VSIZE2; k++)	((double*)BrF)[k] = 0.0;
 V			zero_poles2_vect(BtF, BpF-BtF, 4*l);
 		#endif
-
 		k = l;
 		do {
 			al = alm;
