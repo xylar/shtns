@@ -1,9 +1,9 @@
 image: gcc
 
 before_script:
-  - apt-get update -qq && apt-get install -y -qq libfftw3-dev python-numpy python-dev swig
+  - apt-get update -qq && apt-get install -y -qq libfftw3-dev python3-numpy python3-dev swig
   - gcc --version
-  - python -V
+  - python3 -V
   - lscpu
 
 build:
@@ -18,8 +18,8 @@ build:
     - sed -i "s/skylake-avx512/native/" Makefile && make  # build regular library for artifacts
     - ./configure --enable-python
     - make
-    - python setup.py install --user
-    - python -c "import shtns; shtns.print_version(); sh=shtns.sht(13); sh.set_grid()"
+    - python3 setup.py install --user
+    - python3 -c "import shtns; shtns.print_version(); sh=shtns.sht(13); sh.set_grid()"
     - ./configure --enable-openmp
     - make time_SHT test_suite test_rot
   artifacts:
