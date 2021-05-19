@@ -159,7 +159,7 @@ void spat_to_SHqst_2ml(shtns_cfg shtns, int im, cplx *Vr, cplx *Vt, cplx *Vp, cp
 extern shtns_cfg sht_data;
 
 // Fortran API : Call from fortran without the trailing '_'
-//@{
+///@{
 
 	// regular
 /// \ingroup fortapi
@@ -297,5 +297,5 @@ void shtns_sph_to_spat_ml_(int *im, cplx *Slm, cplx *Vt, cplx *Vp, int *ltr) {
 }
 
 
-//@}
+///@}
 #endif

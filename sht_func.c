@@ -28,7 +28,7 @@ doi:<a href="http://dx.doi.org/10.1016/j.jcp.2009.05.014">10.1016/j.jcp.2009.05.
 
 These functions do only require a call to \ref shtns_create, but not to \ref shtns_set_grid.
 */
-//@{
+///@{
 
 /// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
 /// which is the same as rotating the reference frame by angle -alpha.
@@ -48,7 +48,7 @@ void SH_Zrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
 	}
 }
 
-//@}
+///@}
 
 /// \internal initialize pseudo-spectral rotations
 static void SH_rotK90_init(shtns_cfg shtns)
@@ -334,7 +334,7 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 
 
 /// \addtogroup rotation
-//@{
+///@{
 
 /// rotate Qlm by 90 degrees around X axis and store the result in Rlm.
 /// shtns->mres MUST be 1, and lmax=mmax.
@@ -383,14 +383,14 @@ void SH_Yrotate(shtns_cfg shtns, cplx *Qlm, double alpha, cplx *Rlm)
 	SH_rotK90(shtns, Rlm, Rlm, 0.0, M_PI/2);			// Yrotate90 + Zrotate(pi/2)
 }
 
-//@}
+///@}
 
 
 
 /** \addtogroup operators Special operators
  * Apply special operators in spectral space: multiplication by cos(theta), sin(theta).d/dtheta.
 */
-//@{
+///@{
 
 
 /// \internal generates the cos(theta) matrix up to lmax+1
@@ -498,7 +498,7 @@ void SH_mul_mx(shtns_cfg shtns, double* mx, cplx *Qlm, cplx *Rlm)
 		vr[lm] = mxl*vq[lm-1];
 }
 
-//@}
+///@}
 
 // truncation at LMAX and MMAX
 #define LTR LMAX
@@ -509,7 +509,7 @@ void SH_mul_mx(shtns_cfg shtns, double* mx, cplx *Qlm, cplx *Rlm)
  * These functions are not optimized and can be relatively slow, but they provide good
  * reference implemenation for the transforms.
 */
-//@{
+///@{
 
 /// Evaluate scalar SH representation \b Qlm at physical point defined by \b cost = cos(theta) and \b phi
 double SH_to_point(shtns_cfg shtns, cplx *Qlm, double cost, double phi)
@@ -640,7 +640,7 @@ void SHqst_to_point(shtns_cfg shtns, cplx *Qlm, cplx *Slm, cplx *Tlm, double cos
 	*vt = vtt;	// Bt = I.m/sint *T  + dS/dt
 	*vp = vpp;	// Bp = I.m/sint *S  - dT/dt
 }
-//@}
+///@}
 	
 #undef LTR
 #undef MTR

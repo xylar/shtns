@@ -98,7 +98,7 @@ wigner : examples/wigner.c $(libname) shtns.h
 
 #documentation :
 docs :
-	( cat doc/doxygen.conf ; echo "PROJECT_NUMBER=@PACKAGE_VERSION@" ) | doxygen -
+	( cat doc/doxygen.conf ; grep -m 1 -e "^* v" CHANGELOG.md | sed -e "s/^* v\([^ ]*\).*/PROJECT_NUMBER=\1/" ) | doxygen -
 
 clean :
 	$(MAKE) clean -C SHT

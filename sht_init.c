@@ -1054,7 +1054,7 @@ int config_load(shtns_cfg shtns, int req_flags)
 
 /** \addtogroup init Initialization functions.
 */
-//@{
+///@{
 
 /*! This sets the description of spherical harmonic coefficients.
  * It tells SHTns how to interpret spherical harmonic coefficient arrays, and it sets usefull arrays.
@@ -1576,7 +1576,7 @@ int shtns_gauss_wts(shtns_cfg shtns, double *wts)
 	return i;
 }
 
-//@}
+///@}
 
 
 #ifdef SHT_F77_API
@@ -1587,7 +1587,7 @@ int shtns_gauss_wts(shtns_cfg shtns, double *wts)
 * Call from fortran without the trailing '_'.
 * see the \link SHT_example.f Fortran example \endlink for a simple usage of SHTns from Fortran language.
 */
-//@{
+///@{
 
 /// Set verbosity level
 void shtns_verbose_(int *v)
@@ -1768,7 +1768,7 @@ void shtns_gauss_wts_(double *wts)
 /** \name Point evaluation of Spherical Harmonics
 Evaluate at a given point (\f$cos(\theta)\f$ and \f$\phi\f$) a spherical harmonic representation.
 */
-//@{
+///@{
 /// \see SH_to_point for argument description
 void shtns_sh_to_point_(double *spat, cplx *Qlm, double *cost, double *phi)
 {
@@ -1781,7 +1781,7 @@ void shtns_qst_to_point_(double *vr, double *vt, double *vp,
 {
 	SHqst_to_point(sht_data, Qlm, Slm, Tlm, *cost, *phi, vr, vt, vp);
 }
-//@}
+///@}
 
 void shtns_sh_zrotate_(cplx* Qlm, double* alpha, cplx* Rlm)
 {
@@ -1826,6 +1826,6 @@ void shtns_sh_cplx_yrotate90_(cplx *Qlm, cplx *Rlm)
 
 
 
-//@}
+///@}
 
 #endif

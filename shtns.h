@@ -92,7 +92,8 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 
 /*! \name Access to spherical harmonic components
  * The following macros give access to single spherical harmonic coefficient or perform loops spanning all of them.
-**///@{
+**/
+///@{
 ///LiM(shtns, l,im) : macro returning array index for given l and im, corresponding to config shtns.
 #define LiM(shtns, l,im) ( (((im)*(2*shtns->lmax + 2 - ((im)+1)*shtns->mres))>>1) + (l) )
 /// LM(shtns, l,m) : macro returning array index for given l and m, corresponding to config shtns.
@@ -105,7 +106,7 @@ struct shtns_info {		// allow read-only access to some data (useful for optimiza
 #define LM_L_LOOP( shtns, action ) { int lm=0; do { int l=shtns->li[lm]; action } while(++lm < shtns->nlm); }
 /// LM_cplx(shtns, l,m) : macro returning array index for SH representation of complex-valued fields for given l and m. (mres=1 only!)
 #define LM_cplx(shtns, l, m) ( ((l) <= shtns->mmax) ? (l)*((l)+1)+(m) : shtns->mmax*(2*(l) - shtns->mmax) + (l)+(m) )
-//@}
+///@}
 
 
 /// total number of 'doubles' required for a spatial field (includes FFTW reserved space).
@@ -136,7 +137,7 @@ void shtns_print_version(void);		///< print version information to stdout.
 void shtns_print_cfg(shtns_cfg);	///< print information about given config to stdout.
 
 /// \name initialization
-//@{
+///@{
 /// Simple initialization of the spherical harmonic transforms of given size. Calls \ref shtns_create and \ref shtns_set_grid_auto.
 shtns_cfg shtns_init(enum shtns_type flags, int lmax, int mmax, int mres, int nlat, int nphi);
 /// Defines the sizes of the spectral description. Use for advanced initialization.
@@ -163,10 +164,10 @@ void* shtns_malloc(size_t bytes);	///< alloc appropriate memory (pinned for gpu,
 void shtns_free(void* p);			///< free memory allocated with \ref shtns_malloc
 
 
-//@}
+///@}
 
 /// \name special values
-//@{
+///@{
 double sh00_1(shtns_cfg);	///< return the spherical harmonic representation of 1 (l=0,m=0)
 double sh10_ct(shtns_cfg);	///< return the spherical harmonic representation of cos(theta) (l=1,m=0)
 double sh11_st(shtns_cfg);	///< return the spherical harmonic representation of sin(theta)*cos(phi) (l=1,m=1)
@@ -174,10 +175,10 @@ double shlm_e1(shtns_cfg, int l, int m);		///< return the l,m SH coefficient cor
 /// fill the given array with Gauss weights. returns the number of weights written (0 if not a Gauss grid).
 int shtns_gauss_wts(shtns_cfg, double *wts);
 
-//@}
+///@}
 
 /// \name Rotation functions
-//@{
+///@{
 /// Rotate a SH representation Qlm around the z-axis by angle alpha (in radians),
 /// which is the same as rotating the reference frame by angle -alpha.
 /// Result is stored in Rlm (which can be the same array as Qlm).
@@ -199,10 +200,10 @@ void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx);
 void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm);
 void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm);
 
-//@}
+///@}
 
 /// \name Generation of Legendre associated functions
-//@{
+///@{
 /// Compute values of legendre polynomials noramalized for spherical harmonics,
 /// for a range of l=m..lmax, at given m and x, using stable recurrence.
 /// Requires a previous call to \ref shtns_create().
@@ -213,10 +214,10 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm);
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values (of increasing degree l).
 void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl);
 void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl);
-//@}
+///@}
 
 /// \name Special operator functions
-//@{
+///@{
 /// compute the matrix (stored in mx, a double array of size 2*NLM) required
 /// to multiply an SH representation by cos(theta) using \ref SH_mul_mx.
 void mul_ct_matrix(shtns_cfg, double* mx);
@@ -225,7 +226,7 @@ void mul_ct_matrix(shtns_cfg, double* mx);
 void st_dt_matrix(shtns_cfg, double* mx);
 /// Apply a matrix involving l+1 and l-1 to an SH representation Qlm. Result stored in Rlm (must be different from Qlm).
 void SH_mul_mx(shtns_cfg, double* mx, cplx *Qlm, cplx *Rlm);
-//@}
+///@}
 
 /** \addtogroup sht Spherical Harmonic transform functions.
  * All these function perform a global spherical harmonic transform.
@@ -233,10 +234,10 @@ void SH_mul_mx(shtns_cfg, double* mx, cplx *Qlm, cplx *Rlm);
  * obtained by a previous call to \ref shtns_create or \ref shtns_init.
  * \see \ref spat \see \ref spec \see \ref vsh
  */
-//@{
+///@{
 
 /// \name Scalar transforms
-//@{
+///@{
 /// transform the scalar field Vr into its spherical harmonic representation Qlm.
 /// \param[in] shtns = a configuration created by \ref shtns_create with a grid set by \ref shtns_set_grid or \ref shtns_set_grid_auto
 /// \param[in] Vr = spatial scalar field : double array of size shtns->nspat; NOT GUARANTEED TO BE PRESERVED.
@@ -257,10 +258,10 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z);
 /// \param[in] z = complex spatial field
 /// \param[out] alm[l*(l+1)+m] is the SH coefficient of order l and degree m (with -l <= m <= l) [total of (LMAX+1)^2 coefficients]
 void spat_cplx_to_SH(shtns_cfg shtns, cplx *z, cplx *alm);
-//@}
+///@}
 
 /// \name 2D vector transforms
-//@{
+///@{
 /// transform the theta and phi components (Vt,Vp) of a vector into its spheroidal-toroidal spherical harmonic representation (Slm,Tlm). \see \ref vsh
 void spat_to_SHsphtor(shtns_cfg, double *Vt, double *Vp, cplx *Slm, cplx *Tlm);
 /// transform spheroidal-toroidal spherical harmonic coefficients (Slm,Tlm) to the spatial theta and phi components (Vt,Vp). \see \ref vsh
@@ -274,12 +275,12 @@ void SHtor_to_spat(shtns_cfg, cplx *Tlm, double *Vt, double *Vp);
 void spat_cplx_to_SHsphtor(shtns_cfg, cplx *Vt, cplx *Vp, cplx *Slm, cplx *Tlm);
 /// transform spheroidal-toroidal spherical harmonic coefficients (Slm,Tlm) to the spatial theta and phi complex-valued components (Vt,Vp). \see \ref vsh
 void SHsphtor_to_spat_cplx(shtns_cfg, cplx *Slm, cplx *Tlm, cplx *Vt, cplx *Vp);
-//@}
+///@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat
 #define SH_to_grad_spat(shtns, S,Gt,Gp) SHsph_to_spat(shtns, S, Gt, Gp)
 
 /// \name 3D transforms (combine scalar and vector)
-//@{
+///@{
 /// 3D vector transform from spherical coordinates to radial-spheroidal-toroidal spectral components (see \ref vsh_def).
 /// They should be prefered over separate calls to scalar and 2D vector transforms as they can be significantly faster.
 void spat_to_SHqst(shtns_cfg, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm);
@@ -289,11 +290,11 @@ void SHqst_to_spat(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, doubl
 
 void spat_cplx_to_SHqst(shtns_cfg, cplx *Vr, cplx *Vt, cplx *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm);
 void SHqst_to_spat_cplx(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, cplx *Vr, cplx *Vt, cplx *Vp);
-//@}
+///@}
 
 /// \name Truncated transforms at given degree l
 /// wiht l <= lmax used for setup.
-//@{
+///@{
 void spat_to_SH_l(shtns_cfg, double *Vr, cplx *Qlm, int ltr);
 void SH_to_spat_l(shtns_cfg, cplx *Qlm, double *Vr, int ltr);
 
@@ -304,12 +305,12 @@ void spat_to_SHsphtor_l(shtns_cfg, double *Vt, double *Vp, cplx *Slm, cplx *Tlm,
 
 void spat_to_SHqst_l(shtns_cfg, double *Vr, double *Vt, double *Vp, cplx *Qlm, cplx *Slm, cplx *Tlm, int ltr);
 void SHqst_to_spat_l(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, double *Vt, double *Vp, int ltr);
-//@}
+///@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_l(shtns, S,Gt,Gp,ltr) SHsph_to_spat_l(shtns, S, Gt, Gp, ltr)
 
 /// \name Legendre transform at given m (no fft) and truncated at given degree l <= lmax
-//@{
+///@{
 void spat_to_SH_ml(shtns_cfg, int im, cplx *Vr, cplx *Ql, int ltr);
 void SH_to_spat_ml(shtns_cfg, int im, cplx *Ql, cplx *Vr, int ltr);
 
@@ -320,15 +321,15 @@ void SHtor_to_spat_ml(shtns_cfg, int im, cplx *Tl, cplx *Vt, cplx *Vp, int ltr);
 
 void spat_to_SHqst_ml(shtns_cfg, int im, cplx *Vr, cplx *Vt, cplx *Vp, cplx *Ql, cplx *Sl, cplx *Tl, int ltr);
 void SHqst_to_spat_ml(shtns_cfg, int im, cplx *Ql, cplx *Sl, cplx *Tl, cplx *Vr, cplx *Vt, cplx *Vp, int ltr);
-//@}
+///@}
 /// Compute the spatial representation of the gradient of a scalar SH field. Alias for \ref SHsph_to_spat_l
 #define SH_to_grad_spat_ml(shtns, im, S,Gt,Gp,ltr) SHsph_to_spat_ml(shtns, im, S, Gt, Gp, ltr)
 
-//@}
+///@}
 
 /// \name Local and partial evalutions of a SH representation :
 /// Does not require a call to \ref shtns_set_grid_auto
-//@{
+///@{
 double SH_to_point(shtns_cfg, cplx *Qlm, double cost, double phi);
 void SH_to_grad_point(shtns_cfg, cplx *DrSlm, cplx *Slm,
 					double cost, double phi, double *vr, double *vt, double *vp);
@@ -339,7 +340,7 @@ void SH_to_lat(shtns_cfg shtns, cplx *Qlm, double cost,
 					double *vr, int nphi, int ltr, int mtr);
 void SHqst_to_lat(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double cost,
 					double *vr, double *vt, double *vp, int nphi, int ltr, int mtr);
-//@}
+///@}
 
 
 #endif
