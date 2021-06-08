@@ -188,6 +188,7 @@ struct shtns_rot_ {		// describe a rotation matrix
 	shtns_cfg sht;
 	int lmax, mmax;
 	int flag_alpha_gamma;
+	double no_cs_phase;			// +1 or -1 depending on Condon-Shortley phase.
 	double cos_beta, sin_beta;
 	double alpha, beta, gamma; 	// Euler angles, in ZYZ convention
 	double* plm_beta;

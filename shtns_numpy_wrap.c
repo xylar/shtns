@@ -3312,7 +3312,7 @@ SWIGINTERN void shtns_info_SHqst_to_spat_m(struct shtns_info *self,PyObject *Qlm
 			&& check_spectral(1,Qlm, nelem) && check_spectral(2,Slm, nelem) && check_spectral(3,Tlm, nelem))
 		SHqst_to_spat_ml(self, im_, PyArray_Data(Qlm), PyArray_Data(Slm), PyArray_Data(Tlm), PyArray_Data(Vr), PyArray_Data(Vt), PyArray_Data(Vp), ltr);
 	}
-SWIGINTERN struct shtns_rot_ *new_shtns_rot_(int lmax,int mmax){	// default arguments : mmax
+SWIGINTERN struct shtns_rot_ *new_shtns_rot_(int lmax,int mmax,int norm){	// default arguments : mmax, norm
 		if (lmax < 2) {
 			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
 		}
@@ -3320,7 +3320,7 @@ SWIGINTERN struct shtns_rot_ *new_shtns_rot_(int lmax,int mmax){	// default argu
 		if (mmax > lmax) {
 			throw_exception(SWIG_ValueError,1,"lmax < mmax invalid");	return NULL;
 		}
-		return shtns_rotation_create(lmax, mmax);
+		return shtns_rotation_create(lmax, mmax, norm);
 	}
 SWIGINTERN void delete_shtns_rot_(struct shtns_rot_ *self){
 		shtns_rotation_destroy(self);		// free memory.
@@ -5693,18 +5693,22 @@ SWIGINTERN PyObject *_wrap_new_rotation(PyObject *SWIGUNUSEDPARM(self), PyObject
   PyObject *resultobj = 0;
   int arg1 ;
   int arg2 = (int) -1 ;
+  int arg3 = (int) 0 ;
   int val1 ;
   int ecode1 = 0 ;
   int val2 ;
   int ecode2 = 0 ;
+  int val3 ;
+  int ecode3 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
   char * kwnames[] = {
-    (char *)"lmax",  (char *)"mmax",  NULL 
+    (char *)"lmax",  (char *)"mmax",  (char *)"norm",  NULL 
   };
   struct shtns_rot_ *result = 0 ;
   
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O:new_rotation", kwnames, &obj0, &obj1)) SWIG_fail;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OO:new_rotation", kwnames, &obj0, &obj1, &obj2)) SWIG_fail;
   ecode1 = SWIG_AsVal_int(obj0, &val1);
   if (!SWIG_IsOK(ecode1)) {
     SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "new_rotation" "', argument " "1"" of type '" "int""'");
@@ -5717,9 +5721,16 @@ SWIGINTERN PyObject *_wrap_new_rotation(PyObject *SWIGUNUSEDPARM(self), PyObject
     } 
     arg2 = (int)(val2);
   }
+  if (obj2) {
+    ecode3 = SWIG_AsVal_int(obj2, &val3);
+    if (!SWIG_IsOK(ecode3)) {
+      SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "new_rotation" "', argument " "3"" of type '" "int""'");
+    } 
+    arg3 = (int)(val3);
+  }
   {
     shtns_error = 0;	// clear exception
-    result = (struct shtns_rot_ *)new_shtns_rot_(arg1,arg2);
+    result = (struct shtns_rot_ *)new_shtns_rot_(arg1,arg2,arg3);
     if (shtns_error) {
       // test for exception
       SWIG_exception(shtns_error, shtns_err_msg);		return NULL;
@@ -6104,7 +6115,7 @@ static PyMethodDef SwigMethods[] = {
 	 { "rotation_alpha_get", _wrap_rotation_alpha_get, METH_O, "rotation_alpha_get(rotation self) -> double const"},
 	 { "rotation_beta_get", _wrap_rotation_beta_get, METH_O, "rotation_beta_get(rotation self) -> double const"},
 	 { "rotation_gamma_get", _wrap_rotation_gamma_get, METH_O, "rotation_gamma_get(rotation self) -> double const"},
-	 { "new_rotation", (PyCFunction)(void(*)(void))_wrap_new_rotation, METH_VARARGS|METH_KEYWORDS, "new_rotation(int lmax, int mmax=-1) -> rotation"},
+	 { "new_rotation", (PyCFunction)(void(*)(void))_wrap_new_rotation, METH_VARARGS|METH_KEYWORDS, "new_rotation(int lmax, int mmax=-1, int norm=0) -> rotation"},
 	 { "delete_rotation", _wrap_delete_rotation, METH_O, "delete_rotation(rotation self)"},
 	 { "rotation_set_angles_ZYZ", _wrap_rotation_set_angles_ZYZ, METH_VARARGS, "rotation_set_angles_ZYZ(rotation self, double alpha, double beta, double gamma)"},
 	 { "rotation_set_angles_ZXZ", _wrap_rotation_set_angles_ZXZ, METH_VARARGS, "rotation_set_angles_ZXZ(rotation self, double alpha, double beta, double gamma)"},

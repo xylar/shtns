@@ -704,7 +704,7 @@ struct shtns_rot_ {		// describe a rotation matrix
 	}
 
 	%feature("kwargs") shtns_rot_;
-	shtns_rot_(int lmax, int mmax=-1) {	// default arguments : mmax
+	shtns_rot_(int lmax, int mmax=-1, int norm=0) {	// default arguments : mmax, norm
 		if (lmax < 2) {
 			throw_exception(SWIG_ValueError,1,"lmax < 2 not allowed");	return NULL;
 		}
@@ -712,7 +712,7 @@ struct shtns_rot_ {		// describe a rotation matrix
 		if (mmax > lmax) {
 			throw_exception(SWIG_ValueError,1,"lmax < mmax invalid");	return NULL;
 		}
-		return shtns_rotation_create(lmax, mmax);
+		return shtns_rotation_create(lmax, mmax, norm);
 	}
 
 	~shtns_rot_() {
@@ -720,9 +720,15 @@ struct shtns_rot_ {		// describe a rotation matrix
 	}
 
 	void set_angles_ZYZ(double alpha, double beta, double gamma) {
+		if (fabs(beta) > M_PI) {
+			throw_exception(SWIG_ValueError,2,"beta must be between -pi and pi");	return;
+		}
 		shtns_rotation_set_angles_ZYZ($self, alpha, beta, gamma);
 	}
 	void set_angles_ZXZ(double alpha, double beta, double gamma) {
+		if (fabs(beta) > M_PI) {
+			throw_exception(SWIG_ValueError,2,"beta must be between -pi and pi");	return;
+		}
 		shtns_rotation_set_angles_ZXZ($self, alpha, beta, gamma);
 	}
 	void set_angle_axis(double theta, double Vx, double Vy, double Vz) {

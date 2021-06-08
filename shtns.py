@@ -548,9 +548,9 @@ class rotation(object):
     beta = property(_shtns.rotation_beta_get, doc=r"""beta : q(const).double""")
     gamma = property(_shtns.rotation_gamma_get, doc=r"""gamma : q(const).double""")
 
-    def __init__(self, lmax, mmax=-1):
-        r"""__init__(rotation self, int lmax, int mmax=-1) -> rotation"""
-        _shtns.rotation_swiginit(self, _shtns.new_rotation(lmax, mmax))
+    def __init__(self, lmax, mmax=-1, norm=0):
+        r"""__init__(rotation self, int lmax, int mmax=-1, int norm=0) -> rotation"""
+        _shtns.rotation_swiginit(self, _shtns.new_rotation(lmax, mmax, norm))
     __swig_destroy__ = _shtns.delete_rotation
 
     def set_angles_ZYZ(self, alpha, beta, gamma):

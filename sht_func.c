@@ -1304,11 +1304,12 @@ void SH_to_spat_grad(shtns_cfg shtns, cplx *alm, double *gt, double *gp)
 
 /// Allocate memory and precompute some recurrence coefficients for rotation (independent of angle).
 /// Setting mmax < lmax will result in approximate rotations if not aligned with the z-axis, while mmax=lmax leads to exact rotations.
-shtns_rot shtns_rotation_create(const int lmax, const int mmax)
+shtns_rot shtns_rotation_create(const int lmax, const int mmax, int norm)
 {
 	shtns_rot r = (shtns_rot) malloc(sizeof(struct shtns_rot_));
 	r->lmax = lmax;
 	r->mmax = mmax;
+	r->no_cs_phase = (norm & SHT_NO_CS_PHASE) ? -1. : 1.;	// adapt rotations to Condon-Shortley phase
 	r->plm_beta = (double*) malloc( sizeof(double) * nlm_calc(lmax+1, lmax+1, 1) );
 	r->sht = shtns_create(lmax+1, lmax+1, 1, sht_for_rotations | SHT_NO_CS_PHASE);		// need SH up to lmax+1, with Schmidt semi-normalization.
 	r->alpha = 0.0;
@@ -1353,7 +1354,8 @@ static cplx special_eiphi(const double phi)
 /// Set the rotation angle, and compute associated Legendre functions.
 void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, double gamma)
 {
-	if (fabs(beta) > M_PI) {
+	beta *= r->no_cs_phase;		// condon-shortley phase is the same thing as rotating by 180°, or changing sign of beta.
+	if UNLIKELY(fabs(beta) > M_PI) {
 		printf("ERROR: angle 'beta' must be between -pi and pi\n");
 		exit(1);
 	}

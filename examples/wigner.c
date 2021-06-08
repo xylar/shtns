@@ -5,6 +5,7 @@
 #include <math.h>
 #include "shtns.h"
 
+#include <time.h>
 #include <sys/time.h>
 
 void SH_2real_to_cplx(shtns_cfg shtns, cplx* Rlm, cplx* Ilm, cplx* Zlm);
@@ -86,7 +87,7 @@ int main()
 	srand( time(NULL) );	// initialize random numbers.
 
 	gettimeofday(&t1, NULL);
-	rot = shtns_rotation_create(lmax,lmax);
+	rot = shtns_rotation_create(lmax,lmax,sht_orthonormal);	// third argument is normalization
 	gettimeofday(&t2, NULL);
 	shtns_rotation_set_angles_ZYZ(rot, 0.0, beta, 0.0);
 	gettimeofday(&t3, NULL);
