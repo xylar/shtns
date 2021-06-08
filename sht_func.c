@@ -1310,6 +1310,7 @@ shtns_rot shtns_rotation_create(const int lmax, const int mmax, int norm)
 	r->lmax = lmax;
 	r->mmax = mmax;
 	r->no_cs_phase = (norm & SHT_NO_CS_PHASE) ? -1. : 1.;	// adapt rotations to Condon-Shortley phase
+	r->m0_renorm = (norm & SHT_REAL_NORM) ? sqrt(2.) : 1.;	// adapt to real norm
 	r->plm_beta = (double*) malloc( sizeof(double) * nlm_calc(lmax+1, lmax+1, 1) );
 	r->sht = shtns_create(lmax+1, lmax+1, 1, sht_for_rotations | SHT_NO_CS_PHASE);		// need SH up to lmax+1, with Schmidt semi-normalization.
 	r->alpha = 0.0;
@@ -1617,6 +1618,9 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 		const double cb_p1 = (1. + cos_beta)*0.5;
 		const double cb_m1 = (1. - cos_beta)*0.5;
 
+		const double m0_renorm = r->m0_renorm;
+		const double m0_renorm_1 = 1.0 / m0_renorm;
+
 		const cplx eia = r->eia;
 		const cplx eig = r->eig;
 
@@ -1633,7 +1637,7 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 
 			// gather all m's for given l of source array:
 			long lm = l;
-			ql[0] = creal(Qlm[lm]);			// m=0
+			ql[0] = creal(Qlm[lm]) * m0_renorm;			// m=0
 			if (flag_ag & 1) {		// pre-rotate along Z-axis
 				cplx eima = eia;
 				for (int m=1; m<=mlim; m++) {
@@ -1842,7 +1846,7 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 
 			// scatter all m's for current l into dest array:
 			lm = l;
-			Rlm[lm] = creal(rl[0]);			// m=0
+			Rlm[lm] = creal(rl[0]) * m0_renorm_1;			// m=0
 			if (flag_ag & 2) {		// post-rotate along Z-axis
 				cplx eimg = eig;
 				for (int m=1; m<=mlim; m++) {

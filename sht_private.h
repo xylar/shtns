@@ -192,6 +192,7 @@ struct shtns_rot_ {		// describe a rotation matrix
 	double cos_beta, sin_beta;
 	double alpha, beta, gamma; 	// Euler angles, in ZYZ convention
 	double* plm_beta;
+	double m0_renorm;
 	cplx eia;
 	cplx eig;
 };
