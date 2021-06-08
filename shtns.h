@@ -320,6 +320,8 @@ void SHqst_to_spat_l(shtns_cfg, cplx *Qlm, cplx *Slm, cplx *Tlm, double *Vr, dou
 #define SH_to_grad_spat_l(shtns, S,Gt,Gp,ltr) SHsph_to_spat_l(shtns, S, Gt, Gp, ltr)
 
 /// \name Legendre transform at given m (no fft) and truncated at given degree l <= lmax
+/// The input and output arrays contain only the specified m=im*mres, that is spatial size is nlat
+/// and spectral size is lmax+1-m, containing only the coefficients of the given m.
 ///@{
 void spat_to_SH_ml(shtns_cfg, int im, cplx *Vr, cplx *Ql, int ltr);
 void SH_to_spat_ml(shtns_cfg, int im, cplx *Ql, cplx *Vr, int ltr);

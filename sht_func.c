@@ -1342,6 +1342,14 @@ void SH_to_spat_grad(shtns_cfg shtns, cplx *alm, double *gt, double *gp)
 }
 */
 
+#ifdef _GCC_VEC_
+typedef double rndu __attribute__ ((vector_size (VSIZE2*8), aligned (8)));		///< \internal UNALIGNED vector that contains a complex number
+typedef double v2du __attribute__ ((vector_size (16), aligned (8)));		///< \internal UNALIGNED vector that contains a complex number
+#else
+typedef rnd rndu;	///< \internal
+typedef v2d v2du;	///< \internal
+#endif
+
 /** \addtogroup rotation Rotations of Spherical Harmonic fields.
 Rotation of spherical harmonics, using an on-the-fly algorithm (does not store the rotation matrix) inspired by
 the GUMEROV's algorithm to generate the Wigner-d matrices describing rotation of Spherical Harmonics.
@@ -1631,15 +1639,6 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 	}
 }
 */
-
-
-#ifdef _GCC_VEC_
-typedef double rndu __attribute__ ((vector_size (VSIZE2*8), aligned (8)));		///< \internal UNALIGNED vector that contains a complex number
-typedef double v2du __attribute__ ((vector_size (16), aligned (8)));		///< \internal UNALIGNED vector that contains a complex number
-#else
-typedef rnd rndu;	///< \internal
-typedef v2d v2du;	///< \internal
-#endif
 
 void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
 {
