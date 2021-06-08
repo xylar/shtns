@@ -141,8 +141,8 @@ class sht(object):
 
     __swig_destroy__ = _shtns.delete_sht
 
-    def set_grid(self, nlat=0, nphi=0, flags=sht_quick_init, polar_opt=1.0e-8, nl_order=1):
-        r"""set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double polar_opt=1.0e-8, int nl_order=1)"""
+    def set_grid(self, nlat=0, nphi=0, flags=sht_quick_init, polar_opt=1.0e-10, nl_order=1):
+        r"""set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double polar_opt=1.0e-10, int nl_order=1)"""
         val = _shtns.sht_set_grid(self, nlat, nphi, flags, polar_opt, nl_order)
 
         		## array giving the cosine of the colatitude for the grid.
@@ -554,27 +554,27 @@ class rotation(object):
     __swig_destroy__ = _shtns.delete_rotation
 
     def set_angles_ZYZ(self, alpha, beta, gamma):
-        r"""set_angles_ZYZ(rotation self, double alpha, double beta, double gamma)"""
+        r"""define a rotation with the 3 intrinsic Euler angles (radians) using ZYZ convention."""
         return _shtns.rotation_set_angles_ZYZ(self, alpha, beta, gamma)
 
     def set_angles_ZXZ(self, alpha, beta, gamma):
-        r"""set_angles_ZXZ(rotation self, double alpha, double beta, double gamma)"""
+        r"""define a rotation with the 3 intrinsic Euler angles (radians) using ZXZ convention."""
         return _shtns.rotation_set_angles_ZXZ(self, alpha, beta, gamma)
 
     def set_angle_axis(self, theta, Vx, Vy, Vz):
-        r"""set_angle_axis(rotation self, double theta, double Vx, double Vy, double Vz)"""
+        r"""define a rotation along axis of cartesian coorinates (Vx,Vy,Vz) and of angle theta (radians)."""
         return _shtns.rotation_set_angle_axis(self, theta, Vx, Vy, Vz)
 
     def wigner_d_matrix(self, l):
-        r"""wigner_d_matrix(rotation self, int const l) -> PyObject *"""
+        r"""get the Wigner d-matrix associated with rotation around Y axis (in ZYZ Euler angle convention and for orthonormal harmonics)."""
         return _shtns.rotation_wigner_d_matrix(self, l)
 
     def apply_real(self, Qlm):
-        r"""apply_real(rotation self, PyObject * Qlm) -> PyObject *"""
+        r"""apply a rotation (previously defined by set_angles_ZYZ(), set_angles_ZXZ() or set_angle_axis()) to a spherical harmonic expansion of a real field with 'orthonormal' convention."""
         return _shtns.rotation_apply_real(self, Qlm)
 
     def apply_cplx(self, Qlm):
-        r"""apply_cplx(rotation self, PyObject * Qlm) -> PyObject *"""
+        r"""apply a rotation (previously defined by set_angles_ZYZ(), set_angles_ZXZ() or set_angle_axis()) to a spherical harmonic expansion of a complex-valued field with 'orthonormal' convention."""
         return _shtns.rotation_apply_cplx(self, Qlm)
 
 # Register rotation in _shtns:

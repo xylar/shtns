@@ -20,7 +20,7 @@
  * - synthesis (inverse transform) at any coordinate (not constrained to a grid) useful for rendering purposes.
  * - <b>on-the-fly transforms</b> : saving memory and bandwidth, they are even faster on modern architecture.
  * - accurate up to spherical harmonic degree l=16383 (at least).
- * - \link rotation rotation functions\endlink to rotate spherical harmonics (beta).
+ * - \link rotation rotation functions\endlink to rotate spherical harmonics.
  * - \link operators special spectral operator\endlink functions that do not require a transform (multiply by cos(theta)...) .
  * - scalar transforms and rotations for complex spatial fields.
  * - SHT at fixed m (without fft, aka Legendre transform).
@@ -635,6 +635,9 @@ Please file a <a href="https://bitbucket.org/nschaeff/shtns/issues">bugreport</a
   \brief Solves the non-linear barotropically unstable shallow water test case in Python.
   Running the script should pop up a window with this image:
   \image html shallow_water.png width=800px
+
+\example sht_rot.py
+  \brief Shows how to perform arbitrary rotations of spherical harmonic fields; optionally displays the fields as 3D plots.
 
 */
 

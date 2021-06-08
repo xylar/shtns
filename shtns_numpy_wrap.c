@@ -2995,6 +2995,12 @@ SWIGINTERN void shtns_info_set_grid(struct shtns_info *self,int nlat,int nphi,in
 			throw_exception(SWIG_ValueError,2,"nphi <= 2*mmax");	return;
 		}
 		if (!(flags & 256))  flags |= (256*2);	// default to SHT_PHI_CONTIGUOUS.
+		int grd = flags & 255;
+		// avoid slow initialization (which sometimes hangs with python)
+		if ((grd == sht_auto) || (grd == sht_gauss_fly) || (grd == sht_gauss)) {
+			grd = sht_quick_init;
+		} else if (grd == sht_reg_dct) grd = sht_reg_fast;
+		flags = (flags &~ 255) | grd;
 		*nlat_out = nlat;		*nphi_out = nphi;
 		shtns_set_grid_auto(self, flags, polar_opt, nl_order, nlat_out, nphi_out);
 	}
@@ -3326,15 +3332,24 @@ SWIGINTERN void delete_shtns_rot_(struct shtns_rot_ *self){
 		shtns_rotation_destroy(self);		// free memory.
 	}
 SWIGINTERN void shtns_rot__set_angles_ZYZ(struct shtns_rot_ *self,double alpha,double beta,double gamma){
+		if (fabs(beta) > M_PI) {
+			throw_exception(SWIG_ValueError,2,"beta must be between -pi and pi");	return;
+		}
 		shtns_rotation_set_angles_ZYZ(self, alpha, beta, gamma);
 	}
 SWIGINTERN void shtns_rot__set_angles_ZXZ(struct shtns_rot_ *self,double alpha,double beta,double gamma){
+		if (fabs(beta) > M_PI) {
+			throw_exception(SWIG_ValueError,2,"beta must be between -pi and pi");	return;
+		}
 		shtns_rotation_set_angles_ZXZ(self, alpha, beta, gamma);
 	}
 SWIGINTERN void shtns_rot__set_angle_axis(struct shtns_rot_ *self,double theta,double Vx,double Vy,double Vz){
 		shtns_rotation_set_angle_axis(self, theta, Vx, Vy, Vz);
 	}
 SWIGINTERN PyObject *shtns_rot__wigner_d_matrix(struct shtns_rot_ *self,int const l){
+		if ((l<0) || (l > self->lmax)) {
+			throw_exception(SWIG_ValueError,1,"l must be between 0 and lmax");	return NULL;
+		}
 		npy_intp dims[2] = {2*l+1, 2*l+1};
 		PyObject *mx = PyArray_New(&PyArray_Type, 2, &dims[0], NPY_DOUBLE, NULL, NULL, sizeof(double), 0, NULL);
 		shtns_rotation_wigner_d_matrix(self, l, PyArray_Data(mx));
@@ -3671,7 +3686,7 @@ SWIGINTERN PyObject *_wrap_sht_set_grid(PyObject *SWIGUNUSEDPARM(self), PyObject
   int arg2 = (int) 0 ;
   int arg3 = (int) 0 ;
   int arg4 = (int) sht_quick_init ;
-  double arg5 = (double) 1.0e-8 ;
+  double arg5 = (double) 1.0e-10 ;
   int arg6 = (int) 1 ;
   int *arg7 = (int *) 0 ;
   int *arg8 = (int *) 0 ;
@@ -6059,7 +6074,7 @@ static PyMethodDef SwigMethods[] = {
 	 { "sht_nlm_cplx_get", _wrap_sht_nlm_cplx_get, METH_O, "sht_nlm_cplx_get(sht self) -> unsigned int const"},
 	 { "new_sht", (PyCFunction)(void(*)(void))_wrap_new_sht, METH_VARARGS|METH_KEYWORDS, "new_sht(int lmax, int mmax=-1, int mres=1, int norm=sht_orthonormal, int nthreads=0) -> sht"},
 	 { "delete_sht", _wrap_delete_sht, METH_O, "delete_sht(sht self)"},
-	 { "sht_set_grid", (PyCFunction)(void(*)(void))_wrap_sht_set_grid, METH_VARARGS|METH_KEYWORDS, "sht_set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double polar_opt=1.0e-8, int nl_order=1)"},
+	 { "sht_set_grid", (PyCFunction)(void(*)(void))_wrap_sht_set_grid, METH_VARARGS|METH_KEYWORDS, "sht_set_grid(sht self, int nlat=0, int nphi=0, int flags=sht_quick_init, double polar_opt=1.0e-10, int nl_order=1)"},
 	 { "sht_print_info", _wrap_sht_print_info, METH_O, "sht_print_info(sht self)"},
 	 { "sht_sh00_1", _wrap_sht_sh00_1, METH_O, "sht_sh00_1(sht self) -> double"},
 	 { "sht_sh10_ct", _wrap_sht_sh10_ct, METH_O, "sht_sh10_ct(sht self) -> double"},
@@ -6117,12 +6132,12 @@ static PyMethodDef SwigMethods[] = {
 	 { "rotation_gamma_get", _wrap_rotation_gamma_get, METH_O, "rotation_gamma_get(rotation self) -> double const"},
 	 { "new_rotation", (PyCFunction)(void(*)(void))_wrap_new_rotation, METH_VARARGS|METH_KEYWORDS, "new_rotation(int lmax, int mmax=-1, int norm=0) -> rotation"},
 	 { "delete_rotation", _wrap_delete_rotation, METH_O, "delete_rotation(rotation self)"},
-	 { "rotation_set_angles_ZYZ", _wrap_rotation_set_angles_ZYZ, METH_VARARGS, "rotation_set_angles_ZYZ(rotation self, double alpha, double beta, double gamma)"},
-	 { "rotation_set_angles_ZXZ", _wrap_rotation_set_angles_ZXZ, METH_VARARGS, "rotation_set_angles_ZXZ(rotation self, double alpha, double beta, double gamma)"},
-	 { "rotation_set_angle_axis", _wrap_rotation_set_angle_axis, METH_VARARGS, "rotation_set_angle_axis(rotation self, double theta, double Vx, double Vy, double Vz)"},
-	 { "rotation_wigner_d_matrix", _wrap_rotation_wigner_d_matrix, METH_VARARGS, "rotation_wigner_d_matrix(rotation self, int const l) -> PyObject *"},
-	 { "rotation_apply_real", _wrap_rotation_apply_real, METH_VARARGS, "rotation_apply_real(rotation self, PyObject * Qlm) -> PyObject *"},
-	 { "rotation_apply_cplx", _wrap_rotation_apply_cplx, METH_VARARGS, "rotation_apply_cplx(rotation self, PyObject * Qlm) -> PyObject *"},
+	 { "rotation_set_angles_ZYZ", _wrap_rotation_set_angles_ZYZ, METH_VARARGS, "define a rotation with the 3 intrinsic Euler angles (radians) using ZYZ convention."},
+	 { "rotation_set_angles_ZXZ", _wrap_rotation_set_angles_ZXZ, METH_VARARGS, "define a rotation with the 3 intrinsic Euler angles (radians) using ZXZ convention."},
+	 { "rotation_set_angle_axis", _wrap_rotation_set_angle_axis, METH_VARARGS, "define a rotation along axis of cartesian coorinates (Vx,Vy,Vz) and of angle theta (radians)."},
+	 { "rotation_wigner_d_matrix", _wrap_rotation_wigner_d_matrix, METH_VARARGS, "get the Wigner d-matrix associated with rotation around Y axis (in ZYZ Euler angle convention and for orthonormal harmonics)."},
+	 { "rotation_apply_real", _wrap_rotation_apply_real, METH_VARARGS, "apply a rotation (previously defined by set_angles_ZYZ(), set_angles_ZXZ() or set_angle_axis()) to a spherical harmonic expansion of a real field with 'orthonormal' convention."},
+	 { "rotation_apply_cplx", _wrap_rotation_apply_cplx, METH_VARARGS, "apply a rotation (previously defined by set_angles_ZYZ(), set_angles_ZXZ() or set_angle_axis()) to a spherical harmonic expansion of a complex-valued field with 'orthonormal' convention."},
 	 { "rotation_swigregister", rotation_swigregister, METH_O, NULL},
 	 { "rotation_swiginit", rotation_swiginit, METH_VARARGS, NULL},
 	 { NULL, NULL, 0, NULL }

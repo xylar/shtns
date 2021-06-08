@@ -8,12 +8,12 @@ sh = shtns.sht(Lmax)         # Spherical Harmonic transform object
 rot = shtns.rotation(Lmax)   # corresponding rotation object
 
 
-## Define the rotation:
+# Define the rotation:
 alpha = pi/2
 beta = pi/2
 gamma = 0
 rot.set_angles_ZYZ(alpha, beta, gamma)   # defines rotation by giving Euler angles (alpha, beta, gamma), around axes Z,Y and Z respectively.
-### or alternatively:
+# or alternatively:
 # rot.set_angles_ZXZ(alpha, beta, gamma)  # same, but around axes Z, X and Z
 # rot.set_angle_axis(theta, Vx, Vy, Vz)   # same, but rotation of angle "theta" around vector (Vx,Vy,Vz)
 
@@ -31,8 +31,8 @@ sh.set_grid(nlat=64, nphi=128)
 q = sh.synth(Qlm)
 r = sh.synth(Rlm)
 
-### plot the fields if possible
-### inspired by: https://scipython.com/book/chapter-8-scipy/examples/visualizing-the-spherical-harmonics/
+# plot the fields if possible
+# inspired by: https://scipython.com/book/chapter-8-scipy/examples/visualizing-the-spherical-harmonics/
 
 try:
 	from matplotlib import cm, colors

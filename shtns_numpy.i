@@ -719,32 +719,41 @@ struct shtns_rot_ {		// describe a rotation matrix
 		shtns_rotation_destroy($self);		// free memory.
 	}
 
+	%feature("autodoc", "define a rotation with the 3 intrinsic Euler angles (radians) using ZYZ convention.") set_angles_ZYZ;
 	void set_angles_ZYZ(double alpha, double beta, double gamma) {
 		if (fabs(beta) > M_PI) {
 			throw_exception(SWIG_ValueError,2,"beta must be between -pi and pi");	return;
 		}
 		shtns_rotation_set_angles_ZYZ($self, alpha, beta, gamma);
 	}
+	%feature("autodoc", "define a rotation with the 3 intrinsic Euler angles (radians) using ZXZ convention.") set_angles_ZXZ;
 	void set_angles_ZXZ(double alpha, double beta, double gamma) {
 		if (fabs(beta) > M_PI) {
 			throw_exception(SWIG_ValueError,2,"beta must be between -pi and pi");	return;
 		}
 		shtns_rotation_set_angles_ZXZ($self, alpha, beta, gamma);
 	}
+	%feature("autodoc", "define a rotation along axis of cartesian coorinates (Vx,Vy,Vz) and of angle theta (radians).") set_angle_axis;
 	void set_angle_axis(double theta, double Vx, double Vy, double Vz) {
 		shtns_rotation_set_angle_axis($self, theta, Vx, Vy, Vz);
 	}
+	%feature("autodoc", "get the Wigner d-matrix associated with rotation around Y axis (in ZYZ Euler angle convention and for orthonormal harmonics).") wigner_d_matrix;
 	PyObject* wigner_d_matrix(const int l) {
+		if ((l<0) || (l > $self->lmax)) {
+			throw_exception(SWIG_ValueError,1,"l must be between 0 and lmax");	return NULL;
+		}
 		npy_intp dims[2] = {2*l+1, 2*l+1};
 		PyObject *mx = PyArray_New(&PyArray_Type, 2, &dims[0], NPY_DOUBLE, NULL, NULL, sizeof(double), 0, NULL);
 		shtns_rotation_wigner_d_matrix($self, l, PyArray_Data(mx));
 		return mx;
 	}
+	%feature("autodoc", "apply a rotation (previously defined by set_angles_ZYZ(), set_angles_ZXZ() or set_angle_axis()) to a spherical harmonic expansion of a real field with 'orthonormal' convention.") apply_real;
 	PyObject* apply_real(PyObject* Qlm) {
 		PyObject *Rlm = SpecArray_New(nlm_calc($self->lmax, $self->mmax, 1));
 		shtns_rotation_apply_real($self, PyArray_Data(Qlm), PyArray_Data(Rlm));
 		return Rlm;
 	}
+	%feature("autodoc", "apply a rotation (previously defined by set_angles_ZYZ(), set_angles_ZXZ() or set_angle_axis()) to a spherical harmonic expansion of a complex-valued field with 'orthonormal' convention.") apply_cplx;
 	PyObject* apply_cplx(PyObject* Qlm) {
 		PyObject *Rlm = SpecArray_New(nlm_cplx_calc($self->lmax, $self->mmax, 1));
 		shtns_rotation_apply_cplx($self, PyArray_Data(Qlm), PyArray_Data(Rlm));

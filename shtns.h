@@ -183,23 +183,31 @@ int shtns_gauss_wts(shtns_cfg, double *wts);
 /// which is the same as rotating the reference frame by angle -alpha.
 /// Result is stored in Rlm (which can be the same array as Qlm).
 void SH_Zrotate(shtns_cfg, cplx *Qlm, double alpha, cplx *Rlm);
-/// Rotate SH representation around Y axis by alpha (in radians).
+/// \deprecated Rotate SH representation around Y axis by alpha (in radians).
 void SH_Yrotate(shtns_cfg, cplx *Qlm, double alpha, cplx *Rlm);
-/// Rotate SH representation around Y axis by 90 degrees.
+/// \deprecated Rotate SH representation around Y axis by 90 degrees.
 void SH_Yrotate90(shtns_cfg, cplx *Qlm, cplx *Rlm);
-/// Rotate SH representation around X axis by 90 degrees.
+/// \deprecated Rotate SH representation around X axis by 90 degrees.
 void SH_Xrotate90(shtns_cfg, cplx *Qlm, cplx *Rlm);
 
 
 /// Creation of a spherical harmonic rotation object for degrees and orders up to lmax and mmax respectively.
 shtns_rot shtns_rotation_create(const int lmax, const int mmax, int norm);
-/// Release memory allocated for the rotation obeject.
+/// Release memory allocated for the rotation object.
 void shtns_rotation_destroy(shtns_rot r);
+/// Defines a rotation parameterized by the 3 intrinsic Euler angles with ZYZ convention.
 void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, double gamma);
+/// Defines a rotation parameterized by the 3 intrinsic Euler angles with ZXZ convention.
 void shtns_rotation_set_angles_ZXZ(shtns_rot r, double alpha, double beta, double gamma);
+/// Defines a rotation of angle theta around axis of cartesian coordinates (Vx,Vy,Vz).
 void shtns_rotation_set_angle_axis(shtns_rot r, double theta, double Vx, double Vy, double Vz);
-void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx);
+/// Generate spherical-harmonic rotation matrix for given degree l and orthonormal convention (Wigner-d matrix)
+/// \param[out] mx is an (2*l+1)*(2*l+1) array that will be filled with the Wigner-d matrix elements (rotation matrix along Y-axis in orthonormal spherical harmonic space).
+/// \return 0 if error, or 2*l+1 (size of the square matrix) otherwise.
+int shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx);
+/// apply rotation to the **orthonormal** spherical harmonic expansion Zlm of a complex-valued field, store the result into Rlm (can be the same as Zlm)
 void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm);
+/// apply rotation to the **orthonormal** spherical harmonic expansion Qlm of a real field, store the result into Rlm (can be the same as Qlm)
 void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm);
 
 ///@}

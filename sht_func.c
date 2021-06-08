@@ -20,7 +20,8 @@
  */
 
 
-/** \addtogroup rotation Rotation of SH fields.
+/** \addtogroup gimbutas_rotation Pseudo-spectral rotations of Spherical Harmonic fields (deprecated).
+ \b deprecated use \ref rotation instead.
 Rotation around axis other than Z should be considered of beta quality (they have been tested but may still contain bugs).
 They also require \c mmax = \c lmax. They use an Algorithm inspired by the pseudospectral rotation described in
 Gimbutas Z. and Greengard L. 2009 "A fast and stable method for rotating spherical harmonic expansions" <i>Journal of Computational Physics</i>.
@@ -333,7 +334,7 @@ static void SH_rotK90(shtns_cfg shtns, cplx *Qlm, cplx *Rlm, double dphi0, doubl
 }
 
 
-/// \addtogroup rotation
+/// \addtogroup gimbutas_rotation
 ///@{
 
 /// rotate Qlm by 90 degrees around X axis and store the result in Rlm.
@@ -1295,12 +1296,17 @@ void SH_to_spat_grad(shtns_cfg shtns, cplx *alm, double *gt, double *gp)
 }
 */
 
+/** \addtogroup rotation Rotations of Spherical Harmonic fields.
+Rotation of spherical harmonics, using an on-the-fly algorithm (does not store the rotation matrix) inspired by
+the GUMEROV's algorithm to generate the Wigner-d matrices describing rotation of Spherical Harmonics.
+See https://arxiv.org/abs/1403.7698  or  https://doi.org/10.1007/978-3-319-13230-3_5
+Thanks to Alex J. Yuffa, ayuffa@gmail.com  for his suggestions and help.
 
-
-
-//* GUMEROV's algorithm to generate the Wigner-d matrices describing rotation of Spherical Harmonics
-//* see https://arxiv.org/abs/1403.7698  or  https://doi.org/10.1007/978-3-319-13230-3_5
-//* Thanks to Alex J. Yuffa, ayuffa@gmail.com  for his suggestions and help.
+These functions are more accurate and faster than the \link gimbutas_rotation pseudo-spectral rotations of Gimbutas\endlink and do not require mmax=lmax.
+Note that if mmax<lmax, the rotations are apprixmate only, with the quality of the approximation decreasing with increasing
+'beta' angle (rotation angle around Y-axis).
+*/
+///@{
 
 /// Allocate memory and precompute some recurrence coefficients for rotation (independent of angle).
 /// Setting mmax < lmax will result in approximate rotations if not aligned with the z-axis, while mmax=lmax leads to exact rotations.
@@ -1330,7 +1336,7 @@ void shtns_rotation_destroy(shtns_rot r)
 	}
 }
 
-/// retruns cos(phi) + I*sin(phi), with specialization for some particular values of phi.
+/// \internal retruns cos(phi) + I*sin(phi), with specialization for some particular values of phi.
 static cplx special_eiphi(const double phi)
 {
 	cplx eip;
@@ -1352,7 +1358,7 @@ static cplx special_eiphi(const double phi)
 	return eip;
 }
 
-/// Set the rotation angle, and compute associated Legendre functions.
+/// Set the rotation angles, and compute associated Legendre functions, given the 3 intrinsic Euler angles in ZYZ convention.
 void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, double gamma)
 {
 	beta *= r->no_cs_phase;		// condon-shortley phase is the same thing as rotating by 180°, or changing sign of beta.
@@ -1389,11 +1395,13 @@ void shtns_rotation_set_angles_ZYZ(shtns_rot r, double alpha, double beta, doubl
 	}
 }
 
+/// Set the rotation angles, and compute associated Legendre functions, given the 3 intrinsic Euler angles in ZXZ convention.
 void shtns_rotation_set_angles_ZXZ(shtns_rot r, double alpha, double beta, double gamma)
 {
 	shtns_rotation_set_angles_ZYZ(r, alpha+M_PI/2, beta, gamma-M_PI/2);
 }
 
+/// Sets a rotation by angle theta around axis of cartesian coordinates (Vx,Vy,Vz), and compute associated Legendre functions.
 void shtns_rotation_set_angle_axis(shtns_rot r, double theta, double Vx, double Vy, double Vz)
 {
 	if ((Vx==0) && (Vy==0)) {	// rotation along Z-axis
@@ -1418,13 +1426,14 @@ void shtns_rotation_set_angle_axis(shtns_rot r, double theta, double Vx, double 
 	}
 }
 
-/// lw is the line-width. Use lw=2*l+1 for the full matrix, or l+1 for a compressed matrix.
+/// \internal lw is the line-width. Use lw=2*l+1 for the full matrix, or l+1 for a compressed matrix.
 /// It always has 2*l+1 lines.
-void quarter_wigner_d_matrix(shtns_rot r, const int l, double* mx, const int compressed)
+/// \return the number of columns in the matrix (l+1 for compressed or 2*l+1 for the full matrix; 0 if l is out of the 0..lmax range.
+int quarter_wigner_d_matrix(shtns_rot r, const int l, double* mx, const int compressed)
 {
-	if (l > r->lmax) {
-		printf("ERROR: l <= lmax not satified.\n");
-		exit(1);
+	if ((l > r->lmax) || (l<0)) {
+		printf("ERROR: 0 <= l <= lmax not satified.\n");
+		return 0;	// error, nothing written into mx.
 	}
 
 	const int lmax = r->lmax + 1;
@@ -1485,26 +1494,25 @@ void quarter_wigner_d_matrix(shtns_rot r, const int l, double* mx, const int com
 			mx[lw*mp + m]  = H  * c_1;		// d(m',m)
 			mx[-lw*mp + m] = H_ * c_1;		// d(-m',m)
 	}
+
+	return lw;	// return the number of lines (or columns) in the matrix.
 }
 
 
-/// Generate spherical-harmonic rotation matrix for given degree l (Wigner-d matrix), using GUMEROV's algorithm
-/// see https://arxiv.org/abs/1403.7698  or  https://doi.org/10.1007/978-3-319-13230-3_5
-/// Thanks to Alex J. Yuffa, ayuffa@gmail.com  for his suggestions and help.
-/// \param[out] mx is an (2*l+1)*(2*l+1) array that will be filled with the Wigner-d matrix elements.
-void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
+/// Generate spherical-harmonic rotation matrix for given degree l and orthonormal convention (Wigner-d matrix)
+/// \param[out] mx is an (2*l+1)*(2*l+1) array that will be filled with the Wigner-d matrix elements (rotation matrix along Y-axis in orthonormal spherical harmonic space).
+/// \return 0 if error, or 2*l+1 (size of the square matrix) otherwise.
+/// \warning The returned rotation matrix only applies to **orthonormal** convention (see \ref norm)
+int shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
 {
 	// step 1:
 	if (l==0) {
 		mx[0] = 1;
-		return;
-	}
-	if (l > r->lmax) {
-		printf("ERROR: l <= lmax not satisfied.\n");
-		exit(1);
+		return 1;
 	}
 
-	quarter_wigner_d_matrix(r, l, mx, 0);		// generate quarter of wigner-d matrix (but full storage)
+	const int lw = quarter_wigner_d_matrix(r, l, mx, 0);		// generate quarter of wigner-d matrix (but full storage)
+	if (lw <= 0) return 0;	// error
 
 	// shift mx to index by negative values:
 	mx += l*(2*l+1) + l;
@@ -1523,6 +1531,7 @@ void shtns_rotation_wigner_d_matrix(shtns_rot r, const int l, double* mx)
 			mx[(2*l+1)*(-mp) - m] = x * parity;
 		}
 	}
+	return lw;
 }
 
 /*
@@ -1579,11 +1588,11 @@ void shtns_rotation_apply_cplx(shtns_rot r, cplx* Zlm, cplx* Rlm)
 
 
 #ifdef _GCC_VEC_
-typedef double rndu __attribute__ ((vector_size (VSIZE2*8), aligned (8)));		// UNALIGNED vector that contains a complex number
-typedef double v2du __attribute__ ((vector_size (16), aligned (8)));		// UNALIGNED vector that contains a complex number
+typedef double rndu __attribute__ ((vector_size (VSIZE2*8), aligned (8)));		///< \internal UNALIGNED vector that contains a complex number
+typedef double v2du __attribute__ ((vector_size (16), aligned (8)));		///< \internal UNALIGNED vector that contains a complex number
 #else
-typedef rnd rndu;
-typedef v2d v2du;
+typedef rnd rndu;	///< \internal
+typedef v2d v2du;	///< \internal
 #endif
 
 void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm)
