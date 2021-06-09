@@ -537,20 +537,18 @@ cplx SH_to_point_cplx(shtns_cfg shtns, cplx *alm, double cost, double phi)
 		vr0 += vr1;
 	if (MTR>0) {
 		im = 1;  do {
-			m = im*MRES;
+			const long m = im*MRES;
 			legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
 
 			cplx vrm = 0.0;		cplx vim = 0.0;
-			int ll = (m-1)*m;
-			for (int l=m; l<=LMAX; l++) {			// gather from cplx rep
+			long ll = (m-2)*m;
+			for (long l=m; l<=LMAX; l++) {			// gather from cplx rep
 				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-				cplx rr = alm[ll+m];	// +m
-				cplx ii = alm[ll-m];	// -m
-				if (m&1) ii = -ii;				// m<0, m odd
-				vrm += yl[l] * rr;
-				vim += yl[l] * ii;
+				vrm += yl[l] * alm[ll+2*m];	// +m
+				vim += yl[l] * alm[ll];		// -m
 			}
 			cplx eimp = cos(m*phi) + I*sin(m*phi);		// we need something accurate here.
+			if (m&1) vim = -vim;				// m<0, m odd
 			vr0 += vrm*eimp + vim*conj(eimp);
 		} while(++im <= MTR);
 	}
