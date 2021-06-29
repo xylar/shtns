@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -512,47 +512,72 @@ void SH_mul_mx(shtns_cfg shtns, double* mx, cplx *Qlm, cplx *Rlm)
 */
 ///@{
 
-/// Evaluate complex scalar SH representation \b qlm at physical point defined by \b cost = cos(theta) and \b phi
+/// Evaluate scalar SH representation of complex field \b alm at physical point defined by \b cost = cos(theta) and \b phi
 cplx SH_to_point_cplx(shtns_cfg shtns, cplx *alm, double cost, double phi)
 {
 	double yl[LMAX+1];
-	cplx vr0, vr1;
-	long int l,m,im;
+	long int l,m;
+	cplx z = 0.0;
 
-	vr0 = 0.0;		vr1 = 0.0;
-	m=0;	im=0;
-		legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
+	v2d vr0 = vdup(0.0);		v2d vr1 = vdup(0.0);
+	m=0;
+		legendre_sphPlm_array(shtns, LTR, m, cost, &yl[m]);
 
 		int ll = 0;
 		for (l=0; l<LTR; l+=2) {
 			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-			vr0 += alm[ll] * yl[l];
+			vr0 += ((v2d*)alm)[ll] * vdup(yl[l]);
 			ll += (l<MMAX) ? 2*l+2 : 2*MMAX+1;
-			vr1 += alm[ll] * yl[l+1];
+			vr1 += ((v2d*)alm)[ll] * vdup(yl[l+1]);
 		}
 		if (l==LTR) {
 			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-			vr0 += alm[ll] * yl[l];
+			vr0 += ((v2d*)alm)[ll] * vdup(yl[l]);
 		}
 		vr0 += vr1;
+		z = vcplx_real(vr0) + I*vcplx_imag(vr0);
 	if (MTR>0) {
-		im = 1;  do {
+		cplx eip = cos(MRES*phi) + I*sin(MRES*phi);
+		v2d vrc = vdup(0.0);
+		v2d vrs = vdup(0.0);
+		cplx eimp = eip;
+		for (long im=1; im<=MTR; im++) {
 			const long m = im*MRES;
-			legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
+			//memset(yl+m, 0xFF, sizeof(double)*(LMAX+1-m));
+			long lnz = legendre_sphPlm_array(shtns, LTR, m, cost, &yl[m]);
+			//if (lnz > m) printf("m=%d, lnz=%d  [ %g, %g, %g]\n", m, lnz, yl[lnz-1],yl[lnz],yl[lnz+1]);
+			if (lnz > LTR) break;		// nothing else to do
 
-			cplx vrm = 0.0;		cplx vim = 0.0;
-			long ll = (m-2)*m;
-			for (long l=m; l<=LMAX; l++) {			// gather from cplx rep
-				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-				vrm += yl[l] * alm[ll+2*m];	// +m
-				vim += yl[l] * alm[ll];		// -m
+			v2d vrm = vdup(0.0);		v2d vim = vdup(0.0);
+			long ll = m*m;
+			long l=m;
+			cplx* almm = alm - 2*m;		// m<0
+
+			//for (; l<lnz; l++) 	ll += (l<=MMAX) ? 2*l : 2*MMAX+1;	// skip zeros in yl, replaced by direct computation in next block:
+			if (lnz > m) {	// skip zeros in yl:
+				int lx = (lnz <= MMAX) ? lnz : MMAX+1;
+				ll += ((m+lx-1)*(lx-m));					// for (l=m; l<min(lnz,MMAX+1); l++) ll += 2*l;
+				if (lnz > MMAX+1) {
+					ll += (2*MMAX+1)*(lnz-(MMAX+1));		// for (l=MMAX+1; l<lnz; l++) ll += 2*MMAX+1;
+				}
+				l=lnz;
 			}
-			cplx eimp = cos(m*phi) + I*sin(m*phi);		// we need something accurate here.
+			for (; l<=LMAX; l++) {			// gather from cplx rep
+				ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
+				vim += vdup(yl[l]) * ((v2d*)almm)[ll];	// -m
+				vrm += vdup(yl[l]) * ((v2d*)alm)[ll];	// +m
+			}
+			//cplx eimp = cos(m*phi) + I*sin(m*phi);		// we need something accurate here.
 			if (m&1) vim = -vim;				// m<0, m odd
-			vr0 += vrm*eimp + vim*conj(eimp);
-		} while(++im <= MTR);
+			//vrc += vdup(cos(m*phi)) * (vrm+vim);	// error @lmax=1023 = 2e-7
+			//vrs += vdup(sin(m*phi)) * (vrm-vim);
+			vrc += vdup(creal(eimp)) * (vrm+vim);	// error @lmax=1023 = 2e-9
+			vrs += vdup(cimag(eimp)) * (vrm-vim);
+			eimp *= eip;
+		}
+		z += vcplx_real(vrc) - vcplx_imag(vrs) + I*(vcplx_imag(vrc) + vcplx_real(vrs));
 	}
-	return vr0;
+	return z;
 }
 
 
@@ -567,30 +592,31 @@ double SH_to_point(shtns_cfg shtns, cplx *Qlm, double cost, double phi)
 	m=0;	im=0;
 		legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
 		for (l=m; l<LTR; l+=2) {
-			vr0 += yl[l] * creal( Qlm[l] );
+			vr0 += yl[l]   * creal( Qlm[l] );
 			vr1 += yl[l+1] * creal( Qlm[l+1] );
 		}
 		if (l==LTR) {
 			vr0 += yl[l] * creal( Qlm[l] );
 		}
 		vr0 += vr1;
-	if (MTR>0) {
-		im = 1;  do {
-			m = im*MRES;
-			legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
-			v2d* Ql = (v2d*) &Qlm[LiM(shtns, 0,im)];	// virtual pointer for l=0 and im
-			v2d vrm0 = vdup(0.0);		v2d vrm1 = vdup(0.0);
-			for (l=m; l<LTR; l+=2) {
-				vrm0 += vdup(yl[l]) * Ql[l];
-				vrm1 += vdup(yl[l+1]) * Ql[l+1];
-			}
-			cplx eimp = 2.*(cos(m*phi) + I*sin(m*phi));		// we need something accurate here.
-			vrm0 += vrm1;
-			if (l==LTR) {
-				vrm0 += vdup(yl[l]) * Ql[l];
-			}
-			vr0 += vcplx_real(vrm0)*creal(eimp) - vcplx_imag(vrm0)*cimag(eimp);
-		} while(++im <= MTR);
+	
+	for (im=1; im<=MTR; im++) {
+		m = im*MRES;
+		long lnz = legendre_sphPlm_array(shtns, LTR, im, cost, &yl[m]);
+		if (lnz > LTR) break;		// nothing else to do
+
+		v2d* Ql = (v2d*) &Qlm[LiM(shtns, 0,im)];	// virtual pointer for l=0 and im
+		v2d vrm0 = vdup(0.0);		v2d vrm1 = vdup(0.0);
+		for (l=lnz; l<LTR; l+=2) {
+			vrm0 += vdup(yl[l])   * Ql[l];
+			vrm1 += vdup(yl[l+1]) * Ql[l+1];
+		}
+		cplx eimp = 2.*(cos(m*phi) + I*sin(m*phi));		// we need something accurate here.
+		vrm0 += vrm1;
+		if (l==LTR) {
+			vrm0 += vdup(yl[l]) * Ql[l];
+		}
+		vr0 += vcplx_real(vrm0)*creal(eimp) - vcplx_imag(vrm0)*cimag(eimp);
 	}
 	return vr0;
 }
@@ -614,14 +640,16 @@ void SH_to_grad_point(shtns_cfg shtns, cplx *DrSlm, cplx *Slm, double cost, doub
 	if (MTR>0) {
 		im=1;  do {
 			m = im*MRES;
-			legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
+			long lnz = legendre_sphPlm_deriv_array(shtns, LTR, im, cost, sint, &yl[m], &dtyl[m]);
+			if (lnz > LTR) break;		// nothing else to do
+
 			cplx eimp = 2.*(cos(m*phi) + I*sin(m*phi));
 			cplx imeimp = eimp*m*I;
 			l = LiM(shtns, 0,im);
 			v2d* Ql = (v2d*) &DrSlm[l];		v2d* Sl = (v2d*) &Slm[l];
 			v2d qm = vdup(0.0);
 			v2d dsdt = vdup(0.0);		v2d dsdp = vdup(0.0);
-			for (l=m; l<=LTR; ++l) {
+			for (l=lnz; l<=LTR; ++l) {
 				qm += vdup(yl[l]) * Ql[l];
 				dsdt += vdup(dtyl[l]) * Sl[l];
 				dsdp += vdup(yl[l]) * Sl[l];
@@ -1003,12 +1031,13 @@ void SH_to_spat_cplx(shtns_cfg shtns, cplx *alm, cplx *z)
 		for (long i=(MMAX+1)*NLAT; i<(NPHI-MMAX)*NLAT; i++)	 Q[i] = 0.0;
 	} else {
 		long lm = LM(shtns,m,m);
-		int ll = (m-1)*m;
+		int ll = m*m;
+		cplx* almm = alm - 2*m;
 		for (int l=m; l<=LMAX; l++) {			// gather from cplx rep
 			ll += (l<=MMAX) ? 2*l : 2*MMAX+1;
-			cplx rr = alm[ll+m];	// +m
-			cplx ii = alm[ll-m];	// -m
-			if (m&1) ii = -ii;				// m<0, m odd
+			cplx rr = alm[ll];	// +m
+			cplx ii = almm[ll];	// -m
+			if (m&1) ii = -ii;	// m<0, m odd
 			rlm[lm] = rr;
 			ilm[lm] = ii;
 			lm++;

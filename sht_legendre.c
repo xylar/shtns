@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -104,21 +104,20 @@ static real a_sint_pow_n_hp(real val, real cost, long int n)
 #endif
 
 
-/// \internal computes val.sin(t)^n from cos(t). ie returns val.(1-x^2)^(n/2), with x = cos(t)
-/// assumes: -1 <= cost <= 1, n>=0, and nval<=0 is the extended exponent associated to val.
-/// updates nval, and returns val such as the result is val.SHT_SCALE_FACTOR^(nval)
-static double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
+/// \internal computes sin(t)^n from cos(t). ie returns (1-x^2)^(n/2), with x = cos(t)
+/// assumes: -1 <= cost <= 1, n>=0.
+/// writes nval, and returns val such as the result is val.SHT_SCALE_FACTOR^(nval)
+static double sint_pow_n_ext(double cost, int n, int *nval)
 {
 	double s2 = (1.-cost)*(1.+cost);		// sin(t)^2 = 1 - cos(t)^2 >= 0
-	double val0 = val;		// store sign
 	int ns2 = 0;
-	int nv = *nval;
+	int nv = 0;
 
 #ifdef LEG_RANGE_CHECK
 	if (s2 < 0) return NAN;		// sin(t)^2 < 0 !!!
 #endif
 
-	val = fabs(val);		// val >= 0
+	double val = 1.0;		// val >= 0
 	if (n&1) val *= sqrt(s2);	// = sin(t)
 	while (n >>= 1) {
 		if (n&1) {
@@ -135,7 +134,6 @@ static double a_sint_pow_n_ext(double val, double cost, int n, int *nval)
 	while ((nv < 0) && (val > 1.0/SHT_SCALE_FACTOR)) {	// try to minimize |nv|
 		++nv;	val *= 1.0/SHT_SCALE_FACTOR;
 	}
-	if (val0 < 0) val = -val;		// restore sign.
 	*nval = nv;
 	return val;		// 1/S^2 < val < 1
 }
@@ -158,7 +156,7 @@ static double legendre_sphPlm(shtns_cfg shtns, const int l, const int im, const 
 	ny = 0;
 	al = alm_im(shtns, im);
 	ymm = al[0];
-	if (m>0) ymm = a_sint_pow_n_ext(ymm, x, m, &ny);	// ny <= 0
+	if (m>0) ymm *= sint_pow_n_ext(x, m, &ny);	// ny <= 0
 
 	ymmp1 = ymm;			// l=m
 	if (l == m) goto done;
@@ -236,11 +234,12 @@ done:
 /// Output compatible with the GSL function gsl_sf_legendre_sphPlm_array(lmax, m, x, yl)
 /// \param lmax maximum degree computed, \param im = m/MRES with m the SH order, \param x argument, x=cos(theta).
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values.
-void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl)
+/// \returns the first degree l of non-zero value.
+int legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl)
 {
 	double *al;
-	int l, m, ny;
 	double ymm, ymmp1;
+	int l, m, ny, lnz;
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
@@ -249,36 +248,50 @@ void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const 
 
 	al = alm_im(shtns, im);
 	yl -= m;			// shift pointer
-	for (l=m; l<=lmax; ++l) yl[l] = 0.0;		// zero out array.
+	lnz = m;			// all non-zero a priori
 
 	ny = 0;
 	ymm = al[0];
-	if (m>0) ymm = a_sint_pow_n_ext(ymm, x, m, &ny);	// l=m,  ny <= 0
-	if (ny==0) yl[m] = ymm;
-	if (lmax==m) return;
-
-	ymmp1 = ymm * al[1] * x;		// l=m+1
-	if (ny==0) yl[m+1] = ymmp1;
-	if (lmax==m+1) return;
+	if (m>0) ymm *= sint_pow_n_ext(x, m, &ny);	// l=m,  ny <= 0
 
 	l=m+2;	al+=2;
-	while ((ny < 0) && (l < lmax)) {		// values are negligible => discard.
-		ymm   = al[1]*(x*ymmp1) + al[0]*ymm;
-		ymmp1 = al[3]*(x*ymm)   + al[2]*ymmp1;
-		l+=2;	al+=4;
-		if (fabs(ymm) > 1.0/SHT_SCALE_FACTOR) {		// rescale when value is significant
-			++ny;	ymm *= 1.0/SHT_SCALE_FACTOR;	ymmp1 *= 1.0/SHT_SCALE_FACTOR;
+	if (ny<0) {
+		yl[m] = 0.0;	lnz++;
+		if (lmax==m) return lnz;
+		ymmp1 = ymm * (al[-1] * x);		// l=m+1
+		yl[m+1] = 0.0;	lnz++;
+		if (lmax==m+1) return lnz;
+		while (l < lmax) {		// values are negligible => discard.
+			ymm   = (al[1]*x)*ymmp1 + al[0]*ymm;
+			ymmp1 = (al[3]*x)*ymm   + al[2]*ymmp1;
+			yl[l] = 0.0;	yl[l+1] = 0.0;
+			l+=2;	al+=4;		lnz+=2;
+			if (fabs(ymm) > 1.0) {		// rescale when value is significant
+				ymm *= 1.0/SHT_SCALE_FACTOR;	ymmp1 *= 1.0/SHT_SCALE_FACTOR;
+				if (++ny == 0) goto ny_zero;
+			}
 		}
+		if (l == lmax) {
+			yl[l] = 0.0;	lnz++;
+		}
+		return lnz;
 	}
+	yl[m] = ymm;
+	if (lmax==m) return lnz;
+	ymmp1 = ymm * (al[-1] * x);		// l=m+1
+	yl[m+1] = ymmp1;
+	if (lmax==m+1) return lnz;
+  ny_zero:
 	while (l < lmax) {		// values are unscaled => store
-		ymm   = al[1]*(x*ymmp1) + al[0]*ymm;
-		ymmp1 = al[3]*(x*ymm)   + al[2]*ymmp1;
+		ymm   = (al[1]*x)*ymmp1 + al[0]*ymm;
+		ymmp1 = (al[3]*x)*ymm   + al[2]*ymmp1;
 		yl[l] = ymm;		yl[l+1] = ymmp1;
 		l+=2;	al+=4;
 	}
-	if ((l == lmax) && (ny == 0)) {
-		yl[l] = al[1]*(x*ymmp1) + al[0]*ymm;
+	if (l == lmax) {
+		yl[l] = (al[1]*x)*ymmp1 + (al[0]*ymm);
 	}
+	return lnz;
 }
 
 #if HAVE_LONG_DOUBLE_WIDER
@@ -349,11 +362,12 @@ done:
 /// \param sint = sqrt(1-x^2) to avoid recomputation of sqrt.
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values (divided by sin(theta) if m>0)
 /// \param[out] dyl is a double array of size (lmax-m+1) filled with the theta-derivatives.
-void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
+/// \returns the first degree l of non-zero value.
+int legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl)
 {
 	double *al;
-	int l,m, ny;
 	double st, y0, y1, dy0, dy1;
+	int l,m, ny, lnz;
 
 	m = im*MRES;
 #ifdef LEG_RANGE_CHECK
@@ -362,43 +376,51 @@ void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, 
 
 	al = alm_im(shtns, im);
 	yl -= m;	dyl -= m;			// shift pointers
-	for (l=m; l<=lmax; ++l) {
-		yl[l] = 0.0;	dyl[l] = 0.0;	// zero out arrays.
-	}
+	lnz = m;			// all non-zero apriori
 
 	ny = 0;
 	st = sint;
 	y0 = al[0];
 	dy0 = 0.0;
 	if (m>0) {
-		y0 = a_sint_pow_n_ext(y0, x, m-1, &ny);
+		y0 *= sint_pow_n_ext(x, m-1, &ny);
 		dy0 = x*m*y0;
 		st *= st;		// st = sin(theta)^2 is used in the recurrence for m>0
 	}
-	if (ny==0) {
-		yl[m] = y0; 	dyl[m] = dy0;		// l=m
-	}
-	if (lmax==m) return;		// done.
-
-	y1 = al[1] * (x * y0);
-	dy1 = al[1]*( x*dy0 - st*y0 );
-	if (ny == 0) {
-		yl[m+1] = y1; 	dyl[m+1] = dy1;		// l=m+1
-	}
-	if (lmax==m+1) return;		// done.
 
 	l=m+2;	al+=2;
-	while ((ny < 0) && (l < lmax)) {		// values are negligible => discard.
-		y0 = al[1]*(x*y1) + al[0]*y0;
-		dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
-		y1 = al[3]*(x*y0) + al[2]*y1;
-		dy1 = al[3]*(x*dy0 - y0*st) + al[2]*dy1;
-		l+=2;	al+=4;
-		if (fabs(y0) > 1.0/SHT_SCALE_FACTOR) {		// rescale when value is significant
-			++ny;	y0 *= 1.0/SHT_SCALE_FACTOR;		dy0 *= 1.0/SHT_SCALE_FACTOR;
-					y1 *= 1.0/SHT_SCALE_FACTOR;		dy1 *= 1.0/SHT_SCALE_FACTOR;
+	if (ny<0) {
+		yl[m] = 0.0;	dyl[m] = 0.0;		lnz++;
+		if (lmax==m) return lnz;		// done.
+		y1 = al[-1] * (x * y0);		// l=m+1
+		yl[m+1] = 0.0;	dyl[m+1] = 0.0;		lnz++;
+		if (lmax==m+1) return lnz;
+		while (l < lmax) {		// values are negligible => discard.
+			y0 = (al[1]*x)*y1 + al[0]*y0;
+			dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
+			y1 = (al[3]*x)*y0 + al[2]*y1;
+			dy1 = al[3]*(x*dy0 - y0*st) + al[2]*dy1;
+			yl[l] = 0.0;	yl[l+1] = 0.0;
+			dyl[l] = 0.0;	dyl[l+1] = 0.0;
+			l+=2;	al+=4;	lnz+=2;
+			if (fabs(y0) > 1.0) {		// rescale when value is significant
+				y0 *= 1.0/SHT_SCALE_FACTOR;		dy0 *= 1.0/SHT_SCALE_FACTOR;
+				y1 *= 1.0/SHT_SCALE_FACTOR;		dy1 *= 1.0/SHT_SCALE_FACTOR;
+				if (++ny == 0) goto ny_zero;
+			}
 		}
+		if (l == lmax) {
+			yl[l] = 0.0;	dyl[l] = 0.0;	lnz++;
+		}
+		return lnz;
 	}
+	yl[m] = y0; 	dyl[m] = dy0;		// l=m
+	if (lmax==m) return lnz;		// done.
+	y1 = al[-1] * (x * y0);		// l=m+1
+	dy1 = al[-1]*( x*dy0 - st*y0 );
+	yl[m+1] = y1; 	dyl[m+1] = dy1;		// l=m+1
+	if (lmax==m+1) return lnz;		// done.
+  ny_zero:
 	while (l < lmax) {		// values are unscaled => store.
 		y0 = al[1]*(x*y1) + al[0]*y0;
 		dy0 = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
@@ -408,10 +430,11 @@ void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, 
 		yl[l+1] = y1;	dyl[l+1] = dy1;
 		l+=2;	al+=4;
 	}
-	if ((l==lmax) && (ny == 0)) {
+	if (l==lmax) {
 		yl[l] = al[1]*(x*y1) + al[0]*y0;
 		dyl[l] = al[1]*(x*dy1 - y1*st) + al[0]*dy0;
 	}
+	return lnz;
 }
 
 #if HAVE_LONG_DOUBLE_WIDER

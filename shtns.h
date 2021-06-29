@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -222,8 +222,8 @@ void shtns_rotation_apply_real(shtns_rot r, cplx* Qlm, cplx* Rlm);
 /// \param[in] im = m/MRES with m the SH order
 /// \param[in] x argument, x=cos(theta).
 /// \param[out] yl is a double array of size (lmax-m+1) filled with the values (of increasing degree l).
-void legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl);
-void legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl);
+int legendre_sphPlm_array(shtns_cfg shtns, const int lmax, const int im, const double x, double *yl);
+int legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, const double x, const double sint, double *yl, double *dyl);
 ///@}
 
 /// \name Special operator functions
