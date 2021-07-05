@@ -278,7 +278,8 @@ V				l=m-1;
 
 				l=m;	al+=2;
 		#ifdef HI_LLIM
-				while ((ny0<0) && (l<lnz)) {		// ylm's are too small and are treated as zero
+			  if (ny0<0) {
+				while (l<lnz) {		// ylm's are too small and are treated as zero
 					#ifndef SHTNS_ISHIOKA
 					for (int j=0; j<NWAY; ++j) {
 						y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
@@ -296,12 +297,13 @@ V				l=m-1;
 					l+=2;	al+=2;
 					#endif
 					if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
-						++ny0;
 						for (int j=0; j<NWAY; ++j) {
 							y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
 						}
+						if (++ny0 == 0) break;
 					}
 				}
+			  }
 				ny[i/NWAY] = ny0;		// store extended exponents
 QX				if ((l > llim) && (ny0<0)) break;	// nothing more to do in this block.
 V				if ((l > llim+1) && (ny0<0)) break;	// nothing more to do in this block.

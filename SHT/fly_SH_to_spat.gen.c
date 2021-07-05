@@ -396,7 +396,8 @@ V				poi[j] = vall(0.0);		ter[j] = vall(0.0);
 V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 			l=m;		al+=2;
-			while ((ny<0) && (l<llim)) {		// ylm treated as zero and ignored if ny < 0
+		  if (ny<0) {
+			while (l<llim) {		// ylm treated as zero and ignored if ny < 0
 				for (int j=0; j<NWAY; ++j) {
 					y0[j] = (vall(al[1])*cost[j])*y1[j] + vall(al[0])*y0[j];
 				}
@@ -405,13 +406,14 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 				}
 				l+=2;	al+=4;
 				if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
-					++ny;
 					for (int j=0; j<NWAY; ++j) {
 						y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
 					}
+					if (++ny == 0) break;
 				}
 			}
-		  if (ny == 0) {
+		  }
+		  if LIKELY(ny == 0) {
 			y0[NWAY-1] = vreverse(y0[NWAY-1]);	// reverse back to natural order
 			y1[NWAY-1] = vreverse(y1[NWAY-1]);
 			cost[NWAY-1] = vreverse(cost[NWAY-1]);
