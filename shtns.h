@@ -22,9 +22,11 @@
 #ifdef __cplusplus
 	#include <complex>
 	typedef std::complex<double> cplx;		///< double precision complex number data type
+	typedef std::complex<float> cplx_f;		///< double precision complex number data type
 #else
 	#include <complex.h>
 	typedef complex double cplx;			///< double precision complex number data type
+	typedef complex float cplx_f;			///< double precision complex number data type
 #endif
 
 #ifdef __cplusplus

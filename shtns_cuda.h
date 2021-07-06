@@ -36,8 +36,10 @@ extern "C" {
 //@{
 /// Same as \ref spat_to_SH, but working on data residing on the GPU.
 void cu_spat_to_SH(shtns_cfg shtns, double *Vr, cplx *Qlm, int ltr);
+void cu_spat_to_SH_f(shtns_cfg shtns, float *Vr, cplx_f *Qlm, int ltr);
 /// Same as \ref SH_to_spat, but working on data residing on the GPU.
 void cu_SH_to_spat(shtns_cfg shtns, cplx *Qlm, double *Vr, int ltr);
+void cu_SH_to_spat_f(shtns_cfg shtns, cplx_f *Qlm, float *Vr, int ltr);
 /// Same as \ref spat_to_SHsphtor, but working on data residing on the GPU.
 void cu_spat_to_SHsphtor(shtns_cfg, double *Vt, double *Vp, cplx *Slm, cplx *Tlm, int ltr);
 /// Same as \ref SHsphtor_to_spat, but working on data residing on the GPU.

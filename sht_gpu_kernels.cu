@@ -21,7 +21,10 @@
 #undef SHT_L_RESCALE_FLY
 #undef SHT_ACCURACY
 #define SHT_L_RESCALE_FLY 1800
+#define SHT_L_RESCALE_FLY_FLOAT 128
 #define SHT_ACCURACY 1.0e-40
+#define SHT_ACCURACY_FLOAT 1.0e-15
+#define SHT_SCALE_FACTOR_FLOAT 72057594037927936.0
 
 
 #if (__CUDACC_VER_MAJOR__ < 8) || ( defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600 )
@@ -71,13 +74,68 @@ __device__ __forceinline__ void namedBarrierArrived(int name, int numThreads) {
 }
 */
 
+__global__ void copy_kernel(const double *in, float *out, const int n) {
+	for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) 
+		out[i] = in[i];
+}
+
+static void copy_convert(shtns_cfg shtns) {
+	const int BLOCKSIZE = 256;		// good value
+	int n = 2*shtns->nlm;
+	copy_kernel<<<(n+BLOCKSIZE-1)/BLOCKSIZE, BLOCKSIZE, 0, shtns->comp_stream>>>(shtns->d_alm, shtns->d_alm_f, n);
+	n = 2*shtns->nlat_2;
+	copy_kernel<<<(n+BLOCKSIZE-1)/BLOCKSIZE, BLOCKSIZE, 0, shtns->comp_stream>>>(shtns->d_ct, shtns->d_ct_f, n);
+}
+
+template<typename scalar_t>
+static inline scalar_t *get_alm(shtns_cfg shtns);
+template<>
+inline double *get_alm<double>(shtns_cfg shtns) { return shtns->d_alm; }
+template<>
+inline float *get_alm<float>(shtns_cfg shtns) { return shtns->d_alm_f; }
+
+template<typename scalar_t>
+static inline scalar_t *get_ct(shtns_cfg shtns);
+template<>
+inline double *get_ct<double>(shtns_cfg shtns) { return shtns->d_ct; }
+template<>
+inline float *get_ct<float>(shtns_cfg shtns) { return shtns->d_ct_f; }
+
+template<typename scalar_t>
+static __device__ __inline__ scalar_t get_accuracy();
+template<>
+__device__ __inline__ double get_accuracy<double>() { return SHT_ACCURACY; }
+template<>
+__device__ __inline__ float get_accuracy<float>() { return SHT_ACCURACY_FLOAT; }
+
+template<typename scalar_t>
+static __device__ __inline__ scalar_t get_scale_factor();
+template<>
+__device__ __inline__ double get_scale_factor<double>() { return SHT_SCALE_FACTOR; }
+template<>
+__device__ __inline__ float get_scale_factor<float>() { return SHT_SCALE_FACTOR_FLOAT; }
+
+//template<typename scalar_t>
+//static __device__ __inline__ int polar_optim_limit(int llim);
+//template<>
+//__device__ __inline__ int polar_optim_limit<double>(int llim) { return max(80, llim>>7); }
+//template<>
+//__device__ __inline__ int polar_optim_limit<float>(int llim) { return max(80, llim>>4); }
+
+template<typename scalar_t>
+static inline int get_l_limit();
+template<>
+inline int get_l_limit<double>() { return SHT_L_RESCALE_FLY; }
+template<>
+inline int get_l_limit<float>() { return SHT_L_RESCALE_FLY_FLOAT; }
+
 /// dim0, dim1 : size in complex numbers !
 /// BLOCK_DIM_Y must be between 1 and 16
-template<int BLOCK_DIM_Y> __global__ void
-transpose_cplx_kernel(const double* in, double* out, const int dim0, const int dim1)
+template<typename scalar_t, int BLOCK_DIM_Y> __global__ void
+transpose_cplx_kernel(const scalar_t* in, scalar_t* out, const int dim0, const int dim1)
 {
-	const int TILE_DIM = WARPSZE/2;		// 16 double2 per warp, read as 32 doubles.
-	__shared__ double shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
+	const int TILE_DIM = WARPSZE/2;		// 16 scalar_t2 per warp, read as 32 scalar_ts.
+	__shared__ scalar_t shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
 
 	const int lx = threadIdx.x >> 1;
 	const int ly = threadIdx.y;
@@ -109,11 +167,11 @@ transpose_cplx_kernel(const double* in, double* out, const int dim0, const int d
 
 /// dim0, dim1 : size in complex numbers !
 /// BLOCK_DIM_Y must be a power of 2 between 1 and 16
-template<int BLOCK_DIM_Y> __global__ void
-transpose_cplx_zero_kernel(const double* in, double* out, const int dim0, const int dim1, const int mmax)
+template<typename scalar_t, int BLOCK_DIM_Y> __global__ void
+transpose_cplx_zero_kernel(const scalar_t* in, scalar_t* out, const int dim0, const int dim1, const int mmax)
 {
-	const int TILE_DIM = WARPSZE/2;		// 16 double2 per warp, read as 32 doubles.
-	__shared__ double shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
+	const int TILE_DIM = WARPSZE/2;		// 16 scalar_t2 per warp, read as 32 scalar_ts.
+	__shared__ scalar_t shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
 
 	const int ly = threadIdx.y;
 	const int lx = threadIdx.x >> 1;
@@ -157,11 +215,11 @@ transpose_cplx_zero_kernel(const double* in, double* out, const int dim0, const 
 
 /// dim0, dim1 : size in complex numbers !
 /// BLOCK_DIM_Y must be a power of 2 between 1 and 16
-template<int BLOCK_DIM_Y> __global__ void
-transpose_cplx_skip_kernel(const double* in, double* out, const int dim0, const int dim1, const int mmax)
+template<typename scalar_t, int BLOCK_DIM_Y> __global__ void
+transpose_cplx_skip_kernel(const scalar_t* in, scalar_t* out, const int dim0, const int dim1, const int mmax)
 {
-	const int TILE_DIM = WARPSZE/2;		// 16 double2 per warp, read as 32 doubles.
-	__shared__ double shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
+	const int TILE_DIM = WARPSZE/2;		// 16 scalar_t2 per warp, read as 32 scalar_ts.
+	__shared__ scalar_t shrdMem[TILE_DIM][TILE_DIM+1][2];		// avoid shared mem conflicts
 
 	const int lx = threadIdx.x >> 1;
 	const int ly = threadIdx.y;
@@ -197,50 +255,54 @@ transpose_cplx_skip_kernel(const double* in, double* out, const int dim0, const 
 }
 
 /// dim0, dim1 must be multiple of 16.
+template <typename scalar_t>
 static void
-transpose_cplx(cudaStream_t stream, const double* in, double* out, const int dim0, const int dim1)
+transpose_cplx(cudaStream_t stream, const scalar_t* in, scalar_t* out, const int dim0, const int dim1)
 {
 	const int block_dim_y = 4;		// good performance with 4 (MUST be power of 2 between 1 and 16)
 	dim3 blocks(dim0/16, dim1/16);
 	dim3 threads(32, block_dim_y);
-	transpose_cplx_kernel<block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1);
+	transpose_cplx_kernel<scalar_t,block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1);
 }
 
 /// dim0, dim1 must be multiple of 16.
+template <typename scalar_t>
 static void
-transpose_cplx_zero(cudaStream_t stream, const double* in, double* out, const int dim0, const int dim1, const int mmax)
+transpose_cplx_zero(cudaStream_t stream, const scalar_t* in, scalar_t* out, const int dim0, const int dim1, const int mmax)
 {
 	const int block_dim_y = 4;		// good performance with 4 (MUST be power of 2 between 1 and 16)
 	dim3 blocks(dim0/16, dim1/16);
 	dim3 threads(32, block_dim_y);
-	transpose_cplx_zero_kernel<block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1, mmax);
+	transpose_cplx_zero_kernel<scalar_t,block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1, mmax);
 }
 
 /// dim0, dim1 must be multiple of 16.
+template <typename scalar_t>
 static void
-transpose_cplx_skip(cudaStream_t stream, const double* in, double* out, const int dim0, const int dim1, const int mmax)
+transpose_cplx_skip(cudaStream_t stream, const scalar_t* in, scalar_t* out, const int dim0, const int dim1, const int mmax)
 {
 	const int block_dim_y = 4;		// good performance with 4 (MUST be power of 2 between 1 and 16)
 	dim3 blocks(dim0/16, dim1/16);
 	dim3 threads(32, block_dim_y);
-	transpose_cplx_skip_kernel<block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1, mmax);
+	transpose_cplx_skip_kernel<scalar_t,block_dim_y> <<<blocks, threads, 0, stream>>>(in, out, dim0, dim1, mmax);
 }
 
 
 
 /// On KEPLER, This kernel is fastest with THREADS_PER_BLOCK=256 and NW=1
-template<int S, int NW> __global__ void
-leg_m0_kernel(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2)
+template<typename scalar_t, int S, int NW> __global__ void
+leg_m0_kernel(const scalar_t *al, const scalar_t *ct, const scalar_t *ql, scalar_t *q, const int llim, const int nlat_2)
 {
 	// im = 0
 	const int it = blockDim.x * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
+	const int BLOCKSIZE = 256;		// good value
 
-	//__shared__ double ak[THREADS_PER_BLOCK];		// size blockDim.x
-	//__shared__ double qk[THREADS_PER_BLOCK/2];	// size blockDim.x / 2
+	__shared__ scalar_t ak[3*BLOCKSIZE/2];		// size blockDim.x
+	//__shared__ scalar_t qk[THREADS_PER_BLOCK/2];	// size blockDim.x / 2
 
-	extern __shared__ double ak[];			// size blockDim.x
-	double* const qk = ak + blockDim.x;		// size blockDim.x / 2
+	//extern __shared__ scalar_t ak[];			// size blockDim.x
+	scalar_t* const qk = ak + blockDim.x;		// size blockDim.x / 2
 
 	ak[j] = al[j];
 	if ((j <= llim)&&(j<blockDim.x/2)) qk[j] = ql[2*j];
@@ -248,9 +310,9 @@ leg_m0_kernel(const double *al, const double *ct, const double *ql, double *q, c
 
 	int l = 0;
 	int k = 0;	int kq = 0;
-	double cost[NW];
-	double y0[NW];    double y1[NW];
-	double re[NW];    double ro[NW];
+	scalar_t cost[NW];
+	scalar_t y0[NW];    scalar_t y1[NW];
+	scalar_t re[NW];    scalar_t ro[NW];
 
 	for (int i=0; i<NW; i++) {
 	cost[i] = (it+i<nlat_2) ? ct[it+i] : 0.0;
@@ -293,11 +355,11 @@ leg_m0_kernel(const double *al, const double *ct, const double *ql, double *q, c
 /*
 	if (it < nlat_2) {
 		int l = 0;
-	double cost = ct[it];
-		double y0 = al[0];
-		double re = y0 * ql[0];
-		double y1 = y0 * al[1] * cost;
-		double ro = y1 * ql[1];
+	scalar_t cost = ct[it];
+		scalar_t y0 = al[0];
+		scalar_t re = y0 * ql[0];
+		scalar_t y1 = y0 * al[1] * cost;
+		scalar_t ro = y1 * ql[1];
 		al+=2;    l+=2;
 		while(l<llim) {
 			y0  = al[1]*(cost*y1) + al[0]*y0;
@@ -317,12 +379,12 @@ leg_m0_kernel(const double *al, const double *ct, const double *ql, double *q, c
 	*/
 }
 
-template<int S, int NFIELDS>
-static void leg_m0(shtns_cfg shtns, const double *ql, double *q, const int llim, int spat_dist = 0)
+template<typename scalar_t, int S, int NFIELDS>
+static void leg_m0(shtns_cfg shtns, const scalar_t *ql, scalar_t *q, const int llim, int spat_dist = 0)
 {
 	const int nlat_2 = shtns->nlat_2;
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
+	scalar_t *d_alm = get_alm<scalar_t>(shtns);
+	scalar_t *d_ct = get_ct<scalar_t>(shtns);
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256;		// good value
@@ -333,7 +395,7 @@ static void leg_m0(shtns_cfg shtns, const double *ql, double *q, const int llim,
 	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	for (int f=0; f<NFIELDS; f++) {
-		leg_m0_kernel<S,1> <<<blocksPerGrid, threadsPerBlock, 3*threadsPerBlock/2*sizeof(double), stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2);
+		leg_m0_kernel<scalar_t,S,1> <<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2);
 	}
 }
 
@@ -365,8 +427,8 @@ void warp_reduce_add(double& ev) {
 }
 */
 
-template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
-ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int q_dist=0, const int ql_dist=0)
+template<typename scalar_t, int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
+ileg_m0_kernel(const scalar_t* __restrict__ al, const scalar_t* __restrict__ ct, const scalar_t* __restrict__ q, scalar_t *ql, const int llim, const int nlat_2, const int lmax, const int q_dist=0, const int ql_dist=0)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -374,15 +436,15 @@ ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, con
 	// re-assign each thread an l (transpose)
 	const int ll = j / (BLOCKSIZE/LSPAN);
 
-	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
+	__shared__ scalar_t ak[2*LSPAN+2];	// cache
+	__shared__ scalar_t yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
 	const int l_inc = BLOCKSIZE;
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
-	double y0, y1;
+	const scalar_t cost = (it < nlat_2) ? ct[it] : 0.0;
+	scalar_t y0, y1;
 
 	if (LSPAN < 4) printf("ERROR: LSPAN<4\n");
 
-	double my_reo[NFIELDS][LSPAN];			// in registers
+	scalar_t my_reo[NFIELDS][LSPAN];			// in registers
 	if (j < 2*LSPAN+2) ak[j] = al[j];
 
 	#pragma unroll
@@ -424,7 +486,7 @@ ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, con
 		}
 		if(BLOCKSIZE > WARPSZE)	__syncthreads();
 
-		double qll[NFIELDS];	// accumulator
+		scalar_t qll[NFIELDS];	// accumulator
 		// now re-assign each thread an l (transpose)
 		const int itl = ll*l_inc + j % (BLOCKSIZE/LSPAN);
 		#pragma unroll
@@ -488,12 +550,12 @@ ileg_m0_kernel(const double* __restrict__ al, const double* __restrict__ ct, con
 	}
 }
 
-template<int S, int NFIELDS>
-static void ileg_m0(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+template<typename scalar_t, int S, int NFIELDS>
+static void ileg_m0(shtns_cfg shtns, const scalar_t* q, scalar_t *ql, const int llim, int q_dist=0, int ql_dist=0)
 {
 	const int nlat_2 = shtns->nlat_2;
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
+	scalar_t *d_alm = get_alm<scalar_t>(shtns);
+	scalar_t *d_ct = get_ct<scalar_t>(shtns);
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256/NFIELDS;
@@ -504,7 +566,7 @@ static void ileg_m0(shtns_cfg shtns, const double* q, double *ql, const int llim
 	const int blocksPerGrid = (nlat_2 + BLOCKSIZE*NW - 1) / (BLOCKSIZE*NW);
 	if (q_dist == 0) q_dist = shtns->spat_stride;
 	if (ql_dist == 0) ql_dist = shtns->nlm_stride;
-	ileg_m0_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, q, ql, llim, nlat_2, q_dist, ql_dist);
+	ileg_m0_kernel<scalar_t, BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_alm, d_ct, q, ql, llim, nlat_2, q_dist, ql_dist);
 }
 
 
@@ -512,17 +574,17 @@ static void ileg_m0(shtns_cfg shtns, const double* q, double *ql, const int llim
 	Vlm =  st*d(Slm)/dtheta + I*m*Tlm
 	Wlm = -st*d(Tlm)/dtheta + I*m*Slm
 */
-template<int BLOCKSIZE> __global__ void
-sphtor2scal_kernel(const double* __restrict__ mx, const double* __restrict__ slm, const double* __restrict__ tlm, double *vlm, double *wlm, const int llim, const int lmax, const int mres)
+template<typename scalar_t, int BLOCKSIZE> __global__ void
+sphtor2scal_kernel(const scalar_t* __restrict__ mx, const scalar_t* __restrict__ slm, const scalar_t* __restrict__ tlm, scalar_t *vlm, scalar_t *wlm, const int llim, const int lmax, const int mres)
 {
 	// indices for overlapping blocks:
 	const int ll = (blockDim.x-4) * blockIdx.x + threadIdx.x - 2;		// = 2*l + ((imag) ? 1 : 0)
 	const int j = threadIdx.x;
 	const int im = blockIdx.y;
 
-	__shared__ double sl[BLOCKSIZE];
-	__shared__ double tl[BLOCKSIZE];
-	__shared__ double M[BLOCKSIZE];
+	__shared__ scalar_t sl[BLOCKSIZE];
+	__shared__ scalar_t tl[BLOCKSIZE];
+	__shared__ scalar_t M[BLOCKSIZE];
 
 	const int m = im*mres;
 	//int ofs = im*(2*(lmax+1) -m + mres);
@@ -539,16 +601,16 @@ sphtor2scal_kernel(const double* __restrict__ mx, const double* __restrict__ slm
 		sl[j] = 0.0;
 		tl[j] = 0.0;
 	}
-	const double mimag = im * mres * (ll - (ll^1));
+	const scalar_t mimag = im * mres * (ll - (ll^1));
 
 	__syncthreads();
 
 //    if ((j>=2) && (j<BLOCKSIZE-2) && (ll < 2*(llim+2-m))) {
 	if ((j<BLOCKSIZE-4) && (ll < 2*(llim+1-m))) {
-		double ml = M[2*(j>>1)+1];
-		double mu = M[2*(j>>1)+2];
-		double v = mimag*tl[(j+2)^1]  +  (ml*sl[j] + mu*sl[j+4]);
-		double w = mimag*sl[(j+2)^1]  -  (ml*tl[j] + mu*tl[j+4]);
+		scalar_t ml = M[2*(j>>1)+1];
+		scalar_t mu = M[2*(j>>1)+2];
+		scalar_t v = mimag*tl[(j+2)^1]  +  (ml*sl[j] + mu*sl[j+4]);
+		scalar_t w = mimag*sl[(j+2)^1]  -  (ml*tl[j] + mu*tl[j+4]);
 		vlm[ofs+2*im+2] = v;
 		wlm[ofs+2*im+2] = w;
 	}
@@ -558,17 +620,17 @@ sphtor2scal_kernel(const double* __restrict__ mx, const double* __restrict__ slm
 	Slm = - (I*m*Wlm + MX*Vlm) / (l*(l+1))
 	Tlm = - (I*m*Vlm - MX*Wlm) / (l*(l+1))
 **/
-template<int BLOCKSIZE> __global__ void
-scal2sphtor_kernel(const double* __restrict__ mx, const double* __restrict__ vlm, const double* __restrict__ wlm, double *slm, double *tlm, const int llim, const int lmax, const int mres)
+template<typename scalar_t, int BLOCKSIZE> __global__ void
+scal2sphtor_kernel(const scalar_t* __restrict__ mx, const scalar_t* __restrict__ vlm, const scalar_t* __restrict__ wlm, scalar_t *slm, scalar_t *tlm, const int llim, const int lmax, const int mres)
 {
 	// indices for overlapping blocks:
 	const int ll = (blockDim.x-4) * blockIdx.x + threadIdx.x - 2;		// = 2*l + ((imag) ? 1 : 0)
 	const int j = threadIdx.x;
 	const int im = blockIdx.y;
 
-	__shared__ double vl[BLOCKSIZE];
-	__shared__ double wl[BLOCKSIZE];
-	__shared__ double M[BLOCKSIZE];
+	__shared__ scalar_t vl[BLOCKSIZE];
+	__shared__ scalar_t wl[BLOCKSIZE];
+	__shared__ scalar_t M[BLOCKSIZE];
 
 	const int m = im * mres;
 	//const int xchg = 1 - 2*(j&1);	// +1 for real and -1 for imag
@@ -594,12 +656,12 @@ scal2sphtor_kernel(const double* __restrict__ mx, const double* __restrict__ vlm
 //    if ((j>=2) && (j<THREADS_PER_BLOCK-2) && (ll < 2*(llim+1-m))) {
 	if (j<BLOCKSIZE-4) {
 		if ((ell <= llim) && (ell>0)) {
-			const double mimag = im * mres * ((j^1) -j);
-			double ll_1 = 1.0 / (ell*(ell+1));
-			double ml = M[2*(j>>1)+1];
-			double mu = M[2*(j>>1)+2];
-			double s = mimag*wl[(j+2)^1]  -  (ml*vl[j] + mu*vl[j+4]);
-			double t = mimag*vl[(j+2)^1]  +  (ml*wl[j] + mu*wl[j+4]);
+			const scalar_t mimag = im * mres * ((j^1) -j);
+			scalar_t ll_1 = 1.0 / (ell*(ell+1));
+			scalar_t ml = M[2*(j>>1)+1];
+			scalar_t mu = M[2*(j>>1)+2];
+			scalar_t s = mimag*wl[(j+2)^1]  -  (ml*vl[j] + mu*vl[j+4]);
+			scalar_t t = mimag*vl[(j+2)^1]  +  (ml*wl[j] + mu*wl[j+4]);
 			slm[ofs+2] = s * ll_1;
 			tlm[ofs+2] = t * ll_1;
 		} else if (ell <= lmax) {	// fill with zeros up to lmax (and l=0 too).
@@ -613,7 +675,7 @@ void sphtor2scal_gpu(shtns_cfg shtns, cplx* d_Slm, cplx* d_Tlm, cplx* d_Vlm, cpl
 {
 	dim3 blocks((2*(shtns->lmax+2)+MAX_THREADS_PER_BLOCK-5)/(MAX_THREADS_PER_BLOCK-4), mmax+1);
 	dim3 threads(MAX_THREADS_PER_BLOCK, 1);
-	sphtor2scal_kernel<MAX_THREADS_PER_BLOCK> <<< blocks, threads,0, shtns->comp_stream >>>
+	sphtor2scal_kernel<double, MAX_THREADS_PER_BLOCK> <<< blocks, threads,0, shtns->comp_stream >>>
 		(shtns->d_mx_stdt, (double*) d_Slm, (double*) d_Tlm, (double*) d_Vlm, (double*) d_Wlm, llim, shtns->lmax, shtns->mres);
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) { printf("sphtor2scal_gpu error : %s!\n", cudaGetErrorString(err));	return; }
@@ -623,7 +685,7 @@ void scal2sphtor_gpu(shtns_cfg shtns, cplx* d_Vlm, cplx* d_Wlm, cplx* d_Slm, cpl
 {
 	dim3 blocks((2*(shtns->lmax+2)+MAX_THREADS_PER_BLOCK-5)/(MAX_THREADS_PER_BLOCK-4), shtns->mmax+1);
 	dim3 threads(MAX_THREADS_PER_BLOCK, 1);
-	scal2sphtor_kernel<MAX_THREADS_PER_BLOCK> <<<blocks, threads, 0, shtns->comp_stream>>>
+	scal2sphtor_kernel<double, MAX_THREADS_PER_BLOCK> <<<blocks, threads, 0, shtns->comp_stream>>>
 		(shtns->d_mx_van, (double*) d_Vlm, (double*) d_Wlm, (double*)d_Slm, (double*)d_Tlm, llim, shtns->lmax, shtns->mres);
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) { printf("scal2sphtor_gpu error : %s!\n", cudaGetErrorString(err));	return; }
@@ -634,9 +696,9 @@ void scal2sphtor_gpu(shtns_cfg shtns, cplx* d_Vlm, cplx* d_Wlm, cplx* d_Slm, cpl
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim MUST BE <= 1800
 /// S can only be 0 (for scalar) or 1 (for spin 1 / vector)
-template<int BLOCKSIZE, int S, int NFIELDS, int NW>
+template<typename scalar_t, int BLOCKSIZE, int S, int NFIELDS, int NW>
 static __global__ void leg_m_lowllim_kernel(
-	const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ ql, double *q, 
+	const scalar_t* __restrict__ al, const scalar_t* __restrict__ ct, const scalar_t* __restrict__ ql, scalar_t *q, 
 	const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const int ql_dist=0, const int q_dist=0)
 {
 	const int it = BLOCKSIZE*NW * blockIdx.x + threadIdx.x;
@@ -645,12 +707,12 @@ static __global__ void leg_m_lowllim_kernel(
 	const int m_inc = 2*nlat_2;
 	const int k_inc = 1;
 
-	__shared__ double ak[BLOCKSIZE];		// size blockDim.x
-	__shared__ double qk[NFIELDS][BLOCKSIZE];	// size blockDim.x * NFIELDS
+	__shared__ scalar_t ak[BLOCKSIZE];		// size blockDim.x
+	__shared__ scalar_t qk[NFIELDS][BLOCKSIZE];	// size blockDim.x * NFIELDS
 
-	double cost[NW];
-	double y0[NW];
-	double y1[NW];
+	scalar_t cost[NW];
+	scalar_t y0[NW];
+	scalar_t y1[NW];
 	#pragma unroll
 	for (int i=0; i<NW; i++) {
 		const int iit = it+i*BLOCKSIZE;
@@ -663,7 +725,7 @@ static __global__ void leg_m_lowllim_kernel(
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++) 	qk[f][j] = ql[j  + f*ql_dist];
 		}
-		double re[NFIELDS][NW], ro[NFIELDS][NW];
+		scalar_t re[NFIELDS][NW], ro[NFIELDS][NW];
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
 			#pragma unroll
@@ -745,7 +807,7 @@ static __global__ void leg_m_lowllim_kernel(
 			}
 		}
 	} else { 	// m>0
-		double rer[NFIELDS][NW], ror[NFIELDS][NW], rei[NFIELDS][NW], roi[NFIELDS][NW];
+		scalar_t rer[NFIELDS][NW], ror[NFIELDS][NW], rei[NFIELDS][NW], roi[NFIELDS][NW];
 		int m = im*mres;
 		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
 		al += 2*(l+m);
@@ -861,8 +923,8 @@ static __global__ void leg_m_lowllim_kernel(
 				roi[f][i] = shfl_xor(roi[f][i], 1);
 			}
 		}
-		double nr[NFIELDS][NW];
-		const double sgn = 1 - 2*(j&1);
+		scalar_t nr[NFIELDS][NW];
+		const scalar_t sgn = 1 - 2*(j&1);
 		#pragma unroll
 		for (int i=0; i<NW; i++) {
 			const int iit = it+i*BLOCKSIZE;
@@ -886,15 +948,15 @@ static __global__ void leg_m_lowllim_kernel(
 	}
 }
 
-template<int S, int NFIELDS>
-static void leg_m_lowllim(shtns_cfg shtns, const double *ql, double *q, const int llim, const int mmax, int spat_dist=0)
+template<typename scalar_t, int S, int NFIELDS>
+static void leg_m_lowllim(shtns_cfg shtns, const scalar_t *ql, scalar_t *q, const int llim, const int mmax, int spat_dist=0)
 {
 	const int lmax = shtns->lmax;
 	const int mres = shtns->mres;
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
+	scalar_t *d_alm = get_alm<scalar_t>(shtns);
+	scalar_t *d_ct = get_ct<scalar_t>(shtns);
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256;		// good value
@@ -906,35 +968,38 @@ static void leg_m_lowllim(shtns_cfg shtns, const double *ql, double *q, const in
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
-	leg_m_lowllim_kernel<BLOCKSIZE, S, NFIELDS, NW> <<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) ql, (double*) q, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
+	leg_m_lowllim_kernel<scalar_t, BLOCKSIZE, S, NFIELDS, NW> <<<blocks, threads, 0, stream>>>(d_alm, d_ct, (scalar_t*) ql, (scalar_t*) q, llim, nlat_2, lmax,mres, nphi, shtns->nlm_stride, spat_dist);
 }
 
 /// requirements : blockSize must be 1 in the y-direction and THREADS_PER_BLOCK in the x-direction.
 /// llim can be arbitrarily large (> 1800)
-template<int S> __global__ void
-leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, double *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
+template<typename scalar_t, int S> __global__ void
+leg_m_highllim_kernel(const scalar_t *al, const scalar_t *ct, const scalar_t *ql, scalar_t *q, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi)
 {
+	const int BLOCKSIZE = 256;		// good value
 	const int it = blockDim.x * blockIdx.x + threadIdx.x;
 	const int im = blockIdx.y;
 	const int j = threadIdx.x;
 	const int m_inc = 2*nlat_2;
 	const int k_inc = 1;
+	const scalar_t accuracy = get_accuracy<scalar_t>();
+	const scalar_t scale_factor = get_scale_factor<scalar_t>();
 
-	//__shared__ double ak[THREADS_PER_BLOCK];	// cache
-	//__shared__ double qk[THREADS_PER_BLOCK];
+	__shared__ scalar_t ak[2*BLOCKSIZE];	// cache
+	//__shared__ scalar_t qk[THREADS_PER_BLOCK];
 	// two arrays in shared memory of size blockDim.x :
-	extern __shared__ double ak[];
-	double* const qk = ak + blockDim.x;
+	//extern __shared__ scalar_t ak[];
+	scalar_t* const qk = ak + blockDim.x;
 
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
+	const scalar_t cost = (it < nlat_2) ? ct[it] : 0.0;
 
 	if (im==0) {
 	int l = 0;
-	double y0 = al[0];
+	scalar_t y0 = al[0];
 	if (S==1) y0 *= rsqrt(1.0 - cost*cost);
-	double re = y0 * ql[0];
-	double y1 = y0 * al[1] * cost;
-	double ro = y1 * ql[2];
+	scalar_t re = y0 * ql[0];
+	scalar_t y1 = y0 * al[1] * cost;
+	scalar_t ro = y1 * ql[2];
 	al+=2;    l+=2;
 	while(l<llim) {
 		y0  = al[1]*(cost*y1) + al[0]*y0;
@@ -957,7 +1022,7 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 	int l = (im*(2*(lmax+1)-(m+mres)))>>1;
 	al += 2*(l+m);
 	ql += 2*(l + S*im);
-	double rer,ror, rei,roi, y0, y1;
+	scalar_t rer,ror, rei,roi, y0, y1;
 	ror = 0.0;	roi = 0.0;
 	rer = 0.0;	rei = 0.0;
 	y1 = sqrt(1.0 - cost*cost);	// sin(theta)
@@ -970,16 +1035,18 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 		if (l&1) {
 			y0 *= y1;
 			ny += nsint;
-			if (_any(y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR))) {		// avoid warp divergence
+			//if (_any(y0 < (accuracy+1.0/scale_factor))) {		// avoid warp divergence
+			if (y0 < (accuracy+1.0/scale_factor)) {		// avoid warp divergence
 			ny--;
-			y0 *= SHT_SCALE_FACTOR;
+			y0 *= scale_factor;
 			}
 		}
 		y1 *= y1;
 		nsint += nsint;
-		if (_any(y1 < 1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence
+		//if (_any(y1 < 1.0/scale_factor)) {		// avoid warp divergence
+		if (y1 < 1.0/scale_factor) {		// avoid warp divergence
 			nsint--;
-			y1 *= SHT_SCALE_FACTOR;
+			y1 *= scale_factor;
 		}
 		} while(l >>= 1);
 		y0 *= al[0];
@@ -997,11 +1064,11 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 			y1 = ak[ka+1+ofs]*cost*y0 + ak[ka+ofs]*y1;
 			y0 = ak[ka+3+ofs]*cost*y1 + ak[ka+2+ofs]*y0;
 			l+=2;	al+=4;	ka+=4;
-			if (fabs(y1) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
+			if (fabs(y1) > accuracy*scale_factor + 1.0)
 			{	// rescale when value is significant
 				++ny;
-				y0 *= 1.0/SHT_SCALE_FACTOR;
-				y1 *= 1.0/SHT_SCALE_FACTOR;
+				y0 *= 1.0/scale_factor;
+				y1 *= 1.0/scale_factor;
 			}
 		}
 
@@ -1019,11 +1086,11 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 				ror += y1 * qk[ka+2+ofs];	// real
 				roi += y1 * qk[ka+3+ofs];	// imag
 			}
-			else if (fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
+			else if (fabs(y0) > accuracy*scale_factor + 1.0)
 			{	// rescale when value is significant
 				++ny;
-				y0 *= 1.0/SHT_SCALE_FACTOR;
-				y1 *= 1.0/SHT_SCALE_FACTOR;
+				y0 *= 1.0/scale_factor;
+				y1 *= 1.0/scale_factor;
 			}
 			l+=2;	al+=4;
 			y0 = ak[ka+3+ofs]*cost*y1 + ak[ka+2+ofs]*y0;
@@ -1036,13 +1103,13 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 	}
 
 	/// store mangled for complex fft
-	double nr = rer+ror;
-	double sr = rer-ror;
-	const double sgn = 1 - 2*(j&1);
+	scalar_t nr = rer+ror;
+	scalar_t sr = rer-ror;
+	const scalar_t sgn = 1 - 2*(j&1);
 	rei = shfl_xor(rei, 1);
 	roi = shfl_xor(roi, 1);
-	double nix = sgn*(rei+roi);
-	double six = sgn*(rei-roi);
+	scalar_t nix = sgn*(rei+roi);
+	scalar_t six = sgn*(rei-roi);
 	if (it < nlat_2) {
 		q[im*m_inc + it*k_inc]                     = nr - nix;
 		q[(nphi-im)*m_inc + it*k_inc]              = nr + nix;
@@ -1052,15 +1119,15 @@ leg_m_highllim_kernel(const double *al, const double *ct, const double *ql, doub
 	}
 }
 
-template<int S, int NFIELDS>
-static void leg_m_highllim(shtns_cfg shtns, const double *ql, double *q, const int llim, const int mmax, int spat_dist = 0)
+template<typename scalar_t, int S, int NFIELDS>
+static void leg_m_highllim(shtns_cfg shtns, const scalar_t *ql, scalar_t *q, const int llim, const int mmax, int spat_dist = 0)
 {
 	const int lmax = shtns->lmax;
 	const int mres = shtns->mres;
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
+	scalar_t *d_alm = get_alm<scalar_t>(shtns);
+	scalar_t *d_ct = get_ct<scalar_t>(shtns);
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256;		// good value
@@ -1073,13 +1140,13 @@ static void leg_m_highllim(shtns_cfg shtns, const double *ql, double *q, const i
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
 	for (int f=0; f<NFIELDS; f++) {
-		leg_m_highllim_kernel<S> <<<blocks, threads, 2*threadsPerBlock*sizeof(double), stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2, lmax,mres, nphi);
+		leg_m_highllim_kernel<scalar_t, S> <<<blocks, threads, 0, stream>>>(d_alm, d_ct, ql + f*shtns->nlm_stride, q + f*spat_dist, llim, nlat_2, lmax,mres, nphi);
 	}
 }
 
 
-template<int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
-ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ ct, const double* __restrict__ q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const double mpos_scale, const int q_dist=0, const int ql_dist=0)
+template<typename scalar_t, int BLOCKSIZE, int LSPAN, int S, int NFIELDS> __global__ void
+ileg_m_lowllim_kernel(const scalar_t* __restrict__ al, const scalar_t* __restrict__ ct, const scalar_t* __restrict__ q, scalar_t *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const scalar_t mpos_scale, const int q_dist=0, const int ql_dist=0)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
@@ -1091,16 +1158,16 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 	const int ll = j / (BLOCKSIZE/LSPAN);
 	const int ri = j / (BLOCKSIZE/(2*LSPAN)) % 2;	// real (0) or imag (1)
 
-	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
+	__shared__ scalar_t ak[2*LSPAN+2];	// cache
+	__shared__ scalar_t yl[LSPAN*BLOCKSIZE];		// yl is also used for even/odd computation. Ensure LSPAN >= 4.
 	const int l_inc = BLOCKSIZE;
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
-	double y0, y1;
+	const scalar_t cost = (it < nlat_2) ? ct[it] : 0.0;
+	scalar_t y0, y1;
 
 	if (LSPAN < 4) printf("ERROR: LSPAN<4\n");
 
 	if (im == 0) {
-		double my_reo[NFIELDS][LSPAN];			// in registers
+		scalar_t my_reo[NFIELDS][LSPAN];			// in registers
 		if (j < 2*LSPAN+2) ak[j] = al[j];
 
 		#pragma unroll
@@ -1142,7 +1209,7 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 			}
 			if(BLOCKSIZE > WARPSZE)	__syncthreads();
 
-			double qll[NFIELDS];	// accumulator
+			scalar_t qll[NFIELDS];	// accumulator
 			// now re-assign each thread an l (transpose)
 			const int itl = ll*l_inc + j % (BLOCKSIZE/LSPAN);
 			#pragma unroll
@@ -1205,23 +1272,23 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 			l+=LSPAN;
 		}
 	} else {	// im > 0
-		double my_reo[NFIELDS][2*LSPAN];			// in registers
+		scalar_t my_reo[NFIELDS][2*LSPAN];			// in registers
 		int m = im*mres;
 		int l = (im*(2*(lmax+1)-(m+mres)))>>1;
 		al += 2*(l+m);
 		ql += 2*(l + S*im);	// allow vector transforms where llim = lmax+1
 
 		if (j < 2*LSPAN+2) ak[j] = al[j];
-		const double sgn = 2*(j&1) - 1;	// -/+
+		const scalar_t sgn = 2*(j&1) - 1;	// -/+
 		
 		#pragma unroll
 		for (int f=0; f<NFIELDS; f++) {
 			y0         = (it < nlat_2) ? q[im*m_inc + it + f*q_dist] : 0.0;		// north imag (ani)
-			double qer = (it < nlat_2) ? q[(nphi-im)*m_inc + it + f*q_dist] : 0.0;	// north real (an)
+			scalar_t qer = (it < nlat_2) ? q[(nphi-im)*m_inc + it + f*q_dist] : 0.0;	// north real (an)
 			y1         = (it < nlat_2) ? q[im*m_inc + nlat_2*2-1-it + f*q_dist] : 0.0;	// south imag (asi)
-			double qor = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it + f*q_dist] : 0.0;	// south real (as)
-			double qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
-			double qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
+			scalar_t qor = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it + f*q_dist] : 0.0;	// south real (as)
+			scalar_t qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
+			scalar_t qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
 			y0 = shfl_xor(qei, 1);	// exchange between adjacent lanes.
 			y1 = shfl_xor(qoi, 1);
 
@@ -1265,7 +1332,7 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 
 			// transposed work:
 			if (BLOCKSIZE > WARPSZE)	__syncthreads();
-			double qlri[NFIELDS];	// accumulator
+			scalar_t qlri[NFIELDS];	// accumulator
 			const int itl = ll*l_inc + j % (BLOCKSIZE/(2*LSPAN));
 			#pragma unroll
 			for (int f=0; f<NFIELDS; f++)	qlri[f] = my_reo[f][0] * yl[itl];		// first element
@@ -1311,16 +1378,16 @@ ileg_m_lowllim_kernel(const double* __restrict__ al, const double* __restrict__ 
 	}
 }
 
-template<int S, int NFIELDS> 
-static void ileg_m_lowllim(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+template<typename scalar_t, int S, int NFIELDS> 
+static void ileg_m_lowllim(shtns_cfg shtns, const scalar_t* q, scalar_t *ql, const int llim, int q_dist=0, int ql_dist=0)
 {
 	const int lmax = shtns->lmax;
 	const int mres = shtns->mres;
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
 	int mmax = shtns->mmax;
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
+	scalar_t *d_alm = get_alm<scalar_t>(shtns);
+	scalar_t *d_ct = get_ct<scalar_t>(shtns);
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256/NFIELDS;
@@ -1334,25 +1401,27 @@ static void ileg_m_lowllim(shtns_cfg shtns, const double* q, double *ql, const i
 	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
-	ileg_m_lowllim_kernel<BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (double*) q, (double*) ql, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys, q_dist, ql_dist);
+	ileg_m_lowllim_kernel<scalar_t, BLOCKSIZE, LSPAN_, S, NFIELDS><<<blocks, threads, 0, stream>>>(d_alm, d_ct, (scalar_t*) q, (scalar_t*) ql, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys, q_dist, ql_dist);
 }
 
 
-template<int BLOCKSIZE, int LSPAN, int S> __global__ void
-ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, double *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const double mpos_scale)
+template<typename scalar_t, int BLOCKSIZE, int LSPAN, int S> __global__ void
+ileg_m_highllim_kernel(const scalar_t *al, const scalar_t *ct, const scalar_t *q, scalar_t *ql, const int llim, const int nlat_2, const int lmax, const int mres, const int nphi, const scalar_t mpos_scale)
 {
 	const int it = BLOCKSIZE * blockIdx.x + threadIdx.x;
 	const int j = threadIdx.x;
 	const int im = blockIdx.y;
 	const int m_inc = 2*nlat_2;
 //    const int k_inc = 1;
+	const scalar_t accuracy = get_accuracy<scalar_t>();
+	const scalar_t scale_factor = get_scale_factor<scalar_t>();
 
-	__shared__ double ak[2*LSPAN+2];	// cache
-	__shared__ double yl[LSPAN*BLOCKSIZE];
-	__shared__ double reo[4*BLOCKSIZE];
+	__shared__ scalar_t ak[2*LSPAN+2];	// cache
+	__shared__ scalar_t yl[LSPAN*BLOCKSIZE];
+	__shared__ scalar_t reo[4*BLOCKSIZE];
 	const int l_inc = BLOCKSIZE;
-	const double cost = (it < nlat_2) ? ct[it] : 0.0;
-	double y0, y1;
+	const scalar_t cost = (it < nlat_2) ? ct[it] : 0.0;
+	scalar_t y0, y1;
 
 
 	if (im == 0) {
@@ -1380,7 +1449,7 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 				al += 4;
 			}
 			if (BLOCKSIZE > WARPSZE)	__syncthreads();
-			double qll = 0.0;	// accumulator
+			scalar_t qll = 0.0;	// accumulator
 			// now re-assign each thread an l (transpose)
 			const int ll = j / (BLOCKSIZE/LSPAN);
 			for (int i=0; i<BLOCKSIZE; i+= BLOCKSIZE/LSPAN) {
@@ -1413,13 +1482,13 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 
 		if (j < 2*LSPAN+2) ak[j] = al[j];
 		if (BLOCKSIZE > WARPSZE)	__syncthreads();
-		const double sgn = 2*(j&1) - 1;	// -/+
+		const scalar_t sgn = 2*(j&1) - 1;	// -/+
 		y0    = (it < nlat_2) ? q[im*m_inc + it] : 0.0;		// north imag (ani)
-		double qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
+		scalar_t qer    = (it < nlat_2) ? q[(nphi-im)*m_inc + it] : 0.0;	// north real (an)
 		y1    = (it < nlat_2) ? q[im*m_inc + nlat_2*2-1-it] : 0.0;	// south imag (asi)
-		double qor    = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it] : 0.0;	// south real (as)
-		double qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
-		double qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
+		scalar_t qor    = (it < nlat_2) ? q[(nphi-im)*m_inc + nlat_2*2-1-it] : 0.0;	// south real (as)
+		scalar_t qei = y0-qer;		qer += y0;		// ani = -qei[lane+1],   bni = qei[lane-1]
+		scalar_t qoi = y1-qor;		qor += y1;		// bsi = -qoi[lane-1],   asi = qoi[lane+1];
 		y0 = shfl_xor(qei, 1);	// exchange between adjacent lanes.
 		y1 = shfl_xor(qoi, 1);
 		reo[j] 			    = qer + qor;	// rer
@@ -1438,18 +1507,18 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 				y0 *= y1;
 				ny += nsint;
 				// the use of _any leads to wrong results. On KEPLER it is also slower.
-	//		    if (_any(y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR))) {		// avoid warp divergence
-				if (y0 < (SHT_ACCURACY+1.0/SHT_SCALE_FACTOR)) {
+	//		    if (_any(y0 < (accuracy+1.0/scale_factor))) {		// avoid warp divergence
+				if (y0 < (accuracy+1.0/scale_factor)) {
 					ny--;
-					y0 *= SHT_SCALE_FACTOR;
+					y0 *= scale_factor;
 				}
 			}
 			y1 *= y1;
 			nsint += nsint;
-	//		if (_any(y1 < 1.0/SHT_SCALE_FACTOR)) {		// avoid warp divergence
-			if (y1 < 1.0/SHT_SCALE_FACTOR) {
+	//		if (_any(y1 < 1.0/scale_factor)) {		// avoid warp divergence
+			if (y1 < 1.0/scale_factor) {
 				nsint--;
-				y1 *= SHT_SCALE_FACTOR;
+				y1 *= scale_factor;
 			}
 		} while(l >>= 1);
 		y0 *= ak[0];
@@ -1465,19 +1534,19 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 				yl[(k+1)*l_inc +j] = (ny==0) ? y1 : 0.0;
 				y1 = ak[2*k+5]*cost*y0 + ak[2*k+4]*y1;
 				if (ny<0) {
-	//			if (_any(fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0))
-					if (fabs(y0) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0)
+	//			if (_any(fabs(y0) > accuracy*scale_factor + 1.0))
+					if (fabs(y0) > accuracy*scale_factor + 1.0)
 					{	// rescale when value is significant
 						++ny;
-						y0 *= 1.0/SHT_SCALE_FACTOR;
-						y1 *= 1.0/SHT_SCALE_FACTOR;
+						y0 *= 1.0/scale_factor;
+						y1 *= 1.0/scale_factor;
 					}
 				}
 				al += 4;
 			}
 
 			if (BLOCKSIZE > WARPSZE)	__syncthreads();
-			double qlri = 0.0;	// accumulator
+			scalar_t qlri = 0.0;	// accumulator
 			// now re-assign each thread an l (transpose)
 			const int ll = j / (BLOCKSIZE/LSPAN);
 			const int ri = j / (BLOCKSIZE/(2*LSPAN)) % 2;	// real (0) or imag (1)
@@ -1508,16 +1577,16 @@ ileg_m_highllim_kernel(const double *al, const double *ct, const double *q, doub
 	}
 }
 
-template<int S, int NFIELDS>
-static void ileg_m_highllim(shtns_cfg shtns, const double* q, double *ql, const int llim, int q_dist=0, int ql_dist=0)
+template<typename scalar_t, int S, int NFIELDS>
+static void ileg_m_highllim(shtns_cfg shtns, const scalar_t* q, scalar_t *ql, const int llim, int q_dist=0, int ql_dist=0)
 {
 	const int lmax = shtns->lmax;
 	const int mres = shtns->mres;
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
 	int mmax = shtns->mmax;
-	double *d_alm = shtns->d_alm;
-	double *d_ct = shtns->d_ct;
+	scalar_t *d_alm = get_alm<scalar_t>(shtns);
+	scalar_t *d_ct = get_ct<scalar_t>(shtns);
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256/NFIELDS;
@@ -1532,42 +1601,45 @@ static void ileg_m_highllim(shtns_cfg shtns, const double* q, double *ql, const 
 	dim3 blocks(blocksPerGrid, mmax+1);
 	dim3 threads(threadsPerBlock, 1);
 	for (int f=0; f<NFIELDS; f++) {
-		ileg_m_highllim_kernel<BLOCKSIZE, LSPAN_, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, q + f*q_dist, ql + f*ql_dist, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys);
+		ileg_m_highllim_kernel<scalar_t, BLOCKSIZE, LSPAN_, S><<<blocks, threads, 0, stream>>>(d_alm, d_ct, q + f*q_dist, ql + f*ql_dist, llim, nlat_2, lmax,mres, nphi, shtns->mpos_scale_analys);
 	}
 }
 
 
-template<int S, int NFIELDS>
-static void legendre(shtns_cfg shtns, const double *ql, double *q, const int llim, const int mmax, int spat_dist = 0)
+template<typename scalar_t, int S, int NFIELDS>
+static void legendre(shtns_cfg shtns, const scalar_t *ql, scalar_t *q, const int llim, const int mmax, int spat_dist = 0)
 {
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
 	if (mmax==0) {
-		leg_m0<S,NFIELDS>(shtns, ql, q, llim);
+		leg_m0<scalar_t,S,NFIELDS>(shtns, ql, q, llim);
 	} else {
-		if (llim <= SHT_L_RESCALE_FLY) {
-			leg_m_lowllim<S,NFIELDS>(shtns, ql, q, llim, mmax, spat_dist);
+		const int limit = get_l_limit<scalar_t>();
+		if (llim <= limit) {
+			leg_m_lowllim<scalar_t,S,NFIELDS>(shtns, ql, q, llim, mmax, spat_dist);
 		} else {
-			leg_m_highllim<S,NFIELDS>(shtns, ql, q, llim, mmax);
+			leg_m_highllim<scalar_t,S,NFIELDS>(shtns, ql, q, llim, mmax);
 		}
 	}
 }
 
 /// Perform SH transform on data that is already on the GPU. d_Qlm and d_Vr are pointers to GPU memory (obtained by cudaMalloc() for instance)
-template<int S, int NFIELDS>
-static void ilegendre(shtns_cfg shtns, const double *q, double* ql, const int llim, int spat_dist = 0)
+template<typename scalar_t, int S, int NFIELDS>
+static void ilegendre(shtns_cfg shtns, const scalar_t *q, scalar_t* ql, const int llim, int spat_dist = 0)
 {
 	int mmax = shtns->mmax;
 	const int mres = shtns->mres;
 
 	if (spat_dist == 0) spat_dist = shtns->spat_stride;
-	cudaMemsetAsync(ql, 0, sizeof(double) * NFIELDS * shtns->nlm_stride, shtns->comp_stream);		// set to zero before we start.
+	cudaMemsetAsync(ql, 0, sizeof(scalar_t) * NFIELDS * shtns->nlm_stride, shtns->comp_stream);		// set to zero before we start.
 	if (llim < mmax*mres) mmax = llim / mres;	// truncate mmax too !
 	if (mmax==0) {
-		ileg_m0<S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
-	} else
-	if (llim <= SHT_L_RESCALE_FLY) {
-		ileg_m_lowllim<S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
+		ileg_m0<scalar_t, S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
 	} else {
-		ileg_m_highllim<S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
+		const int limit = get_l_limit<scalar_t>();
+		if (llim <= limit) {
+			ileg_m_lowllim<scalar_t, S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
+		} else {
+			ileg_m_highllim<scalar_t, S, NFIELDS>(shtns, q, ql, llim, spat_dist, shtns->nlm_stride);
+		}
 	}
 }

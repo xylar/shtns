@@ -181,6 +181,9 @@ struct shtns_info {		// MUST start with "int nlm;"
 	unsigned layout;		// requested data layout
 	double Y00_1, Y10_ct, Y11_st;
 	shtns_cfg next;		// pointer to next sht_setup or NULL (records a chained list of SHT setup).
+	float* d_alm_f;
+	float* d_ct_f;
+	cufftHandle cufft_plan_f;						// the cufft Handle
 	// the end should be aligned on the size of int, to allow the storage of small arrays.
 };
 
