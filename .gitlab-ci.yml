@@ -11,6 +11,8 @@ build:
   script:
     - ./configure --disable-simd
     - make time_SHT && mv time_SHT time_SHT_nosimd
+    - ./configure --disable-ishioka
+    - make time_SHT && mv time_SHT time_SHT_noish
     - ./configure
     - sed -i "s/native/nehalem/" Makefile && make time_SHT && mv time_SHT time_SHT_sse3
     - sed -i "s/nehalem/haswell/" Makefile && make time_SHT && mv time_SHT time_SHT_avx2
@@ -40,9 +42,14 @@ test:
     - ./test_suite
     - ./test_rot
     - ./time_SHT_nosimd 127 -quickinit -vector -nlorder=2
-    - ./time_SHT_sse3 127 -quickinit -vector -nlorder=2
-    - ./time_SHT_avx2 127 -quickinit -vector -nlorder=2
-    - ./time_SHT 127 -quickinit -vector -nlorder=2
-    - ./time_SHT 4095 -quickinit -vector -iter=1 -mres=21
-    - ./time_SHT 8191 -quickinit -vector -iter=1 -mmax=0
+    - ./time_SHT_sse3   127 -quickinit -vector -nlorder=2
+    - ./time_SHT_avx2   127 -quickinit -vector -nlorder=2
+    - ./time_SHT        127 -quickinit -vector -nlorder=2
+    - ./time_SHT_noish  127 -quickinit -vector -nlorder=2
+    - ./time_SHT_noish 1022 -quickinit -vector -nlorder=2 -iter=1
+    - ./time_SHT_noish 1034 -regpoles -vector -iter=1 -mres=9
+    - ./time_SHT       1034 -regpoles -vector -iter=1 -mres=9
+    - ./time_SHT       1022 -quickinit -vector -nlorder=2 -iter=1
+    - ./time_SHT       4095 -quickinit -vector -iter=1 -mres=21
+    - ./time_SHT       8191 -quickinit -vector -iter=1 -mmax=0
 
