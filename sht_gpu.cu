@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -138,10 +138,13 @@ void cushtns_release_gpu(shtns_cfg shtns)
 {
 	// TODO: arrays possibly shared between different shtns_cfg should be deallocated ONLY if not used by other shtns_cfg.
 	if (shtns->nphi > 1) cufftDestroy(shtns->cufft_plan);
+	if (shtns->nphi > 1) cufftDestroy(shtns->cufft_plan_float);
 	if (shtns->cu_flags & CUSHT_OWN_COMP_STREAM) cudaStreamDestroy(shtns->comp_stream);
 	if (shtns->cu_flags & CUSHT_OWN_XFER_STREAM) cudaStreamDestroy(shtns->xfer_stream);
 	if (shtns->d_ct) cudaFree(shtns->d_ct);
+	if (shtns->d_ct_f) cudaFree(shtns->d_ct_f);
 	if (shtns->d_alm) cudaFree(shtns->d_alm);
+	if (shtns->d_alm_f) cudaFree(shtns->d_alm_f);
 	if (shtns->d_mx_stdt) cudaFree(shtns->d_mx_stdt);
 	if (shtns->d_mx_van) cudaFree(shtns->d_mx_van);
 	if (shtns->gpu_mem) cudaFree(shtns->gpu_mem);
@@ -194,7 +197,7 @@ static int init_cuda_buffer_fft(shtns_cfg shtns)
 		cufftGetSize(shtns->cufft_plan, &worksize);
 		printf("work-area size: %ld \t nlat*nphi = %ld\n", worksize/8, shtns->spat_stride);
 		cufftGetSize(shtns->cufft_plan_float, &worksize);
-		printf("float work-area size: %ld \t nlat*nphi = %ld\n", worksize/8, shtns->spat_stride);
+		printf("float work-area size: %ld \t nlat*nphi = %ld\n", worksize/4, shtns->spat_stride);
 	}
 
 	// Allocate working arrays for SHT on GPU:
@@ -229,7 +232,9 @@ int cushtns_init_gpu(shtns_cfg shtns)
 	const long nlat_2 = shtns->nlat_2;
 
 	double *d_alm = NULL;
+	float *d_alm_f = NULL;
 	double *d_ct  = NULL;
+	float *d_ct_f  = NULL;
 	double *d_mx_stdt = NULL;
 	double *d_mx_van = NULL;
 	int err_count = 0;
@@ -248,6 +253,8 @@ int cushtns_init_gpu(shtns_cfg shtns)
 	// Allocate the device input vector alm
 	err = cudaMalloc((void **)&d_alm, (2*nlm+MAX_THREADS_PER_BLOCK-1)*sizeof(double));	// allow some overflow.
 	if (err != cudaSuccess) err_count ++;
+	err = cudaMalloc((void **)&d_alm_f, (2*nlm+MAX_THREADS_PER_BLOCK-1)*sizeof(float));	// allow some overflow.
+	if (err != cudaSuccess) err_count ++;
 	if (shtns->mx_stdt) {
 		// Allocate the device matrix for d(sin(t))/dt
 		err = cudaMalloc((void **)&d_mx_stdt, (2*nlm+MAX_THREADS_PER_BLOCK-1)*sizeof(double));
@@ -258,6 +265,8 @@ int cushtns_init_gpu(shtns_cfg shtns)
 	}
 	// Allocate the device input vector cos(theta) and gauss weights
 	err = cudaMalloc((void **)&d_ct, 2*nlat_2*sizeof(double));
+	if (err != cudaSuccess) err_count ++;
+	err = cudaMalloc((void **)&d_ct_f, 2*nlat_2*sizeof(float));
 	if (err != cudaSuccess) err_count ++;
 
 	if (err_count == 0) {
@@ -276,9 +285,12 @@ int cushtns_init_gpu(shtns_cfg shtns)
 	}
 
 	shtns->d_alm = d_alm;
+	shtns->d_alm_f = d_alm_f;
 	shtns->d_ct  = d_ct;
+	shtns->d_ct_f  = d_ct_f;
 	shtns->d_mx_stdt = d_mx_stdt;
 	shtns->d_mx_van = d_mx_van;
+	copy_convert(shtns);
 
 	err_count += init_cuda_buffer_fft(shtns);
 
@@ -313,6 +325,7 @@ void cushtns_set_streams(shtns_cfg shtns, cudaStream_t compute_stream, cudaStrea
 		if (shtns->cu_flags & CUSHT_OWN_COMP_STREAM) cudaStreamDestroy(shtns->comp_stream);
 		shtns->comp_stream = compute_stream;
 		if (shtns->nphi > 1) cufftSetStream(shtns->cufft_plan, compute_stream);
+		if (shtns->nphi > 1) cufftSetStream(shtns->cufft_plan_float, compute_stream);
 		shtns->cu_flags &= ~((int)CUSHT_OWN_COMP_STREAM);		// we don't manage this stream
 	}
 	if (transfer_stream != 0) {
@@ -377,26 +390,25 @@ void fourier_to_spat_gpu(shtns_cfg shtns, double* q, const int mmax)
 	}
 }
 
-void fourier_to_spat_gpu_float(shtns_cfg shtns, float* q, const int mmax)
+void fourier_to_spat_gpu(shtns_cfg shtns, float* q, const int mmax)
 {
-    const int nphi = shtns->nphi;
-    cufftResult res;
-    if (nphi > 1) {
-        cufftComplex* x = (cufftComplex*) q;
-        if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
-            float* xfft = (float*) shtns->xfft;
-            // NEXT:
-            transpose_cplx_zero<float>(shtns->comp_stream, (float*) x, xfft, shtns->nlat_2, nphi, mmax);		// zero out m>mmax during transpose
-            res = cufftExecC2C(shtns->cufft_plan_float, (cufftComplex*) xfft, x, CUFFT_INVERSE);
-        } else {	// THETA_CONTIGUOUS:
-            if (2*(mmax+1) <= nphi) {
-                const int nlat = shtns->nlat;
-                cudaMemsetAsync( q + (mmax+1)*nlat, 0, sizeof(float)*(nphi-2*mmax-1)*nlat, shtns->comp_stream );		// zero out m>mmax before fft
-            }
-            res = cufftExecC2C(shtns->cufft_plan_float, x, x, CUFFT_INVERSE);
-        }
-        if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
-    }
+	const int nphi = shtns->nphi;
+	cufftResult res;
+	if (nphi > 1) {
+		cufftComplex* x = (cufftComplex*) q;
+		if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
+			float* xfft = (float*)shtns->xfft;
+			transpose_cplx_zero(shtns->comp_stream, (float*) x, xfft, shtns->nlat_2, nphi, mmax);		// zero out m>mmax during transpose
+			res = cufftExecC2C(shtns->cufft_plan_float, (cufftComplex*) xfft, x, CUFFT_INVERSE);
+		} else {	// THETA_CONTIGUOUS:
+			if (2*(mmax+1) <= nphi) {
+				const int nlat = shtns->nlat;
+				cudaMemsetAsync( q + (mmax+1)*nlat, 0, sizeof(float)*(nphi-2*mmax-1)*nlat, shtns->comp_stream );		// zero out m>mmax before fft
+			}
+			res = cufftExecC2C(shtns->cufft_plan_float, x, x, CUFFT_INVERSE);
+		}
+		if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
+	}
 }
 
 void spat_to_fourier_gpu(shtns_cfg shtns, double* q, const int mmax)
@@ -416,21 +428,21 @@ void spat_to_fourier_gpu(shtns_cfg shtns, double* q, const int mmax)
     }
 }
 
-void spat_to_fourier_gpu_float(shtns_cfg shtns, float* q, const int mmax)
+void spat_to_fourier_gpu(shtns_cfg shtns, float* q, const int mmax)
 {
-    const int nphi = shtns->nphi;
-    cufftResult res;
-    if (nphi > 1) {
-        cufftComplex *x = (cufftComplex*) q;
-        if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
-            float* xfft = (float*) shtns->xfft;
-            res = cufftExecC2C(shtns->cufft_plan_float, x, (cufftComplex*) xfft, CUFFT_INVERSE);
-            transpose_cplx_skip<float>(shtns->comp_stream, xfft, (float*) x, nphi, shtns->nlat_2, mmax);		// ignore m > mmax during transpose
-        } else {	// THETA_CONTIGUOUS:
-            res = cufftExecC2C(shtns->cufft_plan_float, x, x, CUFFT_INVERSE);
-        }
-        if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
-    }
+	const int nphi = shtns->nphi;
+	cufftResult res;
+	if (nphi > 1) {
+		cufftComplex *x = (cufftComplex*) q;
+		if (shtns->cu_fft_mode == CUSHT_FFT_TRANSPOSE) {
+			float* xfft = (float*)shtns->xfft;
+			res = cufftExecC2C(shtns->cufft_plan_float, x, (cufftComplex*) xfft, CUFFT_INVERSE);
+			transpose_cplx_skip(shtns->comp_stream, xfft, (float*) x, nphi, shtns->nlat_2, mmax);		// ignore m > mmax during transpose
+		} else {	// THETA_CONTIGUOUS:
+			res = cufftExecC2C(shtns->cufft_plan_float, x, x, CUFFT_INVERSE);
+		}
+		if (res != CUFFT_SUCCESS) printf("cufft error %d\n", res);
+	}
 }
 
 void spat_to_fourier_host(shtns_cfg shtns, double* q, double* qf)
@@ -462,43 +474,23 @@ void fourier_to_spat_host(shtns_cfg shtns, double* qf, double* q)
 
 
 /// Perform SH transform on data that is already on the GPU. d_Qlm and d_Vr are pointers to GPU memory (obtained by cudaMalloc() for instance)
-template<int S, int NFIELDS>
-void cuda_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, const long int llim, const int mmax, int spat_dist = 0)
+template<int S, int NFIELDS, typename real=double>
+void cuda_SH_to_spat(shtns_cfg shtns, std::complex<real>* d_Qlm, real* d_Vr, const long int llim, const int mmax, int spat_dist = 0)
 {
     if (spat_dist == 0) spat_dist = shtns->spat_stride;
-    legendre<S,NFIELDS>(shtns, (double*) d_Qlm, d_Vr, llim, mmax, spat_dist);
+    legendre<S,NFIELDS,real>(shtns, (real*) d_Qlm, d_Vr, llim, mmax, spat_dist);
     for (int f=0; f<NFIELDS; f++)  fourier_to_spat_gpu(shtns, d_Vr + f*spat_dist, mmax);
 }
 
-template<int S, int NFIELDS>
-void cuda_SH_to_spat_float(shtns_cfg shtns, cuComplex* d_Qlm, float *d_Vr, const long int llim, const int mmax, int spat_dist = 0)
-{
-    if (spat_dist == 0) spat_dist = shtns->spat_stride;
-    legendre<S,NFIELDS,float>(shtns, (float*) d_Qlm, d_Vr, llim, mmax, spat_dist);
-    for (int f=0; f<NFIELDS; f++)  fourier_to_spat_gpu_float(shtns, d_Vr + f*spat_dist, mmax);
-}
-
 /// Perform SH transform on data that is already on the GPU. d_Qlm and d_Vr are pointers to GPU memory (obtained by cudaMalloc() for instance)
-template<int S, int NFIELDS>
-void cuda_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, const long int llim, int spat_dist = 0)
+template<int S, int NFIELDS, typename real=double>
+void cuda_spat_to_SH(shtns_cfg shtns, real* d_Vr, std::complex<real>* d_Qlm, const long int llim, int spat_dist = 0)
 {
     int mmax = shtns->mmax;
     const int mres = shtns->mres;
     if (spat_dist == 0) spat_dist = shtns->spat_stride;
-    if (llim < mmax*mres)	mmax = llim / mres;		// truncate mmax too !
     for (int f=0; f<NFIELDS; f++) spat_to_fourier_gpu(shtns, d_Vr + f*spat_dist, mmax);
-    ilegendre<S, NFIELDS>(shtns, d_Vr, (double*) d_Qlm, llim, spat_dist);
-}
-
-template<int S, int NFIELDS>
-void cuda_spat_to_SH_float(shtns_cfg shtns, float *d_Vr, cuComplex* d_Qlm, const long int llim, int spat_dist = 0)
-{
-    int mmax = shtns->mmax;
-    const int mres = shtns->mres;
-    if (spat_dist == 0) spat_dist = shtns->spat_stride;
-    if (llim < mmax*mres)	mmax = llim / mres;		// truncate mmax too !
-    for (int f=0; f<NFIELDS; f++) spat_to_fourier_gpu_float(shtns, d_Vr + f*spat_dist, mmax);
-    ilegendre<S, NFIELDS, float>(shtns, d_Vr, (float*) d_Qlm, llim, spat_dist);
+    ilegendre<S, NFIELDS,real>(shtns, d_Vr, (real*) d_Qlm, llim, spat_dist);
 }
 
 extern "C"
@@ -511,14 +503,13 @@ void cu_SH_to_spat(shtns_cfg shtns, cplx* d_Qlm, double *d_Vr, int llim)
 }
 
 extern "C"
-void cu_SH_to_spat_float(shtns_cfg shtns, float* d_Qlm, float *d_Vr, int llim)
+void cu_SH_to_spat_float(shtns_cfg shtns, cplx_f* d_Qlm, float *d_Vr, int llim)
 {
-    int mmax = shtns->mmax;
-    const int mres = shtns->mres;
-    if (llim < mmax*mres)	mmax = llim / mres;	// truncate mmax too !
-    cuda_SH_to_spat_float<0,1>(shtns, (cuComplex*)d_Qlm, d_Vr, llim, mmax);
+	int mmax = shtns->mmax;
+	const int mres = shtns->mres;
+	if (llim < mmax*mres)	mmax = llim / mres;	// truncate mmax too !
+	cuda_SH_to_spat<0,1,float>(shtns, d_Qlm, d_Vr, llim, mmax);
 }
-
 
 extern "C"
 void cu_SHsphtor_to_spat(shtns_cfg shtns, cplx* d_Slm, cplx* d_Tlm, double* d_Vt, double* d_Vp, int llim)
@@ -552,13 +543,13 @@ void cu_SHqst_to_spat(shtns_cfg shtns, cplx* d_Qlm, cplx* d_Slm, cplx* d_Tlm, do
 extern "C"
 void cu_spat_to_SH(shtns_cfg shtns, double *d_Vr, cplx* d_Qlm, int llim)
 {
-    cuda_spat_to_SH<0,1>(shtns, d_Vr, d_Qlm, llim);
+	cuda_spat_to_SH<0,1>(shtns, d_Vr, d_Qlm, llim);
 }
 
 extern "C"
-void cu_spat_to_SH_float(shtns_cfg shtns, float *d_Vr, float* d_Qlm, int llim)
+void cu_spat_to_SH_float(shtns_cfg shtns, float *d_Vr, cplx_f* d_Qlm, int llim)
 {
-    cuda_spat_to_SH_float<0,1>(shtns, d_Vr, (cuComplex*)d_Qlm, llim);
+	cuda_spat_to_SH<0,1,float>(shtns, d_Vr, d_Qlm, llim);
 }
 
 extern "C"

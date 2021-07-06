@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -172,6 +172,8 @@ struct shtns_info {		// MUST start with "int nlm;"
 	cudaStream_t xfer_stream, comp_stream;		// the cuda streams
 	cufftHandle cufft_plan;						// the cufft Handle
 	cufftHandle cufft_plan_float;						// the cufft Handle single precision
+	float* d_alm_f;
+	float* d_ct_f;
 	#endif
 
 	/* other misc informations */
