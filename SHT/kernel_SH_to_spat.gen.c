@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -276,7 +276,6 @@ V			if (robert_form == 0) l=m-1;
 				for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
 			}
 	#else
-			cost[NWAY-1] = vreverse(cost[NWAY-1]);	// for testing the largest one.
 			long int ny = 0;
 			for (long int nsint = 0;;) {		// sin(theta)^m		(use rescaling to avoid underflow)
 				if (l&1) {
@@ -300,9 +299,6 @@ V			if (robert_form == 0) l=m-1;
 			al = alm;
 			for (int j=0; j<NWAY; ++j) {
 				cost[j] = vread(ct, j+k);
-				#ifdef HI_LLIM
-				if (j==NWAY-1) cost[j] = vreverse(cost[j]);
-				#endif
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
 				#ifndef SHTNS_ISHIOKA
@@ -351,11 +347,6 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 		  }
 	#endif
 		  if LIKELY(ny == 0) {
-		#ifdef HI_LLIM
-			y0[NWAY-1] = vreverse(y0[NWAY-1]);		// reverse back to natural order
-			y1[NWAY-1] = vreverse(y1[NWAY-1]);
-			cost[NWAY-1] = vreverse(cost[NWAY-1]);
-		#endif
 		#ifndef SHTNS_ISHIOKA
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}

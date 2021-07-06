@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -239,7 +239,7 @@ V				l=m-1;
 						for (int j=0; j<NWAY; ++j) cost[j] *= cost[j];
 					} while(l >>= 1);
 		#else  /* HI_LLIM */
-				cost[NWAY-1] = vreverse(cost[NWAY-1]);	// for testing the largest one.
+				cost[NWAY-1] = vxchg_even_odd(cost[NWAY-1]);	// avoid testing zero for grid including poles.
 				{	int nsint = 0;
 					do {		// sin(theta)^m		(use rescaling to avoid underflow)
 						if (l&1) {
@@ -265,7 +265,7 @@ V				l=m-1;
 					int idx = k+i+j;	if (idx < 0) idx=0;		// don't read below data.
 					cost[j] = vread(ct, idx);		// cos(theta)
 					#ifdef HI_LLIM
-					if (j==NWAY-1) cost[j] = vreverse(cost[j]);
+					if (j==NWAY-1) cost[j] = vxchg_even_odd(cost[j]);
 					#endif
 					#ifndef SHTNS_ISHIOKA
 					y0[j] *= vall(al[0]);
@@ -281,15 +281,15 @@ V				l=m-1;
 			  if (ny0<0) {
 				while (l<lnz) {		// ylm's are too small and are treated as zero
 					#ifndef SHTNS_ISHIOKA
-					for (int j=0; j<NWAY; ++j) {
+					for (int j=NWAY-1; j>=0; --j) {
 						y0[j] = vall(al[1])*(cost[j]*y1[j]) + vall(al[0])*y0[j];
 					}
-					for (int j=0; j<NWAY; ++j) {
+					for (int j=NWAY-1; j>=0; --j) {
 						y1[j] = vall(al[3])*(cost[j]*y0[j]) + vall(al[2])*y1[j];
 					}
 					l+=2;	al+=4;
 					#else
-					for (int j=0; j<NWAY; ++j) {
+					for (int j=NWAY-1; j>=0; --j) {
 						rnd tmp = y1[j];
 						y1[j] = (vall(al[1])*cost[j] + vall(al[0]))*y1[j] + y0[j];
 						y0[j] = tmp;
@@ -297,7 +297,7 @@ V				l=m-1;
 					l+=2;	al+=2;
 					#endif
 					if (fabs(vlo(y0[NWAY-1])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
-						for (int j=0; j<NWAY; ++j) {
+						for (int j=NWAY-1; j>=0; --j) {
 							y0[j] *= vall(1.0/SHT_SCALE_FACTOR);		y1[j] *= vall(1.0/SHT_SCALE_FACTOR);
 						}
 						if (++ny0 == 0) break;
@@ -308,9 +308,9 @@ V				l=m-1;
 QX				if ((l > llim) && (ny0<0)) break;	// nothing more to do in this block.
 V				if ((l > llim+1) && (ny0<0)) break;	// nothing more to do in this block.
 				lnz = l;				// record the minimum l for significant values, over this block, do not go above that afterwards
-				y0[NWAY-1] = vreverse(y0[NWAY-1]);
-				y1[NWAY-1] = vreverse(y1[NWAY-1]);
-				cost[NWAY-1] = vreverse(cost[NWAY-1]);
+				y0[NWAY-1] = vxchg_even_odd(y0[NWAY-1]);
+				y1[NWAY-1] = vxchg_even_odd(y1[NWAY-1]);
+				cost[NWAY-1] = vxchg_even_odd(cost[NWAY-1]);
 		#endif
 				for (int j=0; j<NWAY; ++j) {	// store other stuff for recurrence.
 					y01ct[i+j][0] = y0[j];
@@ -360,13 +360,17 @@ V			}
 				unsigned ii = imin/NWAY;
 				while ((ny[ii] < 0) && (ii<NBLK/NWAY)) {		// these are zeros
 					const unsigned imax = (ii+1)*NWAY;
+					rnd y0;
 					do {
-						rnd y0 = x[j].y[0];		rnd y1 = x[j].y[1];
-						y0 = vall(al[1])*(x[j].ct*y1) + vall(al[0])*y0;
+						rnd ct = x[j].ct;
+						y0 = x[j].y[0];		rnd y1 = x[j].y[1];
+						y0 = vall(al[1])*(ct*y1) + vall(al[0])*y0;
 						x[j].y[0] = y0;
-						x[j].y[1] = vall(al[3])*(x[j].ct*y0) + vall(al[2])*y1;
+						x[j].y[1] = vall(al[3])*(ct*y0) + vall(al[2])*y1;
 					} while (++j < imax);
-					if (fabs(vlo(x[ii*NWAY+NWAY-1].y[0])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
+					//double yt = ((double*) &x[ii*NWAY+NWAY-1].y[0])[VSIZE2-1];		// access last element, as first one can be zero for grids including poles.
+					double yt = vlo(vxchg_even_odd(y0));	// vxchg_even_odd avoids first element which can be zero for grids including poles.
+					if (fabs(yt) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 						++ny[ii];
 						for (int i=0; i<NWAY; ++i) {
 							x[ii*NWAY+i].y[0] *= vall(1.0/SHT_SCALE_FACTOR);		x[ii*NWAY+i].y[1] *= vall(1.0/SHT_SCALE_FACTOR);
@@ -502,26 +506,30 @@ V			while (l<=llim+1) {	// compute even and odd parts
 				unsigned ii = imin/NWAY;
 				while ((ny[ii] < 0) && (ii<NBLK/NWAY)) {		// these are zeros
 					const unsigned imax = (ii+1)*NWAY;
+					rnd tmp;
 					do {
+						rnd ct2 = x[i].ct2;
 						#if LSPAN==2
-							rnd tmp = x[i].y[1];
-							x[i].y[1] = (vall(al[1])*x[i].ct2 + vall(al[0]))*tmp + x[i].y[0];
-							x[i].y[0] = tmp;
+							tmp = x[i].y[1];
+							x[i].y[1] = (vall(al[1])*ct2 + vall(al[0]))*tmp + x[i].y[0];
 						#elif LSPAN==4
-							x[i].y[0] = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
-							x[i].y[1] = (vall(al[3])*x[i].ct2 + vall(al[2]))*x[i].y[0] + x[i].y[1];
+							tmp = (vall(al[1])*ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
+							x[i].y[1] = (vall(al[3])*ct2 + vall(al[2]))*tmp + x[i].y[1];
 						#elif LSPAN==6
-							rnd y = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
-							x[i].y[0] = (vall(al[3])*x[i].ct2 + vall(al[2]))*y + x[i].y[1];
-							x[i].y[1] = (vall(al[5])*x[i].ct2 + vall(al[4]))*x[i].y[0] + y;
+							rnd y = (vall(al[1])*ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
+							tmp = (vall(al[3])*ct2 + vall(al[2]))*y + x[i].y[1];
+							x[i].y[1] = (vall(al[5])*ct2 + vall(al[4]))*tmp + y;
 						#elif LSPAN==8
-							rnd y0 = (vall(al[1])*x[i].ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
-							rnd y1 = (vall(al[3])*x[i].ct2 + vall(al[2]))*y0 + x[i].y[1];
-							x[i].y[0] = (vall(al[5])*x[i].ct2 + vall(al[4]))*y1 + y0;
-							x[i].y[1] = (vall(al[7])*x[i].ct2 + vall(al[6]))*x[i].y[0] + y1;
+							rnd y0 = (vall(al[1])*ct2 + vall(al[0]))*x[i].y[1] + x[i].y[0];
+							rnd y1 = (vall(al[3])*ct2 + vall(al[2]))*y0 + x[i].y[1];
+							tmp = (vall(al[5])*ct2 + vall(al[4]))*y1 + y0;
+							x[i].y[1] = (vall(al[7])*ct2 + vall(al[6]))*tmp + y1;
 						#endif
+						x[i].y[0] = tmp;
 					} while (++i < imax);
-					if (fabs(vlo(x[ii*NWAY+NWAY-1].y[0])) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
+					//double yt = ((double*) &x[ii*NWAY+NWAY-1].y[0])[VSIZE2-1];		// access last element, as first one can be zero for grids including poles.
+					double yt = vlo(vxchg_even_odd(tmp));	// vxchg_even_odd avoids first element which can be zero for grids including poles.
+					if (fabs(yt) > SHT_ACCURACY*SHT_SCALE_FACTOR + 1.0) {		// rescale when value is significant
 						++ny[ii];
 						for (int j=0; j<NWAY; ++j) {
 							x[ii*NWAY+j].y[0] *= vall(1.0/SHT_SCALE_FACTOR);		x[ii*NWAY+j].y[1] *= vall(1.0/SHT_SCALE_FACTOR);

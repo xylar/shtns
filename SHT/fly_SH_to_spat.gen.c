@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -353,7 +353,6 @@ V			rnd per[NWAY], pei[NWAY], por[NWAY], poi[NWAY];
 				cost[j] = vread(st, k+j);
 				y0[j] = vall(1.0);
 			}
-			cost[NWAY-1] = vreverse(cost[NWAY-1]);	// reverse to bring high-value to the front for cheap testing.
 			l=m;
 V			if (robert_form == 0) l=m-1;
 			long int ny = 0;
@@ -387,7 +386,6 @@ V			if (robert_form == 0) l=m-1;
 Q				ror[j] = vall(0.0);		roi[j] = vall(0.0);
 Q				rer[j] = vall(0.0);		rei[j] = vall(0.0);
 			}
-			cost[NWAY-1] = vreverse(cost[NWAY-1]);	// reverse to bring high-value to the front for cheap testing.
 			for (int j=0; j<NWAY; ++j) {
 				y1[j]  = (vall(al[1])*y0[j]) *cost[j];		//	y1[j] = vall(al[1])*cost[j]*y0[j];
 V				por[j] = vall(0.0);		tei[j] = vall(0.0);
@@ -414,9 +412,6 @@ V				toi[j] = vall(0.0);		per[j] = vall(0.0);
 			}
 		  }
 		  if LIKELY(ny == 0) {
-			y0[NWAY-1] = vreverse(y0[NWAY-1]);	// reverse back to natural order
-			y1[NWAY-1] = vreverse(y1[NWAY-1]);
-			cost[NWAY-1] = vreverse(cost[NWAY-1]);
 			while (l<llim) {	// compute even and odd parts
 Q				for (int j=0; j<NWAY; ++j) {	rer[j] += y0[j]  * qr(l);		rei[j] += y0[j] * qi(l);	}
 V				for (int j=0; j<NWAY; ++j) {	ter[j] += y0[j]  * vr(l);		tei[j] += y0[j] * vi(l);	}
