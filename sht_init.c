@@ -30,6 +30,7 @@
 // global variables definitions
 #include "sht_private.h"
 
+#include <time.h>		// for the clock() function
 // cycle counter from FFTW
 #include "fftw3/cycle.h"
 
@@ -658,7 +659,7 @@ double SHT_error(shtns_cfg shtns, int vector)
 	double t, tmax, n2,  err;
 	long int i, jj, nlm_cplx;
 	
-	srand( time(NULL) );	// init random numbers.
+	srand( 42 );	// init random numbers.
 	
 	Slm0 = (cplx *) VMALLOC(sizeof(cplx)* NLM);
 	Slm = (cplx *) VMALLOC(sizeof(cplx)* NLM);
