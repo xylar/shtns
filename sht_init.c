@@ -901,17 +901,25 @@ done:
 	if (Slm) VFREE(Slm);	 	if (Sh)  VFREE(Sh);
 }
 
-void shtns_print_version() {
+
+const char* shtns_get_build_info() {
+	static char s[128];	// a reasonable buffer size
+	int n = snprintf(s, 127,
   #ifndef SHTNS4MAGIC
-	printf("[SHTns " SHTNS_VER "] built ");
+	"[SHTns " SHTNS_VER "] built "
   #else
-	printf("[SHTns " SHTNS_VER "] built for MagIC ");
+	"[SHTns " SHTNS_VER "] built for MagIC "
   #endif
-	printf(__DATE__ ", " __TIME__  ", id: ");
-	if (strlen(SHTNS_GIT) > 0) printf(SHTNS_GIT ",");
-	printf(_SHTNS_ID_ "\n");
+	__DATE__ ", " __TIME__  ", id: ");
+	if (strlen(SHTNS_GIT) > 0) n += snprintf(s+n, 127-n, SHTNS_GIT ",");
+	snprintf(s+n, 127-n, _SHTNS_ID_);
+	s[127]=0;
+	return s;
 }
 
+void shtns_print_version() {
+	printf("%s\n",shtns_get_build_info());
+}
 
 
 void fprint_ftable(FILE* fp, void* ftable[SHT_NVAR][SHT_NTYP])

@@ -2671,11 +2671,12 @@ SWIGINTERN PyObject *SWIG_PyStaticMethod_New(PyObject *SWIGUNUSEDPARM(self), PyO
 #define SWIGTYPE_p_char swig_types[0]
 #define SWIGTYPE_p_double swig_types[1]
 #define SWIGTYPE_p_double_complex swig_types[2]
-#define SWIGTYPE_p_int swig_types[3]
-#define SWIGTYPE_p_shtns_info swig_types[4]
-#define SWIGTYPE_p_shtns_rot_ swig_types[5]
-static swig_type_info *swig_types[7];
-static swig_module_info swig_module = {swig_types, 6, 0, 0, 0, 0};
+#define SWIGTYPE_p_float_complex swig_types[3]
+#define SWIGTYPE_p_int swig_types[4]
+#define SWIGTYPE_p_shtns_info swig_types[5]
+#define SWIGTYPE_p_shtns_rot_ swig_types[6]
+static swig_type_info *swig_types[8];
+static swig_module_info swig_module = {swig_types, 7, 0, 0, 0, 0};
 #define SWIG_TypeQuery(name) SWIG_TypeQueryModule(&swig_module, &swig_module, name)
 #define SWIG_MangledTypeQuery(name) SWIG_MangledTypeQueryModule(&swig_module, &swig_module, name)
 
@@ -2781,6 +2782,54 @@ inline static PyObject* SpatArray_New(int size) {
 	return PyArray_New(&PyArray_Type, 1, &dims, NPY_DOUBLE, &strides, NULL, strides, 0, NULL);	
 }
 
+
+
+const char __version__[] = SHTNS_VER;		// defines a __version__ attribute
+
+
+SWIGINTERN swig_type_info*
+SWIG_pchar_descriptor(void)
+{
+  static int init = 0;
+  static swig_type_info* info = 0;
+  if (!init) {
+    info = SWIG_TypeQuery("_p_char");
+    init = 1;
+  }
+  return info;
+}
+
+
+SWIGINTERNINLINE PyObject *
+SWIG_FromCharPtrAndSize(const char* carray, size_t size)
+{
+  if (carray) {
+    if (size > INT_MAX) {
+      swig_type_info* pchar_descriptor = SWIG_pchar_descriptor();
+      return pchar_descriptor ? 
+	SWIG_InternalNewPointerObj((char *)(carray), pchar_descriptor, 0) : SWIG_Py_Void();
+    } else {
+#if PY_VERSION_HEX >= 0x03000000
+#if defined(SWIG_PYTHON_STRICT_BYTE_CHAR)
+      return PyBytes_FromStringAndSize(carray, (Py_ssize_t)(size));
+#else
+      return PyUnicode_DecodeUTF8(carray, (Py_ssize_t)(size), "surrogateescape");
+#endif
+#else
+      return PyString_FromStringAndSize(carray, (Py_ssize_t)(size));
+#endif
+    }
+  } else {
+    return SWIG_Py_Void();
+  }
+}
+
+
+SWIGINTERNINLINE PyObject * 
+SWIG_FromCharPtr(const char *cptr)
+{ 
+  return SWIG_FromCharPtrAndSize(cptr, (cptr ? strlen(cptr) : 0));
+}
 
 
 SWIGINTERNINLINE PyObject*
@@ -3376,6 +3425,20 @@ SWIGINTERN PyObject *shtns_rot__apply_cplx(struct shtns_rot_ *self,PyObject *Qlm
 #ifdef __cplusplus
 extern "C" {
 #endif
+SWIGINTERN int Swig_var___version___set(PyObject *_val SWIGUNUSED) {
+  SWIG_Error(SWIG_AttributeError,"Variable __version__ is read-only.");
+  return 1;
+}
+
+
+SWIGINTERN PyObject *Swig_var___version___get(void) {
+  PyObject *pyobj = 0;
+  
+  pyobj = SWIG_FromCharPtr(__version__);
+  return pyobj;
+}
+
+
 SWIGINTERN PyObject *_wrap_sht_nlm_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_info *arg1 = (struct shtns_info *) 0 ;
@@ -5644,6 +5707,19 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_build_info(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  char *result = 0 ;
+  
+  if (!SWIG_Python_UnpackTuple(args, "build_info", 0, 0, 0)) SWIG_fail;
+  result = (char *)shtns_get_build_info();
+  resultobj = SWIG_FromCharPtr((const char *)result);
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_rotation_lmax_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   struct shtns_rot_ *arg1 = (struct shtns_rot_ *) 0 ;
@@ -6156,8 +6232,8 @@ static PyMethodDef SwigMethods[] = {
 	 { "sht_SHqst_to_spat", _wrap_sht_SHqst_to_spat, METH_VARARGS, "sht_SHqst_to_spat(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp)"},
 	 { "sht_spat_cplx_to_SHqst", _wrap_sht_spat_cplx_to_SHqst, METH_VARARGS, "sht_spat_cplx_to_SHqst(sht self, PyObject * Vr, PyObject * Vt, PyObject * Vp, PyObject * Qlm, PyObject * Slm, PyObject * Tlm)"},
 	 { "sht_SHqst_to_spat_cplx", _wrap_sht_SHqst_to_spat_cplx, METH_VARARGS, "sht_SHqst_to_spat_cplx(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, PyObject * Vr, PyObject * Vt, PyObject * Vp)"},
-	 { "sht_SH_to_point", _wrap_sht_SH_to_point, METH_VARARGS, "sht_SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"},
-	 { "sht_SH_to_point_cplx", _wrap_sht_SH_to_point_cplx, METH_VARARGS, "evaluate spherical harmonic expansion of a complex-valued scalar field at point given by cost=cos(theta) and phi."},
+	 { "sht_SH_to_point", _wrap_sht_SH_to_point, METH_VARARGS, "evaluate spherical harmonic expansion Qlm of a real-valued scalar field at point given by cost=cos(theta) and phi."},
+	 { "sht_SH_to_point_cplx", _wrap_sht_SH_to_point_cplx, METH_VARARGS, "evaluate spherical harmonic expansion alm of a complex-valued scalar field at point given by cost=cos(theta) and phi."},
 	 { "sht_SH_to_grad_point", _wrap_sht_SH_to_grad_point, METH_VARARGS, "sht_SH_to_grad_point(sht self, PyObject * DrSlm, PyObject * Slm, double cost, double phi)"},
 	 { "sht_SHqst_to_point", _wrap_sht_SHqst_to_point, METH_VARARGS, "sht_SHqst_to_point(sht self, PyObject * Qlm, PyObject * Slm, PyObject * Tlm, double cost, double phi)"},
 	 { "sht_SH_to_lat", _wrap_sht_SH_to_lat, METH_VARARGS, "sht_SH_to_lat(sht self, PyObject * Qlm, double cost, PyObject * Vr)"},
@@ -6181,6 +6257,7 @@ static PyMethodDef SwigMethods[] = {
 	 { "nlm_cplx_calc", _wrap_nlm_cplx_calc, METH_VARARGS, "nlm_cplx_calc(long lmax, long mmax, long mres) -> long"},
 	 { "set_verbosity", _wrap_set_verbosity, METH_O, "set_verbosity(int arg1)"},
 	 { "print_version", _wrap_print_version, METH_NOARGS, "print_version()"},
+	 { "build_info", _wrap_build_info, METH_NOARGS, "build_info() -> char const *"},
 	 { "rotation_lmax_get", _wrap_rotation_lmax_get, METH_O, "rotation_lmax_get(rotation self) -> int const"},
 	 { "rotation_mmax_get", _wrap_rotation_mmax_get, METH_O, "rotation_mmax_get(rotation self) -> int const"},
 	 { "rotation_alpha_get", _wrap_rotation_alpha_get, METH_O, "rotation_alpha_get(rotation self) -> double const"},
@@ -6209,6 +6286,7 @@ static PyMethodDef SwigMethods_proxydocs[] = {
 static swig_type_info _swigt__p_char = {"_p_char", "char *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_double = {"_p_double", "double *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_double_complex = {"_p_double_complex", "cplx *|double complex *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_float_complex = {"_p_float_complex", "cplx_f *|float complex *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_int = {"_p_int", "int *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_shtns_info = {"_p_shtns_info", "struct shtns_info *|shtns_info *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_shtns_rot_ = {"_p_shtns_rot_", "struct shtns_rot_ *|shtns_rot_ *", 0, 0, (void*)0, 0};
@@ -6217,6 +6295,7 @@ static swig_type_info *swig_type_initial[] = {
   &_swigt__p_char,
   &_swigt__p_double,
   &_swigt__p_double_complex,
+  &_swigt__p_float_complex,
   &_swigt__p_int,
   &_swigt__p_shtns_info,
   &_swigt__p_shtns_rot_,
@@ -6225,6 +6304,7 @@ static swig_type_info *swig_type_initial[] = {
 static swig_cast_info _swigc__p_char[] = {  {&_swigt__p_char, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_double[] = {  {&_swigt__p_double, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_double_complex[] = {  {&_swigt__p_double_complex, 0, 0, 0},{0, 0, 0, 0}};
+static swig_cast_info _swigc__p_float_complex[] = {  {&_swigt__p_float_complex, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_int[] = {  {&_swigt__p_int, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_shtns_info[] = {  {&_swigt__p_shtns_info, 0, 0, 0},{0, 0, 0, 0}};
 static swig_cast_info _swigc__p_shtns_rot_[] = {  {&_swigt__p_shtns_rot_, 0, 0, 0},{0, 0, 0, 0}};
@@ -6233,6 +6313,7 @@ static swig_cast_info *swig_cast_initial[] = {
   _swigc__p_char,
   _swigc__p_double,
   _swigc__p_double_complex,
+  _swigc__p_float_complex,
   _swigc__p_int,
   _swigc__p_shtns_info,
   _swigc__p_shtns_rot_,
@@ -6974,6 +7055,18 @@ SWIG_init(void) {
   
   import_array();		// required by NumPy
   
+  globals = SWIG_globals();
+  if (!globals) {
+    PyErr_SetString(PyExc_TypeError, "Failure to create SWIG globals.");
+#if PY_VERSION_HEX >= 0x03000000
+    return NULL;
+#else
+    return;
+#endif
+  }
+  PyDict_SetItemString(md, "cvar", globals);
+  Py_DECREF(globals);
+  SWIG_addvarlink(globals, "__version__", Swig_var___version___get, Swig_var___version___set);
   SWIG_Python_SetConstant(d, "sht_orthonormal",SWIG_From_int((int)(sht_orthonormal)));
   SWIG_Python_SetConstant(d, "sht_fourpi",SWIG_From_int((int)(sht_fourpi)));
   SWIG_Python_SetConstant(d, "sht_schmidt",SWIG_From_int((int)(sht_schmidt)));

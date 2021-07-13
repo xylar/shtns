@@ -3,6 +3,14 @@
 from distutils.core import setup, Extension
 from numpy import get_include
 
+def getver():
+    with open('CHANGELOG.md') as f:
+        for l in f:
+            s=l.find('* v')
+            if s>=0:
+                return l[s+3:].split()[0]
+    return '@PACKAGE_VERSION@'
+
 numpy_inc = get_include()		#  NumPy include path.
 objs = "sht_init.o sht_kernels_a.o sht_kernels_s.o @objs@"
 shtns_o = objs.split()			# transform to list of objects
@@ -11,7 +19,7 @@ if len(libdir) == 0:
 	libdir = []
 else:
 	libdir = [libdir+"/lib"]
-cargs = "-std=c99 @OPENMP_CFLAGS@"
+cargs = '-std=c99 @OPENMP_CFLAGS@ -DSHTNS_VER="' + getver() +'"'
 largs = "@LDFLAGS@"
 libs = "@LIBS@"
 libslist = libs.replace('-l','').split()	# transform to list of libraries
@@ -25,7 +33,7 @@ shtns_module = Extension('_shtns', sources=['shtns_numpy_wrap.c'],
 	include_dirs=[numpy_inc])
 
 setup(name='@PACKAGE_NAME@',
-	version='@PACKAGE_VERSION@',
+	version=getver(),
 	description='High performance Spherical Harmonic Transform',
 	license='CeCILL',
 	author='Nathanael Schaeffer',

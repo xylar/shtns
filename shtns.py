@@ -447,11 +447,11 @@ class sht(object):
 
 
     def SH_to_point(self, Qlm, cost, phi):
-        r"""SH_to_point(sht self, PyObject * Qlm, double cost, double phi) -> double"""
+        r"""evaluate spherical harmonic expansion Qlm of a real-valued scalar field at point given by cost=cos(theta) and phi."""
         return _shtns.sht_SH_to_point(self, Qlm, cost, phi)
 
     def SH_to_point_cplx(self, alm, cost, phi):
-        r"""evaluate spherical harmonic expansion of a complex-valued scalar field at point given by cost=cos(theta) and phi."""
+        r"""evaluate spherical harmonic expansion alm of a complex-valued scalar field at point given by cost=cos(theta) and phi."""
         return _shtns.sht_SH_to_point_cplx(self, alm, cost, phi)
 
     def SH_to_grad_point(self, DrSlm, Slm, cost, phi):
@@ -524,6 +524,8 @@ class sht(object):
 
 # Register sht in _shtns:
 _shtns.sht_swigregister(sht)
+cvar = _shtns.cvar
+__version__ = cvar.__version__
 
 
 def nlm_calc(lmax, mmax, mres):
@@ -541,6 +543,10 @@ def set_verbosity(arg1):
 def print_version():
     r"""print_version()"""
     return _shtns.print_version()
+
+def build_info():
+    r"""build_info() -> char const *"""
+    return _shtns.build_info()
 class rotation(object):
     r"""Proxy of C shtns_rot_ struct."""
 

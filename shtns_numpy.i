@@ -110,6 +110,10 @@ inline static PyObject* SpatArray_New(int size) {
 
 %}
 
+%inline{
+const char __version__[] = SHTNS_VER;		// defines a __version__ attribute
+}
+
 // main object is renamed to sht.
 %rename("sht") shtns_info;
 %ignore SHT_NATIVE_LAYOUT;
@@ -126,6 +130,7 @@ inline static PyObject* SpatArray_New(int size) {
 %ignore sin_beta;
 %ignore sht;
 
+%rename(build_info) shtns_get_build_info;
 %rename(print_version) shtns_print_version;
 %rename(set_verbosity) shtns_verbose;
 

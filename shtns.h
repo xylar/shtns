@@ -133,6 +133,7 @@ long nlm_cplx_calc(long lmax, long mmax, long mres);
 
 void shtns_verbose(int);			///< controls output during initialization: 0=no output (default), 1=some output, 2=degug (if compiled in)
 void shtns_print_version(void);		///< print version information to stdout.
+const char* shtns_get_build_info(void);	///< get version and build information as a string (the same as the one printed by shtns_print_version())
 
 #ifndef SWIG
 
