@@ -480,7 +480,7 @@
 	#define vinterleave_reverse(a,b)
 	#define vreverse(a) (a)
 	//#define vreverse_pairs(a) (a)
-	//#define vxchg_even_odd(a) (a)
+	#define vxchg_even_odd(a) (a)
 
 	inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, double nr, double sr, double ni, double si) {
 		((v2d*)mem)[2*idx]   = (nr) + I*(ni);
