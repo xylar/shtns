@@ -207,9 +207,6 @@ struct shtns_rot_ {		// describe a rotation matrix
 			if (nlat <= $self->lmax) {	// nlat too small
 				throw_exception(SWIG_ValueError,1,"nlat <= lmax");		return;
 			}
-			if (nlat & 1) {		// nlat must be even
-				throw_exception(SWIG_ValueError,1,"nlat must be even");		return;
-			}
 		}
 		if ((nphi != 0) && (nphi <= $self->mmax *2)) {		// nphi too small
 			throw_exception(SWIG_ValueError,2,"nphi <= 2*mmax");	return;

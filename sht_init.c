@@ -162,14 +162,14 @@ static int fft_int(int n, int fmax)
 */
 
 // sht algorithms (hyb, fly1, ...)
-enum sht_algos { SHT_MEM, SHT_SV,
+enum sht_algos { SHT_ODD, SHT_MEM, SHT_SV,
 	SHT_FLY1, SHT_FLY2, SHT_FLY3, SHT_FLY4, SHT_FLY6, SHT_FLY8,
 	SHT_GPU1, SHT_GPU2, SHT_GPU3, SHT_GPU4,
 	SHT_OMP1, SHT_OMP2, SHT_OMP3, SHT_OMP4, SHT_OMP6, SHT_OMP8,
 	SHT_OMP1A, SHT_OMP2A, SHT_OMP3A, SHT_OMP4A, SHT_OMP6A, SHT_OMP8A,
 	SHT_NALG };
 
-char* sht_name[SHT_NALG] = {"mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu1", "gpu2", "gpu3", "gpu4",
+char* sht_name[SHT_NALG] = {"odd", "mem", "s+v", "fly1", "fly2", "fly3", "fly4", "fly6", "fly8", "gpu1", "gpu2", "gpu3", "gpu4",
 	"omp1a", "omp2a", "omp3a", "omp4a", "omp6a", "omp8a",  "omp1b", "omp2b", "omp3b", "omp4b", "omp6b", "omp8b",   };
 char* sht_type[SHT_NTYP] = {"syn", "ana", "vsy", "van", "gsp", "gto", "v3s", "v3a" };
 char* sht_var[SHT_NVAR] = {"std", "m" };
@@ -178,6 +178,7 @@ int sht_npar[SHT_NTYP] = {2, 2, 4, 4, 3, 3, 6, 6};
 extern void* ffly[6][SHT_NTYP];
 extern void* ffly_m[6][SHT_NTYP];
 extern void* ffly_m0[6][SHT_NTYP];
+extern void* fodd[SHT_NTYP];
 #ifdef _OPENMP
 extern void* fomp_a[6][SHT_NTYP];
 extern void* fomp_b[6][SHT_NTYP];
@@ -197,6 +198,10 @@ static void set_sht_fly(shtns_cfg shtns, int typ_start)
 	for (int it=typ_start; it<SHT_NTYP; it++) {
 		for (int v=0; v<SHT_NVAR; v++)
 			shtns->ftable[v][it] = sht_func[v][algo][it];
+	}
+	if (shtns->nlat & 1) {		// odd nlat handled separately (uses other functions)
+		for (int it=typ_start; it<SHT_NTYP; it++)
+			shtns->ftable[0][it] = fodd[it];
 	}
 }
 
@@ -238,6 +243,7 @@ static void init_sht_array_func(shtns_cfg shtns)
 	sht_func[SHT_STD][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2l;
 	sht_func[SHT_M][SHT_SV][SHT_TYP_3SY] = SHqst_to_spat_2ml;
 	sht_func[SHT_M][SHT_SV][SHT_TYP_3AN] = spat_to_SHqst_2ml;
+	memcpy(sht_func[SHT_STD][SHT_ODD], fodd, sizeof(void*)*SHT_NTYP);
 
 	if (shtns->nphi==1) {		// axisymmetric transform requested.
 		for (int j=0; j<=alg_lim; j++) {
@@ -349,13 +355,8 @@ static void planFFT(shtns_cfg shtns, int layout)
 	double cost_fft_ip, cost_fft_oop, cost_ifft_ip, cost_ifft_oop;
 	cplx *ShF;
 	double *Sh;
-	int nfft, nreal;
-	int theta_inc, phi_inc, phi_embed;
-  #ifdef HAVE_FFTW_COST
-	int in_place = 1;		// try to use in-place real fft.
-  #else
-	int in_place = 0;		// do not try to use in-place real fft if no timing data available.
-  #endif
+	const int nfft = NPHI;
+	int theta_inc, phi_inc;
 
 	if (NPHI <= 2*MMAX) shtns_runerr("the sampling condition Nphi > 2*Mmax is not met.");
 
@@ -381,12 +382,8 @@ static void planFFT(shtns_cfg shtns, int layout)
 
 	shtns->layout = layout;		// store the data-layout for future reference (by CUDA init).
 	/* NPHI > 1 */
-	theta_inc=1;  phi_inc=NLAT;  phi_embed=2*(NPHI/2+1);	// SHT_NATIVE_LAYOUT is the default.
-	if (layout & SHT_THETA_CONTIGUOUS) {	theta_inc=1;  phi_inc=NLAT;  phi_embed=NPHI;	}
-	if (layout & SHT_PHI_CONTIGUOUS)   {	phi_inc=1;  theta_inc=NPHI;  phi_embed=NPHI;	}
-	nfft = NPHI;
-	nreal = phi_embed;
-	if ((theta_inc != 1)||(phi_inc != NLAT))  in_place = 0;		// we need to do the fft out-of-place.
+	theta_inc=1;  phi_inc=NLAT;		// SHT_NATIVE_LAYOUT is the default.
+	if (layout & SHT_PHI_CONTIGUOUS)   {	phi_inc=1;  theta_inc=NPHI;	}
 
 	if ((layout & SHT_ALLOW_PADDING) && (phi_inc % 64 == 0) && (NPHI * phi_inc > 512))
 	{
@@ -398,7 +395,7 @@ static void planFFT(shtns_cfg shtns, int layout)
 
 	#if SHT_VERBOSE > 0
 	if (verbose) {
-		printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d, phi_embed=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc,phi_embed);
+		printf("        => using FFTW : Mmax=%d, Nphi=%d, Nlat=%d  (data layout : phi_inc=%d, theta_inc=%d)\n",MMAX,NPHI,NLAT,phi_inc,theta_inc);
 		if (NPHI <= (SHT_NL_ORDER+1)*MMAX)	printf("     !! Warning : anti-aliasing condition Nphi > %d*Mmax is not met !\n", SHT_NL_ORDER+1);
 		if (NPHI != fft_int(NPHI,7))		printf("     !! Warning : Nphi is not optimal for FFTW !\n");
 	}
@@ -408,43 +405,50 @@ static void planFFT(shtns_cfg shtns, int layout)
 	ShF = (cplx *) VMALLOC(shtns->nspat * sizeof(cplx));		// for complex-valued fields
 	Sh = (double *) VMALLOC(shtns->nspat * sizeof(cplx));
 
+	if (NLAT & 1) {		// odd nlat => c2r transforms
+		const int ncplx = NPHI/2 +1;
+		shtns->fftc = fftw_plan_many_dft_r2c(1, &nfft, NLAT, Sh, &nfft, phi_inc, theta_inc, ShF, &ncplx, NLAT, 1, FFTW_ESTIMATE);
+		shtns->ifftc = fftw_plan_many_dft_c2r(1, &nfft, NLAT, ShF, &ncplx, NLAT, 1, Sh, &nfft, phi_inc, theta_inc, FFTW_ESTIMATE);
+	}
 // complex fft for fly transform is a bit different.
 	if (layout & SHT_PHI_CONTIGUOUS) {		// out-of-place split dft
-		fftw_iodim dim, many;
-		shtns->fftc_mode = 1;
-		//default internal
-		dim.n = NPHI;    	dim.os = 1;			dim.is = NLAT;		// complex transpose
-		many.n = NLAT/2;	many.os = 2*NPHI;	many.is = 2;
-		shtns->ifftc = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
-
-		// legacy analysis fft
-		//dim.n = NPHI;    	dim.is = 1;			dim.os = NLAT;
-		//many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2;
-		// new internal
-		dim.n = NPHI;    	dim.is = 1;			dim.os = 2;		// split complex, but without global transpose (faster).
-		many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2*NPHI;
-		shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
-		shtns->k_stride_a = NPHI;		shtns->m_stride_a = 2;
-		shtns->nlat_padded = NLAT;
-		
-	/*	if (shtns->nthreads > 1) {
-			fftw_plan_with_nthreads(1);
-			// FOR MKL only:
-			//fftw3_mkl.number_of_user_threads = shtns->nthreads;        // required to call the fft of mkl from multiple threads.
-			// try to divide NLAT/2 into threads.
-			int nblk = (NLAT/2) / shtns->nthreads;
-			printf("omp block size (split) = %d\n", nblk);
-			if (nblk * shtns->nthreads != NLAT/2) shtns_runerr("not divisible");
-
+		if ((NLAT & 1) == 0) {
+			fftw_iodim dim, many;
+			shtns->fftc_mode = 1;
+			//default internal
 			dim.n = NPHI;    	dim.os = 1;			dim.is = NLAT;		// complex transpose
-			many.n = nblk;		many.os = 2*NPHI;	many.is = 2;
-			shtns->ifftc_block = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
+			many.n = NLAT/2;	many.os = 2*NPHI;	many.is = 2;
+			shtns->ifftc = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
 
+			// legacy analysis fft
+			//dim.n = NPHI;    	dim.is = 1;			dim.os = NLAT;
+			//many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2;
+			// new internal
 			dim.n = NPHI;    	dim.is = 1;			dim.os = 2;		// split complex, but without global transpose (faster).
-			many.n = nblk;		many.is = 2*NPHI;	many.os = 2*NPHI;
-			shtns->fftc_block = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
-			fftw_plan_with_nthreads(shtns->nthreads);
-		}	*/
+			many.n = NLAT/2;	many.is = 2*NPHI;	many.os = 2*NPHI;
+			shtns->fftc = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
+			shtns->k_stride_a = NPHI;		shtns->m_stride_a = 2;
+			shtns->nlat_padded = NLAT;
+			
+		/*	if (shtns->nthreads > 1) {
+				fftw_plan_with_nthreads(1);
+				// FOR MKL only:
+				//fftw3_mkl.number_of_user_threads = shtns->nthreads;        // required to call the fft of mkl from multiple threads.
+				// try to divide NLAT/2 into threads.
+				int nblk = (NLAT/2) / shtns->nthreads;
+				printf("omp block size (split) = %d\n", nblk);
+				if (nblk * shtns->nthreads != NLAT/2) shtns_runerr("not divisible");
+
+				dim.n = NPHI;    	dim.os = 1;			dim.is = NLAT;		// complex transpose
+				many.n = nblk;		many.os = 2*NPHI;	many.is = 2;
+				shtns->ifftc_block = fftw_plan_guru_split_dft(1, &dim, 1, &many, ((double*)ShF)+1, (double*)ShF, Sh+NPHI, Sh, shtns->fftw_plan_mode);
+
+				dim.n = NPHI;    	dim.is = 1;			dim.os = 2;		// split complex, but without global transpose (faster).
+				many.n = nblk;		many.is = 2*NPHI;	many.os = 2*NPHI;
+				shtns->fftc_block = fftw_plan_guru_split_dft(1, &dim, 1, &many,  Sh+NPHI, Sh, ((double*)ShF)+1, (double*)ShF, shtns->fftw_plan_mode);
+				fftw_plan_with_nthreads(shtns->nthreads);
+			}	*/
+		}
 
 		// for complex transform it is much simpler (out-of-place):
 		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, NLAT, 1, (cplx*)Sh, &nfft, 1, NPHI, FFTW_BACKWARD, shtns->fftw_plan_mode);
@@ -457,6 +461,7 @@ static void planFFT(shtns_cfg shtns, int layout)
 		#endif
 	#ifdef HAVE_LIBCUFFT
 	} else if (!(layout & SHT_THETA_CONTIGUOUS)) {		// use the fastest layout compatible with cuFFT
+		if (NLAT & 1) runerr("odd nlat not supported by GPU"):
 		shtns->fftc_mode = 2;	// out-of-place
 		// Fourier -> spatial
 		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (cplx*) Sh, &nfft, 1, nfft, FFTW_BACKWARD, shtns->fftw_plan_mode);		
@@ -469,22 +474,24 @@ static void planFFT(shtns_cfg shtns, int layout)
 		#endif
 	#endif
 	} else {	//if (layout & SHT_THETA_CONTIGUOUS) {		// use only in-place here, supposed to be faster.
-		shtns->fftc_mode = 0;
-		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, phi_inc/2, 1, ShF, &nfft, phi_inc/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
-		shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
+		if ((NLAT & 1)==0) {
+			shtns->fftc_mode = 0;
+			shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, phi_inc/2, 1, ShF, &nfft, phi_inc/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+			shtns->fftc = shtns->ifftc;		// same thing, with m>0 and m<0 exchanged.
 
-	/*	if (shtns->nthreads > 1) {
-			fftw_plan_with_nthreads(1);
-			// FOR MKL only:
-			//fftw3_mkl.number_of_user_threads = shtns->nthreads;        // required to call the fft of mkl from multiple threads.
-			// try to divide NLAT/2 into threads.
-			int nblk = (NLAT/2) / shtns->nthreads;
-			printf("omp block size = %d\n", nblk);
-			if (nblk * shtns->nthreads != NLAT/2) shtns_runerr("not divisible");
-			shtns->ifftc_block = fftw_plan_many_dft(1, &nfft, nblk, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
-			shtns->fftc_block = shtns->ifftc_block;		// same thing, with m>0 and m<0 exchanged.
-			fftw_plan_with_nthreads(shtns->nthreads);
-		}	*/
+		/*	if (shtns->nthreads > 1) {
+				fftw_plan_with_nthreads(1);
+				// FOR MKL only:
+				//fftw3_mkl.number_of_user_threads = shtns->nthreads;        // required to call the fft of mkl from multiple threads.
+				// try to divide NLAT/2 into threads.
+				int nblk = (NLAT/2) / shtns->nthreads;
+				printf("omp block size = %d\n", nblk);
+				if (nblk * shtns->nthreads != NLAT/2) shtns_runerr("not divisible");
+				shtns->ifftc_block = fftw_plan_many_dft(1, &nfft, nblk, ShF, &nfft, NLAT/2, 1, ShF, &nfft, NLAT/2, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
+				shtns->fftc_block = shtns->ifftc_block;		// same thing, with m>0 and m<0 exchanged.
+				fftw_plan_with_nthreads(shtns->nthreads);
+			}	*/
+		}
 
 		// complex-values spatial fields (in-place):
 		shtns->ifft_cplx = fftw_plan_many_dft(1, &nfft, NLAT, ShF, &nfft, phi_inc, 1, ShF, &nfft, phi_inc, 1, FFTW_BACKWARD, shtns->fftw_plan_mode);
@@ -586,6 +593,7 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 		#endif
 		clenshaw_curtis_nodes(xg,stg,wg,NLAT);
 	} else shtns_runerr("unknown grid.");
+	if (NLAT&1) wg[NLAT/2] *= 0.5;		// odd NLAT : adjust weigth of middle point.
 	for (it=0; it<NLAT; it++) {
 		shtns->ct[it] = latdir * xg[it];
 		shtns->st[it] = stg[it];
@@ -607,7 +615,7 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 		x2 = x2*1.5 - 1.;
 		st2 = st2*0.75 - 1.;
 		if (verbose>1) {
-			printf("          Sum of weigths = 2 + %g (should be 2)\n", s);
+			printf("          Sum of weights = 2 + %g (should be 2)\n", s);
 			printf("          Applying quadrature rule to 3/2.x^2 = 1 + %g (should be 1)\n", x2);
 			printf("          Applying quadrature rule to 3/4.sin2(theta) = 1 + %g (should be 1)\n", st2);
 		} else if (fabs(s)+fabs(x2)+fabs(st2) > 1e-14)	shtns_runerr("Bad quadrature accuracy.");
@@ -615,9 +623,6 @@ static void grid_weights(shtns_cfg shtns, double latdir)
 
 	for (it=0; it<NLAT_2; it++)
 		shtns->wg[it] = wg[it]*iylm_fft_norm;		// faster double-precision computations.
-	if (NLAT & 1) {		// odd NLAT : adjust weigth of middle point. (required for Gauss, untested for regular grids... TODO CHECK)
-		shtns->wg[NLAT_2-1] *= 0.5;
-	}
 	for (it=NLAT_2; it < NLAT_2 +overflow; it++) shtns->wg[it] = 0.0;		// padding for multi-way algorithm.
 
 #if SHT_VERBOSE > 1
@@ -1340,11 +1345,9 @@ int shtns_set_grid_auto(shtns_cfg shtns, enum shtns_type flags, double eps, int 
 	#if HAVE_LIBCUFFT
 		if (*nlat % 64) shtns_runerr("Nlat must be a multiple of 64 for GPUs\n");
 	#endif
-	if (*nlat & 1) shtns_runerr("Nlat must be even\n");
-	#if _GCC_VEC_
-		#ifdef SHTNS4MAGIC
-			if (*nlat % (VSIZE2*2)) shtns_runerr("Nlat must be an even multiple of vector size\n");
-		#endif
+	if (*nlat & 1) quick_init = 1;	// only one type of transform works with nlat odd. NEVER try others.
+	#ifdef SHTNS4MAGIC
+		if (*nlat % (VSIZE2*2)) shtns_runerr("Nlat must be an even multiple of vector size\n");
 	#endif
 	shtns_unset_grid(shtns);		// release grid if previously allocated.
 	if (nl_order <= 0) nl_order = SHT_DEFAULT_NL_ORDER;

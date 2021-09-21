@@ -41,6 +41,8 @@ test:
   script:
     - ./test_suite
     - ./test_rot
+    - ./time_SHT        120 -nlat=127 -vector
+    - ./time_SHT        120 -nlat=127 -vector -mmax=0
     - ./time_SHT_nosimd 127 -quickinit -vector -nlorder=2
     - ./time_SHT_sse3   127 -quickinit -vector -nlorder=2
     - ./time_SHT_avx2   127 -quickinit -vector -nlorder=2

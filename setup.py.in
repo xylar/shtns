@@ -12,7 +12,7 @@ def getver():
     return '@PACKAGE_VERSION@'
 
 numpy_inc = get_include()		#  NumPy include path.
-objs = "sht_init.o sht_kernels_a.o sht_kernels_s.o @objs@"
+objs = "sht_init.o sht_kernels_a.o sht_kernels_s.o sht_odd_nlat.o @objs@"
 shtns_o = objs.split()			# transform to list of objects
 libdir = "@prefix@"
 if len(libdir) == 0:

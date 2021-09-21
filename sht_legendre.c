@@ -765,7 +765,7 @@ void gauss_nodes(double *x, double* st, double *w, const int n)
 	double eps = 2.3e-16;		// desired precision, minimum = 2.2204e-16 (double)
 	if ((sizeof(real) > 8) && (long_double_caps > 1))	eps = 1.1e-19;		// desired precision, minimum = 1.0842e-19 (long double i387)
 
-	const long m = (n+1)/2;
+	const long m = n/2;
 	#pragma omp parallel for
 	for (long i=0;i<m;++i) {
 		real z, z1, pp, p2, p1;
