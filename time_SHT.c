@@ -679,6 +679,7 @@ void usage()
 	printf(" -schmidt : use schmidt semi-normalization.\n");
 	printf(" -4pi : use 4pi normalization.\n");
 	printf(" -robert : use Robert form, ie spatial vector fields are multiplied by sin(colatitude).\n");
+	printf(" -nopadding : disable padding (may reduce performance).\n");
   #ifdef _OPENMP
 	printf(" -nth=<n> : use n threads.\n");
   #endif
@@ -695,7 +696,7 @@ int main(int argc, char *argv[])
 	double polaropt = 1.e-8;		// default for polar optimization.
 	enum shtns_type shtmode = sht_auto;		// default to "auto" (fastest) mode.
 	enum shtns_norm shtnorm = sht_orthonormal;		// default to "orthonormal" SH.
-	int layout = SHT_NATIVE_LAYOUT;
+	int layout = SHT_NATIVE_LAYOUT | SHT_ALLOW_PADDING;		// allow padding by default
 	int nlorder = 0;
 	int point = 0;
 	int vector = 0;
@@ -740,7 +741,7 @@ int main(int argc, char *argv[])
 		if (strcmp(name,"point") == 0) point = 1;
 		if (strcmp(name,"loadsave") == 0) loadsave = 1;
 		if (strcmp(name,"robert") == 0) robert_form = t;
-		if (strcmp(name,"padding") == 0) layout |= SHT_ALLOW_PADDING;		// Allow padding if it may improve performance.
+		if (strcmp(name,"nopadding") == 0) layout &= ~SHT_ALLOW_PADDING;		// disable padding.
 		if (strcmp(name,"accuracy") == 0) accuracy_test = 1;			// Parform an accuracy test instead of a speed test.
 	}
 
