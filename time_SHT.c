@@ -56,15 +56,15 @@ void runerr(const char * error_text)
 /// for real-time performance measurements, returns time in mili-seconds.
 #ifdef _OPENMP
   #include <omp.h>
-  inline double wtime_ms() {  return omp_get_wtime() * 1e3;  }
+  inline double wtime() {  return omp_get_wtime();  }
 #else
   #include <sys/time.h>
-  double wtime_ms() {			// use gettimeofday
+  double wtime() {			// use gettimeofday
 	static long sec_base = -1;
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	if (sec_base == -1) sec_base = tv.tv_sec;
-	return tv.tv_usec*1e-3 + (tv.tv_sec - sec_base)*1e3;
+	return tv.tv_usec*1e-6 + (tv.tv_sec - sec_base);
   }
 #endif
 
@@ -169,7 +169,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 	}
 	print_error(sqrt(n2/NLM), tmax, shtns->li[jj],jj, "");
 	if ((tmax > 1e-7) && (NLM < 15)) {
-		printf("\n orig:");
+		printf(" orig:");
 		for (i=0; i<NLM;i++)
 			if ((i <= LMAX)||(i >= nlm_cplx)) {		// m=0, and 2*m=nphi is real
 				printf("  %g",creal(Slm0[i]));
@@ -183,6 +183,7 @@ double scal_error(complex double *Slm, complex double *Slm0, int ltr)
 			} else {
 				printf("  %g,%g",creal(Slm[i]),cimag(Slm[i]));
 			}
+		printf("\n");
 	}
 	return(tmax);
 }
@@ -207,7 +208,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 	}
 	print_error(sqrt(n2/NLM), tmax, shtns->li[jj],jj, "Spheroidal");
 	if ((tmax > 1e-4) && (NLM < 15)) {
-		printf("\n orig:");
+		printf(" orig:");
 		for (i=0; i<NLM;i++)
 			if ((i <= LMAX)||(i >= NLM)) {		// m=0, and 2*m=nphi is real
 				printf("  %g",creal(Slm0[i]));
@@ -221,6 +222,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 			} else {
 				printf("  %g,%g",creal(Slm[i]),cimag(Slm[i]));
 			}
+		printf("\n");
 	}
 //	write_vect("Slm",Slm,NLM*2);
 	tmax0 = tmax;
@@ -240,7 +242,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 	}
 	print_error(sqrt(n2/NLM), tmax, shtns->li[jj],jj, "Toroidal");
 	if ((tmax > 1e-4) && (NLM < 15)) {
-		printf("\n orig:");
+		printf(" orig:");
 		for (i=0; i<NLM;i++)
 			if ((i <= LMAX)||(i >= NLM)) {		// m=0, and 2*m=nphi is real
 				printf("  %g",creal(Tlm0[i]));
@@ -254,6 +256,7 @@ double vect_error(complex double *Slm, complex double *Tlm, complex double *Slm0
 			} else {
 				printf("  %g,%g",creal(Tlm[i]),cimag(Tlm[i]));
 			}
+		printf("\n");
 	}
 //	write_vect("Tlm",Tlm,NLM*2);
 	return(tmax > tmax0 ? tmax : tmax0);
@@ -266,19 +269,21 @@ void test_SH_point()
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
-	ts2 = wtime_ms();
+	ts2 = wtime();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		double v = SH_to_point(shtns, Slm, 0.8, 0.76);
 	}
-	ts2 = wtime_ms() - ts2;
+	ts2 = wtime() - ts2;
 
-	ta2 = wtime_ms();
+	ta2 = wtime();
 	for (jj=1; jj< SHT_ITER; jj++) {
 		double vr, vt, vp;
 		SHqst_to_point(shtns, Slm, Slm0, Tlm0, 0.8, 0.76, &vr, &vt, &vp);
 	}
-	ta2 = wtime_ms() - ta2;
+	ta2 = wtime() - ta2;
 
+	ts2 *= 1000./SHT_ITER;	// ms per eval
+	ta2 *= 1000./SHT_ITER;	// ms per eval
 	printf("   SHT_to_point time = %f ms [scalar], %f ms [3D vector]\n", ts2, ta2);
 	return;
 }
@@ -294,23 +299,25 @@ void test_SHT()
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
 	tcpu = clock();
-	ts2 = wtime_ms();
+	ts2 = wtime();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SH_to_spat(shtns, Slm,Sh);
 	}
-	ts2 = wtime_ms() - ts2;
+	ts2 = wtime() - ts2;
 	tcpu = clock() - tcpu;
 	ts = tcpu / (1000.*SHT_ITER);
 
 	tcpu = clock();
-	ta2 = wtime_ms();
+	ta2 = wtime();
 	spat_to_SH(shtns, Sh,Slm);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SH(shtns, Sh,Tlm);
 	}
-	ta2 = wtime_ms() - ta2;
+	ta2 = wtime() - ta2;
 	tcpu = clock() - tcpu;
 	ta = tcpu / (1000.*SHT_ITER);
+	ts2 *= 1000./SHT_ITER;
+	ta2 *= 1000./SHT_ITER;
   #ifdef _OPENMP
 	printf("   SHT time (lmax=%d): \t synthesis = %.5f ms [cpu %.3f] [%.3f Gflops] \t analysis = %.5f ms [cpu %.3f] [%.3f Gflops] \n", LMAX, ts2, ts, gflop/ts2, ta2, ta, gflop/ta2);
   #else
@@ -338,18 +345,20 @@ void test_SHT_m0()
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
-	ts = wtime_ms();
+	ts = wtime();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHsph_to_spat(shtns, Slm,Sh,NULL);
 	}
-	ts = wtime_ms() - ts;
+	ts = wtime() - ts;
 
-	ta = wtime_ms();
+	ta = wtime();
 	SHtor_to_spat(shtns, Slm, NULL, Sh);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		SHtor_to_spat(shtns, Slm, NULL, Sh);
 	}
-	ta = wtime_ms() - ta;
+	ta = wtime() - ta;
+	ts *= 1000./SHT_ITER;	// ms per eval
+	ta *= 1000./SHT_ITER;	// ms per eval
 	printf("   SHT time : \t spheroidal = %f ms \t torodial = %f ms\n", ts, ta);
 
 	return;
@@ -362,18 +371,20 @@ void test_SHT_l(int ltr)
 
 	for (i=0;i<NLM;i++) Slm[i] = Slm0[i];	// restore test case...
 
-	ts = wtime_ms();
+	ts = wtime();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SH_to_spat_l(shtns, Slm,Sh,ltr);
 	}
-	ts = wtime_ms() - ts;
+	ts = wtime() - ts;
 
-	ta = wtime_ms();
+	ta = wtime();
 		spat_to_SH_l(shtns, Sh,Slm,ltr);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SH_l(shtns, Sh,Tlm,ltr);
 	}
-	ta = wtime_ms() - ta;
+	ta = wtime() - ta;
+	ts *= 1000./SHT_ITER;	// ms per eval
+	ta *= 1000./SHT_ITER;	// ms per eval
 	printf("   SHT time truncated at l=%d : synthesis = %f ms, analysis = %f ms\n", ltr, ts, ta);
 
 	scal_error(Slm, Slm0, ltr);
@@ -397,18 +408,20 @@ void test_SHT_vect_l(int ltr)
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
 	}
-	ts = wtime_ms();
+	ts = wtime();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHsphtor_to_spat_l(shtns, Slm,Tlm,Sh,Th,ltr);
 	}
-	ts = wtime_ms() - ts;
+	ts = wtime() - ts;
 
-	ta = wtime_ms();
+	ta = wtime();
 		spat_to_SHsphtor_l(shtns, Sh,Th,Slm,Tlm, ltr);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SHsphtor_l(shtns, Sh,Th,S2,T2, ltr);
 	}
-	ta = wtime_ms() - ta;
+	ta = wtime() - ta;
+	ts *= 1000./SHT_ITER;	// ms per eval
+	ta *= 1000./SHT_ITER;	// ms per eval
 	printf("   vector SHT time trucated at l=%d : \t synthesis %f ms \t analysis %f ms\n", ltr, ts, ta);
 
 	shtns_free(T2);	shtns_free(S2);
@@ -433,18 +446,20 @@ void test_SHT_vect()
 	for (i=0;i<NLM;i++) {
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];
 	}
-	ts = wtime_ms();
+	ts = wtime();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHsphtor_to_spat(shtns, Slm,Tlm,Sh,Th);
 	}
-	ts = wtime_ms() - ts;
+	ts = wtime() - ts;
 
-	ta = wtime_ms();
+	ta = wtime();
 		spat_to_SHsphtor(shtns, Sh,Th,Slm,Tlm);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SHsphtor(shtns, Sh,Th,S2,T2);
 	}
-	ta = wtime_ms() - ta;
+	ta = wtime() - ta;
+	ts *= 1000./SHT_ITER;	// ms per eval
+	ta *= 1000./SHT_ITER;	// ms per eval
 	printf("   vector SHT time (lmax=%d) : \t synthesis %f ms \t analysis %f ms\n", LMAX, ts, ta);
 
 	shtns_free(T2);	shtns_free(S2);
@@ -465,18 +480,20 @@ void test_SHT_vect3d_l(int ltr)
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
 	}
 
-	ts = wtime_ms();
+	ts = wtime();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHqst_to_spat_l(shtns, Qlm,Slm,Tlm,NL,Sh,Th, ltr);
 	}
-	ts = wtime_ms() - ts;
+	ts = wtime() - ts;
 
-	ta = wtime_ms();
+	ta = wtime();
 		spat_to_SHqst_l(shtns, NL,Sh,Th,Qlm,Slm,Tlm, ltr);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SHqst_l(shtns, NL,Sh,Th,Q2,S2,T2, ltr);
 	}
-	ta = wtime_ms() - ta;
+	ta = wtime() - ta;
+	ts *= 1000./SHT_ITER;	// ms per eval
+	ta *= 1000./SHT_ITER;	// ms per eval
 	printf("   3D vector SHT time : \t synthesis %f ms \t analysis %f ms\n", ts, ta);
 
 	shtns_free(T2);	shtns_free(S2);	shtns_free(Q2);
@@ -506,18 +523,20 @@ void test_SHT_vect3d()
 		Slm[i] = Slm0[i];	Tlm[i] = Tlm0[i];	Qlm[i] = Tlm0[i];
 	}
 
-	ts = wtime_ms();
+	ts = wtime();
 	for (jj=0; jj< SHT_ITER; jj++) {
 		SHqst_to_spat(shtns, Qlm,Slm,Tlm,NL,Sh,Th);
 	}
-	ts = wtime_ms() - ts;
+	ts = wtime() - ts;
 
-	ta = wtime_ms();
+	ta = wtime();
 		spat_to_SHqst(shtns, NL,Sh,Th,Qlm,Slm,Tlm);
 	for (jj=1; jj< SHT_ITER; jj++) {
 		spat_to_SHqst(shtns, NL,Sh,Th,Q2,S2,T2);
 	}
-	ta = wtime_ms() - ta;
+	ta = wtime() - ta;
+	ts *= 1000./SHT_ITER;	// ms per eval
+	ta *= 1000./SHT_ITER;	// ms per eval
 	printf("   3D vector SHT time (lmax=%d): \t synthesis %f ms \t analysis %f ms\n", LMAX, ts, ta);
 
 	shtns_free(T2);	shtns_free(S2);	shtns_free(Q2);
