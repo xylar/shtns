@@ -169,8 +169,8 @@ double split_sym_asym_m0_accl0(double* F0, double* eo, unsigned nlat_2, int k_in
 		}
 		k+=VSIZE2;
 	} while(k < nk);
-	for (int j=2; j<VSIZE2/2; j+=2) {	r0[0] += r0[j];		r0[1] += r0[j+1];	}
 	#if VSIZE2 >= 4
+	for (int j=2; j<VSIZE2/2; j+=2) {	r0[0] += r0[j];		r0[1] += r0[j+1];	}
 	r0[0] += r0[1];
 	#endif
 	return vlo_to_dbl(r0[0]) + vhi_to_dbl(r0[0]);
