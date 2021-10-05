@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2020 Centre National de la Recherche Scientifique.
+ * Copyright (c) 2010-2021 Centre National de la Recherche Scientifique.
  * written by Nathanael Schaeffer (CNRS, ISTerre, Grenoble, France).
  * 
  * nathanael.schaeffer@univ-grenoble-alpes.fr
@@ -27,7 +27,7 @@
 #endif
 
 /* are there supported vector extensions available ? */
-#if !(defined __SSE2__ || defined __VSX__ )
+#if !(defined __SSE2__ || defined __VSX__ || defined __ARM_NEON)
 	#undef _GCC_VEC_
 #endif
 #ifdef __INTEL_COMPILER
@@ -43,14 +43,90 @@
 	#endif
 #endif
 
+
+#if _GCC_VEC_ && ( __ARM_NEON_FP >= 8  )
+	// support ARM NEON
+	#include <arm_neon.h>
+	#define MIN_ALIGNMENT 16
+	#define VSIZE 2
+	typedef float64x2_t s2d;
+	typedef float64x2_t v2d;
+	typedef float64x2_t rnd;
+	#define VSIZE2 2
+	#define _SIMD_NAME_ "neon"
+	#warning "arm neon"
+	#define vall(x) vdupq_n_f64(x)
+	// _mm_unpacklo_pd => vzip1q_f64 	// _mm_unpackhi_pd => vzip2q_f64
+
+	#define vxor2(v,x) veorq_u64(v,x)
+	#define vread2(mem, idx) vld1q_f64( ((double*)(mem)) + (idx)*2 )
+	#define vstor2(mem, idx, v) vst1q_f64( ((double*)(mem)) + (idx)*2 , v)
+
+	#define vread(mem, idx) ((s2d*)(mem))[idx]
+	#define vstor(mem, idx, v) ((s2d*)(mem))[idx] = v
+	inline static v2d v2d_reduce(v2d a, v2d b) { return vpaddq_f64(a,b); }
+	inline static v2d vneg_even_precalc(v2d v) {		// don't use in an intensive loop.
+		v[0] = -v[0];
+		return v;
+	}
+	inline static v2d vreverse(v2d a) { return vextq_f64(a,a,1); }
+	#define vxchg(a) vreverse(a)
+	#define vreverse_pairs(v) (v)
+	#define vdup_even(v) vdupq_laneq_f64(v,0)
+	#define vdup_odd(v) vdupq_laneq_f64(v,1)
+	#define vxchg_even_odd(v) vreverse(v)
+
+	static const unsigned long long _neg0[2] __attribute__((aligned (16))) = {0x8000000000000000ULL, 0} ;		// a constant needed to change the sign of vectors
+
+	#define vblend_even_odd(a,b) vsetq_lane_f64(vgetq_lane_f64(b,1),a,1)	//	__builtin_shufflevector(a,b,0,3)
+	#define vneg_even_xor_cte (*(const v2d*)_neg0)
+	#define vxor(v,x) vxor2(v,x)
+	#define reduce_add(a) vaddvq_f64(a)
+	#define vinterleave(a,b) {  rnd x = vzip1q_f64(a,b);	b = vzip2q_f64(a, b);	a = x; }
+	#define vinterleave_reverse(a,b)	{  rnd x = vzip1q_f64(a,b);	a = vzip2q_f64(a, b);	b = x; }
+
+	inline static void S2D_CSTORE2_4MAGIC(double* mem, long idx, rnd nr, rnd sr, rnd ni, rnd si) {
+		((s2d*)mem)[idx*4]   = vzip1q_f64(nr, ni);	// aa = north_ri[0]
+		((s2d*)mem)[idx*4+1] = vzip1q_f64(sr, si);	// cc = south_ri[0]
+		((s2d*)mem)[idx*4+2] = vzip2q_f64(nr, ni);	// bb = north_ri[1]
+		((s2d*)mem)[idx*4+3] = vzip2q_f64(sr, si);	// dd = south_ri[1]
+	}
+	inline static v2d IxKxZ(double k, v2d z) {		// I*k*z,  allowing to use FMA.
+		v2d vk = {-k,k};
+		return vk * vxchg(z);
+	}
+
+	// vset(lo, hi) takes two doubles and pack them in a vector
+	inline static v2d vset(double lo, double hi) {
+		v2d v = {lo, hi};
+		return v;
+	}
+	// vdup(x) takes a double and duplicate it to a vector of 2 doubles.
+	#define vdup(x) vall(x)
+	// vxchg(a) exchange hi and lo component of vector a
+	#define vlo_to_cplx(a) vsetq_lane_f64(0.0,a,1)
+	#define vhi_to_cplx(a) vsetq_lane_f64(vgetq_lane_f64(a,1),vall(0.0),0)
+	#define vcplx_real(a) vlo_to_dbl(a)
+	#define vcplx_imag(a) vhi_to_dbl(a)
+	#ifdef __clang__
+		// allow to compile with clang (llvm)
+		#define vlo(a) (a)[0]
+		#define vlo_to_dbl(a) (a)[0]
+		#define vhi_to_dbl(a) (a)[1]
+	#else
+		// gcc extensions
+		#define vlo(a) vgetq_lane_f64(a,0)
+		#define vlo_to_dbl(a) vgetq_lane_f64(a,0)
+		#define vhi_to_dbl(a) vgetq_lane_f64(a,1)
+	#endif
+	#define v2d_lo(a) (a)
+#endif
+
 #if _GCC_VEC_ && __VSX__
 	// support VSX (IBM Power)
 	#include <altivec.h>
 	#define MIN_ALIGNMENT 16
 	#define VSIZE 2
-	//typedef double s2d __attribute__ ((vector_size (8*VSIZE)));		// vector that should behave like a real scalar for complex number multiplication.
-	//typedef double v2d __attribute__ ((vector_size (8*VSIZE)));		// vector that contains a complex number
-	//typedef double rnd __attribute__ ((vector_size (VSIZE2*8)));		// vector of 2 doubles.
 	typedef __vector double s2d;
 	typedef __vector double v2d;
 	typedef __vector double rnd;
