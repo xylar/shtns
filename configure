@@ -4741,13 +4741,13 @@ then :
      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
 
-	LIBS="-mkl $LIBS"	# easy way !
 	ac_fn_c_check_func "$LINENO" "fftw_plan_many_dft" "ac_cv_func_fftw_plan_many_dft"
 if test "x$ac_cv_func_fftw_plan_many_dft" = xyes
 then :
 
 	    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \"FFTW interface found in MKL, link with -mkl\"" >&5
 printf "%s\n" "$as_me: \"FFTW interface found in MKL, link with -mkl\"" >&6;}
+	    LIBS="-mkl $LIBS"	# easy way, for intel compiler !
 	    mkl_found=yes
 
 else $as_nop
@@ -4762,6 +4762,12 @@ else $as_nop
   CFLAGS=$ax_check_save_flags
      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
+     :
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+
+  if test "x$mkl_found" == "xno"
+then :
 
 	# assume 64 bit mode, add default directory to find the MKL
 	LDFLAGS="$LDFLAGS -L$MKLROOT/lib/intel64"
@@ -4830,8 +4836,6 @@ fi
 
 
 fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
-
   if test "x$mkl_found" == "xno"
 then :
 
