@@ -56,9 +56,9 @@ V	v2d vw[2*llim+2+LSPAN];
 
 	// the SSE macro should align these arrays on vector length.
   #ifndef SHT_AXISYM
-Q	double reori[NLAT_2*4 + (VSIZE2-1)*4] SSE;
-V	double teori[NLAT_2*4 + (VSIZE2-1)*4] SSE;
-V	double peori[NLAT_2*4 + (VSIZE2-1)*4] SSE;
+Q	double reori[NLAT_2*4 + VSIZE2*4] SSE;
+V	double teori[NLAT_2*4 + VSIZE2*4] SSE;
+V	double peori[NLAT_2*4 + VSIZE2*4] SSE;
   #else
 Q	double reori[NLAT_2*2 + (VSIZE2-1)*2] SSE;
 V	double teori[NLAT_2*2 + (VSIZE2-1)*2] SSE;
