@@ -839,9 +839,17 @@ cplx exp_2IpiK_N_accurate(long k, long n)
 	double c = 1.0;
 	double s = 0.0;
 	if (k != 0) {
-		double xd = ((double)(2*k)/n) * M_PI;		// x should be:  0 <= x <= pi/4
-		c = cos(xd);
-		s = sin(xd);
+		if (8*k == n) {		// special value for pi/4
+			c = s = sqrt(0.5);
+		} else if (12*k == n) {		// special value for pi/6
+			c = sqrt(3)*0.5;
+			s = 0.5;
+		} else {
+			// use extra precision here, to get accurate double values in the end.
+			long double x = ((long double)(2*k)/n) * M_PIl;		// x should be:  0 <= x <= pi/4
+			c = cosl(x);
+			s = sinl(x);
+		}
 	}
 	if (quadrant & 4) {
 		double t = c;	c = s;	s = t;		// exchange sin and cos
