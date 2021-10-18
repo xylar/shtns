@@ -461,7 +461,7 @@ static void planFFT(shtns_cfg shtns, int layout)
 		#endif
 	#ifdef HAVE_LIBCUFFT
 	} else if (!(layout & SHT_THETA_CONTIGUOUS)) {		// use the fastest layout compatible with cuFFT
-		if (NLAT & 1) runerr("odd nlat not supported by GPU"):
+		if (NLAT & 1) runerr("odd nlat not supported by GPU");
 		shtns->fftc_mode = 2;	// out-of-place
 		// Fourier -> spatial
 		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (cplx*) Sh, &nfft, 1, nfft, FFTW_BACKWARD, shtns->fftw_plan_mode);		
