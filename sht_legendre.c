@@ -387,12 +387,13 @@ int legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, c
 		dy0 = x*m*y0;
 		st *= st;		// st = sin(theta)^2 is used in the recurrence for m>0
 	}
+	y1 = al[1] * (x * y0);		// l=m+1
+	dy1 = al[1]*( x*dy0 - st*y0 );
 
 	l=m+2;	al+=2;
 	if (ny<0) {
 		yl[m] = 0.0;	dyl[m] = 0.0;		lnz++;
 		if (lmax==m) return lnz;		// done.
-		y1 = al[-1] * (x * y0);		// l=m+1
 		yl[m+1] = 0.0;	dyl[m+1] = 0.0;		lnz++;
 		if (lmax==m+1) return lnz;
 		while (l < lmax) {		// values are negligible => discard.
@@ -416,8 +417,6 @@ int legendre_sphPlm_deriv_array(shtns_cfg shtns, const int lmax, const int im, c
 	}
 	yl[m] = y0; 	dyl[m] = dy0;		// l=m
 	if (lmax==m) return lnz;		// done.
-	y1 = al[-1] * (x * y0);		// l=m+1
-	dy1 = al[-1]*( x*dy0 - st*y0 );
 	yl[m+1] = y1; 	dyl[m+1] = dy1;		// l=m+1
 	if (lmax==m+1) return lnz;		// done.
   ny_zero:
