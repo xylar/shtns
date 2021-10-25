@@ -56,6 +56,11 @@ void test_simd()
 
 	SILENT_TEST( vcplx_real(va) == a[0] );
 	SILENT_TEST( vcplx_imag(va) == a[1] );
+
+	va = vread2(a,0);	// check that vread2 is the same as direct vector load
+	SILENT_TEST( vcplx_real(va) == a[0] );
+	SILENT_TEST( vcplx_imag(va) == a[1] );
+
 	#ifdef _GCC_VEC_
 	SILENT_TEST( vcplx_real(vxchg(va)) == a[1] );
 	SILENT_TEST( vcplx_imag(vxchg(va)) == a[0] );
@@ -92,7 +97,7 @@ void test_analys()
 {
 	printf(COLOR_WRN "** ANALYSE TESTS **" COLOR_END "\n");
 
-	const int nlat = 32;
+	const int nlat = 64;
 	const int nphi = 8;
 	const int lmax = 7;
 	shtns_cfg sht = shtns_init(sht_orthonormal | sht_quick_init, lmax, 3, 1, nlat, nphi);
@@ -108,7 +113,7 @@ void test_analys()
 		}
 	}
 	
-	spat_to_SH(sht, (double*) d, q);	// Note that this destroys the content fof 'd'
+	spat_to_SH(sht, (double*) d, q);	// Note that this destroys the content of 'd'
 	
 	//for (int lm=0; lm < sht->nlm; lm++) 	printf("lm=%d [%g %g]\n", lm, creal(q[lm]), cimag(q[lm]));
 

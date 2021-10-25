@@ -58,12 +58,11 @@
 	#define vall(x) vdupq_n_f64(x)
 	// _mm_unpacklo_pd => vzip1q_f64 	// _mm_unpackhi_pd => vzip2q_f64
 
-	#define vxor2(v,x) veorq_u64(v,x)
-	#define vread2(mem, idx) vld1q_f64( ((double*)(mem)) + (idx)*2 )
-	#define vstor2(mem, idx, v) vst1q_f64( ((double*)(mem)) + (idx)*2 , v)
-
 	#define vread(mem, idx) ((s2d*)(mem))[idx]
 	#define vstor(mem, idx, v) ((s2d*)(mem))[idx] = v
+	#define vread2 vread
+	#define vstor2 vstor
+	#define vxor2(v,x) veorq_u64(v,x)
 	inline static v2d v2d_reduce(v2d a, v2d b) { return vpaddq_f64(a,b); }
 	inline static v2d vneg_even_precalc(v2d v) {		// don't use in an intensive loop.
 		v[0] = -v[0];
@@ -142,18 +141,15 @@
 	#define vdup_even(v) vec_mergeh(v,v)
 	#define vdup_odd(v)  vec_mergel(v,v)
 	#define vxchg_even_odd(a) vreverse(a)
-	#define vread(mem, idx) vec_ld((int)(idx)*16, ((const vector double*)(mem)))
-	#define vstor(mem, idx, v) vec_st((v2d)v, (int)(idx)*16, ((vector double*)(mem)))
+	#define vread(mem, idx) ((s2d*)(mem))[idx]
+	#define vstor(mem, idx, v) ((s2d*)(mem))[idx] = v
 	#define vread2 vread
 	#define vstor2 vstor
 	static const unsigned long long _neg0[2] __attribute__((aligned (16))) = {0x8000000000000000ULL, 0} ;		// a constant needed to change the sign of vectors
 	#define vneg_even_xor_cte (*(const v2d*)_neg0)
 	#define vxor(v,x) vec_xor(v,x)
 	#define vxor2 vxor
-	inline static double reduce_add(rnd a) {
-		rnd b = a + vec_mergel(a, a);
-		return( vec_extract(b,0) );
-	}
+	inline static double reduce_add(rnd v) { return vec_extract(v,0) + vec_extract(v,1); }
 	inline static v2d v2d_reduce(rnd a, rnd b) {
 		v2d c = vec_mergel(a, b);		b = vec_mergeh(a, b);
 		return b + c;
