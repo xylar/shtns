@@ -27,7 +27,7 @@
 #endif
 
 /* are there supported vector extensions available ? */
-#if !(defined __SSE2__ || defined __VSX__ || defined __ARM_NEON)
+#if !(defined __SSE2__ || defined __VSX__ || __ARM_NEON_FP >= 8)
 	#undef _GCC_VEC_
 #endif
 #ifdef __INTEL_COMPILER

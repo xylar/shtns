@@ -20,7 +20,7 @@ FEATURES:
   Gauss-Legendre quadrature).
 - support for **regular grids** (but they require twice the number of nodes than Gauss grid)
 - support for SSE2, SSE3, **AVX, AVX2, AVX-512** vectorization, as well as 
-  Xeon Phi (KNL) and AltiVec VSX.
+  Xeon Phi (KNL), AltiVec VSX, and Neon.
 - **parallel transforms with OpenMP**.
 - *Beta*: automatic **GPU off-loading** with nvidia cuda (Kepler, Pascal & Volta).
 - synthesis (inverse transform) at any coordinate (not constrained to a grid).

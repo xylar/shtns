@@ -1,6 +1,17 @@
 SHTNS CHANGE LOG:
 -----------------
 
+* v3.5  (26 Oct 2021)
+	- Rotations now support all normalizations; older pseudo-spectral rotations are deprected.
+	- Python interface for rotations.
+	- New `SH_to_point_cplx()` function for point-evaluation of complex-valued field.
+	- New support for odd number of grid points in latitude (nlat).
+	- Support for ARM Neon vector instructions.
+	- beta: float support (single precision) for cuda transforms on GPU.
+	- Polar optimization for point evaluations.
+	- Fix issues in `shtns_rotation_set_angles_ZXZ()` and `shtns_rotation_set_angle_axis()`
+	- Fix all accuracy errors for regular grids including poles and lmax>=1000.
+
 * v3.4.6  (15 May 2021)
 	- Fix major bug arising in complex-valued synthesis since v3.4 (issue #42).
 	- Fix accuracy error for regular grids including poles and lmax>=1000.
@@ -14,13 +25,13 @@ SHTNS CHANGE LOG:
 * v3.4.4  (12 Oct 2020)
 	- Fix accuracy loss with cuda-transforms on GPU at large sizes (Lmax around 8000)
 	- Fix wrong sign for rotation around Z-axis in `shtns_rotation_set_angle*()`
-	- Fix compilations issues arising with some compilers and systems.
+	- Fix compilation issues arising with some compilers and systems.
 	- Rotations: allow beta<0 in `shtns_rotation_set_angles_Z?Z()`
 
 * v3.4.3  (8 Sep 2020)
 	- Fix critical bug sometimes causing intermittent accuracy errors with avx512 and large 
 	  sizes (Lmax>=1800).
-	- Detection and workaround for a bug in some versions `binutils` causing systematic failures 
+	- Detection and workaround for a bug in some versions of `binutils` causing systematic failures.
 	  with avx512 and gcc as the compiler. The bug is fixed in `binutils` 2.32 or more recent.
 	- Better handling of cuda by `./configure` allowing to set target architecture/compute 
 	  capability (e.g. `--enable-cuda=pascal`)

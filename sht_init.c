@@ -1059,7 +1059,7 @@ int config_load(shtns_cfg shtns, int req_flags)
 }
 
 /// \internal returns 1 if val cannot fit in dest (unsigned)
-#define IS_TOO_LARGE(val, dest) (sizeof(dest) >= sizeof(val)) ? 0 : ( ( val >= (1<<(8*sizeof(dest))) ) ? 1 : 0 )
+#define IS_TOO_LARGE(val, dest) (sizeof(dest) >= sizeof(val)) ? 0 : ( ( val >= (1ULL<<(8*sizeof(dest))) ) ? 1 : 0 )
 
 /// \internal returns the size that must be allocated for an shtns_info.
 #define SIZEOF_SHTNS_INFO(mmax) ( sizeof(struct shtns_info) + (mmax+1)*( sizeof(unsigned short) ) )
