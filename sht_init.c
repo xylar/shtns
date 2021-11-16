@@ -385,6 +385,7 @@ static void planFFT(shtns_cfg shtns, int layout)
 	theta_inc=1;  phi_inc=NLAT;		// SHT_NATIVE_LAYOUT is the default.
 	if (layout & SHT_PHI_CONTIGUOUS)   {	phi_inc=1;  theta_inc=NPHI;	}
 
+	#ifndef HAVE_LIBCUFFT
 	if ((layout & SHT_ALLOW_PADDING) && (phi_inc % 64 == 0) && (NPHI * phi_inc > 512))
 	{
 		phi_inc += 8;		// we add some padding, to avoid cache bank conflicts.
@@ -392,6 +393,7 @@ static void planFFT(shtns_cfg shtns, int layout)
 		shtns->m_stride_a = phi_inc;		// stride between phi in spectral domain
 		shtns->nlat_padded = phi_inc;		// stride between phi in spatial domain
 	}
+	#endif
 
 	#if SHT_VERBOSE > 0
 	if (verbose) {
@@ -461,7 +463,7 @@ static void planFFT(shtns_cfg shtns, int layout)
 		#endif
 	#ifdef HAVE_LIBCUFFT
 	} else if (!(layout & SHT_THETA_CONTIGUOUS)) {		// use the fastest layout compatible with cuFFT
-		if (NLAT & 1) runerr("odd nlat not supported by GPU");
+		if (NLAT & 1) shtns_runerr("odd nlat not supported by GPU");
 		shtns->fftc_mode = 2;	// out-of-place
 		// Fourier -> spatial
 		shtns->ifftc = fftw_plan_many_dft(1, &nfft, NLAT/2, ShF, &nfft, NLAT/2, 1, (cplx*) Sh, &nfft, 1, nfft, FFTW_BACKWARD, shtns->fftw_plan_mode);		

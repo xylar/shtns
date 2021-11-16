@@ -335,8 +335,8 @@ template<int S, int NFIELDS, typename real=double>
 static void leg_m0(shtns_cfg shtns, const real *ql, real *q, const int llim, int spat_dist = 0)
 {
 	const int nlat_2 = shtns->nlat_2;
-	real *d_alm = (sizeof(real) >= 8) ? (real) shtns->d_alm : (real) shtns->d_alm_f;
-	real *d_ct = (sizeof(real) >= 8) ? (real) shtns->d_ct : (real) shtns->d_ct_f;
+	real *d_alm = (sizeof(real) >= 8) ? (real*) shtns->d_alm : (real*) shtns->d_alm_f;
+	real *d_ct = (sizeof(real) >= 8) ? (real*) shtns->d_ct : (real*) shtns->d_ct_f;
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256;		// good value
@@ -506,8 +506,8 @@ template<int S, int NFIELDS, typename real=double>
 static void ileg_m0(shtns_cfg shtns, const real* q, real *ql, const int llim, int q_dist=0, int ql_dist=0)
 {
 	const int nlat_2 = shtns->nlat_2;
-	real *d_alm = (sizeof(real) >= 8) ? (real) shtns->d_alm : (real) shtns->d_alm_f;
-	real *d_ct = (sizeof(real) >= 8) ? (real) shtns->d_ct : (real) shtns->d_ct_f;
+	real *d_alm = (sizeof(real) >= 8) ? (real*) shtns->d_alm : (real*) shtns->d_alm_f;
+	real *d_ct = (sizeof(real) >= 8) ? (real*) shtns->d_ct : (real*) shtns->d_ct_f;
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256/NFIELDS;
@@ -907,8 +907,8 @@ static void leg_m_lowllim(shtns_cfg shtns, const real *ql, real *q, const int ll
 	const int mres = shtns->mres;
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
-	real *d_alm = (sizeof(real) >= 8) ? (real) shtns->d_alm : (real) shtns->d_alm_f;
-	real *d_ct = (sizeof(real) >= 8) ? (real) shtns->d_ct : (real) shtns->d_ct_f;
+	real *d_alm = (sizeof(real) >= 8) ? (real*) shtns->d_alm : (real*) shtns->d_alm_f;
+	real *d_ct = (sizeof(real) >= 8) ? (real*) shtns->d_ct : (real*) shtns->d_ct_f;
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256;		// good value
@@ -934,7 +934,7 @@ leg_m_highllim_kernel(const real *al, const real *ct, const real *ql, real *q, c
 	const int m_inc = 2*nlat_2;
 	const int k_inc = 1;
 	const real accuracy = (sizeof(real) >= 8) ? SHT_ACCURACY : SHT_ACCURACY_FLOAT;
-	const real scale_factor = (sizeof(real >= 8) ? SHT_SCALE_FACTOR : SHT_SCALE_FACTOR_FLOAT;
+	const real scale_factor = (sizeof(real) >= 8) ? SHT_SCALE_FACTOR : SHT_SCALE_FACTOR_FLOAT;
 
 	__shared__ real ak[BLOCKSIZE];	// cache
 	__shared__ real qk[BLOCKSIZE];
@@ -1072,8 +1072,8 @@ static void leg_m_highllim(shtns_cfg shtns, const real *ql, real *q, const int l
 	const int mres = shtns->mres;
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
-	real *d_alm = (sizeof(real) >= 8) ? (real) shtns->d_alm : (real) shtns->d_alm_f;
-	real *d_ct = (sizeof(real) >= 8) ? (real) shtns->d_ct : (real) shtns->d_ct_f;
+	real *d_alm = (sizeof(real) >= 8) ? (real*) shtns->d_alm : (real*) shtns->d_alm_f;
+	real *d_ct = (sizeof(real) >= 8) ? (real*) shtns->d_ct : (real*) shtns->d_ct_f;
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256;		// good value
@@ -1332,8 +1332,8 @@ static void ileg_m_lowllim(shtns_cfg shtns, const real* q, real *ql, const int l
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
 	int mmax = shtns->mmax;
-	real *d_alm = (sizeof(real) >= 8) ? (real) shtns->d_alm : (real) shtns->d_alm_f;
-	real *d_ct = (sizeof(real) >= 8) ? (real) shtns->d_ct : (real) shtns->d_ct_f;
+	real *d_alm = (sizeof(real) >= 8) ? (real*) shtns->d_alm : (real*) shtns->d_alm_f;
+	real *d_ct = (sizeof(real) >= 8) ? (real*) shtns->d_ct : (real*) shtns->d_ct_f;
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256/NFIELDS;
@@ -1360,7 +1360,7 @@ ileg_m_highllim_kernel(const real *al, const real *ct, const real *q, real *ql, 
 	const int m_inc = 2*nlat_2;
 //    const int k_inc = 1;
 	const real accuracy = (sizeof(real) >= 8) ? SHT_ACCURACY : SHT_ACCURACY_FLOAT;
-	const real scale_factor = (sizeof(real >= 8) ? SHT_SCALE_FACTOR : SHT_SCALE_FACTOR_FLOAT;
+	const real scale_factor = (sizeof(real) >= 8) ? SHT_SCALE_FACTOR : SHT_SCALE_FACTOR_FLOAT;
 
 	__shared__ real ak[2*LSPAN+2];	// cache
 	__shared__ real yl[LSPAN*BLOCKSIZE];
@@ -1528,8 +1528,8 @@ static void ileg_m_highllim(shtns_cfg shtns, const real* q, real *ql, const int 
 	const int nlat_2 = shtns->nlat_2;
 	const int nphi = shtns->nphi;
 	int mmax = shtns->mmax;
-	real *d_alm = (sizeof(real) >= 8) ? (real) shtns->d_alm : (real) shtns->d_alm_f;
-	real *d_ct = (sizeof(real) >= 8) ? (real) shtns->d_ct : (real) shtns->d_ct_f;
+	real *d_alm = (sizeof(real) >= 8) ? (real*) shtns->d_alm : (real*) shtns->d_alm_f;
+	real *d_ct = (sizeof(real) >= 8) ? (real*) shtns->d_ct : (real*) shtns->d_ct_f;
 	cudaStream_t stream = shtns->comp_stream;
 
 	const int BLOCKSIZE = 256/NFIELDS;

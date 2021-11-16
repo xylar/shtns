@@ -487,7 +487,6 @@ template<int S, int NFIELDS, typename real=double>
 void cuda_spat_to_SH(shtns_cfg shtns, real* d_Vr, std::complex<real>* d_Qlm, const long int llim, int spat_dist = 0)
 {
     int mmax = shtns->mmax;
-    const int mres = shtns->mres;
     if (spat_dist == 0) spat_dist = shtns->spat_stride;
     for (int f=0; f<NFIELDS; f++) spat_to_fourier_gpu(shtns, d_Vr + f*spat_dist, mmax);
     ilegendre<S, NFIELDS,real>(shtns, d_Vr, (real*) d_Qlm, llim, spat_dist);
