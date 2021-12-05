@@ -3172,7 +3172,7 @@ SWIGINTERN PyObject *shtns_info_st_dt_matrix(struct shtns_info *self){
 	}
 SWIGINTERN void shtns_info___spat_shape(struct shtns_info *self,int *dim0,int *dim1){
 		*dim0 = self->nphi;	*dim1 = self->nlat;
-		if (self->fftc_mode == 1) {	// phi-contiguous
+		if (self->layout & (256*2)) {	// phi-contiguous
 			*dim0 = self->nlat;		*dim1 = self->nphi;
 		}
 	}
@@ -7064,6 +7064,7 @@ SWIG_init(void) {
   PyDict_SetItemString(md, "cvar", globals);
   Py_DECREF(globals);
   SWIG_addvarlink(globals, "__version__", Swig_var___version___get, Swig_var___version___set);
+  SWIG_Python_SetConstant(d, "SHTNS_INTERFACE",SWIG_From_int((int)(0x30500)));
   SWIG_Python_SetConstant(d, "sht_orthonormal",SWIG_From_int((int)(sht_orthonormal)));
   SWIG_Python_SetConstant(d, "sht_fourpi",SWIG_From_int((int)(sht_fourpi)));
   SWIG_Python_SetConstant(d, "sht_schmidt",SWIG_From_int((int)(sht_schmidt)));

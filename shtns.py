@@ -66,6 +66,8 @@ class _SwigNonDynamicMeta(type):
 
 import numpy as np
 
+SHTNS_INTERFACE = _shtns.SHTNS_INTERFACE
+
 sht_orthonormal = _shtns.sht_orthonormal
 
 sht_fourpi = _shtns.sht_fourpi
