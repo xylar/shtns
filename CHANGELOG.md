@@ -1,6 +1,10 @@
 SHTNS CHANGE LOG:
 -----------------
 
+* v3.5.1  (6 Dec 2021)
+	- Fix python interface to also support odd nlat
+	- Fix compilation for GPU (cuda).
+
 * v3.5  (26 Oct 2021)
 	- Rotations now support all normalizations; older pseudo-spectral rotations are deprected.
 	- Python interface for rotations.
