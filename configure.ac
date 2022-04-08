@@ -218,11 +218,13 @@ libname=$target		# set the libname befor checking for python.
 AS_IF([test "x$enable_mkl" == "xyes"], [
   mkl_found=no
   AX_CHECK_COMPILE_FLAG([-mkl], [
+	LIBS_bak="$LIBS"
+	LIBS="-mkl $LIBS"	# easy way, for intel compiler !
 	AC_CHECK_FUNC(fftw_plan_many_dft, [
 	    AC_MSG_NOTICE(["FFTW interface found in MKL, link with -mkl"])
-	    LIBS="-mkl $LIBS"	# easy way, for intel compiler !
 	    mkl_found=yes
 	],[
+	    LIBS="$LIBS_bak"
 	    AC_MSG_NOTICE(["FFTW interface not found in MKL libraries (-mkl)."])
 	])
   ])
