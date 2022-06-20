@@ -1,6 +1,10 @@
 SHTNS CHANGE LOG:
 -----------------
 
+* v3.5.2  (20 Jun 2022)
+	- Fix major bug, leading to rare NaNs in transforms. Results were either NaN, or good.
+	- Fix intel MKL detection, wich was failing with newer gcc versions.
+
 * v3.5.1  (6 Dec 2021)
 	- Fix python interface to also support odd nlat
 	- Fix compilation for GPU (cuda).
