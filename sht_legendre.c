@@ -618,6 +618,7 @@ void legendre_precomp(shtns_cfg shtns, enum shtns_norm norm, int with_cs_phase, 
 		const long n_alloc = (norm == sht_schmidt) ? 8 : 5;
 		clm = (double *) malloc( n_alloc*nlm0/2 * sizeof(double) );	// a_lm, b_lm
 		if (clm==0) shtns_runerr("not enough memory.");
+		memset(clm, 0, n_alloc*nlm0/2 * sizeof(double) );	// fill with zeros, because some values will not be set otherwise
 		xlm = clm + nlm0;
 		shtns->clm = clm;
 		shtns->xlm = xlm;
